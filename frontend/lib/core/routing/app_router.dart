@@ -103,8 +103,10 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen());
       case Routes.pdfReader: {
         final args = settings.arguments as PdfReaderArgs?;
-        if (args == null) return MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen());
-        return MaterialPageRoute(builder: (_) => PdfReaderScreen(assetPath: args.assetPath, title: args.title));
+        if (args == null) {
+          return MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen());
+        }
+        return MaterialPageRoute(builder: (_) => PdfReaderScreen(doc: args.document));
       }
 
       case Routes.authLogin:
