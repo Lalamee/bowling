@@ -28,6 +28,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   late MechanicProfile profile;
   bool _isLoading = true;
   bool _hasError = false;
+  bool _hasCachedProfile = false;
 
   @override
   void initState() {
@@ -59,7 +60,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     try {
       if (mounted) {
         setState(() {
-          _isLoading = true;
+          _isLoading = !_hasCachedProfile;
           _hasError = false;
         });
       }
@@ -68,8 +69,11 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       if (me == null) {
         setState(() {
           _isLoading = false;
-          _hasError = true;
+          _hasError = !_hasCachedProfile;
         });
+        if (_hasCachedProfile) {
+          _showLoadError();
+        }
         return;
       }
       final cache = _mapApiToCache(me);
@@ -81,10 +85,21 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _hasError = true;
+          _hasError = !_hasCachedProfile;
         });
+        if (_hasCachedProfile) {
+          _showLoadError();
+        }
       }
     }
+  }
+
+  void _showLoadError() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Не удалось обновить профиль, отображены сохранённые данные'),
+      ),
+    );
   }
 
   Map<String, dynamic> _mapApiToCache(Map<String, dynamic> me) {
@@ -101,9 +116,14 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     String? status;
     String? clubName;
     String? address;
+    String? fullName;
 
     if (profileData is Map) {
       final map = Map<String, dynamic>.from(profileData);
+      final profileFullName = _asString(map['fullName']);
+      if (profileFullName != null) {
+        fullName = profileFullName;
+      }
       final workPlaces = map['workPlaces'];
       if (workPlaces is String) {
         clubs.addAll(workPlaces
@@ -158,12 +178,12 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     }
 
     return {
-      'fullName': _asString(me['fullName']) ?? _asString(me['phone']) ?? profile.fullName,
+      'fullName': fullName ?? _asString(me['fullName']) ?? profile.fullName,
       'phone': _asString(me['phone']) ?? profile.phone,
       'status': status ?? profile.status,
       'clubs': clubs,
       'clubName': clubName ?? (clubs.isNotEmpty ? clubs.first : profile.clubName),
-      'address': address ?? (clubs.isNotEmpty ? clubs.first : profile.address),
+      'address': address ?? profile.address,
       'birthDate': birthDate?.toIso8601String(),
       'workplaceVerified': workplaceVerified ?? profile.workplaceVerified,
     };
@@ -195,7 +215,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         fullName: _asString(raw['fullName']) ?? profile.fullName,
         phone: _asString(raw['phone']) ?? profile.phone,
         clubName: _asString(raw['clubName']) ?? (clubs.isNotEmpty ? clubs.first : profile.clubName),
-        address: _asString(raw['address']) ?? (clubs.isNotEmpty ? clubs.first : profile.address),
+        address: _asString(raw['address']) ?? profile.address,
         status: _asString(raw['status']) ?? profile.status,
         clubs: clubs.isNotEmpty ? clubs : null,
         workplaceVerified: raw['workplaceVerified'] as bool? ?? profile.workplaceVerified,
@@ -203,6 +223,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       );
       _isLoading = false;
       _hasError = false;
+      _hasCachedProfile = true;
     });
   }
 
@@ -216,6 +237,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
 
   Future<void> _logout() async {
     await AuthService.logout();
+    await LocalAuthStorage.clearMechanicState();
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
   }
