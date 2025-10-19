@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/repositories/worklogs_repository.dart';
 import '../../../../models/work_log_dto.dart';
+import '../../../../models/work_log_search_dto.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../core/utils/bottom_nav.dart';
@@ -16,7 +17,7 @@ class WorkLogsScreen extends StatefulWidget {
 
 class _WorkLogsScreenState extends State<WorkLogsScreen> {
   final _repo = WorklogsRepository();
-  List<dynamic> workLogs = [];
+  List<WorkLogDto> workLogs = [];
   bool isLoading = true;
 
   @override
@@ -28,10 +29,10 @@ class _WorkLogsScreenState extends State<WorkLogsScreen> {
   Future<void> _loadWorkLogs() async {
     setState(() => isLoading = true);
     try {
-      final data = await _repo.search({});
+      final page = await _repo.search(WorkLogSearchDto());
       if (mounted) {
         setState(() {
-          workLogs = data;
+          workLogs = page.content;
           isLoading = false;
         });
       }
@@ -95,20 +96,18 @@ class _WorkLogsScreenState extends State<WorkLogsScreen> {
 }
 
 class _WorkLogCard extends StatelessWidget {
-  final dynamic workLog;
+  final WorkLogDto workLog;
 
   const _WorkLogCard({required this.workLog});
 
   @override
   Widget build(BuildContext context) {
-    final logId = workLog is Map ? workLog['logId'] : null;
-    final status = workLog is Map ? workLog['status'] ?? 'UNKNOWN' : 'UNKNOWN';
-    final problemDescription = workLog is Map ? workLog['problemDescription'] ?? '' : '';
-    final clubName = workLog is Map ? workLog['clubName'] : null;
-    final mechanicName = workLog is Map ? workLog['mechanicName'] : null;
-    final createdDate = workLog is Map && workLog['createdDate'] != null
-        ? DateTime.tryParse(workLog['createdDate'].toString())
-        : null;
+    final logId = workLog.logId;
+    final status = workLog.status;
+    final problemDescription = workLog.problemDescription;
+    final clubName = workLog.clubName;
+    final mechanicName = workLog.mechanicName;
+    final createdDate = workLog.createdDate;
 
     return Container(
       decoration: BoxDecoration(
@@ -226,12 +225,20 @@ class _WorkLogCard extends StatelessWidget {
 
   String _getStatusText(String status) {
     switch (status) {
-      case 'DRAFT':
-        return 'Черновик';
+      case 'CREATED':
+        return 'Создано';
+      case 'ASSIGNED':
+        return 'Назначено';
       case 'IN_PROGRESS':
         return 'В работе';
+      case 'ON_HOLD':
+        return 'На паузе';
       case 'COMPLETED':
         return 'Завершено';
+      case 'VERIFIED':
+        return 'Проверено';
+      case 'CLOSED':
+        return 'Закрыто';
       case 'CANCELLED':
         return 'Отменено';
       default:
@@ -243,11 +250,19 @@ class _WorkLogCard extends StatelessWidget {
     switch (status) {
       case 'COMPLETED':
         return Colors.green;
+      case 'VERIFIED':
+        return Colors.blue;
+      case 'CLOSED':
+        return Colors.blueGrey;
       case 'CANCELLED':
         return Colors.red;
       case 'IN_PROGRESS':
         return AppColors.primary;
-      case 'DRAFT':
+      case 'ASSIGNED':
+        return Colors.orange;
+      case 'ON_HOLD':
+        return Colors.deepPurple;
+      case 'CREATED':
         return AppColors.darkGray;
       default:
         return AppColors.darkGray;

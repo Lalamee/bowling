@@ -87,22 +87,30 @@ public class MaintenanceRequestService {
 		return convertToResponseDTO(savedRequest, requestParts);
 	}
 
-	@Transactional(readOnly = true)
-	public List<MaintenanceRequestResponseDTO> getAllRequests() {
-		List<MaintenanceRequest> requests = maintenanceRequestRepository.findAllByOrderByRequestDateDesc();
-		return requests.stream()
-				.map(request -> {
-					List<RequestPart> parts = requestPartRepository.findByRequestRequestId(request.getRequestId());
-					return convertToResponseDTO(request, parts);
-				})
-				.collect(Collectors.toList());
-	}
+        @Transactional(readOnly = true)
+        public List<MaintenanceRequestResponseDTO> getAllRequests() {
+                List<MaintenanceRequest> requests = maintenanceRequestRepository.findAllByOrderByRequestDateDesc();
+                return requests.stream()
+                                .map(request -> {
+                                        List<RequestPart> parts = requestPartRepository.findByRequestRequestId(request.getRequestId());
+                                        return convertToResponseDTO(request, parts);
+                                })
+                                .collect(Collectors.toList());
+        }
 
-	@Transactional(readOnly = true)
-	public List<MaintenanceRequestResponseDTO> getRequestsByStatus(String status) {
-		MaintenanceRequestStatus st;
-		try {
-			st = MaintenanceRequestStatus.valueOf(status);
+        @Transactional(readOnly = true)
+        public MaintenanceRequestResponseDTO getRequestById(Long requestId) {
+                MaintenanceRequest request = maintenanceRequestRepository.findById(requestId)
+                                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+                List<RequestPart> parts = requestPartRepository.findByRequestRequestId(requestId);
+                return convertToResponseDTO(request, parts);
+        }
+
+        @Transactional(readOnly = true)
+        public List<MaintenanceRequestResponseDTO> getRequestsByStatus(String status) {
+                MaintenanceRequestStatus st;
+                try {
+                        st = MaintenanceRequestStatus.valueOf(status);
 		} catch (IllegalArgumentException ex) {
 			throw new IllegalArgumentException("Unknown status: " + status);
 		}
@@ -315,36 +323,50 @@ public class MaintenanceRequestService {
 		return convertToResponseDTO(req, parts);
 	}
 
-	private MaintenanceRequestResponseDTO convertToResponseDTO(MaintenanceRequest request, List<RequestPart> parts) {
-		List<MaintenanceRequestResponseDTO.RequestPartResponseDTO> partDTOs = parts.stream()
-				.map(part -> MaintenanceRequestResponseDTO.RequestPartResponseDTO.builder()
-						.partId(part.getPartId())
-						.catalogNumber(part.getCatalogNumber())
-						.partName(part.getPartName())
-						.quantity(part.getQuantity())
-						.status(part.getStatus() != null ? part.getStatus().name() : null)
-						.rejectionReason(part.getRejectionReason())
-						.supplierId(part.getSupplierId())
-						.orderDate(part.getOrderDate())
-						.deliveryDate(part.getDeliveryDate())
-						.issueDate(part.getIssueDate())
-						.build())
-				.collect(Collectors.toList());
+        private MaintenanceRequestResponseDTO convertToResponseDTO(MaintenanceRequest request, List<RequestPart> parts) {
+                BowlingClub club = request.getClub();
+                Long clubId = club != null ? club.getClubId() : null;
+                String clubName = club != null ? club.getName() : null;
 
-		return MaintenanceRequestResponseDTO.builder()
-				.requestId(request.getRequestId())
-				.clubId(request.getClub().getClubId())
-				.clubName(request.getClub().getName())
-				.laneNumber(request.getLaneNumber())
-				.mechanicId(request.getMechanic().getProfileId())
-				.mechanicName(request.getMechanic().getFullName())
-				.requestDate(request.getRequestDate())
-				.completionDate(request.getCompletionDate())
-				.status(request.getStatus() != null ? request.getStatus().name() : null)
-				.managerNotes(request.getManagerNotes())
-				.managerDecisionDate(request.getManagerDecisionDate())
-				.verificationStatus(request.getVerificationStatus())
-				.requestedParts(partDTOs)
-				.build();
-	}
+                MechanicProfile mechanic = request.getMechanic();
+                Long mechanicId = mechanic != null ? mechanic.getProfileId() : null;
+                String mechanicName = mechanic != null ? mechanic.getFullName() : null;
+
+                List<MaintenanceRequestResponseDTO.RequestPartResponseDTO> partDTOs = parts.stream()
+                                .map(part -> {
+                                        Supplier supplier = Optional.ofNullable(part.getPurchaseOrder())
+                                                        .map(PurchaseOrder::getSupplier)
+                                                        .orElse(null);
+                                        return MaintenanceRequestResponseDTO.RequestPartResponseDTO.builder()
+                                                        .partId(part.getPartId())
+                                                        .catalogNumber(part.getCatalogNumber())
+                                                        .partName(part.getPartName())
+                                                        .quantity(part.getQuantity())
+                                                        .status(part.getStatus() != null ? part.getStatus().name() : null)
+                                                        .rejectionReason(part.getRejectionReason())
+                                                        .supplierId(part.getSupplierId())
+                                                        .supplierName(supplier != null ? supplier.getLegalName() : null)
+                                                        .orderDate(part.getOrderDate())
+                                                        .deliveryDate(part.getDeliveryDate())
+                                                        .issueDate(part.getIssueDate())
+                                                        .build();
+                                })
+                                .collect(Collectors.toList());
+
+                return MaintenanceRequestResponseDTO.builder()
+                                .requestId(request.getRequestId())
+                                .clubId(clubId)
+                                .clubName(clubName)
+                                .laneNumber(request.getLaneNumber())
+                                .mechanicId(mechanicId)
+                                .mechanicName(mechanicName)
+                                .requestDate(request.getRequestDate())
+                                .completionDate(request.getCompletionDate())
+                                .status(request.getStatus() != null ? request.getStatus().name() : null)
+                                .managerNotes(request.getManagerNotes())
+                                .managerDecisionDate(request.getManagerDecisionDate())
+                                .verificationStatus(request.getVerificationStatus())
+                                .requestedParts(partDTOs)
+                                .build();
+        }
 }

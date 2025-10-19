@@ -1,53 +1,45 @@
 class OrderPartsRequestDto {
   final String? notes;
-  final List<OrderedPartDto>? parts;
+  final List<OrderPartItemDto> items;
 
   OrderPartsRequestDto({
     this.notes,
-    this.parts,
+    required this.items,
   });
 
   Map<String, dynamic> toJson() {
     return {
-      if (notes != null) 'notes': notes,
-      if (parts != null) 'parts': parts!.map((p) => p.toJson()).toList(),
+      'items': items.map((p) => p.toJson()).toList(),
+      if (notes != null && notes!.isNotEmpty) 'notes': notes,
     };
   }
 
   factory OrderPartsRequestDto.fromJson(Map<String, dynamic> json) {
     return OrderPartsRequestDto(
-      notes: json['notes'],
-      parts: json['parts'] != null
-          ? (json['parts'] as List).map((p) => OrderedPartDto.fromJson(p)).toList()
-          : null,
+      notes: json['notes'] as String?,
+      items: (json['items'] as List? ?? [])
+          .map((p) => OrderPartItemDto.fromJson(Map<String, dynamic>.from(p as Map)))
+          .toList(),
     );
   }
 }
 
-class OrderedPartDto {
-  final String catalogNumber;
-  final int quantity;
-  final String? notes;
+class OrderPartItemDto {
+  final int partId;
+  final int supplierId;
 
-  OrderedPartDto({
-    required this.catalogNumber,
-    required this.quantity,
-    this.notes,
+  OrderPartItemDto({
+    required this.partId,
+    required this.supplierId,
   });
 
-  Map<String, dynamic> toJson() {
-    return {
-      'catalogNumber': catalogNumber,
-      'quantity': quantity,
-      if (notes != null) 'notes': notes,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+        'partId': partId,
+        'supplierId': supplierId,
+      };
 
-  factory OrderedPartDto.fromJson(Map<String, dynamic> json) {
-    return OrderedPartDto(
-      catalogNumber: json['catalogNumber'],
-      quantity: json['quantity'],
-      notes: json['notes'],
-    );
-  }
+  factory OrderPartItemDto.fromJson(Map<String, dynamic> json) => OrderPartItemDto(
+        partId: (json['partId'] as num).toInt(),
+        supplierId: (json['supplierId'] as num).toInt(),
+      );
 }

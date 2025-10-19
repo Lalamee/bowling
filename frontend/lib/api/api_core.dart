@@ -46,14 +46,42 @@ class ApiCore {
             try {
               final r = await dio.post('/api/auth/refresh', data: {'refreshToken': refresh});
               final data = r.data;
-              final newToken = (data is Map && data['accessToken'] != null) ? data['accessToken'].toString() : null;
-              if (newToken != null) {
-                await storage.write(key: 'jwt_token', value: newToken);
+              String? newAccessToken;
+              String? newRefreshToken;
+              if (data is Map) {
+                final access = data['accessToken'];
+                final refreshValue = data['refreshToken'];
+                newAccessToken = access?.toString();
+                newRefreshToken = refreshValue?.toString();
+              }
+              if (newAccessToken != null) {
+                final headers = Map<String, dynamic>.from(reqOptions.headers);
+                headers['x-retried'] = true;
+                headers['Authorization'] = 'Bearer $newAccessToken';
+
+                await storage.write(key: 'jwt_token', value: newAccessToken);
+                if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
+                  await storage.write(key: 'refresh_token', value: newRefreshToken);
+                }
+
                 final opts = Options(
                   method: reqOptions.method,
-                  headers: Map<String, dynamic>.from(reqOptions.headers)..['x-retried']=true..['Authorization']='Bearer $newToken',
+                  headers: headers,
+                  contentType: reqOptions.contentType,
+                  responseType: reqOptions.responseType,
+                  sendTimeout: reqOptions.sendTimeout,
+                  receiveTimeout: reqOptions.receiveTimeout,
                 );
-                final newRes = await dio.request(reqOptions.path, data: reqOptions.data, queryParameters: reqOptions.queryParameters, options: opts);
+
+                final newRes = await dio.request(
+                  reqOptions.path,
+                  data: reqOptions.data,
+                  queryParameters: reqOptions.queryParameters,
+                  options: opts,
+                  cancelToken: reqOptions.cancelToken,
+                  onSendProgress: reqOptions.onSendProgress,
+                  onReceiveProgress: reqOptions.onReceiveProgress,
+                );
                 return handler.resolve(newRes);
               }
             } catch (_) {

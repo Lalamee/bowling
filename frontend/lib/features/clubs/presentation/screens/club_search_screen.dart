@@ -3,6 +3,7 @@ import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/inputs/adaptive_text.dart';
 import '../../../../core/repositories/parts_repository.dart';
 import '../../../../core/utils/net_ui.dart';
+import '../../../../models/parts_catalog_response_dto.dart';
 
 class ClubSearchScreen extends StatefulWidget {
   final String query;
@@ -15,7 +16,7 @@ class ClubSearchScreen extends StatefulWidget {
 class _ClubSearchScreenState extends State<ClubSearchScreen> {
   final _ctrl = TextEditingController();
   final _repo = PartsRepository();
-  List<dynamic> _parts = [];
+  List<PartsCatalogResponseDto> _parts = [];
   bool _isLoading = false;
 
   @override
@@ -69,9 +70,8 @@ class _ClubSearchScreenState extends State<ClubSearchScreen> {
 
   List<String> get _filtered {
     return _parts
-        .map((p) => (p is Map ? (p['partName'] ?? p['name'] ?? '') : p.toString()))
-        .where((s) => s.isNotEmpty)
-        .cast<String>()
+        .map((p) => p.commonName ?? p.officialNameRu ?? p.officialNameEn ?? p.catalogNumber)
+        .where((s) => s.trim().isNotEmpty)
         .toList();
   }
 
