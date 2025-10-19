@@ -141,6 +141,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       places.add(_currentClub.text.trim());
     }
 
+    final trimmedStatus = status?.trim();
+
     final data = {
       'fio': _fio.text.trim(),
       'birth': DateFormat('yyyy-MM-dd').format(birthDate!),
@@ -155,24 +157,19 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'currentClub': _currentClub.text.trim(),
       'bowlingHistory': _bowlingHistory.text.trim(),
       'skills': _skills.text.trim(),
-      'status': status,
+      'status': trimmedStatus ?? status,
       'workPlaces': places.join(', '),
       'workPeriods': periods.join(', '),
     };
 
     final success = await AuthService.registerMechanic(data);
-    if (success) {
-      await LocalAuthStorage.setMechanicRegistered(true);
-      if (!mounted) return;
-      Navigator.of(context).pushNamedAndRemoveUntil(Routes.profileMechanic, (route) => false);
-    } else {
+    if (!success) {
       _showBar('Ошибка при отправке данных');
       return;
     }
 
     final trimmedPhone = _phone.text.trim();
     final trimmedClub = _currentClub.text.trim();
-    final trimmedStatus = status?.trim();
     final clubsCache = List<String>.from(places);
     if (clubsCache.isEmpty && trimmedClub.isNotEmpty) {
       clubsCache.add(trimmedClub);

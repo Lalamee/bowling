@@ -1,16 +1,18 @@
 import 'dart:developer';
 
-import '../../../../../core/repositories/user_repository.dart';
 import 'package:flutter/material.dart';
-import '../../../../../core/theme/colors.dart';
-import '../../../../../shared/widgets/tiles/profile_tile.dart';
-import '../../domain/mechanic_profile.dart';
-import 'edit_mechanic_profile_screen.dart';
-import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
-import '../../../../../core/utils/bottom_nav.dart';
-import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
+
+import '../../../../../core/repositories/user_repository.dart';
 import '../../../../../core/routing/routes.dart';
 import '../../../../../core/services/auth_service.dart';
+import '../../../../../core/services/local_auth_storage.dart';
+import '../../../../../core/theme/colors.dart';
+import '../../../../../core/utils/bottom_nav.dart';
+import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
+import '../../../../../shared/widgets/tiles/profile_tile.dart';
+import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
+import '../../domain/mechanic_profile.dart';
+import 'edit_mechanic_profile_screen.dart';
 
 enum EditFocus { none, name, phone, address }
 
@@ -27,22 +29,22 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   bool _isLoading = true;
   bool _hasError = false;
 
-//   @override
-//   void initState() {
-//     super.initState();
-//     profile = MechanicProfile(
-//       fullName: 'Механик Иван Иванович',
-//       phone: '+7 (980) 001-01-01',
-//       clubName: 'Боулинг клуб "Кегли"',
-//       clubs: ['Боулинг клуб "Кегли"'],
-//       address: 'г. Воронеж, ул. Тверская, д. 45',
-//       workplaceVerified: false,
-//       birthDate: DateTime(1989, 2, 24),
-//       status: 'Самозанятый',
-//     );
-//     _loadLocalProfile();
-//     _load();
-//   }
+  @override
+  void initState() {
+    super.initState();
+    profile = MechanicProfile(
+      fullName: 'Механик Иван Иванович',
+      phone: '+7 (980) 001-01-01',
+      clubName: 'Боулинг клуб "Кегли"',
+      clubs: const ['Боулинг клуб "Кегли"'],
+      address: 'г. Воронеж, ул. Тверская, д. 45',
+      workplaceVerified: false,
+      birthDate: DateTime(1989, 2, 24),
+      status: 'Самозанятый',
+    );
+    _loadLocalProfile();
+    _load();
+  }
 
   Future<void> _loadLocalProfile() async {
     final stored = await LocalAuthStorage.loadMechanicProfile();
@@ -318,44 +320,6 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                     ProfileTile(icon: Icons.exit_to_app_rounded, text: 'Выход', danger: true, onTap: _logout),
                   ],
                 ),
-                const SizedBox(width: 12),
-                const Text('Статус:', style: TextStyle(fontSize: 14, color: AppColors.darkGray)),
-                const SizedBox(width: 8),
-                Expanded(child: Text(profile.status, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          ProfileTile(
-            icon: Icons.menu_book_rounded,
-            text: 'База знаний',
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen())),
-          ),
-          const SizedBox(height: 10),
-          ...List.generate(profile.clubs.length, (i) {
-            final club = profile.clubs[i];
-            return Padding(
-              padding: EdgeInsets.only(bottom: i == profile.clubs.length - 1 ? 0 : 10),
-              child: ProfileTile(
-                icon: Icons.location_searching_rounded,
-                text: club,
-                showAlertBadge: !profile.workplaceVerified && i == 0,
-                onTap: () => _openEdit(EditFocus.none),
-              ),
-            );
-          }),
-          const SizedBox(height: 10),
-          ProfileTile(icon: Icons.location_on_rounded, text: profile.address, onEdit: () => _openEdit(EditFocus.address)),
-          const SizedBox(height: 10),
-          ProfileTile(icon: Icons.history_rounded, text: 'История заказов', onTap: () => Navigator.pushNamed(context, Routes.ordersPersonalHistory)),
-          const SizedBox(height: 10),
-          ProfileTile(icon: Icons.notifications_active_outlined, text: 'Оповещения', onTap: () {}),
-          const SizedBox(height: 10),
-          ProfileTile(icon: Icons.star_border_rounded, text: 'Избранные заказы/детали', onTap: () {}),
-          const SizedBox(height: 10),
-          ProfileTile(icon: Icons.exit_to_app_rounded, text: 'Выход', danger: true, onTap: _logout),
-        ],
-      ),
       bottomNavigationBar: AppBottomNav(
         currentIndex: 3,
         onTap: (i) => BottomNavDirect.go(context, 3, i),
