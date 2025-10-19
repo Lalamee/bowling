@@ -66,7 +66,7 @@ class AppRouter {
 
       case Routes.orders:
         return MaterialPageRoute(builder: (_) => const OrdersScreen());
-      case Routes.orderSummary: {
+      case Routes.orderSummary:
         final args = settings.arguments as OrderSummaryArgs?;
         if (args == null) {
           return MaterialPageRoute(builder: (_) => const OrdersScreen());
@@ -77,7 +77,6 @@ class AppRouter {
             orderNumber: args.orderNumber,
           ),
         );
-      }
 
       case Routes.club:
         return MaterialPageRoute(builder: (_) => const ClubScreen());
