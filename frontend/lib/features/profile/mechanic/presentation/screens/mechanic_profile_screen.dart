@@ -78,6 +78,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       }
       final cache = _mapApiToCache(me);
       await LocalAuthStorage.saveMechanicProfile(cache);
+      await LocalAuthStorage.setMechanicRegistered(true);
       if (!mounted) return;
       _applyProfile(cache);
     } catch (e, s) {

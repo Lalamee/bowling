@@ -178,8 +178,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     final profileData = {
       'fullName': _fio.text.trim(),
       'phone': trimmedPhone,
-      'clubName': clubsCache.isNotEmpty ? clubsCache.first : trimmedClub,
-      'address': clubsCache.isNotEmpty ? clubsCache.first : trimmedClub,
+      'clubName': resolvedClubName,
+      'address': resolvedClubAddress ?? '',
       'status': trimmedStatus ?? 'Самозанятый',
       'birthDate': birthDate?.toIso8601String(),
       'clubs': clubsCache,
