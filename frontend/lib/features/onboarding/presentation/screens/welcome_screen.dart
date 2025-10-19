@@ -39,13 +39,22 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     setState(() => _canEnter = registered || cached != null);
   }
 
-  void _enter() {
+  Future<void> _enter() async {
     if (TestOverrides.useLoginScreen) {
       Navigator.pushReplacementNamed(context, Routes.authLogin);
       return;
     }
-    if (!_canEnter) {
-      return;
+    var canEnter = _canEnter;
+    if (!canEnter) {
+      final registered = await LocalAuthStorage.isMechanicRegistered();
+      final cached = await LocalAuthStorage.loadMechanicProfile();
+      canEnter = registered || cached != null;
+      if (mounted && canEnter != _canEnter) {
+        setState(() => _canEnter = canEnter);
+      }
+      if (!canEnter) {
+        return;
+      }
     }
     final role = TestOverrides.userRole.toLowerCase();
     if (role == 'owner') {
@@ -86,7 +95,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _enter,
+                  onPressed: () => _enter(),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.white,

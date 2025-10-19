@@ -29,6 +29,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   bool _isLoading = true;
   bool _hasError = false;
   bool _hasCachedProfile = false;
+  Map<String, dynamic>? _cachedRawProfile;
 
   @override
   void initState() {
@@ -43,8 +44,13 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       birthDate: DateTime(1989, 2, 24),
       status: 'Самозанятый',
     );
-    _loadLocalProfile();
-    _load();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _loadLocalProfile();
+    if (!mounted) return;
+    await _load();
   }
 
   Future<void> _loadLocalProfile() async {
@@ -178,54 +184,187 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       }
     }
 
-    return {
-      'fullName': fullName ?? _asString(me['fullName']) ?? profile.fullName,
-      'phone': _asString(me['phone']) ?? profile.phone,
-      'status': status ?? profile.status,
+    final raw = {
+      'fullName': fullName ?? _asString(me['fullName']),
+      'phone': _asString(me['phone']),
+      'status': status,
       'clubs': clubs,
-      'clubName': clubName ?? (clubs.isNotEmpty ? clubs.first : profile.clubName),
-      'address': address ?? profile.address,
+      'clubName': clubName,
+      'address': address,
       'birthDate': birthDate?.toIso8601String(),
-      'workplaceVerified': workplaceVerified ?? profile.workplaceVerified,
+      'workplaceVerified': workplaceVerified,
     };
+
+    return _normalizeProfileData(raw);
   }
 
   void _applyProfile(Map<String, dynamic> raw) {
-    String? _asString(dynamic value) {
-      if (value == null) return null;
-      final str = value.toString().trim();
-      return str.isEmpty ? null : str;
-    }
+    final normalized = _normalizeProfileData(raw);
+    final birthIso = normalized['birthDate'] as String?;
+    final birthDate = birthIso != null ? DateTime.tryParse(birthIso) : null;
 
-    final clubs = <String>[];
-    final rawClubs = raw['clubs'];
-    if (rawClubs is Iterable) {
-      clubs.addAll(rawClubs.map((e) => e.toString().trim()).where((e) => e.isNotEmpty));
-    } else if (rawClubs is String && rawClubs.isNotEmpty) {
-      clubs.addAll(rawClubs.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty));
-    }
-
-    final birthRaw = raw['birthDate'];
-    DateTime? birthDate;
-    if (birthRaw is String && birthRaw.isNotEmpty) {
-      birthDate = DateTime.tryParse(birthRaw);
-    }
+    final clubs = (normalized['clubs'] as List?)?.map((e) => e.toString()).toList() ?? const <String>[];
 
     setState(() {
       profile = profile.copyWith(
-        fullName: _asString(raw['fullName']) ?? profile.fullName,
-        phone: _asString(raw['phone']) ?? profile.phone,
-        clubName: _asString(raw['clubName']) ?? (clubs.isNotEmpty ? clubs.first : profile.clubName),
-        address: _asString(raw['address']) ?? profile.address,
-        status: _asString(raw['status']) ?? profile.status,
+        fullName: normalized['fullName'] as String? ?? profile.fullName,
+        phone: normalized['phone'] as String? ?? profile.phone,
+        clubName: normalized['clubName'] as String? ?? profile.clubName,
+        address: normalized['address'] as String? ?? profile.address,
+        status: normalized['status'] as String? ?? profile.status,
         clubs: clubs.isNotEmpty ? clubs : null,
-        workplaceVerified: raw['workplaceVerified'] as bool? ?? profile.workplaceVerified,
+        workplaceVerified: normalized['workplaceVerified'] as bool? ?? profile.workplaceVerified,
         birthDate: birthDate ?? profile.birthDate,
       );
       _isLoading = false;
       _hasError = false;
       _hasCachedProfile = true;
     });
+    _cachedRawProfile = {
+      ...normalized,
+      'clubs': List<String>.from(clubs.isNotEmpty ? clubs : profile.clubs),
+    };
+  }
+
+  Map<String, dynamic> _normalizeProfileData(Map<String, dynamic> raw) {
+    String? _asString(dynamic value) {
+      if (value == null) return null;
+      final str = value.toString().trim();
+      return str.isEmpty ? null : str;
+    }
+
+    Iterable<String> _extractClubs(dynamic value) {
+      if (value is Iterable) {
+        return value.map((e) => e.toString().trim()).where((e) => e.isNotEmpty);
+      }
+      if (value is String && value.isNotEmpty) {
+        return value.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty);
+      }
+      return const Iterable<String>.empty();
+    }
+
+    final previous = _cachedRawProfile;
+    final fallback = profile;
+
+    final resolvedPhone = _asString(raw['phone']) ?? _asString(previous?['phone']) ?? fallback.phone;
+
+    bool _looksLikePhone(String? value) {
+      if (value == null) return false;
+      final digits = value.replaceAll(RegExp(r'\D'), '');
+      final refDigits = resolvedPhone.replaceAll(RegExp(r'\D'), '');
+      if (digits.length < 5 || refDigits.length < 5) return false;
+      return digits == refDigits || digits.endsWith(refDigits) || refDigits.endsWith(digits);
+    }
+
+    String _resolveFullName() {
+      final candidate = _asString(raw['fullName']);
+      if (candidate != null && !_looksLikePhone(candidate)) {
+        return candidate;
+      }
+      final previousName = _asString(previous?['fullName']);
+      if (previousName != null && !_looksLikePhone(previousName)) {
+        return previousName;
+      }
+      final fallbackName = fallback.fullName.trim();
+      if (!_looksLikePhone(fallbackName)) {
+        return fallbackName;
+      }
+      return fallbackName;
+    }
+
+    final rawClubs = _extractClubs(raw['clubs']);
+    final previousClubs = _extractClubs(previous?['clubs']);
+    final fallbackClubs = fallback.clubs;
+
+    String _resolveClubName() {
+      final rawName = _asString(raw['clubName']);
+      if (rawName != null && rawName.isNotEmpty) {
+        return rawName;
+      }
+      if (rawClubs.isNotEmpty) {
+        return rawClubs.first;
+      }
+      final previousName = _asString(previous?['clubName']);
+      if (previousName != null && previousName.isNotEmpty) {
+        return previousName;
+      }
+      if (previousClubs.isNotEmpty) {
+        return previousClubs.first;
+      }
+      return fallback.clubName;
+    }
+
+    final resolvedClubName = _resolveClubName();
+
+    List<String> _mergeClubs() {
+      final result = <String>[];
+      final seen = <String>{};
+
+      void addValue(String? value, {bool prioritize = false}) {
+        final trimmed = value?.trim();
+        if (trimmed == null || trimmed.isEmpty) return;
+        if (seen.contains(trimmed)) {
+          if (prioritize) {
+            result.remove(trimmed);
+            result.insert(0, trimmed);
+          }
+          return;
+        }
+        if (prioritize) {
+          result.insert(0, trimmed);
+        } else {
+          result.add(trimmed);
+        }
+        seen.add(trimmed);
+      }
+
+      addValue(resolvedClubName, prioritize: true);
+      for (final value in rawClubs) {
+        addValue(value);
+      }
+      for (final value in previousClubs) {
+        addValue(value);
+      }
+      for (final value in fallbackClubs) {
+        addValue(value);
+      }
+      addValue(resolvedClubName, prioritize: true);
+      return result;
+    }
+
+    final mergedClubs = _mergeClubs();
+
+    DateTime? _parseDate(String? value) {
+      if (value == null || value.isEmpty) return null;
+      return DateTime.tryParse(value);
+    }
+
+    final resolvedBirth = _parseDate(_asString(raw['birthDate'])) ??
+        _parseDate(_asString(previous?['birthDate'])) ??
+        fallback.birthDate;
+
+    final resolvedAddress = _asString(raw['address']) ??
+        _asString(previous?['address']) ??
+        fallback.address;
+
+    final resolvedStatus = _asString(raw['status']) ??
+        _asString(previous?['status']) ??
+        fallback.status;
+
+    final resolvedVerified = (raw['workplaceVerified'] is bool)
+        ? raw['workplaceVerified'] as bool
+        : (previous?['workplaceVerified'] as bool?) ?? fallback.workplaceVerified;
+
+    return {
+      'fullName': _resolveFullName(),
+      'phone': resolvedPhone,
+      'status': resolvedStatus,
+      'clubs': mergedClubs,
+      'clubName': resolvedClubName,
+      'address': resolvedAddress,
+      'birthDate': resolvedBirth.toIso8601String(),
+      'workplaceVerified': resolvedVerified,
+    };
   }
 
   Future<void> _openEdit(EditFocus focus) async {

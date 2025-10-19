@@ -170,16 +170,92 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
 
     final trimmedPhone = _phone.text.trim();
     final trimmedClub = _currentClub.text.trim();
-    final clubsCache = List<String>.from(places);
-    if (clubsCache.isEmpty && trimmedClub.isNotEmpty) {
-      clubsCache.add(trimmedClub);
+
+    String resolvedClubName = trimmedClub;
+    String? resolvedClubAddress;
+
+    if (trimmedClub.contains('\n')) {
+      final parts = trimmedClub
+          .split(RegExp(r'[\r\n]+'))
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      if (parts.isNotEmpty) {
+        resolvedClubName = parts.first;
+        if (parts.length > 1) {
+          resolvedClubAddress = parts.sublist(1).join(', ');
+        }
+      }
+    }
+
+    if (resolvedClubAddress == null && trimmedClub.contains(',')) {
+      final index = trimmedClub.indexOf(',');
+      final first = trimmedClub.substring(0, index).trim();
+      final rest = trimmedClub.substring(index + 1).trim();
+      if (first.isNotEmpty) {
+        resolvedClubName = first;
+      }
+      if (rest.isNotEmpty) {
+        resolvedClubAddress = rest;
+      }
+    }
+
+    if (resolvedClubAddress == null) {
+      final dashMatch = RegExp(r'\s[—–-]\s').firstMatch(trimmedClub);
+      if (dashMatch != null) {
+        final index = dashMatch.start;
+        final first = trimmedClub.substring(0, index).trim();
+        final rest = trimmedClub.substring(dashMatch.end).trim();
+        if (first.isNotEmpty) {
+          resolvedClubName = first;
+        }
+        if (rest.isNotEmpty) {
+          resolvedClubAddress = rest;
+        }
+      }
+    }
+
+    final displayClubName = resolvedClubName.trim().isNotEmpty
+        ? resolvedClubName.trim()
+        : trimmedClub;
+    final displayAddress = () {
+      final addr = resolvedClubAddress?.trim();
+      if (addr != null && addr.isNotEmpty) {
+        return addr;
+      }
+      // если адрес распознать не удалось, сохраняем исходное значение,
+      // чтобы в профиле не показывался дефолтный адрес-заглушка
+      return trimmedClub;
+    }();
+
+    final clubsCache = <String>[];
+    void addClub(String? value) {
+      final trimmed = value?.trim();
+      if (trimmed == null || trimmed.isEmpty) return;
+      if (!clubsCache.contains(trimmed)) {
+        clubsCache.add(trimmed);
+      }
+    }
+
+    for (final place in places) {
+      addClub(place);
+    }
+    addClub(trimmedClub);
+    addClub(displayClubName);
+
+    if (displayClubName.isNotEmpty) {
+      clubsCache.remove(displayClubName);
+      clubsCache.insert(0, displayClubName);
+    }
+    if (clubsCache.isEmpty && displayClubName.isNotEmpty) {
+      clubsCache.add(displayClubName);
     }
 
     final profileData = {
       'fullName': _fio.text.trim(),
       'phone': trimmedPhone,
-      'clubName': resolvedClubName,
-      'address': resolvedClubAddress ?? '',
+      'clubName': displayClubName,
+      'address': displayAddress,
       'status': trimmedStatus ?? 'Самозанятый',
       'birthDate': birthDate?.toIso8601String(),
       'clubs': clubsCache,
