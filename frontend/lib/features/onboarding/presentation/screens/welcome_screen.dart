@@ -6,6 +6,7 @@ import '../../../../core/theme/colors.dart';
 
 import '../../../../../core/routing/routes.dart';
 import '../../../../../core/debug/test_overrides.dart';
+import '../../../../../core/services/local_auth_storage.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -16,11 +17,13 @@ class WelcomeScreen extends StatefulWidget {
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
   late final TapGestureRecognizer _policyRecognizer;
+  bool _canEnter = false;
 
   @override
   void initState() {
     super.initState();
     _policyRecognizer = TapGestureRecognizer()..onTap = () {};
+    _loadRegistrationStatus();
   }
 
   @override
@@ -29,9 +32,18 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     super.dispose();
   }
 
+  Future<void> _loadRegistrationStatus() async {
+    final registered = await LocalAuthStorage.isMechanicRegistered();
+    if (!mounted) return;
+    setState(() => _canEnter = registered);
+  }
+
   void _enter() {
     if (TestOverrides.useLoginScreen) {
       Navigator.pushReplacementNamed(context, Routes.authLogin);
+      return;
+    }
+    if (!_canEnter) {
       return;
     }
     final role = TestOverrides.userRole.toLowerCase();
