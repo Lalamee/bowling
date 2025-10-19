@@ -170,71 +170,9 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
 
     final trimmedPhone = _phone.text.trim();
     final trimmedClub = _currentClub.text.trim();
-
-    String resolvedClubName = trimmedClub;
-    String? resolvedClubAddress;
-
-    if (trimmedClub.contains('\n')) {
-      final parts = trimmedClub
-          .split(RegExp(r'[\r\n]+'))
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList();
-      if (parts.isNotEmpty) {
-        resolvedClubName = parts.first;
-        if (parts.length > 1) {
-          resolvedClubAddress = parts.sublist(1).join(', ');
-        }
-      }
-    }
-
-    if (resolvedClubAddress == null && trimmedClub.contains(',')) {
-      final index = trimmedClub.indexOf(',');
-      final first = trimmedClub.substring(0, index).trim();
-      final rest = trimmedClub.substring(index + 1).trim();
-      if (first.isNotEmpty) {
-        resolvedClubName = first;
-      }
-      if (rest.isNotEmpty) {
-        resolvedClubAddress = rest;
-      }
-    }
-
-    if (resolvedClubAddress == null) {
-      final dashMatch = RegExp(r'\s[—–-]\s').firstMatch(trimmedClub);
-      if (dashMatch != null) {
-        final index = dashMatch.start;
-        final first = trimmedClub.substring(0, index).trim();
-        final rest = trimmedClub.substring(dashMatch.end).trim();
-        if (first.isNotEmpty) {
-          resolvedClubName = first;
-        }
-        if (rest.isNotEmpty) {
-          resolvedClubAddress = rest;
-        }
-      }
-    }
-
-    resolvedClubAddress = resolvedClubAddress?.trim();
-
-    final clubsCache = <String>[];
-    void addClub(String? value) {
-      final trimmed = value?.trim();
-      if (trimmed == null || trimmed.isEmpty) return;
-      if (!clubsCache.contains(trimmed)) {
-        clubsCache.add(trimmed);
-      }
-    }
-
-    for (final place in places) {
-      addClub(place);
-    }
-    addClub(trimmedClub);
-    addClub(resolvedClubName);
-
-    if (resolvedClubName.isNotEmpty) {
-      clubsCache.remove(resolvedClubName);
-      clubsCache.insert(0, resolvedClubName);
+    final clubsCache = List<String>.from(places);
+    if (clubsCache.isEmpty && trimmedClub.isNotEmpty) {
+      clubsCache.add(trimmedClub);
     }
 
     final profileData = {

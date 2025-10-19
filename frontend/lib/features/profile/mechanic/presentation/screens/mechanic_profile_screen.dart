@@ -43,13 +43,8 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       birthDate: DateTime(1989, 2, 24),
       status: 'Самозанятый',
     );
-    _init();
-  }
-
-  Future<void> _init() async {
-    await _loadLocalProfile();
-    if (!mounted) return;
-    await _load();
+    _loadLocalProfile();
+    _load();
   }
 
   Future<void> _loadLocalProfile() async {
@@ -243,6 +238,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
 
   Future<void> _logout() async {
     await AuthService.logout();
+    await LocalAuthStorage.clearMechanicState();
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
   }
