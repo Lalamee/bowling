@@ -161,7 +161,11 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     };
 
     final success = await AuthService.registerMechanic(data);
-    if (!success) {
+    if (success) {
+      await LocalAuthStorage.setMechanicRegistered(true);
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil(Routes.profileMechanic, (route) => false);
+    } else {
       _showBar('Ошибка при отправке данных');
       return;
     }
