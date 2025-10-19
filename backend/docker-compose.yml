@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  bowling_manager-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8087:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://79.174.89.77:18037/${POSTGRES_DB:-Bowling_db}
+      SPRING_DATASOURCE_USERNAME: ${DATABASE_USERNAME:-BM_apps}
+      SPRING_DATASOURCE_PASSWORD: ${DATABASE_PASSWORD:-bfGO320n.s}
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-that-should-be-at-least-256-bits-long-for-security-please-change-in-production}
+      JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-3600000}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8081,http://localhost:5173,http://localhost:8080, http://10.0.2.2:8080, http://10.0.2.2:8081}
+    restart: unless-stopped
