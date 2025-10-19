@@ -377,6 +377,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
 
   Future<void> _logout() async {
     await AuthService.logout();
+    await LocalAuthStorage.clearMechanicState();
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
   }
