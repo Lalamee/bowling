@@ -141,6 +141,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       places.add(_currentClub.text.trim());
     }
 
+    final trimmedStatus = status?.trim();
+
     final data = {
       'fio': _fio.text.trim(),
       'birth': DateFormat('yyyy-MM-dd').format(birthDate!),
@@ -155,34 +157,91 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'currentClub': _currentClub.text.trim(),
       'bowlingHistory': _bowlingHistory.text.trim(),
       'skills': _skills.text.trim(),
-      'status': status,
+      'status': trimmedStatus ?? status,
       'workPlaces': places.join(', '),
       'workPeriods': periods.join(', '),
     };
 
     final success = await AuthService.registerMechanic(data);
-    if (success) {
-      await LocalAuthStorage.setMechanicRegistered(true);
-      if (!mounted) return;
-      Navigator.of(context).pushNamedAndRemoveUntil(Routes.profileMechanic, (route) => false);
-    } else {
+    if (!success) {
       _showBar('Ошибка при отправке данных');
       return;
     }
 
     final trimmedPhone = _phone.text.trim();
     final trimmedClub = _currentClub.text.trim();
-    final trimmedStatus = status?.trim();
-    final clubsCache = List<String>.from(places);
-    if (clubsCache.isEmpty && trimmedClub.isNotEmpty) {
-      clubsCache.add(trimmedClub);
+
+    String resolvedClubName = trimmedClub;
+    String? resolvedClubAddress;
+
+    if (trimmedClub.contains('\n')) {
+      final parts = trimmedClub
+          .split(RegExp(r'[\r\n]+'))
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      if (parts.isNotEmpty) {
+        resolvedClubName = parts.first;
+        if (parts.length > 1) {
+          resolvedClubAddress = parts.sublist(1).join(', ');
+        }
+      }
+    }
+
+    if (resolvedClubAddress == null && trimmedClub.contains(',')) {
+      final index = trimmedClub.indexOf(',');
+      final first = trimmedClub.substring(0, index).trim();
+      final rest = trimmedClub.substring(index + 1).trim();
+      if (first.isNotEmpty) {
+        resolvedClubName = first;
+      }
+      if (rest.isNotEmpty) {
+        resolvedClubAddress = rest;
+      }
+    }
+
+    if (resolvedClubAddress == null) {
+      final dashMatch = RegExp(r'\s[—–-]\s').firstMatch(trimmedClub);
+      if (dashMatch != null) {
+        final index = dashMatch.start;
+        final first = trimmedClub.substring(0, index).trim();
+        final rest = trimmedClub.substring(dashMatch.end).trim();
+        if (first.isNotEmpty) {
+          resolvedClubName = first;
+        }
+        if (rest.isNotEmpty) {
+          resolvedClubAddress = rest;
+        }
+      }
+    }
+
+    resolvedClubAddress = resolvedClubAddress?.trim();
+
+    final clubsCache = <String>[];
+    void addClub(String? value) {
+      final trimmed = value?.trim();
+      if (trimmed == null || trimmed.isEmpty) return;
+      if (!clubsCache.contains(trimmed)) {
+        clubsCache.add(trimmed);
+      }
+    }
+
+    for (final place in places) {
+      addClub(place);
+    }
+    addClub(trimmedClub);
+    addClub(resolvedClubName);
+
+    if (resolvedClubName.isNotEmpty) {
+      clubsCache.remove(resolvedClubName);
+      clubsCache.insert(0, resolvedClubName);
     }
 
     final profileData = {
       'fullName': _fio.text.trim(),
       'phone': trimmedPhone,
-      'clubName': clubsCache.isNotEmpty ? clubsCache.first : trimmedClub,
-      'address': clubsCache.isNotEmpty ? clubsCache.first : trimmedClub,
+      'clubName': resolvedClubName,
+      'address': resolvedClubAddress ?? '',
       'status': trimmedStatus ?? 'Самозанятый',
       'birthDate': birthDate?.toIso8601String(),
       'clubs': clubsCache,
