@@ -10,6 +10,8 @@ import '../../../../../shared/widgets/chips/radio_group_horizontal.dart';
 import '../../../../../shared/widgets/layout/common_ui.dart';
 import '../../../../../core/utils/validators.dart';
 import '../../../../../core/services/auth_service.dart';
+import '../../../../../core/services/local_auth_storage.dart';
+import '../../../../../core/routing/routes.dart';
 
 class RegisterMechanicScreen extends StatefulWidget {
   const RegisterMechanicScreen({Key? key}) : super(key: key);
@@ -82,6 +84,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       initialDate: birthDate ?? DateTime(now.year - 18),
       firstDate: DateTime(1900),
       lastDate: now,
+      locale: const Locale('ru'),
     );
     if (picked != null) {
       setState(() {
@@ -159,7 +162,22 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
 
     final success = await AuthService.registerMechanic(data);
     if (success) {
-      _showBar('Регистрация механика успешна');
+      final profileData = {
+        'fullName': _fio.text.trim(),
+        'phone': _phone.text.trim(),
+        'clubName': _currentClub.text.trim(),
+        'address': _currentClub.text.trim(),
+        'status': status,
+        'birthDate': birthDate?.toIso8601String(),
+        'clubs': places,
+        'skills': _skills.text.trim(),
+        'advantages': _extraEducation.text.trim(),
+      };
+      await LocalAuthStorage.saveMechanicProfile(profileData);
+      await LocalAuthStorage.setMechanicRegistered(true);
+      await AuthService.login(phone: _phone.text.trim(), password: data['password']);
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil(Routes.profileMechanic, (route) => false);
     } else {
       _showBar('Ошибка при отправке данных');
     }

@@ -8,6 +8,8 @@ import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../../core/utils/bottom_nav.dart';
 import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
 import '../../../../../core/routing/routes.dart';
+import '../../../../../core/services/auth_service.dart';
+import '../../../../../core/services/local_auth_storage.dart';
 
 enum EditFocus { none, name, phone, address }
 
@@ -21,9 +23,6 @@ class MechanicProfileScreen extends StatefulWidget {
 class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   final UserRepository _repo = UserRepository();
   late MechanicProfile profile;
-  String fullName = '—';
-  String phone = '—';
-  String email = '';
 
   @override
   void initState() {
@@ -38,18 +37,58 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       birthDate: DateTime(1989, 2, 24),
       status: 'Самозанятый',
     );
+    _loadLocalProfile();
     _load();
+  }
+
+  Future<void> _loadLocalProfile() async {
+    final stored = await LocalAuthStorage.loadMechanicProfile();
+    if (!mounted || stored == null) return;
+
+    String? _asString(dynamic value) {
+      if (value == null) return null;
+      final str = value.toString();
+      return str.isEmpty ? null : str;
+    }
+
+    final storedClubs = () {
+      final raw = stored['clubs'];
+      if (raw is List) {
+        return raw.whereType<String>().toList();
+      }
+      return <String>[];
+    }();
+
+    final birth = stored['birthDate'];
+    DateTime? parsedBirth;
+    if (birth is String && birth.isNotEmpty) {
+      parsedBirth = DateTime.tryParse(birth);
+    }
+
+    setState(() {
+      profile = profile.copyWith(
+        fullName: _asString(stored['fullName']) ?? profile.fullName,
+        phone: _asString(stored['phone']) ?? profile.phone,
+        clubName: _asString(stored['clubName']) ?? profile.clubName,
+        address: _asString(stored['address']) ?? profile.address,
+        status: _asString(stored['status']) ?? profile.status,
+        clubs: storedClubs.isNotEmpty ? storedClubs : null,
+        birthDate: parsedBirth ?? profile.birthDate,
+      );
+    });
   }
 
   Future<void> _load() async {
     final me = await _repo.me();
-    if (mounted) {
-      setState(() {
-        fullName = (me?['fullName'] ?? me?['phone'] ?? 'Профиль').toString();
-        phone = (me?['phone'] ?? '—').toString();
-        email = (me?['email'] ?? '').toString();
-      });
-    }
+    if (!mounted || me == null) return;
+    final phone = me['phone']?.toString();
+    final name = me['fullName']?.toString();
+    setState(() {
+      profile = profile.copyWith(
+        phone: phone?.isNotEmpty == true ? phone : null,
+        fullName: name?.isNotEmpty == true ? name : null,
+      );
+    });
   }
 
   Future<void> _openEdit(EditFocus focus) async {
@@ -58,6 +97,13 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       MaterialPageRoute(builder: (_) => EditMechanicProfileScreen(initial: profile, focus: focus)),
     );
     if (updated != null) setState(() => profile = updated);
+  }
+
+  Future<void> _logout() async {
+    await AuthService.logout();
+    await LocalAuthStorage.clearMechanicState();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
   }
 
   @override
@@ -127,7 +173,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
           const SizedBox(height: 10),
           ProfileTile(icon: Icons.star_border_rounded, text: 'Избранные заказы/детали', onTap: () {}),
           const SizedBox(height: 10),
-          ProfileTile(icon: Icons.exit_to_app_rounded, text: 'Выход', danger: true, onTap: () {}),
+          ProfileTile(icon: Icons.exit_to_app_rounded, text: 'Выход', danger: true, onTap: _logout),
         ],
       ),
       bottomNavigationBar: AppBottomNav(
