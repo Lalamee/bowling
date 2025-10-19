@@ -31,20 +31,30 @@ public class MaintenanceController {
 		return ResponseEntity.status(HttpStatus.CREATED).body(response);
 	}
 
-	@GetMapping("/requests")
-	public ResponseEntity<List<MaintenanceRequestResponseDTO>> getAllRequests(Authentication authentication) {
-		if (authentication == null || !authentication.isAuthenticated()) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-		}
-		List<MaintenanceRequestResponseDTO> requests = maintenanceRequestService.getAllRequests();
-		return ResponseEntity.ok(requests);
-	}
+        @GetMapping("/requests")
+        public ResponseEntity<List<MaintenanceRequestResponseDTO>> getAllRequests(Authentication authentication) {
+                if (authentication == null || !authentication.isAuthenticated()) {
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+                }
+                List<MaintenanceRequestResponseDTO> requests = maintenanceRequestService.getAllRequests();
+                return ResponseEntity.ok(requests);
+        }
 
-	@GetMapping("/requests/status/{status}")
-	public ResponseEntity<List<MaintenanceRequestResponseDTO>> getRequestsByStatus(@PathVariable String status, Authentication authentication) {
-		if (authentication == null || !authentication.isAuthenticated()) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-		}
+        @GetMapping("/requests/{requestId}")
+        public ResponseEntity<MaintenanceRequestResponseDTO> getRequestById(@PathVariable Long requestId,
+                        Authentication authentication) {
+                if (authentication == null || !authentication.isAuthenticated()) {
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+                }
+                MaintenanceRequestResponseDTO request = maintenanceRequestService.getRequestById(requestId);
+                return ResponseEntity.ok(request);
+        }
+
+        @GetMapping("/requests/status/{status}")
+        public ResponseEntity<List<MaintenanceRequestResponseDTO>> getRequestsByStatus(@PathVariable String status, Authentication authentication) {
+                if (authentication == null || !authentication.isAuthenticated()) {
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+                }
 		List<MaintenanceRequestResponseDTO> requests = maintenanceRequestService.getRequestsByStatus(status);
 		return ResponseEntity.ok(requests);
 	}

@@ -224,22 +224,16 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
 
   String _getStatusText(String status) {
     switch (status) {
-      case 'DRAFT':
-        return 'Черновик';
-      case 'PUBLISHED':
-        return 'Опубликована';
-      case 'ASSIGNED':
-        return 'Назначена';
-      case 'PARTS_ORDERED':
-        return 'Запчасти заказаны';
-      case 'PARTS_DELIVERED':
-        return 'Запчасти доставлены';
-      case 'PARTS_ISSUED':
-        return 'Запчасти выданы';
-      case 'COMPLETED':
+      case 'NEW':
+        return 'Новая';
+      case 'APPROVED':
+        return 'Одобрена';
+      case 'IN_PROGRESS':
+        return 'В работе';
+      case 'DONE':
         return 'Завершена';
-      case 'REJECTED':
-        return 'Отклонена';
+      case 'CLOSED':
+        return 'Закрыта';
       case 'UNREPAIRABLE':
         return 'Неремонтопригодно';
       default:

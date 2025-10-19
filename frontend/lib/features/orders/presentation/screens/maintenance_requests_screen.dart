@@ -23,14 +23,11 @@ class _MaintenanceRequestsScreenState extends State<MaintenanceRequestsScreen> {
 
   final List<String> statuses = [
     'Все',
-    'DRAFT',
-    'PUBLISHED',
-    'ASSIGNED',
-    'PARTS_ORDERED',
-    'PARTS_DELIVERED',
-    'PARTS_ISSUED',
-    'COMPLETED',
-    'REJECTED',
+    'NEW',
+    'APPROVED',
+    'IN_PROGRESS',
+    'DONE',
+    'CLOSED',
     'UNREPAIRABLE',
   ];
 
@@ -166,22 +163,16 @@ class _MaintenanceRequestsScreenState extends State<MaintenanceRequestsScreen> {
     switch (status) {
       case 'Все':
         return 'Все';
-      case 'DRAFT':
-        return 'Черновик';
-      case 'PUBLISHED':
-        return 'Опубликована';
-      case 'ASSIGNED':
-        return 'Назначена';
-      case 'PARTS_ORDERED':
-        return 'Заказаны';
-      case 'PARTS_DELIVERED':
-        return 'Доставлены';
-      case 'PARTS_ISSUED':
-        return 'Выданы';
-      case 'COMPLETED':
+      case 'NEW':
+        return 'Новая';
+      case 'APPROVED':
+        return 'Одобрена';
+      case 'IN_PROGRESS':
+        return 'В работе';
+      case 'DONE':
         return 'Завершена';
-      case 'REJECTED':
-        return 'Отклонена';
+      case 'CLOSED':
+        return 'Закрыта';
       case 'UNREPAIRABLE':
         return 'Не ремонтопригодно';
       default:
@@ -205,7 +196,7 @@ class _RequestCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -238,7 +229,7 @@ class _RequestCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
+                        color: statusColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -309,22 +300,16 @@ class _RequestCard extends StatelessWidget {
 
   String _getStatusText(String status) {
     switch (status) {
-      case 'DRAFT':
-        return 'Черновик';
-      case 'PUBLISHED':
-        return 'Опубликована';
-      case 'ASSIGNED':
-        return 'Назначена';
-      case 'PARTS_ORDERED':
-        return 'Запчасти заказаны';
-      case 'PARTS_DELIVERED':
-        return 'Запчасти доставлены';
-      case 'PARTS_ISSUED':
-        return 'Запчасти выданы';
-      case 'COMPLETED':
+      case 'NEW':
+        return 'Новая';
+      case 'APPROVED':
+        return 'Одобрена';
+      case 'IN_PROGRESS':
+        return 'В работе';
+      case 'DONE':
         return 'Завершена';
-      case 'REJECTED':
-        return 'Отклонена';
+      case 'CLOSED':
+        return 'Закрыта';
       case 'UNREPAIRABLE':
         return 'Неремонтопригодно';
       default:
@@ -334,18 +319,18 @@ class _RequestCard extends StatelessWidget {
 
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'COMPLETED':
+      case 'DONE':
         return Colors.green;
-      case 'REJECTED':
+      case 'CLOSED':
+        return Colors.blueGrey;
+      case 'APPROVED':
+        return Colors.blue;
+      case 'IN_PROGRESS':
+        return AppColors.primary;
       case 'UNREPAIRABLE':
         return Colors.red;
-      case 'ASSIGNED':
-      case 'PARTS_ORDERED':
-      case 'PARTS_DELIVERED':
-      case 'PARTS_ISSUED':
-        return AppColors.primary;
-      case 'PUBLISHED':
-        return Colors.orange;
+      case 'NEW':
+        return AppColors.darkGray;
       default:
         return AppColors.darkGray;
     }
