@@ -34,8 +34,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   Future<void> _loadRegistrationStatus() async {
     final registered = await LocalAuthStorage.isMechanicRegistered();
+    final cached = await LocalAuthStorage.loadMechanicProfile();
     if (!mounted) return;
-    setState(() => _canEnter = registered);
+    setState(() => _canEnter = registered || cached != null);
   }
 
   void _enter() {
