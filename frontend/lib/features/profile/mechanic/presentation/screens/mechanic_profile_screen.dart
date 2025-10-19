@@ -35,14 +35,14 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   void initState() {
     super.initState();
     profile = MechanicProfile(
-      fullName: 'Механик Иван Иванович',
-      phone: '+7 (980) 001-01-01',
-      clubName: 'Боулинг клуб "Кегли"',
-      clubs: const ['Боулинг клуб "Кегли"'],
-      address: 'г. Воронеж, ул. Тверская, д. 45',
+      fullName: '',
+      phone: '',
+      clubName: '',
+      clubs: const [],
+      address: '',
       workplaceVerified: false,
-      birthDate: DateTime(1989, 2, 24),
-      status: 'Самозанятый',
+      birthDate: DateTime.now(),
+      status: '',
     );
     _init();
   }
@@ -256,6 +256,46 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       return digits == refDigits || digits.endsWith(refDigits) || refDigits.endsWith(digits);
     }
 
+    bool _looksLikeTimeline(String value) {
+      final lower = value.toLowerCase();
+      if (!RegExp(r'\d{4}').hasMatch(lower)) return false;
+      return RegExp(r'(?:[-–—]|\bс\b|\bпо\b|н\.в\.?|наст\.?|текущ)').hasMatch(lower);
+    }
+
+    String _stripTimeline(String value) {
+      var result = value.trim();
+      result = result.replaceAll(RegExp(r'\s+'), ' ');
+      const timelineSuffix =
+          r'(?:\d{1,2}\.\d{1,2}\.\d{4}|\d{1,2}\.\d{4}|[а-яa-z]+\s+\d{4}|\d{4}|н\.в\.?|наст\.?)';
+      final parentheticalTimeline = RegExp(r'\s*\((?:[^()]*\d{4}[^()]*)\)\s*$');
+      if (parentheticalTimeline.hasMatch(result)) {
+        result = result.replaceFirst(parentheticalTimeline, '').trim();
+      }
+      final dashTimeline = RegExp(
+        r'\s*[-–—]\s*(?:с\s*)?' + timelineSuffix + r'(?:\s*(?:[-–—]|\bпо\b)\s*' + timelineSuffix + r')?\s*$',
+        caseSensitive: false,
+      );
+      if (dashTimeline.hasMatch(result)) {
+        result = result.replaceFirst(dashTimeline, '').trim();
+      }
+      final commaTimeline = RegExp(
+        r'\s*,\s*(?:с\s*)?' + timelineSuffix + r'(?:\s*(?:[-–—]|\bпо\b)\s*' + timelineSuffix + r')?\s*$',
+        caseSensitive: false,
+      );
+      if (commaTimeline.hasMatch(result)) {
+        result = result.replaceFirst(commaTimeline, '').trim();
+      }
+      return result.trim();
+    }
+
+    String? _sanitizeClubLabel(String? value) {
+      final candidate = _asString(value);
+      if (candidate == null || candidate.isEmpty) return null;
+      final stripped = _stripTimeline(candidate);
+      if (stripped.isEmpty) return null;
+      return stripped;
+    }
+
     String _resolveFullName() {
       final candidate = _asString(raw['fullName']);
       if (candidate != null && !_looksLikePhone(candidate)) {
@@ -277,19 +317,29 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     final fallbackClubs = fallback.clubs;
 
     String _resolveClubName() {
-      final rawName = _asString(raw['clubName']);
+      final rawName = _sanitizeClubLabel(raw['clubName']);
       if (rawName != null && rawName.isNotEmpty) {
         return rawName;
       }
-      if (rawClubs.isNotEmpty) {
-        return rawClubs.first;
+      for (final value in rawClubs) {
+        final sanitized = _sanitizeClubLabel(value);
+        if (sanitized != null) {
+          return sanitized;
+        }
       }
-      final previousName = _asString(previous?['clubName']);
+      final previousName = _sanitizeClubLabel(previous?['clubName']);
       if (previousName != null && previousName.isNotEmpty) {
         return previousName;
       }
-      if (previousClubs.isNotEmpty) {
-        return previousClubs.first;
+      for (final value in previousClubs) {
+        final sanitized = _sanitizeClubLabel(value);
+        if (sanitized != null) {
+          return sanitized;
+        }
+      }
+      final fallbackSanitized = _sanitizeClubLabel(fallback.clubName);
+      if (fallbackSanitized != null) {
+        return fallbackSanitized;
       }
       return fallback.clubName;
     }
@@ -301,21 +351,23 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       final seen = <String>{};
 
       void addValue(String? value, {bool prioritize = false}) {
-        final trimmed = value?.trim();
-        if (trimmed == null || trimmed.isEmpty) return;
-        if (seen.contains(trimmed)) {
+        final sanitized = _sanitizeClubLabel(value);
+        if (sanitized == null || sanitized.isEmpty) return;
+        if (_looksLikeTimeline(sanitized)) return;
+        if (seen.contains(sanitized)) {
           if (prioritize) {
-            result.remove(trimmed);
-            result.insert(0, trimmed);
+            result
+              ..remove(sanitized)
+              ..insert(0, sanitized);
           }
           return;
         }
         if (prioritize) {
-          result.insert(0, trimmed);
+          result.insert(0, sanitized);
         } else {
-          result.add(trimmed);
+          result.add(sanitized);
         }
-        seen.add(trimmed);
+        seen.add(sanitized);
       }
 
       addValue(resolvedClubName, prioritize: true);
@@ -329,6 +381,11 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         addValue(value);
       }
       addValue(resolvedClubName, prioritize: true);
+
+      if (result.isEmpty) {
+        addValue(resolvedClubName, prioritize: true);
+      }
+
       return result;
     }
 
@@ -343,9 +400,23 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         _parseDate(_asString(previous?['birthDate'])) ??
         fallback.birthDate;
 
-    final resolvedAddress = _asString(raw['address']) ??
-        _asString(previous?['address']) ??
-        fallback.address;
+    String? _resolveAddress() {
+      final candidates = <String?>[
+        _asString(raw['address']),
+        _asString(previous?['address']),
+        fallback.address,
+      ];
+      for (final candidate in candidates) {
+        final trimmed = candidate?.trim();
+        if (trimmed == null || trimmed.isEmpty) continue;
+        if (trimmed == resolvedClubName) continue;
+        if (_looksLikeTimeline(trimmed)) continue;
+        return trimmed;
+      }
+      return null;
+    }
+
+    final resolvedAddress = _resolveAddress() ?? '';
 
     final resolvedStatus = _asString(raw['status']) ??
         _asString(previous?['status']) ??
@@ -366,7 +437,6 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       'workplaceVerified': resolvedVerified,
     };
   }
-
   Future<void> _openEdit(EditFocus focus) async {
     final updated = await Navigator.push<MechanicProfile>(
       context,

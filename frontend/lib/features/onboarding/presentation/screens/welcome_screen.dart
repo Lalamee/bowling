@@ -44,17 +44,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       Navigator.pushReplacementNamed(context, Routes.authLogin);
       return;
     }
-    var canEnter = _canEnter;
+    final cached = await LocalAuthStorage.loadMechanicProfile();
+    final registered = await LocalAuthStorage.isMechanicRegistered();
+    final canEnter = registered || cached != null;
+    if (mounted && canEnter != _canEnter) {
+      setState(() => _canEnter = canEnter);
+    }
     if (!canEnter) {
-      final registered = await LocalAuthStorage.isMechanicRegistered();
-      final cached = await LocalAuthStorage.loadMechanicProfile();
-      canEnter = registered || cached != null;
-      if (mounted && canEnter != _canEnter) {
-        setState(() => _canEnter = canEnter);
-      }
-      if (!canEnter) {
-        return;
-      }
+      return;
     }
     final role = TestOverrides.userRole.toLowerCase();
     if (role == 'owner') {

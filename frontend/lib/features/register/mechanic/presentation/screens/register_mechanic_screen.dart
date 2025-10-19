@@ -120,12 +120,59 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       return;
     }
 
+    String normalizeSpaces(String value) => value.replaceAll(RegExp(r'\s+'), ' ').trim();
+    const timelineSuffixPattern =
+        r'(?:\d{1,2}\.\d{1,2}\.\d{4}|\d{1,2}\.\d{4}|[а-яa-z]+\s+\d{4}|\d{4}|н\.в\.?|наст\.?)';
+    final parentheticalTimelinePattern = RegExp(r'\s*\((?:[^()]*\d{4}[^()]*)\)\s*$');
+    final dashTimelinePattern = RegExp(
+      r'\s*[-–—]\s*(?:с\s*)?' + timelineSuffixPattern + r'(?:\s*(?:[-–—]|\bпо\b)\s*' + timelineSuffixPattern + r')?\s*$',
+      caseSensitive: false,
+    );
+    final commaTimelinePattern = RegExp(
+      r'\s*,\s*(?:с\s*)?' + timelineSuffixPattern + r'(?:\s*(?:[-–—]|\bпо\b)\s*' + timelineSuffixPattern + r')?\s*$',
+      caseSensitive: false,
+    );
+    bool looksLikeTimeline(String value) {
+      final lower = value.toLowerCase();
+      if (!RegExp(r'\d{4}').hasMatch(lower)) return false;
+      return RegExp(r'(?:[-–—]|\bс\b|\bпо\b|н\.в\.?|наст\.?|текущ)').hasMatch(lower);
+    }
+
+    String stripTimeline(String value) {
+      var result = normalizeSpaces(value);
+      if (parentheticalTimelinePattern.hasMatch(result)) {
+        result = normalizeSpaces(result.replaceFirst(parentheticalTimelinePattern, ''));
+      }
+      if (dashTimelinePattern.hasMatch(result)) {
+        result = normalizeSpaces(result.replaceFirst(dashTimelinePattern, ''));
+      }
+      if (commaTimelinePattern.hasMatch(result)) {
+        result = normalizeSpaces(result.replaceFirst(commaTimelinePattern, ''));
+      }
+      return result;
+    }
+
+    String sanitizeClubLabel(String value) {
+      final cleaned = stripTimeline(value);
+      if (cleaned.isEmpty) return '';
+      if (looksLikeTimeline(cleaned)) return '';
+      return cleaned;
+    }
+
+    String sanitizeAddress(String? value, String clubName) {
+      final trimmed = value == null ? '' : normalizeSpaces(value);
+      if (trimmed.isEmpty) return '';
+      if (looksLikeTimeline(trimmed)) return '';
+      if (sanitizeClubLabel(trimmed) == clubName) return '';
+      return trimmed;
+    }
+
     final entries = Validators.parseEmploymentHistory(_bowlingHistory.text.trim());
     final places = <String>[];
     final periods = <String>[];
 
     for (final e in entries) {
-      final place = e.place.trim();
+      final place = sanitizeClubLabel(e.place);
       if (place.isEmpty) continue;
       places.add(place);
       final y1 = e.from?.year;
@@ -137,16 +184,89 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       }
     }
 
-    if (places.isEmpty && _currentClub.text.trim().isNotEmpty) {
-      places.add(_currentClub.text.trim());
-    }
-
+    final trimmedClub = _currentClub.text.trim();
     final trimmedStatus = status?.trim();
 
+    String rawNameCandidate = trimmedClub;
+    String? addressCandidate;
+
+    final lineParts = trimmedClub
+        .split(RegExp(r'[\r\n]+'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (lineParts.isNotEmpty) {
+      rawNameCandidate = lineParts.first;
+      if (lineParts.length > 1) {
+        addressCandidate = lineParts.sublist(1).join(', ');
+      }
+    }
+
+    if (addressCandidate == null) {
+      final commaParts = trimmedClub
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      if (commaParts.length > 1) {
+        rawNameCandidate = commaParts.first;
+        addressCandidate = commaParts.sublist(1).join(', ');
+      }
+    }
+
+    if (addressCandidate == null) {
+      final dashMatch = RegExp(r'\s[-–—]\s').firstMatch(trimmedClub);
+      if (dashMatch != null) {
+        final before = trimmedClub.substring(0, dashMatch.start).trim();
+        final after = trimmedClub.substring(dashMatch.end).trim();
+        if (after.isNotEmpty && !looksLikeTimeline(after)) {
+          rawNameCandidate = before;
+          addressCandidate = after;
+        }
+      }
+    }
+
+    final historyFallbackName = places.isNotEmpty ? places.first : '';
+    final nameCandidates = <String>[
+      sanitizeClubLabel(rawNameCandidate),
+      sanitizeClubLabel(trimmedClub),
+      historyFallbackName,
+    ];
+
+    var displayClubName = '';
+    for (final candidate in nameCandidates) {
+      if (candidate.isNotEmpty) {
+        displayClubName = candidate;
+        break;
+      }
+    }
+    if (displayClubName.isEmpty) {
+      final fallbackName = sanitizeClubLabel(trimmedClub);
+      displayClubName = fallbackName.isNotEmpty ? fallbackName : trimmedClub;
+    }
+
+    final displayAddress = sanitizeAddress(addressCandidate, displayClubName);
+
+    if (displayClubName.isNotEmpty) {
+      final already = places.contains(displayClubName);
+      if (!already) {
+        places.insert(0, displayClubName);
+      }
+    } else if (places.isEmpty && trimmedClub.isNotEmpty) {
+      final fallbackName = sanitizeClubLabel(trimmedClub);
+      places.add(fallbackName.isNotEmpty ? fallbackName : trimmedClub);
+    }
+
+    if (places.isEmpty && trimmedClub.isNotEmpty) {
+      final fallbackName = sanitizeClubLabel(trimmedClub);
+      places.add(fallbackName.isNotEmpty ? fallbackName : trimmedClub);
+    }
+
+    final trimmedPhone = _phone.text.trim();
     final data = {
       'fio': _fio.text.trim(),
       'birth': DateFormat('yyyy-MM-dd').format(birthDate!),
-      'phone': _phone.text.trim(),
+      'phone': trimmedPhone,
       'password': 'password123',
       'educationLevelId': educationLevelId!, // уже "1".."5"
       'educationName': _educationName.text.trim(),
@@ -154,7 +274,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'advantages': _extraEducation.text.trim(),
       'workYears': _workYears.text.trim(),
       'bowlingYears': _bowlingYears.text.trim(),
-      'currentClub': _currentClub.text.trim(),
+      'currentClub': trimmedClub,
       'bowlingHistory': _bowlingHistory.text.trim(),
       'skills': _skills.text.trim(),
       'status': trimmedStatus ?? status,
@@ -168,88 +288,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       return;
     }
 
-    final trimmedPhone = _phone.text.trim();
-    final trimmedClub = _currentClub.text.trim();
-
-    String resolvedClubName = trimmedClub;
-    String? resolvedClubAddress;
-
-    if (trimmedClub.contains('\n')) {
-      final parts = trimmedClub
-          .split(RegExp(r'[\r\n]+'))
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList();
-      if (parts.isNotEmpty) {
-        resolvedClubName = parts.first;
-        if (parts.length > 1) {
-          resolvedClubAddress = parts.sublist(1).join(', ');
-        }
-      }
-    }
-
-    if (resolvedClubAddress == null && trimmedClub.contains(',')) {
-      final index = trimmedClub.indexOf(',');
-      final first = trimmedClub.substring(0, index).trim();
-      final rest = trimmedClub.substring(index + 1).trim();
-      if (first.isNotEmpty) {
-        resolvedClubName = first;
-      }
-      if (rest.isNotEmpty) {
-        resolvedClubAddress = rest;
-      }
-    }
-
-    if (resolvedClubAddress == null) {
-      final dashMatch = RegExp(r'\s[—–-]\s').firstMatch(trimmedClub);
-      if (dashMatch != null) {
-        final index = dashMatch.start;
-        final first = trimmedClub.substring(0, index).trim();
-        final rest = trimmedClub.substring(dashMatch.end).trim();
-        if (first.isNotEmpty) {
-          resolvedClubName = first;
-        }
-        if (rest.isNotEmpty) {
-          resolvedClubAddress = rest;
-        }
-      }
-    }
-
-    final displayClubName = resolvedClubName.trim().isNotEmpty
-        ? resolvedClubName.trim()
-        : trimmedClub;
-    final displayAddress = () {
-      final addr = resolvedClubAddress?.trim();
-      if (addr != null && addr.isNotEmpty) {
-        return addr;
-      }
-      // если адрес распознать не удалось, сохраняем исходное значение,
-      // чтобы в профиле не показывался дефолтный адрес-заглушка
-      return trimmedClub;
-    }();
-
-    final clubsCache = <String>[];
-    void addClub(String? value) {
-      final trimmed = value?.trim();
-      if (trimmed == null || trimmed.isEmpty) return;
-      if (!clubsCache.contains(trimmed)) {
-        clubsCache.add(trimmed);
-      }
-    }
-
-    for (final place in places) {
-      addClub(place);
-    }
-    addClub(trimmedClub);
-    addClub(displayClubName);
-
-    if (displayClubName.isNotEmpty) {
-      clubsCache.remove(displayClubName);
-      clubsCache.insert(0, displayClubName);
-    }
-    if (clubsCache.isEmpty && displayClubName.isNotEmpty) {
-      clubsCache.add(displayClubName);
-    }
+    final clubsCache = displayClubName.isNotEmpty ? [displayClubName] : <String>[];
 
     final profileData = {
       'fullName': _fio.text.trim(),

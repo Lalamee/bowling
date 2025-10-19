@@ -18,9 +18,7 @@ class MechanicProfile {
     required this.birthDate,
     required this.status,
     List<String>? clubs,
-  }) : clubs = (clubs == null || clubs.isEmpty)
-            ? [clubName]
-            : clubs;
+  }) : clubs = _prepareClubs(clubs, clubName);
 
   MechanicProfile copyWith({
     String? fullName,
@@ -32,20 +30,49 @@ class MechanicProfile {
     DateTime? birthDate,
     String? status,
   }) {
-    final nextClubs = clubs ??
-        (clubName != null
-            ? [clubName, ...this.clubs.skip(1)]
-            : this.clubs);
+    final nextClubName = clubName ?? this.clubName;
 
     return MechanicProfile(
       fullName: fullName ?? this.fullName,
       phone: phone ?? this.phone,
-      clubName: clubName ?? this.clubName,
+      clubName: nextClubName,
       address: address ?? this.address,
       workplaceVerified: workplaceVerified ?? this.workplaceVerified,
       birthDate: birthDate ?? this.birthDate,
       status: status ?? this.status,
-      clubs: nextClubs,
+      clubs: clubs ?? _prepareClubs(this.clubs, nextClubName),
     );
+  }
+
+  static List<String> _prepareClubs(List<String>? clubs, String clubName) {
+    final result = <String>[];
+    final seen = <String>{};
+
+    void add(String? value, {bool prioritize = false}) {
+      final trimmed = value?.trim();
+      if (trimmed == null || trimmed.isEmpty) return;
+      if (seen.contains(trimmed)) {
+        if (prioritize) {
+          result
+            ..remove(trimmed)
+            ..insert(0, trimmed);
+        }
+        return;
+      }
+      if (prioritize) {
+        result.insert(0, trimmed);
+      } else {
+        result.add(trimmed);
+      }
+      seen.add(trimmed);
+    }
+
+    add(clubName, prioritize: true);
+    if (clubs != null) {
+      for (final value in clubs) {
+        add(value);
+      }
+    }
+    return result;
   }
 }
