@@ -1,3 +1,5 @@
+import '../../models/maintenance_request_response_dto.dart';
+
 class PdfReaderArgs {
   final String assetPath;
   final String title;
@@ -5,8 +7,9 @@ class PdfReaderArgs {
 }
 
 class OrderSummaryArgs {
-  final String orderId;
-  const OrderSummaryArgs(this.orderId);
+  final MaintenanceRequestResponseDto? order;
+  final String? orderNumber;
+  const OrderSummaryArgs({this.order, this.orderNumber});
 }
 
 class EditMechanicProfileArgs {
