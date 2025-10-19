@@ -1,16 +1,18 @@
 import 'dart:developer';
 
-import '../../../../../core/repositories/user_repository.dart';
 import 'package:flutter/material.dart';
-import '../../../../../core/theme/colors.dart';
-import '../../../../../shared/widgets/tiles/profile_tile.dart';
-import '../../domain/mechanic_profile.dart';
-import 'edit_mechanic_profile_screen.dart';
-import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
-import '../../../../../core/utils/bottom_nav.dart';
-import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
+
+import '../../../../../core/repositories/user_repository.dart';
 import '../../../../../core/routing/routes.dart';
 import '../../../../../core/services/auth_service.dart';
+import '../../../../../core/services/local_auth_storage.dart';
+import '../../../../../core/theme/colors.dart';
+import '../../../../../core/utils/bottom_nav.dart';
+import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
+import '../../../../../shared/widgets/tiles/profile_tile.dart';
+import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
+import '../../domain/mechanic_profile.dart';
+import 'edit_mechanic_profile_screen.dart';
 
 enum EditFocus { none, name, phone, address }
 
@@ -26,23 +28,24 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   late MechanicProfile profile;
   bool _isLoading = true;
   bool _hasError = false;
+  bool _hasCachedProfile = false;
 
-//   @override
-//   void initState() {
-//     super.initState();
-//     profile = MechanicProfile(
-//       fullName: 'Механик Иван Иванович',
-//       phone: '+7 (980) 001-01-01',
-//       clubName: 'Боулинг клуб "Кегли"',
-//       clubs: ['Боулинг клуб "Кегли"'],
-//       address: 'г. Воронеж, ул. Тверская, д. 45',
-//       workplaceVerified: false,
-//       birthDate: DateTime(1989, 2, 24),
-//       status: 'Самозанятый',
-//     );
-//     _loadLocalProfile();
-//     _load();
-//   }
+  @override
+  void initState() {
+    super.initState();
+    profile = MechanicProfile(
+      fullName: 'Механик Иван Иванович',
+      phone: '+7 (980) 001-01-01',
+      clubName: 'Боулинг клуб "Кегли"',
+      clubs: const ['Боулинг клуб "Кегли"'],
+      address: 'г. Воронеж, ул. Тверская, д. 45',
+      workplaceVerified: false,
+      birthDate: DateTime(1989, 2, 24),
+      status: 'Самозанятый',
+    );
+    _loadLocalProfile();
+    _load();
+  }
 
   Future<void> _loadLocalProfile() async {
     final stored = await LocalAuthStorage.loadMechanicProfile();
@@ -57,7 +60,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     try {
       if (mounted) {
         setState(() {
-          _isLoading = true;
+          _isLoading = !_hasCachedProfile;
           _hasError = false;
         });
       }
@@ -66,8 +69,11 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       if (me == null) {
         setState(() {
           _isLoading = false;
-          _hasError = true;
+          _hasError = !_hasCachedProfile;
         });
+        if (_hasCachedProfile) {
+          _showLoadError();
+        }
         return;
       }
       final cache = _mapApiToCache(me);
@@ -79,10 +85,21 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _hasError = true;
+          _hasError = !_hasCachedProfile;
         });
+        if (_hasCachedProfile) {
+          _showLoadError();
+        }
       }
     }
+  }
+
+  void _showLoadError() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Не удалось обновить профиль, отображены сохранённые данные'),
+      ),
+    );
   }
 
   Map<String, dynamic> _mapApiToCache(Map<String, dynamic> me) {
@@ -99,9 +116,14 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     String? status;
     String? clubName;
     String? address;
+    String? fullName;
 
     if (profileData is Map) {
       final map = Map<String, dynamic>.from(profileData);
+      final profileFullName = _asString(map['fullName']);
+      if (profileFullName != null) {
+        fullName = profileFullName;
+      }
       final workPlaces = map['workPlaces'];
       if (workPlaces is String) {
         clubs.addAll(workPlaces
@@ -156,12 +178,12 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     }
 
     return {
-      'fullName': _asString(me['fullName']) ?? _asString(me['phone']) ?? profile.fullName,
+      'fullName': fullName ?? _asString(me['fullName']) ?? profile.fullName,
       'phone': _asString(me['phone']) ?? profile.phone,
       'status': status ?? profile.status,
       'clubs': clubs,
       'clubName': clubName ?? (clubs.isNotEmpty ? clubs.first : profile.clubName),
-      'address': address ?? (clubs.isNotEmpty ? clubs.first : profile.address),
+      'address': address ?? profile.address,
       'birthDate': birthDate?.toIso8601String(),
       'workplaceVerified': workplaceVerified ?? profile.workplaceVerified,
     };
@@ -193,7 +215,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         fullName: _asString(raw['fullName']) ?? profile.fullName,
         phone: _asString(raw['phone']) ?? profile.phone,
         clubName: _asString(raw['clubName']) ?? (clubs.isNotEmpty ? clubs.first : profile.clubName),
-        address: _asString(raw['address']) ?? (clubs.isNotEmpty ? clubs.first : profile.address),
+        address: _asString(raw['address']) ?? profile.address,
         status: _asString(raw['status']) ?? profile.status,
         clubs: clubs.isNotEmpty ? clubs : null,
         workplaceVerified: raw['workplaceVerified'] as bool? ?? profile.workplaceVerified,
@@ -201,6 +223,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       );
       _isLoading = false;
       _hasError = false;
+      _hasCachedProfile = true;
     });
   }
 
@@ -214,6 +237,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
 
   Future<void> _logout() async {
     await AuthService.logout();
+    await LocalAuthStorage.clearMechanicState();
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
   }
@@ -318,44 +342,6 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                     ProfileTile(icon: Icons.exit_to_app_rounded, text: 'Выход', danger: true, onTap: _logout),
                   ],
                 ),
-                const SizedBox(width: 12),
-                const Text('Статус:', style: TextStyle(fontSize: 14, color: AppColors.darkGray)),
-                const SizedBox(width: 8),
-                Expanded(child: Text(profile.status, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          ProfileTile(
-            icon: Icons.menu_book_rounded,
-            text: 'База знаний',
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen())),
-          ),
-          const SizedBox(height: 10),
-          ...List.generate(profile.clubs.length, (i) {
-            final club = profile.clubs[i];
-            return Padding(
-              padding: EdgeInsets.only(bottom: i == profile.clubs.length - 1 ? 0 : 10),
-              child: ProfileTile(
-                icon: Icons.location_searching_rounded,
-                text: club,
-                showAlertBadge: !profile.workplaceVerified && i == 0,
-                onTap: () => _openEdit(EditFocus.none),
-              ),
-            );
-          }),
-          const SizedBox(height: 10),
-          ProfileTile(icon: Icons.location_on_rounded, text: profile.address, onEdit: () => _openEdit(EditFocus.address)),
-          const SizedBox(height: 10),
-          ProfileTile(icon: Icons.history_rounded, text: 'История заказов', onTap: () => Navigator.pushNamed(context, Routes.ordersPersonalHistory)),
-          const SizedBox(height: 10),
-          ProfileTile(icon: Icons.notifications_active_outlined, text: 'Оповещения', onTap: () {}),
-          const SizedBox(height: 10),
-          ProfileTile(icon: Icons.star_border_rounded, text: 'Избранные заказы/детали', onTap: () {}),
-          const SizedBox(height: 10),
-          ProfileTile(icon: Icons.exit_to_app_rounded, text: 'Выход', danger: true, onTap: _logout),
-        ],
-      ),
       bottomNavigationBar: AppBottomNav(
         currentIndex: 3,
         onTap: (i) => BottomNavDirect.go(context, 3, i),
