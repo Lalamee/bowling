@@ -161,26 +161,41 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     };
 
     final success = await AuthService.registerMechanic(data);
-    if (success) {
-      final profileData = {
-        'fullName': _fio.text.trim(),
-        'phone': _phone.text.trim(),
-        'clubName': _currentClub.text.trim(),
-        'address': _currentClub.text.trim(),
-        'status': status,
-        'birthDate': birthDate?.toIso8601String(),
-        'clubs': places,
-        'skills': _skills.text.trim(),
-        'advantages': _extraEducation.text.trim(),
-      };
-      await LocalAuthStorage.saveMechanicProfile(profileData);
-      await LocalAuthStorage.setMechanicRegistered(true);
-      await AuthService.login(phone: _phone.text.trim(), password: data['password']);
-      if (!mounted) return;
-      Navigator.of(context).pushNamedAndRemoveUntil(Routes.profileMechanic, (route) => false);
-    } else {
+    if (!success) {
       _showBar('Ошибка при отправке данных');
+      return;
     }
+
+    final trimmedPhone = _phone.text.trim();
+    final trimmedClub = _currentClub.text.trim();
+    final trimmedStatus = status?.trim();
+    final clubsCache = List<String>.from(places);
+    if (clubsCache.isEmpty && trimmedClub.isNotEmpty) {
+      clubsCache.add(trimmedClub);
+    }
+
+    final profileData = {
+      'fullName': _fio.text.trim(),
+      'phone': trimmedPhone,
+      'clubName': clubsCache.isNotEmpty ? clubsCache.first : trimmedClub,
+      'address': clubsCache.isNotEmpty ? clubsCache.first : trimmedClub,
+      'status': trimmedStatus ?? 'Самозанятый',
+      'birthDate': birthDate?.toIso8601String(),
+      'clubs': clubsCache,
+      'workplaceVerified': false,
+    };
+    await LocalAuthStorage.saveMechanicProfile(profileData);
+    await LocalAuthStorage.setMechanicRegistered(true);
+
+    final password = data['password']?.toString() ?? 'password123';
+    final loginResult = await AuthService.login(phone: trimmedPhone, password: password);
+    if (loginResult == null) {
+      _showBar('Не удалось войти с новыми данными, попробуйте позже');
+      return;
+    }
+
+    if (!mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil(Routes.profileMechanic, (route) => false);
   }
 
   @override

@@ -8,7 +8,11 @@ class LocalAuthStorage {
 
   static Future<void> setMechanicRegistered(bool value) async {
     final sp = await SharedPreferences.getInstance();
-    await sp.setBool(_mechanicRegisteredKey, value);
+    if (value) {
+      await sp.setBool(_mechanicRegisteredKey, true);
+    } else {
+      await sp.remove(_mechanicRegisteredKey);
+    }
   }
 
   static Future<bool> isMechanicRegistered() async {
