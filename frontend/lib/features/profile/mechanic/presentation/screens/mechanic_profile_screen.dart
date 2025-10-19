@@ -8,6 +8,7 @@ import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../../core/utils/bottom_nav.dart';
 import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
 import '../../../../../core/routing/routes.dart';
+import '../../../../../core/services/auth_service.dart';
 
 enum EditFocus { none, name, phone, address }
 
@@ -58,6 +59,12 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       MaterialPageRoute(builder: (_) => EditMechanicProfileScreen(initial: profile, focus: focus)),
     );
     if (updated != null) setState(() => profile = updated);
+  }
+
+  Future<void> _logout() async {
+    await AuthService.logout();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
   }
 
   @override
@@ -127,7 +134,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
           const SizedBox(height: 10),
           ProfileTile(icon: Icons.star_border_rounded, text: 'Избранные заказы/детали', onTap: () {}),
           const SizedBox(height: 10),
-          ProfileTile(icon: Icons.exit_to_app_rounded, text: 'Выход', danger: true, onTap: () {}),
+          ProfileTile(icon: Icons.exit_to_app_rounded, text: 'Выход', danger: true, onTap: _logout),
         ],
       ),
       bottomNavigationBar: AppBottomNav(

@@ -10,6 +10,8 @@ import '../../../../../shared/widgets/chips/radio_group_horizontal.dart';
 import '../../../../../shared/widgets/layout/common_ui.dart';
 import '../../../../../core/utils/validators.dart';
 import '../../../../../core/services/auth_service.dart';
+import '../../../../../core/services/local_auth_storage.dart';
+import '../../../../../core/routing/routes.dart';
 
 class RegisterMechanicScreen extends StatefulWidget {
   const RegisterMechanicScreen({Key? key}) : super(key: key);
@@ -159,7 +161,9 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
 
     final success = await AuthService.registerMechanic(data);
     if (success) {
-      _showBar('Регистрация механика успешна');
+      await LocalAuthStorage.setMechanicRegistered(true);
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil(Routes.profileMechanic, (route) => false);
     } else {
       _showBar('Ошибка при отправке данных');
     }
