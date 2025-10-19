@@ -64,7 +64,7 @@ class _ManagerOrdersHistoryScreenState extends State<ManagerOrdersHistoryScreen>
                   onConfirm: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => OrderSummaryScreen(orderNumber: item.number, initialItems: const [])),
+                      MaterialPageRoute(builder: (_) => OrderSummaryScreen(orderNumber: item.number)),
                     );
                   },
                 );
