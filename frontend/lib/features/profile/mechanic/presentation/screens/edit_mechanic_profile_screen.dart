@@ -145,6 +145,7 @@ class _EditMechanicProfileScreenState extends State<EditMechanicProfileScreen> {
       firstDate: DateTime(1900),
       lastDate: now,
       helpText: 'Выберите дату рождения',
+      locale: const Locale('ru'),
     );
     if (picked != null) {
       _birth.text = DateFormat('dd.MM.yyyy').format(picked);
