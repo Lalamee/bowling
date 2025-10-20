@@ -20,6 +20,7 @@ import '../models/order_parts_request_dto.dart';
 import '../models/delivery_request_dto.dart';
 import '../models/issue_request_dto.dart';
 import '../models/close_request_dto.dart';
+import '../core/network/dio_client.dart';
 
 /// Типизированный API сервис для взаимодействия с backend
 class ApiService {
@@ -329,12 +330,11 @@ class ApiService {
 
   /// Сохранение токенов после успешной авторизации
   Future<void> saveTokens(LoginResponseDto loginResponse) async {
-    await _core.storage.write(key: 'jwt_token', value: loginResponse.accessToken);
-    await _core.storage.write(key: 'refresh_token', value: loginResponse.refreshToken);
+    await DioClient.saveTokens(accessToken: loginResponse.accessToken, refreshToken: loginResponse.refreshToken);
   }
 
   /// Очистка токенов при выходе
   Future<void> clearTokens() async {
-    await _core.clearToken();
+    await DioClient.clearTokens();
   }
 }

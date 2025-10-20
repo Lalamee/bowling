@@ -41,7 +41,7 @@ import '../../features/profile/manager/presentation/screens/manager_notification
 import '../../features/knowledge_base/presentation/screens/knowledge_base_screen.dart';
 import '../../features/knowledge_base/presentation/screens/pdf_reader_screen.dart';
 
-import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/ui/login_page.dart';
 import '../../features/auth/presentation/screens/recover_ask_login_screen.dart';
 import '../../features/auth/presentation/screens/recover_code_screen.dart';
 import '../../features/auth/presentation/screens/recover_new_password_screen.dart';
@@ -110,7 +110,7 @@ class AppRouter {
       }
 
       case Routes.authLogin:
-        return MaterialPageRoute(builder: (_) => const LoginScreen());
+        return MaterialPageRoute(builder: (_) => const LoginPage());
       case Routes.recoverAsk:
         return MaterialPageRoute(builder: (_) => const RecoverAskLoginScreen());
       case Routes.recoverCode:
