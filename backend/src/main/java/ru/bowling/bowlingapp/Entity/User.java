@@ -7,10 +7,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "users", indexes = {
-        @Index(name = "idx_users_phone_unique", columnList = "phone", unique = true),
-        @Index(name = "idx_users_email_unique", columnList = "email", unique = true)
-})
+@Table(name = "users")
 @Data
 @Builder
 @AllArgsConstructor
@@ -27,9 +24,6 @@ public class User {
 
     @Column(name = "phone", nullable = false, unique = true, length = 20)
     private String phone;
-
-    @Column(name = "email", unique = true, length = 320)
-    private String email;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "role_id", nullable = false)

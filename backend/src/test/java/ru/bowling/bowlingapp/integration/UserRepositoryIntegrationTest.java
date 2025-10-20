@@ -17,14 +17,14 @@ import ru.bowling.bowlingapp.Repository.RoleRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
 
 import java.time.LocalDate;
-import java.util.Optional;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class UserRepositoryIntegrationTest {
+public class UserRepositoryIntegrationTest {
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine");
@@ -47,7 +47,8 @@ class UserRepositoryIntegrationTest {
     private AccountTypeRepository accountTypeRepository;
 
     @Test
-    void whenSaveUser_thenCanFindByPhoneAndEmailIgnoringCase() {
+    void whenSaveAndRetrieveUser_thenCorrectMapping() {
+        // Given
         Role role = new Role();
         role.setName("TEST_ROLE");
         Role savedRole = roleRepository.save(role);
@@ -57,54 +58,29 @@ class UserRepositoryIntegrationTest {
         AccountType savedAccountType = accountTypeRepository.save(accountType);
 
         User user = User.builder()
-                .phone("+79991234567")
-                .email("owner@example.com")
+                .phone("1234567890")
                 .passwordHash("hashed_password")
                 .role(savedRole)
                 .accountType(savedAccountType)
-                .registrationDate(LocalDate.now())
+                .registrationDate(LocalDateTime.now())
                 .isActive(true)
                 .isVerified(true)
                 .build();
 
+        // When
         User savedUser = userRepository.save(user);
+        User foundUser = userRepository.findById(savedUser.getUserId()).orElse(null);
 
-        Optional<User> byPhone = userRepository.findByPhone("+79991234567");
-        Optional<User> byEmailLower = userRepository.findByEmailIgnoreCase("owner@example.com");
-        Optional<User> byEmailUpper = userRepository.findByEmailIgnoreCase("OWNER@EXAMPLE.COM");
-
-        assertThat(byPhone).isPresent();
-        assertThat(byPhone.get().getUserId()).isEqualTo(savedUser.getUserId());
-        assertThat(byEmailLower).isPresent();
-        assertThat(byEmailUpper).isPresent();
-        assertThat(byEmailUpper.get().getUserId()).isEqualTo(savedUser.getUserId());
-    }
-
-    @Test
-    void whenEmailExists_thenExistsByEmailReturnsTrue() {
-        Role role = new Role();
-        role.setName("ROLE_TWO");
-        Role savedRole = roleRepository.save(role);
-
-        AccountType accountType = new AccountType();
-        accountType.setName("ACCOUNT_TWO");
-        AccountType savedAccountType = accountTypeRepository.save(accountType);
-
-        User user = User.builder()
-                .phone("+79990000000")
-                .email("second@example.com")
-                .passwordHash("hashed_password")
-                .role(savedRole)
-                .accountType(savedAccountType)
-                .registrationDate(LocalDate.now())
-                .isActive(true)
-                .isVerified(false)
-                .build();
-
-        userRepository.save(user);
-
-        assertThat(userRepository.existsByEmailIgnoreCase("second@example.com")).isTrue();
-        assertThat(userRepository.existsByEmailIgnoreCase("SECOND@example.com")).isTrue();
-        assertThat(userRepository.existsByEmailIgnoreCase("missing@example.com")).isFalse();
+        // Then
+        assertThat(foundUser).isNotNull();
+        assertThat(foundUser.getUserId()).isNotNull();
+        assertThat(foundUser.getUserId()).isInstanceOf(Long.class);
+        assertThat(foundUser.getPhone()).isEqualTo("1234567890");
+        assertThat(foundUser.getRole()).isNotNull();
+        assertThat(foundUser.getRole().getRoleId()).isEqualTo(savedRole.getRoleId());
+        assertThat(foundUser.getRole().getRoleId()).isInstanceOf(Long.class);
+        assertThat(foundUser.getAccountType()).isNotNull();
+        assertThat(foundUser.getAccountType().getAccountTypeId()).isEqualTo(savedAccountType.getAccountTypeId());
+        assertThat(foundUser.getAccountType().getAccountTypeId()).isInstanceOf(Long.class);
     }
 }

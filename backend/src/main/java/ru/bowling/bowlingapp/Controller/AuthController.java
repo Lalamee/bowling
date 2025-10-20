@@ -4,21 +4,15 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.*;
 import ru.bowling.bowlingapp.Config.JwtTokenProvider;
 import ru.bowling.bowlingapp.DTO.*;
-import ru.bowling.bowlingapp.Entity.MechanicProfile;
-import ru.bowling.bowlingapp.Entity.OwnerProfile;
 import ru.bowling.bowlingapp.Entity.User;
-import ru.bowling.bowlingapp.Repository.UserRepository;
 import ru.bowling.bowlingapp.Service.AuthService;
-
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -26,11 +20,8 @@ import java.util.regex.Pattern;
 public class AuthController {
 
     private final AuthService authService;
+    private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", Pattern.CASE_INSENSITIVE);
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequestDTO request) {
@@ -40,41 +31,26 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
-        Identifier identifier = resolveIdentifier(request.getIdentifier());
-        if (identifier == null) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("code", "AUTH_IDENTIFIER_INVALID", "message", "Введите телефон +7XXXXXXXXXX или e-mail"));
-        }
+    public ResponseEntity<?> login(@Valid @RequestBody UserLoginDTO loginDto) {
+        User user = authService.authenticateUser(loginDto.getPhone(), loginDto.getPassword());
 
-        Optional<User> userOptional = identifier.type == IdentifierType.PHONE
-                ? userRepository.findByPhone(identifier.value)
-                : userRepository.findByEmailIgnoreCase(identifier.value);
-
-        if (userOptional.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("code", "AUTH_INVALID", "message", "Неверный логин или пароль"));
-        }
-
-        User user = userOptional.get();
-        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("code", "AUTH_INVALID", "message", "Неверный логин или пароль"));
-        }
-
-        if (user.getIsActive() != null && !user.getIsActive()) {
+        if (!user.getIsActive()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("code", "AUTH_INACTIVE", "message", "Аккаунт деактивирован"));
+                    .body(StandardResponseDTO.builder().message("Account is deactivated").status("error").build());
+        }
+
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(loginDto.getPhone(), loginDto.getPassword())
+            );
+        } catch (AuthenticationException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(StandardResponseDTO.builder().message("Invalid phone or password").status("error").build());
         }
 
         String accessToken = jwtTokenProvider.generateAccessToken(user);
         String refreshToken = jwtTokenProvider.generateRefreshToken(user);
-        LoginResponseDTO response = LoginResponseDTO.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .tokenType("Bearer")
-                .user(buildUserSummary(user))
-                .build();
+        LoginResponseDTO response = new LoginResponseDTO(accessToken, refreshToken);
         return ResponseEntity.ok(response);
     }
 
@@ -101,12 +77,7 @@ public class AuthController {
 
         String newAccessToken = jwtTokenProvider.generateAccessToken(user);
         String newRefreshToken = jwtTokenProvider.generateRefreshToken(user);
-        LoginResponseDTO response = LoginResponseDTO.builder()
-                .accessToken(newAccessToken)
-                .refreshToken(newRefreshToken)
-                .tokenType("Bearer")
-                .user(buildUserSummary(user))
-                .build();
+        LoginResponseDTO response = new LoginResponseDTO(newAccessToken, newRefreshToken);
         return ResponseEntity.ok(response);
     }
 
@@ -147,73 +118,15 @@ public class AuthController {
         return ResponseEntity.ok(StandardResponseDTO.builder().message("Password changed successfully").status("success").build());
     }
 
-    private Identifier resolveIdentifier(String raw) {
-        if (raw == null) {
-            return null;
-        }
-        String trimmed = raw.trim();
-        if (trimmed.isEmpty()) {
-            return null;
-        }
-
-        String normalizedPhone = normalizePhone(trimmed);
-        if (normalizedPhone != null) {
-            return new Identifier(normalizedPhone, IdentifierType.PHONE);
-        }
-
-        String normalizedEmail = normalizeEmail(trimmed);
-        if (normalizedEmail != null) {
-            return new Identifier(normalizedEmail, IdentifierType.EMAIL);
-        }
-
-        return null;
-    }
-
-    private String normalizePhone(String input) {
-        String digits = input.replaceAll("\\D", "");
-        if (digits.length() == 11 && digits.startsWith("8")) {
-            digits = "7" + digits.substring(1);
-        }
-        if (digits.length() == 10) {
-            return "+7" + digits;
-        }
-        if (digits.length() == 11 && digits.startsWith("7")) {
-            return "+7" + digits.substring(1);
-        }
-        return null;
-    }
-
-    private String normalizeEmail(String input) {
-        String email = input.trim();
-        if (EMAIL_PATTERN.matcher(email).matches()) {
-            return email.toLowerCase(Locale.ROOT);
-        }
-        return null;
-    }
-
-    private UserSummaryDTO buildUserSummary(User user) {
-        String name = Optional.ofNullable(user.getMechanicProfile())
-                .map(MechanicProfile::getFullName)
-                .filter(s -> s != null && !s.trim().isEmpty())
-                .or(() -> Optional.ofNullable(user.getOwnerProfile())
-                        .map(OwnerProfile::getContactPerson)
-                        .filter(s -> s != null && !s.trim().isEmpty()))
-                .orElse(null);
-
-        return UserSummaryDTO.builder()
-                .id(user.getUserId())
-                .role(user.getRole() != null ? user.getRole().getName() : null)
-                .name(name)
-                .email(user.getEmail())
-                .phone(user.getPhone())
-                .build();
-    }
-
-    private record Identifier(String value, IdentifierType type) {
-    }
-
-    private enum IdentifierType {
-        PHONE,
-        EMAIL
-    }
+//    @PostMapping("/reset-password/request")
+//    public ResponseEntity<?> requestPasswordReset(@Valid @RequestBody PasswordResetInitRequestDTO request) {
+//        authService.requestPasswordReset(request.getPhone());
+//        return ResponseEntity.ok(StandardResponseDTO.builder().message("Reset token sent").status("success").build());
+//    }
+//
+//    @PostMapping("/reset-password/confirm")
+//    public ResponseEntity<?> confirmPasswordReset(@Valid @RequestBody PasswordResetConfirmRequestDTO request) {
+//        authService.confirmPasswordReset(request.getToken(), request.getNewPassword());
+//        return ResponseEntity.ok(StandardResponseDTO.builder().message("Password reset successfully").status("success").build());
+//    }
 }
