@@ -6,6 +6,7 @@ import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/utils/net_ui.dart';
 import '../../../../../core/utils/validators.dart';
+import '../../../../../core/utils/phone_utils.dart';
 import '../../../../../shared/widgets/buttons/custom_button.dart';
 import '../../../../../shared/widgets/chips/radio_group_horizontal.dart';
 import '../../../../../shared/widgets/chips/radio_group_vertical.dart';
@@ -96,22 +97,22 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
       return;
     }
 
-    final trimmedPhone = _phone.text.trim();
+    final normalizedPhone = PhoneUtils.normalize(_phone.text);
     final password = 'password123';
 
     final data = {
-      'phone': trimmedPhone,
+      'phone': normalizedPhone,
       'password': password,
       'inn': _inn.text.trim(),
       'legalName': _club.text.trim(),
       'contactPerson': _fio.text.trim(),
-      'contactPhone': trimmedPhone,
+      'contactPhone': normalizedPhone,
       'contactEmail': _email.text.trim(),
     };
 
     final profileSnapshot = {
       'fullName': _fio.text.trim(),
-      'phone': trimmedPhone,
+      'phone': normalizedPhone,
       'clubName': _club.text.trim(),
       'address': _addr.text.trim(),
       'status': status,
@@ -128,7 +129,7 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
         throw Exception('Не удалось зарегистрировать владельца. Попробуйте ещё раз.');
       }
 
-      final loginResult = await AuthService.login(phone: trimmedPhone, password: password);
+      final loginResult = await AuthService.login(phone: normalizedPhone, password: password);
       if (loginResult == null) {
         throw Exception('Регистрация выполнена, но не удалось войти. Попробуйте выполнить вход вручную.');
       }

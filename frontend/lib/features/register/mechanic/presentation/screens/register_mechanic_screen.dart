@@ -9,6 +9,7 @@ import '../../../../../shared/widgets/chips/radio_group_wrap.dart';
 import '../../../../../shared/widgets/chips/radio_group_horizontal.dart';
 import '../../../../../shared/widgets/layout/common_ui.dart';
 import '../../../../../core/utils/validators.dart';
+import '../../../../../core/utils/phone_utils.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/routing/routes.dart';
@@ -262,11 +263,11 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       places.add(fallbackName.isNotEmpty ? fallbackName : trimmedClub);
     }
 
-    final trimmedPhone = _phone.text.trim();
+    final normalizedPhone = PhoneUtils.normalize(_phone.text);
     final data = {
       'fio': _fio.text.trim(),
       'birth': DateFormat('yyyy-MM-dd').format(birthDate!),
-      'phone': trimmedPhone,
+      'phone': normalizedPhone,
       'password': 'password123',
       'educationLevelId': educationLevelId!, // уже "1".."5"
       'educationName': _educationName.text.trim(),
@@ -308,7 +309,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
 
     final profileData = {
       'fullName': _fio.text.trim(),
-      'phone': trimmedPhone,
+      'phone': normalizedPhone,
       'clubName': displayClubName.isNotEmpty
           ? displayClubName
           : (clubsCache.isNotEmpty ? clubsCache.first : trimmedClub),
@@ -321,7 +322,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'workplaceVerified': false,
     };
     final password = data['password']?.toString() ?? 'password123';
-    final loginResult = await AuthService.login(phone: trimmedPhone, password: password);
+    final loginResult = await AuthService.login(phone: normalizedPhone, password: password);
     if (loginResult == null) {
       _showBar('Не удалось войти с новыми данными, попробуйте позже');
       return;
