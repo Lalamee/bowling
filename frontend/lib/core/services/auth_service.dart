@@ -27,7 +27,7 @@ class AuthService {
   }
 
   static Future<bool> registerOwner(Map<String, dynamic> data) async {
-    const int ownerRoleId = 2; // соответствует роли CLUB_OWNER на бэкенде
+    const int ownerRoleId = 5; // соответствует роли CLUB_OWNER на бэкенде
     const int ownerAccountTypeId = 2; // соответствует типу аккаунта владельца клуба
 
     String? _nullable(dynamic value) {
@@ -44,6 +44,12 @@ class AuthService {
     }
 
     try {
+      String? _nullable(dynamic value) {
+        if (value == null) return null;
+        final str = value.toString().trim();
+        return str.isEmpty ? null : str;
+      }
+
       final request = RegisterRequestDto(
         user: RegisterUserDto(
           phone: data['phone'],
