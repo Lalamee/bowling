@@ -4,7 +4,6 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-import com.android.build.api.variant.ApkVariantOutput
 import java.io.FileInputStream
 import java.util.Properties
 
@@ -68,20 +67,18 @@ android {
             isEnable = true
             reset()
             include("armeabi-v7a", "arm64-v8a")
-            isUniversalApk = true
+            isUniversalApk = false
         }
     }
 }
 
 androidComponents {
-    onVariants(selector().withBuildType("release")) { variant ->
-        variant.outputs
-            .filterIsInstance<ApkVariantOutput>()
-            .forEach { output ->
-                if (output.filters.isEmpty()) {
-                    output.enabled = false
-                }
-            }
+    onVariants(selector().all()) { variant: com.android.build.api.variant.ApplicationVariant ->
+        variant.outputs.forEach { output: com.android.build.api.variant.VariantOutput ->
+            val apkOutput = output as? com.android.build.api.variant.ApkVariantOutput ?: return@forEach
+            val versionName = apkOutput.versionName.orNull ?: variant.name
+            apkOutput.outputFileName.set("${variant.name}-$versionName.apk")
+        }
     }
 }
 
