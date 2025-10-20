@@ -288,20 +288,34 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       return;
     }
 
-    final trimmedPhone = _phone.text.trim();
-    final trimmedClub = _currentClub.text.trim();
-    final trimmedStatus = status?.trim();
     final clubsCache = List<String>.from(places);
-    if (clubsCache.isEmpty && trimmedClub.isNotEmpty) {
+    if (clubsCache.isEmpty && displayClubName.isNotEmpty) {
+      clubsCache.add(displayClubName);
+    } else if (clubsCache.isEmpty && trimmedClub.isNotEmpty) {
       clubsCache.add(trimmedClub);
     }
+
+    final normalizedStatus = () {
+      final trimmed = trimmedStatus?.trim();
+      if (trimmed != null && trimmed.isNotEmpty) {
+        return trimmed;
+      }
+      if (status != null && status!.trim().isNotEmpty) {
+        return status!.trim();
+      }
+      return 'Самозанятый';
+    }();
 
     final profileData = {
       'fullName': _fio.text.trim(),
       'phone': trimmedPhone,
-      'clubName': clubsCache.isNotEmpty ? clubsCache.first : trimmedClub,
-      'address': clubsCache.isNotEmpty ? clubsCache.first : trimmedClub,
-      'status': trimmedStatus ?? 'Самозанятый',
+      'clubName': displayClubName.isNotEmpty
+          ? displayClubName
+          : (clubsCache.isNotEmpty ? clubsCache.first : trimmedClub),
+      'address': displayAddress.isNotEmpty
+          ? displayAddress
+          : (clubsCache.isNotEmpty ? clubsCache.first : trimmedClub),
+      'status': normalizedStatus,
       'birthDate': birthDate?.toIso8601String(),
       'clubs': clubsCache,
       'workplaceVerified': false,
