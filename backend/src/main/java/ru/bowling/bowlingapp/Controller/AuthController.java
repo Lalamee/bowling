@@ -93,18 +93,8 @@ public class AuthController {
                     .body(StandardResponseDTO.builder().message("User not authenticated").status("error").build());
         }
 
-        String phone = authentication.getName();
-        User user = authService.findUserByPhone(phone);
-
-        UserInfoDTO userInfo = UserInfoDTO.builder()
-                .id(user.getUserId())
-                .phone(user.getPhone())
-                .roleId(user.getRole().getRoleId())
-                .accountTypeId(user.getAccountType().getAccountTypeId())
-                .isVerified(user.getIsVerified())
-                .registrationDate(user.getRegistrationDate())
-                .build();
-        return ResponseEntity.ok(userInfo);
+        String login = authentication.getName();
+        return ResponseEntity.ok(authService.getCurrentUserInfo(login));
     }
 
     @PostMapping("/change-password")

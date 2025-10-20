@@ -33,9 +33,16 @@ public class AuthService implements UserDetailsService {
         return UserPrincipal.create(user);
     }
 
+    @Transactional(readOnly = true)
     public User findUserByPhone(String phone) {
         return userRepository.findByPhone(phone)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with phone: " + phone));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getCurrentUserInfo(String login) {
+        User user = findUserByLogin(login);
+        return buildUserInfoResponse(user);
     }
 
     public User authenticateUser(String phone, String password) {
