@@ -1,20 +1,20 @@
 class UserLoginDto {
-  final String phone;
+  final String identifier;
   final String password;
 
   UserLoginDto({
-    required this.phone,
+    required this.identifier,
     required this.password,
   });
 
   Map<String, dynamic> toJson() => {
-        'phone': phone,
+        'identifier': identifier,
         'password': password,
       };
 
   factory UserLoginDto.fromJson(Map<String, dynamic> json) {
     return UserLoginDto(
-      phone: json['phone'] as String,
+      identifier: json['identifier'] as String,
       password: json['password'] as String,
     );
   }

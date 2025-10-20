@@ -24,24 +24,17 @@ public class AuthService implements UserDetailsService {
     private final PasswordEncoder passwordEncoder;
 
     @Override
-    public UserDetails loadUserByUsername(String phone) throws UsernameNotFoundException {
-        User user = userRepository.findByPhone(phone)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with phone: " + phone));
-        
+    public UserDetails loadUserByUsername(String identifier) throws UsernameNotFoundException {
+        User user = userRepository.findByPhone(identifier)
+                .or(() -> userRepository.findByEmailIgnoreCase(identifier))
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with identifier: " + identifier));
+
         return UserPrincipal.create(user);
     }
 
     public User findUserByPhone(String phone) {
         return userRepository.findByPhone(phone)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with phone: " + phone));
-    }
-
-    public User authenticateUser(String phone, String password) {
-        User user = findUserByPhone(phone);
-        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
-            throw new IllegalArgumentException("Invalid password");
-        }
-        return user;
     }
 
     @Transactional
