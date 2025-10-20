@@ -235,33 +235,33 @@ public class AuthService implements UserDetailsService {
         if (dto.getAccountTypeId() == null) {
             throw new IllegalArgumentException("Account type ID is required");
         }
-
-        if (accountType == null) {
-            throw new IllegalArgumentException("Account type not found");
-        }
-
-        if (isMechanicAccountType(accountType.getName())) {
-            if (mechanicDto == null) {
-                throw new IllegalArgumentException("Mechanic profile data is required for mechanic account type");
-            }
-            if (mechanicDto.getFullName() == null || mechanicDto.getFullName().trim().isEmpty()) {
-                throw new IllegalArgumentException("Full name is required for mechanic profile");
-            }
-            if (mechanicDto.getBirthDate() == null) {
-                throw new IllegalArgumentException("Birth date is required for mechanic profile");
-            }
-            if (mechanicDto.getTotalExperienceYears() == null || mechanicDto.getTotalExperienceYears() < 0) {
-                throw new IllegalArgumentException("Total experience years must be non-negative");
-            }
-            if (mechanicDto.getBowlingExperienceYears() == null || mechanicDto.getBowlingExperienceYears() < 0) {
-                throw new IllegalArgumentException("Bowling experience years must be non-negative");
-            }
-        } else if (isOwnerAccountType(accountType.getName())) {
-            if (ownerDto == null) {
-                throw new IllegalArgumentException("Owner profile data is required for club owner account type");
-            }
-            if (ownerDto.getInn() == null || ownerDto.getInn().trim().isEmpty()) {
-                throw new IllegalArgumentException("INN is required for owner profile");
+        
+        
+        AccountType accountType = accountTypeRepository.findById(dto.getAccountTypeId()).orElse(null);
+        if (accountType != null) {
+            if (isMechanicAccountType(accountType.getName())) {
+                if (mechanicDto == null) {
+                    throw new IllegalArgumentException("Mechanic profile data is required for mechanic account type");
+                }
+                if (mechanicDto.getFullName() == null || mechanicDto.getFullName().trim().isEmpty()) {
+                    throw new IllegalArgumentException("Full name is required for mechanic profile");
+                }
+                if (mechanicDto.getBirthDate() == null) {
+                    throw new IllegalArgumentException("Birth date is required for mechanic profile");
+                }
+                if (mechanicDto.getTotalExperienceYears() == null || mechanicDto.getTotalExperienceYears() < 0) {
+                    throw new IllegalArgumentException("Total experience years must be non-negative");
+                }
+                if (mechanicDto.getBowlingExperienceYears() == null || mechanicDto.getBowlingExperienceYears() < 0) {
+                    throw new IllegalArgumentException("Bowling experience years must be non-negative");
+                }
+            } else if (isOwnerAccountType(accountType.getName())) {
+                if (ownerDto == null) {
+                    throw new IllegalArgumentException("Owner profile data is required for club owner account type");
+                }
+                if (ownerDto.getInn() == null || ownerDto.getInn().trim().isEmpty()) {
+                    throw new IllegalArgumentException("INN is required for owner profile");
+                }
             }
         }
     }
