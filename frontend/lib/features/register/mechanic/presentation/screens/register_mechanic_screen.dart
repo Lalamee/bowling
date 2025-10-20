@@ -288,27 +288,34 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       return;
     }
 
-    final clubsCache = displayClubName.isNotEmpty ? [displayClubName] : <String>[];
+    final trimmedPhone = _phone.text.trim();
+    final trimmedClub = _currentClub.text.trim();
+    final trimmedStatus = status?.trim();
+    final clubsCache = List<String>.from(places);
+    if (clubsCache.isEmpty && trimmedClub.isNotEmpty) {
+      clubsCache.add(trimmedClub);
+    }
 
     final profileData = {
       'fullName': _fio.text.trim(),
       'phone': trimmedPhone,
-      'clubName': displayClubName,
-      'address': displayAddress,
+      'clubName': clubsCache.isNotEmpty ? clubsCache.first : trimmedClub,
+      'address': clubsCache.isNotEmpty ? clubsCache.first : trimmedClub,
       'status': trimmedStatus ?? 'Самозанятый',
       'birthDate': birthDate?.toIso8601String(),
       'clubs': clubsCache,
       'workplaceVerified': false,
     };
-    await LocalAuthStorage.saveMechanicProfile(profileData);
-    await LocalAuthStorage.setMechanicRegistered(true);
-
     final password = data['password']?.toString() ?? 'password123';
     final loginResult = await AuthService.login(phone: trimmedPhone, password: password);
     if (loginResult == null) {
       _showBar('Не удалось войти с новыми данными, попробуйте позже');
       return;
     }
+
+    await LocalAuthStorage.saveMechanicProfile(profileData);
+    await LocalAuthStorage.setMechanicRegistered(true);
+    await LocalAuthStorage.setRegisteredRole('mechanic');
 
     if (!mounted) return;
     Navigator.of(context).pushNamedAndRemoveUntil(Routes.profileMechanic, (route) => false);

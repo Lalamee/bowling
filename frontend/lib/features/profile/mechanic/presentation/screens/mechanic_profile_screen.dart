@@ -1,5 +1,6 @@
 import 'dart:developer';
 
+import '../../../../../core/repositories/user_repository.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../../core/repositories/user_repository.dart';
@@ -13,6 +14,12 @@ import '../../../../../shared/widgets/tiles/profile_tile.dart';
 import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
 import '../../domain/mechanic_profile.dart';
 import 'edit_mechanic_profile_screen.dart';
+import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
+import '../../../../../core/utils/bottom_nav.dart';
+import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
+import '../../../../../core/routing/routes.dart';
+import '../../../../../core/services/auth_service.dart';
+import '../../../../../core/services/local_auth_storage.dart';
 
 enum EditFocus { none, name, phone, address }
 
@@ -28,8 +35,6 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   late MechanicProfile profile;
   bool _isLoading = true;
   bool _hasError = false;
-  bool _hasCachedProfile = false;
-  Map<String, dynamic>? _cachedRawProfile;
 
   @override
   void initState() {
@@ -44,13 +49,8 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       birthDate: DateTime.now(),
       status: '',
     );
-    _init();
-  }
-
-  Future<void> _init() async {
-    await _loadLocalProfile();
-    if (!mounted) return;
-    await _load();
+    _loadLocalProfile();
+    _load();
   }
 
   Future<void> _loadLocalProfile() async {
@@ -66,7 +66,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     try {
       if (mounted) {
         setState(() {
-          _isLoading = !_hasCachedProfile;
+          _isLoading = true;
           _hasError = false;
         });
       }
@@ -75,16 +75,12 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       if (me == null) {
         setState(() {
           _isLoading = false;
-          _hasError = !_hasCachedProfile;
+          _hasError = true;
         });
-        if (_hasCachedProfile) {
-          _showLoadError();
-        }
         return;
       }
       final cache = _mapApiToCache(me);
       await LocalAuthStorage.saveMechanicProfile(cache);
-      await LocalAuthStorage.setMechanicRegistered(true);
       if (!mounted) return;
       _applyProfile(cache);
     } catch (e, s) {
@@ -92,21 +88,10 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _hasError = !_hasCachedProfile;
+          _hasError = true;
         });
-        if (_hasCachedProfile) {
-          _showLoadError();
-        }
       }
     }
-  }
-
-  void _showLoadError() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Не удалось обновить профиль, отображены сохранённые данные'),
-      ),
-    );
   }
 
   Map<String, dynamic> _mapApiToCache(Map<String, dynamic> me) {
@@ -123,14 +108,9 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     String? status;
     String? clubName;
     String? address;
-    String? fullName;
 
     if (profileData is Map) {
       final map = Map<String, dynamic>.from(profileData);
-      final profileFullName = _asString(map['fullName']);
-      if (profileFullName != null) {
-        fullName = profileFullName;
-      }
       final workPlaces = map['workPlaces'];
       if (workPlaces is String) {
         clubs.addAll(workPlaces
@@ -184,46 +164,53 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       }
     }
 
-    final raw = {
-      'fullName': fullName ?? _asString(me['fullName']),
-      'phone': _asString(me['phone']),
-      'status': status,
+    return {
+      'fullName': _asString(me['fullName']) ?? _asString(me['phone']) ?? profile.fullName,
+      'phone': _asString(me['phone']) ?? profile.phone,
+      'status': status ?? profile.status,
       'clubs': clubs,
-      'clubName': clubName,
-      'address': address,
+      'clubName': clubName ?? (clubs.isNotEmpty ? clubs.first : profile.clubName),
+      'address': address ?? (clubs.isNotEmpty ? clubs.first : profile.address),
       'birthDate': birthDate?.toIso8601String(),
-      'workplaceVerified': workplaceVerified,
+      'workplaceVerified': workplaceVerified ?? profile.workplaceVerified,
     };
-
-    return _normalizeProfileData(raw);
   }
 
   void _applyProfile(Map<String, dynamic> raw) {
-    final normalized = _normalizeProfileData(raw);
-    final birthIso = normalized['birthDate'] as String?;
-    final birthDate = birthIso != null ? DateTime.tryParse(birthIso) : null;
+    String? _asString(dynamic value) {
+      if (value == null) return null;
+      final str = value.toString().trim();
+      return str.isEmpty ? null : str;
+    }
 
-    final clubs = (normalized['clubs'] as List?)?.map((e) => e.toString()).toList() ?? const <String>[];
+    final clubs = <String>[];
+    final rawClubs = raw['clubs'];
+    if (rawClubs is Iterable) {
+      clubs.addAll(rawClubs.map((e) => e.toString().trim()).where((e) => e.isNotEmpty));
+    } else if (rawClubs is String && rawClubs.isNotEmpty) {
+      clubs.addAll(rawClubs.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty));
+    }
+
+    final birthRaw = raw['birthDate'];
+    DateTime? birthDate;
+    if (birthRaw is String && birthRaw.isNotEmpty) {
+      birthDate = DateTime.tryParse(birthRaw);
+    }
 
     setState(() {
       profile = profile.copyWith(
-        fullName: normalized['fullName'] as String? ?? profile.fullName,
-        phone: normalized['phone'] as String? ?? profile.phone,
-        clubName: normalized['clubName'] as String? ?? profile.clubName,
-        address: normalized['address'] as String? ?? profile.address,
-        status: normalized['status'] as String? ?? profile.status,
+        fullName: _asString(raw['fullName']) ?? profile.fullName,
+        phone: _asString(raw['phone']) ?? profile.phone,
+        clubName: _asString(raw['clubName']) ?? (clubs.isNotEmpty ? clubs.first : profile.clubName),
+        address: _asString(raw['address']) ?? (clubs.isNotEmpty ? clubs.first : profile.address),
+        status: _asString(raw['status']) ?? profile.status,
         clubs: clubs.isNotEmpty ? clubs : null,
-        workplaceVerified: normalized['workplaceVerified'] as bool? ?? profile.workplaceVerified,
+        workplaceVerified: raw['workplaceVerified'] as bool? ?? profile.workplaceVerified,
         birthDate: birthDate ?? profile.birthDate,
       );
       _isLoading = false;
       _hasError = false;
-      _hasCachedProfile = true;
     });
-    _cachedRawProfile = {
-      ...normalized,
-      'clubs': List<String>.from(clubs.isNotEmpty ? clubs : profile.clubs),
-    };
   }
 
   Map<String, dynamic> _normalizeProfileData(Map<String, dynamic> raw) {

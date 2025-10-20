@@ -17,7 +17,7 @@ class WelcomeScreen extends StatefulWidget {
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
   late final TapGestureRecognizer _policyRecognizer;
-  bool _canEnter = false;
+  String? _registeredRole;
 
   @override
   void initState() {
@@ -33,27 +33,27 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 
   Future<void> _loadRegistrationStatus() async {
-    final registered = await LocalAuthStorage.isMechanicRegistered();
-    final cached = await LocalAuthStorage.loadMechanicProfile();
+    final role = await LocalAuthStorage.getRegisteredRole();
     if (!mounted) return;
-    setState(() => _canEnter = registered || cached != null);
+    setState(() {
+      _registeredRole = role?.toLowerCase();
+    });
   }
 
-  Future<void> _enter() async {
+  void _enter() {
     if (TestOverrides.useLoginScreen) {
       Navigator.pushReplacementNamed(context, Routes.authLogin);
       return;
     }
-    final cached = await LocalAuthStorage.loadMechanicProfile();
-    final registered = await LocalAuthStorage.isMechanicRegistered();
-    final canEnter = registered || cached != null;
-    if (mounted && canEnter != _canEnter) {
-      setState(() => _canEnter = canEnter);
+    var role = _registeredRole?.trim().toLowerCase();
+    if (role == null || role.isEmpty) {
+      if (TestOverrides.enabled) {
+        role = TestOverrides.userRole.toLowerCase();
+      } else {
+        Navigator.pushReplacementNamed(context, Routes.authLogin);
+        return;
+      }
     }
-    if (!canEnter) {
-      return;
-    }
-    final role = TestOverrides.userRole.toLowerCase();
     if (role == 'owner') {
       Navigator.pushReplacementNamed(context, Routes.profileOwner);
     } else if (role == 'manager') {
