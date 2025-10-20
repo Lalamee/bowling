@@ -99,8 +99,6 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
 
     final trimmedFullName = _fio.text.trim();
     final trimmedInn = _inn.text.trim();
-    final normalizedInnDigits = trimmedInn.replaceAll(RegExp(r'\D'), '');
-    final innForPayload = normalizedInnDigits.isNotEmpty ? normalizedInnDigits : trimmedInn;
     final trimmedClub = _club.text.trim();
     final trimmedAddress = _addr.text.trim();
     final trimmedEmail = _email.text.trim();
@@ -112,7 +110,7 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
     final data = {
       'phone': normalizedPhone,
       'password': password,
-      'inn': innForPayload,
+      'inn': trimmedInn,
       'legalName': trimmedClub,
       'contactPerson': trimmedFullName,
       'contactPhone': normalizedPhone,
@@ -132,7 +130,7 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
       'status': trimmedStatus ?? status,
       'clubs': clubs,
       'email': trimmedEmail,
-      'inn': innForPayload,
+      'inn': trimmedInn,
       'lanes': trimmedLanes,
       'equipment': equipment,
       'workplaceVerified': false,

@@ -1,5 +1,3 @@
-import 'package:dio/dio.dart';
-
 import '../../api/api_core.dart';
 import '../../api/api_service.dart';
 import '../../models/user_login_dto.dart';
@@ -27,22 +25,6 @@ class AuthService {
   }
 
   static Future<bool> registerOwner(Map<String, dynamic> data) async {
-    const int ownerRoleId = 5; // соответствует роли CLUB_OWNER на бэкенде
-    const int ownerAccountTypeId = 2; // соответствует типу аккаунта владельца клуба
-
-    String? _nullable(dynamic value) {
-      if (value == null) return null;
-      final str = value.toString().trim();
-      return str.isEmpty ? null : str;
-    }
-
-    String _sanitizeInn(String? value) {
-      if (value == null) return '';
-      final trimmed = value.trim();
-      final digitsOnly = trimmed.replaceAll(RegExp(r'\D'), '');
-      return digitsOnly.isNotEmpty ? digitsOnly : trimmed;
-    }
-
     try {
       String? _nullable(dynamic value) {
         if (value == null) return null;
@@ -54,29 +36,22 @@ class AuthService {
         user: RegisterUserDto(
           phone: data['phone'],
           password: data['password'] ?? 'password123',
-          roleId: ownerRoleId,
-          accountTypeId: ownerAccountTypeId,
+          roleId: 3,
+          accountTypeId: 2,
         ),
         ownerProfile: OwnerProfileDto(
-          inn: _sanitizeInn(data['inn']),
+          inn: _nullable(data['inn']) ?? '',
           legalName: _nullable(data['legalName']),
           contactPerson: _nullable(data['contactPerson']),
           contactPhone: _nullable(data['contactPhone']),
           contactEmail: _nullable(data['contactEmail']),
         ),
       );
-
       final response = await _api.register(request);
       if (!response.isSuccess) {
         throw ApiException(response.message);
       }
       return true;
-    } on DioException catch (e) {
-      final err = e.error;
-      if (err is ApiException) {
-        throw err;
-      }
-      throw ApiException(e.message ?? 'Не удалось зарегистрировать владельца');
     } on ApiException {
       rethrow;
     } catch (_) {
