@@ -66,18 +66,17 @@ android {
         abi {
             isEnable = true
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
-            isUniversalApk = true
+            include("armeabi-v7a", "arm64-v8a")
+            isUniversalApk = false
         }
     }
 }
 
 androidComponents {
     onVariants(selector().all()) { variant: com.android.build.api.variant.ApplicationVariant ->
-        val versionName = variant.versionName.orNull ?: variant.name
         variant.outputs.forEach { output: com.android.build.api.variant.VariantOutput ->
             if (output is com.android.build.api.variant.ApkVariantOutput) {
-                output.outputFileName.set("${variant.name}-$versionName.apk")
+                output.outputFileName.set("${variant.name}-${variant.versionName.get()}.apk")
             }
         }
     }
