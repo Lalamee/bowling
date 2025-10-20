@@ -74,10 +74,11 @@ android {
 
 androidComponents {
     onVariants(selector().all()) { variant: com.android.build.api.variant.ApplicationVariant ->
+        val versionName = variant.versionName.orNull ?: variant.name
         variant.outputs.forEach { output: com.android.build.api.variant.VariantOutput ->
-            val apkOutput = output as? com.android.build.api.variant.ApkVariantOutput ?: return@forEach
-            val versionName = apkOutput.versionName.orNull ?: variant.name
-            apkOutput.outputFileName.set("${variant.name}-$versionName.apk")
+            if (output is com.android.build.api.variant.ApkVariantOutput) {
+                output.outputFileName.set("${variant.name}-$versionName.apk")
+            }
         }
     }
 }
