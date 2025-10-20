@@ -70,14 +70,11 @@ android {
             isUniversalApk = false
         }
     }
-}
 
-androidComponents {
-    onVariants(selector().all()) { variant: com.android.build.api.variant.ApplicationVariant ->
-        variant.outputs.forEach { output: com.android.build.api.variant.VariantOutput ->
-            if (output is com.android.build.api.variant.ApkVariantOutput) {
-                output.outputFileName.set("${variant.name}-${variant.versionName.get()}.apk")
-            }
+    applicationVariants.all { variant ->
+        variant.outputs.forEach { out ->
+            val o = out as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            o.outputFileName = "${variant.name}-${variant.versionName}.apk"
         }
     }
 }
