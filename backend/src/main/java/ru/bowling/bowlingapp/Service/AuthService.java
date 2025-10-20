@@ -131,8 +131,14 @@ public class AuthService implements UserDetailsService {
 
     @Transactional
     public void registerUser(RegisterUserDTO dto, MechanicProfileDTO mechanicDto, OwnerProfileDTO ownerDto) {
-        validateRegistrationData(dto, mechanicDto, ownerDto);
-        
+        if (dto == null) {
+            throw new IllegalArgumentException("User registration data is required");
+        }
+
+        AccountType accountType = resolveAccountType(dto, mechanicDto, ownerDto);
+
+        validateRegistrationData(dto, mechanicDto, ownerDto, accountType);
+
         if (userRepository.existsByPhone(dto.getPhone())) {
             throw new IllegalArgumentException("Phone already registered");
         }
@@ -140,9 +146,6 @@ public class AuthService implements UserDetailsService {
         Role role = roleRepository.findById(dto.getRoleId())
                 .orElseThrow(() -> new IllegalArgumentException("Role not found"));
         
-        AccountType accountType = accountTypeRepository.findById(dto.getAccountTypeId())
-                .orElseThrow(() -> new IllegalArgumentException("Account type not found"));
-
         User user = User.builder()
                 .phone(dto.getPhone())
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
@@ -216,15 +219,11 @@ public class AuthService implements UserDetailsService {
         userRepository.save(user);
     }
     
-    private void validateRegistrationData(RegisterUserDTO dto, MechanicProfileDTO mechanicDto, OwnerProfileDTO ownerDto) {
-        if (dto == null) {
-            throw new IllegalArgumentException("User registration data is required");
-        }
-        
+    private void validateRegistrationData(RegisterUserDTO dto, MechanicProfileDTO mechanicDto, OwnerProfileDTO ownerDto, AccountType accountType) {
         if (dto.getPhone() == null || dto.getPhone().trim().isEmpty()) {
             throw new IllegalArgumentException("Phone is required");
         }
-        
+
         if (dto.getPassword() == null || dto.getPassword().length() < 8) {
             throw new IllegalArgumentException("Password must be at least 8 characters long");
         }
@@ -265,6 +264,39 @@ public class AuthService implements UserDetailsService {
                 }
             }
         }
+    }
+
+    private AccountType resolveAccountType(RegisterUserDTO dto, MechanicProfileDTO mechanicDto, OwnerProfileDTO ownerDto) {
+        AccountType accountType = null;
+        if (dto.getAccountTypeId() != null) {
+            accountType = accountTypeRepository.findById(dto.getAccountTypeId()).orElse(null);
+        }
+
+        if (ownerDto != null) {
+            if (accountType != null && isOwnerAccountType(accountType.getName())) {
+                return accountType;
+            }
+            return accountTypeRepository.findAll().stream()
+                    .filter(type -> isOwnerAccountType(type.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Owner account type is not configured"));
+        }
+
+        if (mechanicDto != null) {
+            if (accountType != null && isMechanicAccountType(accountType.getName())) {
+                return accountType;
+            }
+            return accountTypeRepository.findAll().stream()
+                    .filter(type -> isMechanicAccountType(type.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Mechanic account type is not configured"));
+        }
+
+        if (accountType != null) {
+            return accountType;
+        }
+
+        throw new IllegalArgumentException("Account type not found");
     }
 
     private Map<String, Object> buildUserInfoResponse(User user) {
