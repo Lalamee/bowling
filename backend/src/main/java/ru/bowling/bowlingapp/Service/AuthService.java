@@ -13,6 +13,7 @@ import ru.bowling.bowlingapp.Repository.*;
 import ru.bowling.bowlingapp.Security.UserPrincipal;
 
 import java.time.LocalDate;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -23,11 +24,12 @@ public class AuthService implements UserDetailsService {
     private final AccountTypeRepository accountTypeRepository;
     private final PasswordEncoder passwordEncoder;
 
+    private static final Pattern RUSSIAN_PHONE_PATTERN = Pattern.compile("^\\+7\\d{10}$");
+
     @Override
     public UserDetails loadUserByUsername(String phone) throws UsernameNotFoundException {
-        User user = userRepository.findByPhone(phone)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with phone: " + phone));
-        
+        User user = findUserByLogin(phone);
+
         return UserPrincipal.create(user);
     }
 
@@ -37,11 +39,58 @@ public class AuthService implements UserDetailsService {
     }
 
     public User authenticateUser(String phone, String password) {
-        User user = findUserByPhone(phone);
+        User user = findUserByLogin(phone);
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new IllegalArgumentException("Invalid password");
         }
         return user;
+    }
+
+    private User findUserByLogin(String login) {
+        String normalizedPhone = normalizePhone(login);
+        if (normalizedPhone != null) {
+            return userRepository.findByPhone(normalizedPhone)
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found with phone: " + normalizedPhone));
+        }
+        return userRepository.findByPhone(login)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with phone: " + login));
+    }
+
+    private String normalizePhone(String rawLogin) {
+        if (rawLogin == null) {
+            return null;
+        }
+
+        String trimmed = rawLogin.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+
+        String digitsOnly = trimmed.replaceAll("\\D", "");
+
+        if (digitsOnly.length() == 11 && digitsOnly.startsWith("8")) {
+            return toValidPhone("+7" + digitsOnly.substring(1));
+        }
+
+        if (digitsOnly.length() == 11 && digitsOnly.startsWith("7")) {
+            return toValidPhone("+7" + digitsOnly.substring(1));
+        }
+
+        if (trimmed.startsWith("+")) {
+            return toValidPhone("+" + digitsOnly);
+        }
+
+        return null;
+    }
+
+    private String toValidPhone(String candidate) {
+        if (candidate == null) {
+            return null;
+        }
+        if (RUSSIAN_PHONE_PATTERN.matcher(candidate).matches()) {
+            return candidate;
+        }
+        return null;
     }
 
     @Transactional
