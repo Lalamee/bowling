@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -108,10 +109,36 @@ public class AuthService implements UserDetailsService {
         return null;
     }
 
+    private boolean isMechanicAccountType(String accountTypeName) {
+        String normalized = normalizeAccountTypeName(accountTypeName);
+        return "INDIVIDUAL".equals(normalized)
+                || "МЕХАНИК".equals(normalized)
+                || "ГЛАВНЫЙ МЕХАНИК".equals(normalized);
+    }
+
+    private boolean isOwnerAccountType(String accountTypeName) {
+        String normalized = normalizeAccountTypeName(accountTypeName);
+        return "CLUB_OWNER".equals(normalized)
+                || "ВЛАДЕЛЕЦ".equals(normalized);
+    }
+
+    private String normalizeAccountTypeName(String accountTypeName) {
+        if (accountTypeName == null) {
+            return null;
+        }
+        return accountTypeName.trim().toUpperCase(Locale.ROOT);
+    }
+
     @Transactional
     public void registerUser(RegisterUserDTO dto, MechanicProfileDTO mechanicDto, OwnerProfileDTO ownerDto) {
-        validateRegistrationData(dto, mechanicDto, ownerDto);
-        
+        if (dto == null) {
+            throw new IllegalArgumentException("User registration data is required");
+        }
+
+        AccountType accountType = resolveAccountType(dto, mechanicDto, ownerDto);
+
+        validateRegistrationData(dto, mechanicDto, ownerDto, accountType);
+
         if (userRepository.existsByPhone(dto.getPhone())) {
             throw new IllegalArgumentException("Phone already registered");
         }
@@ -119,9 +146,6 @@ public class AuthService implements UserDetailsService {
         Role role = roleRepository.findById(dto.getRoleId())
                 .orElseThrow(() -> new IllegalArgumentException("Role not found"));
         
-        AccountType accountType = accountTypeRepository.findById(dto.getAccountTypeId())
-                .orElseThrow(() -> new IllegalArgumentException("Account type not found"));
-
         User user = User.builder()
                 .phone(dto.getPhone())
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
@@ -135,7 +159,7 @@ public class AuthService implements UserDetailsService {
         // Используем имена вместо ID для надежности
         String accountTypeName = accountType.getName();
 
-        if ("INDIVIDUAL".equals(accountTypeName)) { // механик/гл. механик
+        if (isMechanicAccountType(accountTypeName)) { // механик/гл. механик
             MechanicProfile profile = MechanicProfile.builder()
                     .user(user)
                     .fullName(mechanicDto.getFullName())
@@ -155,7 +179,7 @@ public class AuthService implements UserDetailsService {
                     .updatedAt(LocalDate.now())
                     .build();
             user.setMechanicProfile(profile);
-        } else if ("CLUB_OWNER".equals(accountTypeName)) { // владелец
+        } else if (isOwnerAccountType(accountTypeName)) { // владелец
             OwnerProfile profile = OwnerProfile.builder()
                     .user(user)
                     .inn(ownerDto.getInn())
@@ -195,15 +219,11 @@ public class AuthService implements UserDetailsService {
         userRepository.save(user);
     }
     
-    private void validateRegistrationData(RegisterUserDTO dto, MechanicProfileDTO mechanicDto, OwnerProfileDTO ownerDto) {
-        if (dto == null) {
-            throw new IllegalArgumentException("User registration data is required");
-        }
-        
+    private void validateRegistrationData(RegisterUserDTO dto, MechanicProfileDTO mechanicDto, OwnerProfileDTO ownerDto, AccountType accountType) {
         if (dto.getPhone() == null || dto.getPhone().trim().isEmpty()) {
             throw new IllegalArgumentException("Phone is required");
         }
-        
+
         if (dto.getPassword() == null || dto.getPassword().length() < 8) {
             throw new IllegalArgumentException("Password must be at least 8 characters long");
         }
@@ -215,35 +235,68 @@ public class AuthService implements UserDetailsService {
         if (dto.getAccountTypeId() == null) {
             throw new IllegalArgumentException("Account type ID is required");
         }
-        
-        
-        AccountType accountType = accountTypeRepository.findById(dto.getAccountTypeId()).orElse(null);
-        if (accountType != null) {
-            if ("INDIVIDUAL".equals(accountType.getName())) {
-                if (mechanicDto == null) {
-                    throw new IllegalArgumentException("Mechanic profile data is required for INDIVIDUAL account type");
-                }
-                if (mechanicDto.getFullName() == null || mechanicDto.getFullName().trim().isEmpty()) {
-                    throw new IllegalArgumentException("Full name is required for mechanic profile");
-                }
-                if (mechanicDto.getBirthDate() == null) {
-                    throw new IllegalArgumentException("Birth date is required for mechanic profile");
-                }
-                if (mechanicDto.getTotalExperienceYears() == null || mechanicDto.getTotalExperienceYears() < 0) {
-                    throw new IllegalArgumentException("Total experience years must be non-negative");
-                }
-                if (mechanicDto.getBowlingExperienceYears() == null || mechanicDto.getBowlingExperienceYears() < 0) {
-                    throw new IllegalArgumentException("Bowling experience years must be non-negative");
-                }
-            } else if ("CLUB_OWNER".equals(accountType.getName())) {
-                if (ownerDto == null) {
-                    throw new IllegalArgumentException("Owner profile data is required for CLUB_OWNER account type");
-                }
-                if (ownerDto.getInn() == null || ownerDto.getInn().trim().isEmpty()) {
-                    throw new IllegalArgumentException("INN is required for owner profile");
-                }
+
+        if (accountType == null) {
+            throw new IllegalArgumentException("Account type not found");
+        }
+
+        if (isMechanicAccountType(accountType.getName())) {
+            if (mechanicDto == null) {
+                throw new IllegalArgumentException("Mechanic profile data is required for mechanic account type");
+            }
+            if (mechanicDto.getFullName() == null || mechanicDto.getFullName().trim().isEmpty()) {
+                throw new IllegalArgumentException("Full name is required for mechanic profile");
+            }
+            if (mechanicDto.getBirthDate() == null) {
+                throw new IllegalArgumentException("Birth date is required for mechanic profile");
+            }
+            if (mechanicDto.getTotalExperienceYears() == null || mechanicDto.getTotalExperienceYears() < 0) {
+                throw new IllegalArgumentException("Total experience years must be non-negative");
+            }
+            if (mechanicDto.getBowlingExperienceYears() == null || mechanicDto.getBowlingExperienceYears() < 0) {
+                throw new IllegalArgumentException("Bowling experience years must be non-negative");
+            }
+        } else if (isOwnerAccountType(accountType.getName())) {
+            if (ownerDto == null) {
+                throw new IllegalArgumentException("Owner profile data is required for club owner account type");
+            }
+            if (ownerDto.getInn() == null || ownerDto.getInn().trim().isEmpty()) {
+                throw new IllegalArgumentException("INN is required for owner profile");
             }
         }
+    }
+
+    private AccountType resolveAccountType(RegisterUserDTO dto, MechanicProfileDTO mechanicDto, OwnerProfileDTO ownerDto) {
+        AccountType accountType = null;
+        if (dto.getAccountTypeId() != null) {
+            accountType = accountTypeRepository.findById(dto.getAccountTypeId()).orElse(null);
+        }
+
+        if (ownerDto != null) {
+            if (accountType != null && isOwnerAccountType(accountType.getName())) {
+                return accountType;
+            }
+            return accountTypeRepository.findAll().stream()
+                    .filter(type -> isOwnerAccountType(type.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Owner account type is not configured"));
+        }
+
+        if (mechanicDto != null) {
+            if (accountType != null && isMechanicAccountType(accountType.getName())) {
+                return accountType;
+            }
+            return accountTypeRepository.findAll().stream()
+                    .filter(type -> isMechanicAccountType(type.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Mechanic account type is not configured"));
+        }
+
+        if (accountType != null) {
+            return accountType;
+        }
+
+        throw new IllegalArgumentException("Account type not found");
     }
 
     private Map<String, Object> buildUserInfoResponse(User user) {
