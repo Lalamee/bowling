@@ -4,6 +4,16 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+import com.android.build.api.variant.ApkVariantOutput
+import java.io.FileInputStream
+import java.util.Properties
+
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.example.flutter_application_1"
     compileSdk = flutter.compileSdkVersion
@@ -24,15 +34,61 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        multiDexEnabled = true
+    }
+
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = keystoreProperties["storeFile"]?.let { rootProject.file(it) }
+                storePassword = keystoreProperties["storePassword"] as String
+            } else {
+                initWith(getByName("debug"))
+            }
+        }
     }
 
     buildTypes {
-        release {
-            signingConfig = signingConfigs.getByName("debug")
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            isDebuggable = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
+    }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a")
+            isUniversalApk = true
+        }
+    }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("release")) { variant ->
+        variant.outputs
+            .filterIsInstance<ApkVariantOutput>()
+            .forEach { output ->
+                if (output.filters.isEmpty()) {
+                    output.enabled = false
+                }
+            }
     }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("androidx.multidex:multidex:2.0.1")
 }
