@@ -32,6 +32,7 @@ class LocalAuthStorage {
     final sp = await SharedPreferences.getInstance();
     final raw = sp.getString(_mechanicProfileKey);
     if (raw == null || raw.isEmpty) return null;
+
     try {
       final decoded = jsonDecode(raw);
       if (decoded is Map<String, dynamic>) {

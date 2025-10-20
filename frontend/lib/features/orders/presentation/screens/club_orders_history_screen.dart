@@ -1,19 +1,61 @@
 import 'package:flutter/material.dart';
+
+import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/theme/colors.dart';
+import '../../../../core/utils/net_ui.dart';
+import '../../../../models/maintenance_request_response_dto.dart';
 
 class ClubOrdersHistoryScreen extends StatefulWidget {
   const ClubOrdersHistoryScreen({super.key});
+
   @override
   State<ClubOrdersHistoryScreen> createState() => _ClubOrdersHistoryScreenState();
 }
 
 class _ClubOrdersHistoryScreenState extends State<ClubOrdersHistoryScreen> {
-  final List<_Order> orders = const [
-    _Order('Заказ №25', true),
-    _Order('Заказ №26', false),
-    _Order('Заказ №27', false),
-    _Order('Заказ №28', false),
-  ];
+  final MaintenanceRepository _repository = MaintenanceRepository();
+
+  bool _loading = true;
+  bool _error = false;
+  Map<String, List<MaintenanceRequestResponseDto>> _ordersByClub = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOrders();
+  }
+
+  Future<void> _loadOrders() async {
+    setState(() {
+      _loading = true;
+      _error = false;
+    });
+    try {
+      final data = await _repository.getAllRequests();
+      if (!mounted) return;
+      data.sort((a, b) {
+        final aDate = a.requestDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = b.requestDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      });
+      final grouped = <String, List<MaintenanceRequestResponseDto>>{};
+      for (final order in data) {
+        final key = order.clubName ?? 'Без названия';
+        grouped.putIfAbsent(key, () => []).add(order);
+      }
+      setState(() {
+        _ordersByClub = grouped;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = true;
+      });
+      showApiError(context, e);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,30 +74,72 @@ class _ClubOrdersHistoryScreenState extends State<ClubOrdersHistoryScreen> {
             child: InkWell(
               customBorder: const CircleBorder(),
               onTap: () => Navigator.pop(context),
-              child: const SizedBox(width: 40, height: 40, child: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textDark)),
+              child: const SizedBox(
+                width: 40,
+                height: 40,
+                child: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textDark),
+              ),
             ),
           ),
         ),
-        title: const Text('Все заказы клуба', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+        title: const Text(
+          'Все заказы клуба',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textDark),
+        ),
         centerTitle: false,
-        actions: const [
-          Padding(padding: EdgeInsets.only(right: 12), child: _SquareIcon(icon: Icons.info_outline)),
+        actions: [
+          IconButton(
+            onPressed: _loadOrders,
+            icon: const Icon(Icons.refresh, color: AppColors.primary),
+          ),
         ],
       ),
-      body: ListView.separated(
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off, size: 64, color: AppColors.darkGray),
+            const SizedBox(height: 12),
+            const Text('Не удалось загрузить историю заказов', style: TextStyle(color: AppColors.darkGray)),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _loadOrders,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Повторить попытку'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_ordersByClub.isEmpty) {
+      return const Center(
+        child: Text('Нет заказов', style: TextStyle(color: AppColors.darkGray)),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadOrders,
+      child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        itemCount: orders.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, i) {
-          final o = orders[i];
-          return Row(
-            children: [
-              Expanded(child: _FlatTile(height: 52, child: Text(o.title, style: const TextStyle(fontSize: 16, color: AppColors.textDark)))),
-              const SizedBox(width: 8),
-              const _SquareIcon(icon: Icons.keyboard_arrow_down_rounded),
-              const SizedBox(width: 8),
-              _SquareBadge(icon: o.hasIssue ? Icons.error_outline : Icons.check, color: AppColors.primary),
-            ],
+        itemCount: _ordersByClub.length,
+        itemBuilder: (_, index) {
+          final clubName = _ordersByClub.keys.elementAt(index);
+          final orders = _ordersByClub[clubName]!;
+          return _ClubSection(
+            clubName: clubName,
+            orders: orders,
           );
         },
       ),
@@ -63,57 +147,91 @@ class _ClubOrdersHistoryScreenState extends State<ClubOrdersHistoryScreen> {
   }
 }
 
-class _Order {
-  final String title;
-  final bool hasIssue;
-  const _Order(this.title, this.hasIssue);
-}
+class _ClubSection extends StatelessWidget {
+  final String clubName;
+  final List<MaintenanceRequestResponseDto> orders;
 
-class _FlatTile extends StatelessWidget {
-  final double? width;
-  final double height;
-  final Widget child;
-  const _FlatTile({this.width, required this.height, required this.child});
+  const _ClubSection({required this.clubName, required this.orders});
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: height,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      alignment: Alignment.centerLeft,
-      decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.lightGray), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 4))]),
-      child: child,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            clubName,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
+          ),
+          const SizedBox(height: 8),
+          ...orders.map(
+            (order) => Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.lightGray),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 4)),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Заявка №${order.requestId}',
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textDark),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _buildSubtitle(order),
+                          style: const TextStyle(fontSize: 13, color: AppColors.darkGray),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: AppColors.darkGray),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  String _buildSubtitle(MaintenanceRequestResponseDto order) {
+    final pieces = <String>[];
+    if (order.status != null && order.status!.isNotEmpty) {
+      pieces.add(_statusName(order.status!));
+    }
+    if (order.requestDate != null) {
+      pieces.add(_formatDate(order.requestDate!));
+    }
+    return pieces.join(' • ');
   }
 }
 
-class _SquareIcon extends StatelessWidget {
-  final IconData icon;
-  const _SquareIcon({required this.icon});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 3))]),
-      child: Icon(icon, color: AppColors.darkGray),
-    );
+String _statusName(String status) {
+  switch (status.toUpperCase()) {
+    case 'APPROVED':
+      return 'Одобрено';
+    case 'REJECTED':
+      return 'Отклонено';
+    case 'IN_PROGRESS':
+      return 'В работе';
+    case 'COMPLETED':
+      return 'Завершено';
+    default:
+      return status;
   }
 }
 
-class _SquareBadge extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  const _SquareBadge({required this.icon, required this.color});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.lightGray), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 3))]),
-      child: Icon(icon, color: color, size: 20),
-    );
-  }
+String _formatDate(DateTime date) {
+  return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
 }

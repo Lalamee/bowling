@@ -66,11 +66,17 @@ class AppRouter {
 
       case Routes.orders:
         return MaterialPageRoute(builder: (_) => const OrdersScreen());
-      case Routes.orderSummary: {
+      case Routes.orderSummary:
         final args = settings.arguments as OrderSummaryArgs?;
-        if (args == null) return MaterialPageRoute(builder: (_) => const OrdersScreen());
-        return MaterialPageRoute(builder: (_) => OrderSummaryScreen(orderId: args.orderId));
-      }
+        if (args == null) {
+          return MaterialPageRoute(builder: (_) => const OrdersScreen());
+        }
+        return MaterialPageRoute(
+          builder: (_) => OrderSummaryScreen(
+            order: args.order,
+            orderNumber: args.orderNumber,
+          ),
+        );
 
       case Routes.club:
         return MaterialPageRoute(builder: (_) => const ClubScreen());
@@ -97,8 +103,10 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen());
       case Routes.pdfReader: {
         final args = settings.arguments as PdfReaderArgs?;
-        if (args == null) return MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen());
-        return MaterialPageRoute(builder: (_) => PdfReaderScreen(assetPath: args.assetPath, title: args.title));
+        if (args == null) {
+          return MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen());
+        }
+        return MaterialPageRoute(builder: (_) => PdfReaderScreen(doc: args.document));
       }
 
       case Routes.authLogin:
@@ -142,20 +150,4 @@ class AppRouter {
     }
     return null;
   }
-}
-
-class PdfReaderArgs {
-  final String assetPath;
-  final String title;
-  const PdfReaderArgs({required this.assetPath, required this.title});
-}
-
-class OrderSummaryArgs {
-  final String orderId;
-  const OrderSummaryArgs(this.orderId);
-}
-
-class EditMechanicProfileArgs {
-  final String? mechanicId;
-  const EditMechanicProfileArgs({this.mechanicId});
 }

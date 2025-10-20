@@ -2,8 +2,16 @@ import 'dart:developer';
 
 import '../../../../../core/repositories/user_repository.dart';
 import 'package:flutter/material.dart';
+
+import '../../../../../core/repositories/user_repository.dart';
+import '../../../../../core/routing/routes.dart';
+import '../../../../../core/services/auth_service.dart';
+import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/theme/colors.dart';
+import '../../../../../core/utils/bottom_nav.dart';
+import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../../shared/widgets/tiles/profile_tile.dart';
+import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
 import '../../domain/mechanic_profile.dart';
 import 'edit_mechanic_profile_screen.dart';
 import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
@@ -32,14 +40,14 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   void initState() {
     super.initState();
     profile = MechanicProfile(
-      fullName: 'Механик Иван Иванович',
-      phone: '+7 (980) 001-01-01',
-      clubName: 'Боулинг клуб "Кегли"',
-      clubs: ['Боулинг клуб "Кегли"'],
-      address: 'г. Воронеж, ул. Тверская, д. 45',
+      fullName: '',
+      phone: '',
+      clubName: '',
+      clubs: const [],
+      address: '',
       workplaceVerified: false,
-      birthDate: DateTime(1989, 2, 24),
-      status: 'Самозанятый',
+      birthDate: DateTime.now(),
+      status: '',
     );
     _loadLocalProfile();
     _load();
@@ -205,6 +213,217 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     });
   }
 
+  Map<String, dynamic> _normalizeProfileData(Map<String, dynamic> raw) {
+    String? _asString(dynamic value) {
+      if (value == null) return null;
+      final str = value.toString().trim();
+      return str.isEmpty ? null : str;
+    }
+
+    Iterable<String> _extractClubs(dynamic value) {
+      if (value is Iterable) {
+        return value.map((e) => e.toString().trim()).where((e) => e.isNotEmpty);
+      }
+      if (value is String && value.isNotEmpty) {
+        return value.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty);
+      }
+      return const Iterable<String>.empty();
+    }
+
+    final previous = _cachedRawProfile;
+    final fallback = profile;
+
+    final resolvedPhone = _asString(raw['phone']) ?? _asString(previous?['phone']) ?? fallback.phone;
+
+    bool _looksLikePhone(String? value) {
+      if (value == null) return false;
+      final digits = value.replaceAll(RegExp(r'\D'), '');
+      final refDigits = resolvedPhone.replaceAll(RegExp(r'\D'), '');
+      if (digits.length < 5 || refDigits.length < 5) return false;
+      return digits == refDigits || digits.endsWith(refDigits) || refDigits.endsWith(digits);
+    }
+
+    bool _looksLikeTimeline(String value) {
+      final lower = value.toLowerCase();
+      if (!RegExp(r'\d{4}').hasMatch(lower)) return false;
+      return RegExp(r'(?:[-–—]|\bс\b|\bпо\b|н\.в\.?|наст\.?|текущ)').hasMatch(lower);
+    }
+
+    String _stripTimeline(String value) {
+      var result = value.trim();
+      result = result.replaceAll(RegExp(r'\s+'), ' ');
+      const timelineSuffix =
+          r'(?:\d{1,2}\.\d{1,2}\.\d{4}|\d{1,2}\.\d{4}|[а-яa-z]+\s+\d{4}|\d{4}|н\.в\.?|наст\.?)';
+      final parentheticalTimeline = RegExp(r'\s*\((?:[^()]*\d{4}[^()]*)\)\s*$');
+      if (parentheticalTimeline.hasMatch(result)) {
+        result = result.replaceFirst(parentheticalTimeline, '').trim();
+      }
+      final dashTimeline = RegExp(
+        r'\s*[-–—]\s*(?:с\s*)?' + timelineSuffix + r'(?:\s*(?:[-–—]|\bпо\b)\s*' + timelineSuffix + r')?\s*$',
+        caseSensitive: false,
+      );
+      if (dashTimeline.hasMatch(result)) {
+        result = result.replaceFirst(dashTimeline, '').trim();
+      }
+      final commaTimeline = RegExp(
+        r'\s*,\s*(?:с\s*)?' + timelineSuffix + r'(?:\s*(?:[-–—]|\bпо\b)\s*' + timelineSuffix + r')?\s*$',
+        caseSensitive: false,
+      );
+      if (commaTimeline.hasMatch(result)) {
+        result = result.replaceFirst(commaTimeline, '').trim();
+      }
+      return result.trim();
+    }
+
+    String? _sanitizeClubLabel(String? value) {
+      final candidate = _asString(value);
+      if (candidate == null || candidate.isEmpty) return null;
+      final stripped = _stripTimeline(candidate);
+      if (stripped.isEmpty) return null;
+      return stripped;
+    }
+
+    String _resolveFullName() {
+      final candidate = _asString(raw['fullName']);
+      if (candidate != null && !_looksLikePhone(candidate)) {
+        return candidate;
+      }
+      final previousName = _asString(previous?['fullName']);
+      if (previousName != null && !_looksLikePhone(previousName)) {
+        return previousName;
+      }
+      final fallbackName = fallback.fullName.trim();
+      if (!_looksLikePhone(fallbackName)) {
+        return fallbackName;
+      }
+      return fallbackName;
+    }
+
+    final rawClubs = _extractClubs(raw['clubs']);
+    final previousClubs = _extractClubs(previous?['clubs']);
+    final fallbackClubs = fallback.clubs;
+
+    String _resolveClubName() {
+      final rawName = _sanitizeClubLabel(raw['clubName']);
+      if (rawName != null && rawName.isNotEmpty) {
+        return rawName;
+      }
+      for (final value in rawClubs) {
+        final sanitized = _sanitizeClubLabel(value);
+        if (sanitized != null) {
+          return sanitized;
+        }
+      }
+      final previousName = _sanitizeClubLabel(previous?['clubName']);
+      if (previousName != null && previousName.isNotEmpty) {
+        return previousName;
+      }
+      for (final value in previousClubs) {
+        final sanitized = _sanitizeClubLabel(value);
+        if (sanitized != null) {
+          return sanitized;
+        }
+      }
+      final fallbackSanitized = _sanitizeClubLabel(fallback.clubName);
+      if (fallbackSanitized != null) {
+        return fallbackSanitized;
+      }
+      return fallback.clubName;
+    }
+
+    final resolvedClubName = _resolveClubName();
+
+    List<String> _mergeClubs() {
+      final result = <String>[];
+      final seen = <String>{};
+
+      void addValue(String? value, {bool prioritize = false}) {
+        final sanitized = _sanitizeClubLabel(value);
+        if (sanitized == null || sanitized.isEmpty) return;
+        if (_looksLikeTimeline(sanitized)) return;
+        if (seen.contains(sanitized)) {
+          if (prioritize) {
+            result
+              ..remove(sanitized)
+              ..insert(0, sanitized);
+          }
+          return;
+        }
+        if (prioritize) {
+          result.insert(0, sanitized);
+        } else {
+          result.add(sanitized);
+        }
+        seen.add(sanitized);
+      }
+
+      addValue(resolvedClubName, prioritize: true);
+      for (final value in rawClubs) {
+        addValue(value);
+      }
+      for (final value in previousClubs) {
+        addValue(value);
+      }
+      for (final value in fallbackClubs) {
+        addValue(value);
+      }
+      addValue(resolvedClubName, prioritize: true);
+
+      if (result.isEmpty) {
+        addValue(resolvedClubName, prioritize: true);
+      }
+
+      return result;
+    }
+
+    final mergedClubs = _mergeClubs();
+
+    DateTime? _parseDate(String? value) {
+      if (value == null || value.isEmpty) return null;
+      return DateTime.tryParse(value);
+    }
+
+    final resolvedBirth = _parseDate(_asString(raw['birthDate'])) ??
+        _parseDate(_asString(previous?['birthDate'])) ??
+        fallback.birthDate;
+
+    String? _resolveAddress() {
+      final candidates = <String?>[
+        _asString(raw['address']),
+        _asString(previous?['address']),
+        fallback.address,
+      ];
+      for (final candidate in candidates) {
+        final trimmed = candidate?.trim();
+        if (trimmed == null || trimmed.isEmpty) continue;
+        if (trimmed == resolvedClubName) continue;
+        if (_looksLikeTimeline(trimmed)) continue;
+        return trimmed;
+      }
+      return null;
+    }
+
+    final resolvedAddress = _resolveAddress() ?? '';
+
+    final resolvedStatus = _asString(raw['status']) ??
+        _asString(previous?['status']) ??
+        fallback.status;
+
+    final resolvedVerified = (raw['workplaceVerified'] is bool)
+        ? raw['workplaceVerified'] as bool
+        : (previous?['workplaceVerified'] as bool?) ?? fallback.workplaceVerified;
+
+    return {
+      'fullName': _resolveFullName(),
+      'phone': resolvedPhone,
+      'status': resolvedStatus,
+      'clubs': mergedClubs,
+      'clubName': resolvedClubName,
+      'address': resolvedAddress,
+      'birthDate': resolvedBirth.toIso8601String(),
+      'workplaceVerified': resolvedVerified,
+    };
+  }
   Future<void> _openEdit(EditFocus focus) async {
     final updated = await Navigator.push<MechanicProfile>(
       context,

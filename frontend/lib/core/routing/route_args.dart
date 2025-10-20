@@ -1,12 +1,15 @@
+import '../../models/maintenance_request_response_dto.dart';
+import '../../features/knowledge_base/domain/kb_pdf.dart';
+
 class PdfReaderArgs {
-  final String assetPath;
-  final String title;
-  const PdfReaderArgs({required this.assetPath, required this.title});
+  final KbPdf document;
+  const PdfReaderArgs({required this.document});
 }
 
 class OrderSummaryArgs {
-  final String orderId;
-  const OrderSummaryArgs(this.orderId);
+  final MaintenanceRequestResponseDto? order;
+  final String? orderNumber;
+  const OrderSummaryArgs({this.order, this.orderNumber});
 }
 
 class EditMechanicProfileArgs {
