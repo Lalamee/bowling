@@ -1,3 +1,4 @@
+import '../../api/api_core.dart';
 import '../../api/api_service.dart';
 import '../../models/user_login_dto.dart';
 import '../../models/register_request_dto.dart';
@@ -25,6 +26,12 @@ class AuthService {
 
   static Future<bool> registerOwner(Map<String, dynamic> data) async {
     try {
+      String? _nullable(dynamic value) {
+        if (value == null) return null;
+        final str = value.toString().trim();
+        return str.isEmpty ? null : str;
+      }
+
       final request = RegisterRequestDto(
         user: RegisterUserDto(
           phone: data['phone'],
@@ -33,17 +40,22 @@ class AuthService {
           accountTypeId: 2,
         ),
         ownerProfile: OwnerProfileDto(
-          inn: data['inn'],
-          legalName: data['legalName'],
-          contactPerson: data['contactPerson'],
-          contactPhone: data['contactPhone'],
-          contactEmail: data['contactEmail'] ?? '',
+          inn: _nullable(data['inn']) ?? '',
+          legalName: _nullable(data['legalName']),
+          contactPerson: _nullable(data['contactPerson']),
+          contactPhone: _nullable(data['contactPhone']),
+          contactEmail: _nullable(data['contactEmail']),
         ),
       );
       final response = await _api.register(request);
-      return response.isSuccess;
-    } catch (e) {
-      return false;
+      if (!response.isSuccess) {
+        throw ApiException(response.message);
+      }
+      return true;
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException('Не удалось зарегистрировать владельца');
     }
   }
 

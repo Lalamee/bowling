@@ -1,6 +1,7 @@
 import '../../../../core/utils/net_ui.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/local_auth_storage.dart';
+import '../../../../core/utils/phone_utils.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/colors.dart';
@@ -29,23 +30,26 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _onLogin() async {
     final phone = _login.text.trim();
+    final normalizedPhone = PhoneUtils.normalize(phone);
     final password = _password.text;
     if (phone.isEmpty || password.isEmpty) {
       showSnack(context, 'Введите телефон и пароль');
       return;
     }
-    final res = await withLoader(context, () => AuthService.login(phone: phone, password: password));
+    final res = await withLoader(context, () => AuthService.login(phone: normalizedPhone, password: password));
     if (res != null && mounted) {
-      await _cacheRole();
-      Navigator.of(context).pushReplacementNamed(Routes.orders);
+      final role = await _cacheRole();
+      if (!mounted) return;
+      final destination = _routeForRole(role);
+      Navigator.of(context).pushReplacementNamed(destination);
     } else if (mounted) {
       showSnack(context, 'Неверный телефон или пароль');
     }
   }
 
-  Future<void> _cacheRole() async {
+  Future<String?> _cacheRole() async {
     final info = await AuthService.currentUser();
-    if (info == null) return;
+    if (info == null) return null;
 
     String? role;
     switch (info.accountTypeId) {
@@ -78,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }();
 
-    if (role == null) return;
+    if (role == null) return null;
 
     if (role == 'mechanic') {
       await LocalAuthStorage.clearOwnerState();
@@ -92,6 +96,20 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     await LocalAuthStorage.setRegisteredRole(role);
+    return role;
+  }
+
+  String _routeForRole(String? role) {
+    switch (role) {
+      case 'owner':
+        return Routes.profileOwner;
+      case 'manager':
+        return Routes.profileManager;
+      case 'admin':
+        return Routes.profileAdmin;
+      default:
+        return Routes.profileMechanic;
+    }
   }
 
   @override

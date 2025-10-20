@@ -3,7 +3,6 @@ import 'dart:developer';
 import '../../../../../core/repositories/user_repository.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../../core/repositories/user_repository.dart';
 import '../../../../../core/routing/routes.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/local_auth_storage.dart';
@@ -14,12 +13,6 @@ import '../../../../../shared/widgets/tiles/profile_tile.dart';
 import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
 import '../../domain/mechanic_profile.dart';
 import 'edit_mechanic_profile_screen.dart';
-import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
-import '../../../../../core/utils/bottom_nav.dart';
-import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
-import '../../../../../core/routing/routes.dart';
-import '../../../../../core/services/auth_service.dart';
-import '../../../../../core/services/local_auth_storage.dart';
 
 enum EditFocus { none, name, phone, address }
 
@@ -35,6 +28,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   late MechanicProfile profile;
   bool _isLoading = true;
   bool _hasError = false;
+  Map<String, dynamic>? _cachedRawProfile;
 
   @override
   void initState() {
@@ -59,7 +53,8 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       return;
     }
 
-    _applyProfile(stored);
+    final normalized = _normalizeProfileData(Map<String, dynamic>.from(stored));
+    _applyProfile(normalized);
   }
 
   Future<void> _load() async {
@@ -80,9 +75,10 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         return;
       }
       final cache = _mapApiToCache(me);
-      await LocalAuthStorage.saveMechanicProfile(cache);
+      final normalized = _normalizeProfileData(cache);
+      await LocalAuthStorage.saveMechanicProfile(normalized);
       if (!mounted) return;
-      _applyProfile(cache);
+      _applyProfile(normalized);
     } catch (e, s) {
       log('Failed to load mechanic profile: $e', stackTrace: s);
       if (mounted) {
@@ -413,7 +409,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         ? raw['workplaceVerified'] as bool
         : (previous?['workplaceVerified'] as bool?) ?? fallback.workplaceVerified;
 
-    return {
+    final normalized = {
       'fullName': _resolveFullName(),
       'phone': resolvedPhone,
       'status': resolvedStatus,
@@ -423,6 +419,10 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       'birthDate': resolvedBirth.toIso8601String(),
       'workplaceVerified': resolvedVerified,
     };
+
+    _cachedRawProfile = Map<String, dynamic>.from(normalized);
+
+    return normalized;
   }
   Future<void> _openEdit(EditFocus focus) async {
     final updated = await Navigator.push<MechanicProfile>(

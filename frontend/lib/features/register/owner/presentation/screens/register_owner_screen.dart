@@ -6,6 +6,7 @@ import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/utils/net_ui.dart';
 import '../../../../../core/utils/validators.dart';
+import '../../../../../core/utils/phone_utils.dart';
 import '../../../../../shared/widgets/buttons/custom_button.dart';
 import '../../../../../shared/widgets/chips/radio_group_horizontal.dart';
 import '../../../../../shared/widgets/chips/radio_group_vertical.dart';
@@ -96,30 +97,43 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
       return;
     }
 
-    final trimmedPhone = _phone.text.trim();
-    final password = 'password123';
+    final trimmedFullName = _fio.text.trim();
+    final trimmedInn = _inn.text.trim();
+    final trimmedClub = _club.text.trim();
+    final trimmedAddress = _addr.text.trim();
+    final trimmedEmail = _email.text.trim();
+    final trimmedLanes = _lanes.text.trim();
+    final trimmedStatus = status?.trim();
+    final normalizedPhone = PhoneUtils.normalize(_phone.text);
+    const password = 'password123';
 
     final data = {
-      'phone': trimmedPhone,
+      'phone': normalizedPhone,
       'password': password,
-      'inn': _inn.text.trim(),
-      'legalName': _club.text.trim(),
-      'contactPerson': _fio.text.trim(),
-      'contactPhone': trimmedPhone,
-      'contactEmail': _email.text.trim(),
+      'inn': trimmedInn,
+      'legalName': trimmedClub,
+      'contactPerson': trimmedFullName,
+      'contactPhone': normalizedPhone,
+      'contactEmail': trimmedEmail,
     };
 
+    final clubs = <String>[];
+    if (trimmedClub.isNotEmpty) {
+      clubs.add(trimmedClub);
+    }
+
     final profileSnapshot = {
-      'fullName': _fio.text.trim(),
-      'phone': trimmedPhone,
-      'clubName': _club.text.trim(),
-      'address': _addr.text.trim(),
-      'status': status,
-      'clubs': [_club.text.trim()].where((element) => element.isNotEmpty).toList(),
-      'email': _email.text.trim(),
-      'inn': _inn.text.trim(),
-      'lanes': _lanes.text.trim(),
+      'fullName': trimmedFullName,
+      'phone': normalizedPhone,
+      'clubName': trimmedClub,
+      'address': trimmedAddress,
+      'status': trimmedStatus ?? status,
+      'clubs': clubs,
+      'email': trimmedEmail,
+      'inn': trimmedInn,
+      'lanes': trimmedLanes,
       'equipment': equipment,
+      'workplaceVerified': false,
     };
 
     final result = await withLoader<bool?>(context, () async {
@@ -128,11 +142,12 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
         throw Exception('Не удалось зарегистрировать владельца. Попробуйте ещё раз.');
       }
 
-      final loginResult = await AuthService.login(phone: trimmedPhone, password: password);
+      final loginResult = await AuthService.login(phone: normalizedPhone, password: password);
       if (loginResult == null) {
         throw Exception('Регистрация выполнена, но не удалось войти. Попробуйте выполнить вход вручную.');
       }
 
+      await LocalAuthStorage.clearMechanicState();
       await LocalAuthStorage.saveOwnerProfile(profileSnapshot);
       await LocalAuthStorage.setOwnerRegistered(true);
       await LocalAuthStorage.setRegisteredRole('owner');
