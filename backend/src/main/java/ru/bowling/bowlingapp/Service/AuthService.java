@@ -13,7 +13,15 @@ import ru.bowling.bowlingapp.Repository.*;
 import ru.bowling.bowlingapp.Security.UserPrincipal;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -236,5 +244,167 @@ public class AuthService implements UserDetailsService {
                 }
             }
         }
+    }
+
+    private Map<String, Object> buildUserInfoResponse(User user) {
+        Map<String, Object> response = new LinkedHashMap<>();
+
+        response.put("id", user.getUserId());
+        response.put("phone", user.getPhone());
+        response.put("roleId", user.getRole() != null ? user.getRole().getRoleId() : null);
+        response.put("role", user.getRole() != null ? user.getRole().getName() : null);
+        response.put("accountTypeId", user.getAccountType() != null ? user.getAccountType().getAccountTypeId() : null);
+        response.put("accountType", user.getAccountType() != null ? user.getAccountType().getName() : null);
+        response.put("isVerified", user.getIsVerified());
+        response.put("registrationDate", user.getRegistrationDate() != null ? user.getRegistrationDate().toString() : null);
+
+        response.put("fullName", resolveFullName(user));
+        response.put("email", resolveEmail(user));
+
+        if (user.getMechanicProfile() != null) {
+            response.put("mechanicProfile", buildMechanicProfile(user.getMechanicProfile()));
+        }
+
+        if (user.getOwnerProfile() != null) {
+            response.put("ownerProfile", buildOwnerProfile(user.getOwnerProfile()));
+        }
+
+        return response;
+    }
+
+    private String resolveFullName(User user) {
+        if (user.getMechanicProfile() != null && isNotBlank(user.getMechanicProfile().getFullName())) {
+            return user.getMechanicProfile().getFullName().trim();
+        }
+        if (user.getOwnerProfile() != null) {
+            OwnerProfile ownerProfile = user.getOwnerProfile();
+            if (isNotBlank(ownerProfile.getContactPerson())) {
+                return ownerProfile.getContactPerson().trim();
+            }
+            if (isNotBlank(ownerProfile.getLegalName())) {
+                return ownerProfile.getLegalName().trim();
+            }
+        }
+        return user.getPhone();
+    }
+
+    private String resolveEmail(User user) {
+        if (user.getOwnerProfile() != null && isNotBlank(user.getOwnerProfile().getContactEmail())) {
+            return user.getOwnerProfile().getContactEmail().trim();
+        }
+        return null;
+    }
+
+    private Map<String, Object> buildMechanicProfile(MechanicProfile profile) {
+        Map<String, Object> result = new LinkedHashMap<>();
+
+        result.put("fullName", trimOrNull(profile.getFullName()));
+        result.put("birthDate", profile.getBirthDate() != null ? profile.getBirthDate().toString() : null);
+        result.put("isEntrepreneur", profile.getIsEntrepreneur());
+        result.put("isVerified", profile.getIsDataVerified());
+        result.put("workPlaces", trimOrNull(profile.getWorkPlaces()));
+        result.put("workPeriods", trimOrNull(profile.getWorkPeriods()));
+
+        List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs()).orElse(Collections.emptyList());
+        List<String> clubNames = clubs.stream()
+                .map(BowlingClub::getName)
+                .filter(this::isNotBlank)
+                .map(String::trim)
+                .collect(Collectors.toList());
+
+        if (!clubNames.isEmpty()) {
+            result.put("clubName", clubNames.get(0));
+        }
+
+        String address = clubs.stream()
+                .map(BowlingClub::getAddress)
+                .filter(this::isNotBlank)
+                .map(String::trim)
+                .findFirst()
+                .orElse(null);
+
+        if (address != null) {
+            result.put("address", address);
+        }
+
+        result.put("clubs", clubNames);
+        result.put("status", Boolean.TRUE.equals(profile.getIsEntrepreneur()) ? "Самозанятый" : "Штатный механик");
+        result.put("workplaceVerified", Boolean.TRUE.equals(profile.getIsDataVerified()));
+
+        return result;
+    }
+
+    private Map<String, Object> buildOwnerProfile(OwnerProfile profile) {
+        Map<String, Object> result = new LinkedHashMap<>();
+
+        result.put("legalName", trimOrNull(profile.getLegalName()));
+        result.put("contactPerson", trimOrNull(profile.getContactPerson()));
+        result.put("contactPhone", trimOrNull(profile.getContactPhone()));
+        result.put("contactEmail", trimOrNull(profile.getContactEmail()));
+        result.put("inn", trimOrNull(profile.getInn()));
+        result.put("isVerified", profile.getIsDataVerified());
+        result.put("workplaceVerified", Boolean.TRUE.equals(profile.getIsDataVerified()));
+
+        List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs()).orElse(Collections.emptyList());
+        List<String> clubNames = clubs.stream()
+                .map(BowlingClub::getName)
+                .filter(this::isNotBlank)
+                .map(String::trim)
+                .collect(Collectors.toList());
+
+        if (!clubNames.isEmpty()) {
+            result.put("clubName", clubNames.get(0));
+        }
+
+        String address = clubs.stream()
+                .map(BowlingClub::getAddress)
+                .filter(this::isNotBlank)
+                .map(String::trim)
+                .findFirst()
+                .orElse(null);
+
+        if (address != null) {
+            result.put("address", address);
+        }
+
+        result.put("status", "Собственник");
+        result.put("clubs", clubNames);
+
+        Integer totalLanes = clubs.stream()
+                .map(BowlingClub::getLanesCount)
+                .filter(Objects::nonNull)
+                .reduce(Integer::sum)
+                .orElse(null);
+
+        if (totalLanes != null && totalLanes > 0) {
+            result.put("lanes", totalLanes.toString());
+        }
+
+        List<String> equipment = clubs.stream()
+                .flatMap(club -> Optional.ofNullable(club.getEquipmentTypes()).orElseGet(ArrayList::new).stream())
+                .map(type -> {
+                    if (type.getEquipmentType() != null && isNotBlank(type.getEquipmentType().getName())) {
+                        return type.getEquipmentType().getName().trim();
+                    }
+                    return trimOrNull(type.getOtherName());
+                })
+                .filter(this::isNotBlank)
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (!equipment.isEmpty()) {
+            result.put("equipment", String.join(", ", equipment));
+        }
+
+        return result;
+    }
+
+    private boolean isNotBlank(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private String trimOrNull(String value) {
+        return isNotBlank(value) ? value.trim() : null;
     }
 }

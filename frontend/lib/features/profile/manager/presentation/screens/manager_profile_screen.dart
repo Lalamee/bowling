@@ -16,11 +16,11 @@ class ManagerProfileScreen extends StatefulWidget {
 
 class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
   final UserRepository _repo = UserRepository();
-  String fullName = 'Менеджер Иван Иванович';
-  String phone = '+7 (980) 001 01 01';
+  String fullName = '—';
+  String phone = '—';
   String email = '';
-  String clubName = 'Боулинг клуб "Кегли"';
-  String address = 'г. Воронеж, ул. Тверская, д. 45';
+  String clubName = '—';
+  String address = '—';
 
   @override
   void initState() {
@@ -30,13 +30,79 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
 
   Future<void> _load() async {
     final me = await _repo.me();
-    if (mounted) {
-      setState(() {
-        fullName = (me?['fullName'] ?? me?['phone'] ?? 'Профиль').toString();
-        phone = (me?['phone'] ?? '—').toString();
-        email = (me?['email'] ?? '').toString();
-      });
+    if (!mounted) return;
+
+    setState(() {
+      fullName = _asString(me?['fullName']) ?? _asString(me?['phone']) ?? fullName;
+      phone = _asString(me?['phone']) ?? phone;
+      email = _asString(me?['email']) ?? email;
+
+      final ownerProfile = me?['ownerProfile'];
+      final mechanicProfile = me?['mechanicProfile'];
+
+      final clubs = _resolveClubs([ownerProfile, mechanicProfile, me]);
+      if (clubs.isNotEmpty) {
+        clubName = clubs.first;
+      }
+
+      final resolvedAddress = _resolveAddress([ownerProfile, mechanicProfile, me]);
+      if (resolvedAddress != null) {
+        address = resolvedAddress;
+      }
+    });
+  }
+
+  String? _asString(dynamic value) {
+    if (value == null) return null;
+    final str = value.toString().trim();
+    return str.isEmpty ? null : str;
+  }
+
+  List<String> _resolveClubs(List<dynamic> sources) {
+    final result = <String>[];
+    final seen = <String>{};
+
+    for (final source in sources) {
+      if (source is Map) {
+        final map = Map<String, dynamic>.from(source);
+        final clubName = _asString(map['clubName']);
+        if (clubName != null && seen.add(clubName)) {
+          result.add(clubName);
+        }
+
+        final clubs = map['clubs'];
+        if (clubs is Iterable) {
+          for (final club in clubs) {
+            final value = _asString(club);
+            if (value != null && seen.add(value)) {
+              result.add(value);
+            }
+          }
+        } else if (clubs is String) {
+          for (final part in clubs.split(',')) {
+            final value = _asString(part);
+            if (value != null && seen.add(value)) {
+              result.add(value);
+            }
+          }
+        }
+      }
     }
+
+    return result;
+  }
+
+  String? _resolveAddress(List<dynamic> sources) {
+    for (final source in sources) {
+      if (source is Map) {
+        final map = Map<String, dynamic>.from(source);
+        final value = _asString(map['address']);
+        if (value != null) {
+          return value;
+        }
+      }
+    }
+    return null;
   }
 
   @override
