@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../../core/repositories/user_repository.dart';
 import '../../../../../core/routing/routes.dart';
-import '../../../../../core/services/auth_service.dart';
+import '../../../../../features/auth/data/auth_service.dart';
 import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
