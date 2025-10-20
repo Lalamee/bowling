@@ -4,6 +4,7 @@ import '../../models/register_request_dto.dart';
 import '../../models/register_user_dto.dart';
 import '../../models/mechanic_profile_dto.dart';
 import '../../models/owner_profile_dto.dart';
+import '../../models/user_info_dto.dart';
 
 class AuthService {
   static final _api = ApiService();
@@ -87,5 +88,13 @@ class AuthService {
       await _api.logout();
     } catch (_) {}
     await _api.clearTokens();
+  }
+
+  static Future<UserInfoDto?> currentUser() async {
+    try {
+      return await _api.getCurrentUser();
+    } catch (_) {
+      return null;
+    }
   }
 }

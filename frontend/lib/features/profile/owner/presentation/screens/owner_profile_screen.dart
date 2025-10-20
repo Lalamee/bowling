@@ -1,13 +1,18 @@
-import '../../../../../core/repositories/user_repository.dart';
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
+
+import '../../../../../core/repositories/user_repository.dart';
+import '../../../../../core/routing/routes.dart';
+import '../../../../../core/services/auth_service.dart';
+import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/theme/colors.dart';
+import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../../shared/widgets/tiles/profile_tile.dart';
+import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
+import '../../../../../core/utils/bottom_nav.dart';
 import '../../domain/owner_profile.dart';
 import 'edit_owner_profile_screen.dart';
-import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
-import '../../../../../core/utils/bottom_nav.dart';
-import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
-import '../../../../../core/routing/routes.dart';
 
 enum OwnerEditFocus { none, name, phone, address }
 
@@ -21,35 +26,172 @@ class OwnerProfileScreen extends StatefulWidget {
 class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
   final UserRepository _repo = UserRepository();
   late OwnerProfile profile;
-  String fullName = '—';
-  String phone = '—';
-  String email = '';
+  bool _isLoading = true;
+  bool _hasError = false;
+  String? email;
+  String? inn;
+  String? lanes;
+  String? equipment;
 
   @override
   void initState() {
     super.initState();
     profile = OwnerProfile(
-      fullName: 'Собственник Иван Иванович',
-      phone: '+7 (980) 001-01-01',
-      clubName: 'Боулинг клуб "Кегли"',
-      clubs: ['Боулинг клуб "Кегли"'],
-      address: 'г. Воронеж, ул. Тверская, д. 45',
-      workplaceVerified: true,
-      birthDate: DateTime(1989, 2, 24),
+      fullName: 'Собственник',
+      phone: '—',
+      clubName: '—',
+      clubs: const [],
+      address: '—',
+      workplaceVerified: false,
+      birthDate: DateTime(1989, 1, 1),
       status: 'Собственник',
     );
+    _loadLocalProfile();
     _load();
   }
 
+  Future<void> _loadLocalProfile() async {
+    final stored = await LocalAuthStorage.loadOwnerProfile();
+    if (!mounted || stored == null) return;
+    _applyProfile(stored);
+  }
+
   Future<void> _load() async {
-    final me = await _repo.me();
-    if (mounted) {
-      setState(() {
-        fullName = (me?['fullName'] ?? me?['phone'] ?? 'Профиль').toString();
-        phone = (me?['phone'] ?? '—').toString();
-        email = (me?['email'] ?? '').toString();
-      });
+    try {
+      if (mounted) {
+        setState(() {
+          _isLoading = true;
+          _hasError = false;
+        });
+      }
+      final me = await _repo.me();
+      if (!mounted) return;
+      if (me == null) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
+        return;
+      }
+      final cache = _mapApiToCache(me);
+      await LocalAuthStorage.saveOwnerProfile(cache);
+      if (!mounted) return;
+      _applyProfile(cache);
+    } catch (e, s) {
+      log('Failed to load owner profile: $e', stackTrace: s);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
+      }
     }
+  }
+
+  Map<String, dynamic> _mapApiToCache(Map<String, dynamic> me) {
+    String? asString(dynamic value) {
+      if (value == null) return null;
+      final str = value.toString().trim();
+      return str.isEmpty ? null : str;
+    }
+
+    final ownerProfile = me['ownerProfile'];
+    final clubs = <String>[];
+    String? clubName;
+    String? address;
+    String? status;
+    String? contactEmail;
+    String? contactInn;
+    String? clubEquipment;
+    String? clubLanes;
+    String? contactPerson;
+    String? contactPhone;
+
+    if (ownerProfile is Map) {
+      final map = Map<String, dynamic>.from(ownerProfile);
+      final legalName = asString(map['legalName']);
+      if (legalName != null) {
+        clubName = legalName;
+        clubs.add(legalName);
+      }
+      contactPerson = asString(map['contactPerson']);
+      contactPhone = asString(map['contactPhone']);
+      final legalAddress = asString(map['address'] ?? map['legalAddress']);
+      if (legalAddress != null) {
+        address = legalAddress;
+      }
+      contactEmail = asString(map['contactEmail']);
+      contactInn = asString(map['inn']);
+      status = asString(map['status']) ?? profile.status;
+      clubEquipment = asString(map['equipment']);
+      clubLanes = asString(map['lanes']);
+    }
+
+    var fullName = asString(me['fullName']) ?? contactPerson ?? profile.fullName;
+    var phone = asString(me['phone']) ?? contactPhone ?? profile.phone;
+    final verified = me['isVerified'] is bool ? me['isVerified'] as bool : profile.workplaceVerified;
+
+    if (clubName == null && clubs.isEmpty) {
+      final fallbackClub = asString(me['company']) ?? asString(me['clubName']);
+      if (fallbackClub != null) {
+        clubName = fallbackClub;
+        clubs.add(fallbackClub);
+      }
+    }
+
+    if (address == null) {
+      address = asString(me['address']);
+    }
+
+    return {
+      'fullName': fullName,
+      'phone': phone,
+      'clubName': clubName ?? (clubs.isNotEmpty ? clubs.first : profile.clubName),
+      'address': address ?? profile.address,
+      'status': status ?? profile.status,
+      'clubs': clubs,
+      'workplaceVerified': verified,
+      'email': contactEmail ?? asString(me['email']),
+      'inn': contactInn,
+      'lanes': clubLanes,
+      'equipment': clubEquipment,
+    };
+  }
+
+  void _applyProfile(Map<String, dynamic> raw) {
+    String? asString(dynamic value) {
+      if (value == null) return null;
+      final str = value.toString().trim();
+      return str.isEmpty ? null : str;
+    }
+
+    final clubs = <String>[];
+    final rawClubs = raw['clubs'];
+    if (rawClubs is Iterable) {
+      clubs.addAll(rawClubs.map((e) => e.toString().trim()).where((e) => e.isNotEmpty));
+    } else if (rawClubs is String && rawClubs.isNotEmpty) {
+      clubs.addAll(rawClubs.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty));
+    }
+
+    final updatedProfile = profile.copyWith(
+      fullName: asString(raw['fullName']) ?? profile.fullName,
+      phone: asString(raw['phone']) ?? profile.phone,
+      clubName: asString(raw['clubName']) ?? (clubs.isNotEmpty ? clubs.first : profile.clubName),
+      address: asString(raw['address']) ?? profile.address,
+      status: asString(raw['status']) ?? profile.status,
+      clubs: clubs.isNotEmpty ? clubs : profile.clubs,
+      workplaceVerified: raw['workplaceVerified'] as bool? ?? profile.workplaceVerified,
+    );
+
+    setState(() {
+      profile = updatedProfile;
+      email = asString(raw['email']) ?? email;
+      inn = asString(raw['inn']) ?? inn;
+      lanes = asString(raw['lanes']) ?? lanes;
+      equipment = asString(raw['equipment']) ?? equipment;
+      _isLoading = false;
+      _hasError = false;
+    });
   }
 
   Future<void> _openEdit(OwnerEditFocus focus) async {
@@ -58,6 +200,13 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
       MaterialPageRoute(builder: (_) => EditOwnerProfileScreen(initial: profile, focus: focus)),
     );
     if (updated != null) setState(() => profile = updated);
+  }
+
+  Future<void> _logout() async {
+    await AuthService.logout();
+    await LocalAuthStorage.clearOwnerState();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
   }
 
   @override
@@ -74,62 +223,115 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
         centerTitle: false,
         actions: [IconButton(onPressed: _load, icon: const Icon(Icons.sync), color: AppColors.primary)],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        children: [
-          ProfileTile(icon: Icons.person, text: profile.fullName, onEdit: () => _openEdit(OwnerEditFocus.name)),
-          const SizedBox(height: 10),
-          ProfileTile(icon: Icons.phone, text: profile.phone, onEdit: () => _openEdit(OwnerEditFocus.phone)),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(color: AppColors.white, border: Border.all(color: AppColors.lightGray), borderRadius: BorderRadius.circular(14)),
-            child: Row(
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.badge_outlined, size: 18, color: AppColors.primary),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _hasError
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'Не удалось загрузить профиль',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _isLoading = true;
+                              _hasError = false;
+                            });
+                            _load();
+                          },
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Повторить'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  children: [
+                    ProfileTile(icon: Icons.person, text: profile.fullName, onEdit: () => _openEdit(OwnerEditFocus.name)),
+                    const SizedBox(height: 10),
+                    ProfileTile(icon: Icons.phone, text: profile.phone, onEdit: () => _openEdit(OwnerEditFocus.phone)),
+                    if (email != null && email!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      ProfileTile(icon: Icons.email_outlined, text: email!),
+                    ],
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(color: AppColors.white, border: Border.all(color: AppColors.lightGray), borderRadius: BorderRadius.circular(14)),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(10)),
+                            child: const Icon(Icons.badge_outlined, size: 18, color: AppColors.primary),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text('Статус:', style: TextStyle(fontSize: 14, color: AppColors.darkGray)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              profile.status,
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (inn != null && inn!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      ProfileTile(icon: Icons.numbers_rounded, text: 'ИНН: $inn'),
+                    ],
+                    const SizedBox(height: 10),
+                    ProfileTile(
+                      icon: Icons.menu_book_rounded,
+                      text: 'База знаний',
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen())),
+                    ),
+                    const SizedBox(height: 10),
+                    if (profile.clubs.isNotEmpty)
+                      ...List.generate(profile.clubs.length, (i) {
+                        final club = profile.clubs[i];
+                        return Padding(
+                          padding: EdgeInsets.only(bottom: i == profile.clubs.length - 1 ? 0 : 10),
+                          child: ProfileTile(
+                            icon: Icons.location_searching_rounded,
+                            text: club,
+                            showAlertBadge: !profile.workplaceVerified && i == 0,
+                            onTap: () => _openEdit(OwnerEditFocus.none),
+                          ),
+                        );
+                      }),
+                    const SizedBox(height: 10),
+                    ProfileTile(icon: Icons.location_on_rounded, text: profile.address, onEdit: () => _openEdit(OwnerEditFocus.address)),
+                    if (lanes != null && lanes!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      ProfileTile(icon: Icons.format_list_numbered, text: 'Дорожек: $lanes'),
+                    ],
+                    if (equipment != null && equipment!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      ProfileTile(icon: Icons.memory_rounded, text: 'Оборудование: $equipment'),
+                    ],
+                    const SizedBox(height: 10),
+                    ProfileTile(icon: Icons.history_rounded, text: 'История заказов', onTap: () => Navigator.pushNamed(context, Routes.ordersPersonalHistory)),
+                    const SizedBox(height: 10),
+                    ProfileTile(icon: Icons.notifications_active_outlined, text: 'Оповещения', onTap: () {}),
+                    const SizedBox(height: 10),
+                    ProfileTile(icon: Icons.group_outlined, text: 'Сотрудники клуба', onTap: () => Navigator.pushNamed(context, Routes.clubStaff)),
+                    const SizedBox(height: 10),
+                    ProfileTile(icon: Icons.exit_to_app_rounded, text: 'Выход', danger: true, onTap: _logout),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                const Text('Статус:', style: TextStyle(fontSize: 14, color: AppColors.darkGray)),
-                const SizedBox(width: 8),
-                Expanded(child: Text(profile.status, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          ProfileTile(
-            icon: Icons.menu_book_rounded,
-            text: 'База знаний',
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen())),
-          ),
-          const SizedBox(height: 10),
-          ...List.generate(profile.clubs.length, (i) {
-            final club = profile.clubs[i];
-            return Padding(
-              padding: EdgeInsets.only(bottom: i == profile.clubs.length - 1 ? 0 : 10),
-              child: ProfileTile(
-                icon: Icons.location_searching_rounded,
-                text: club,
-                showAlertBadge: !profile.workplaceVerified && i == 0,
-                onTap: () => _openEdit(OwnerEditFocus.none),
-              ),
-            );
-          }),
-          const SizedBox(height: 10),
-          ProfileTile(icon: Icons.location_on_rounded, text: profile.address, onEdit: () => _openEdit(OwnerEditFocus.address)),
-          const SizedBox(height: 10),
-          ProfileTile(icon: Icons.history_rounded, text: 'История заказов', onTap: () {}),
-          const SizedBox(height: 10),
-          ProfileTile(icon: Icons.notifications_active_outlined, text: 'Оповещения', onTap: () {}),
-          const SizedBox(height: 10),
-          ProfileTile(icon: Icons.group_outlined, text: 'Сотрудники клуба', onTap: () => Navigator.pushNamed(context, Routes.clubStaff)),
-          const SizedBox(height: 10),
-          ProfileTile(icon: Icons.exit_to_app_rounded, text: 'Выход', danger: true, onTap: () {}),
-        ],
-      ),
       bottomNavigationBar: AppBottomNav(
         currentIndex: 3,
         onTap: (i) => BottomNavDirect.go(context, 3, i),

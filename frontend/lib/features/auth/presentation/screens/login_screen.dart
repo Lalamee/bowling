@@ -1,5 +1,6 @@
 import '../../../../core/utils/net_ui.dart';
 import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/local_auth_storage.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/colors.dart';
@@ -35,10 +36,62 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     final res = await withLoader(context, () => AuthService.login(phone: phone, password: password));
     if (res != null && mounted) {
+      await _cacheRole();
       Navigator.of(context).pushReplacementNamed(Routes.orders);
     } else if (mounted) {
       showSnack(context, 'Неверный телефон или пароль');
     }
+  }
+
+  Future<void> _cacheRole() async {
+    final info = await AuthService.currentUser();
+    if (info == null) return;
+
+    String? role;
+    switch (info.accountTypeId) {
+      case 1:
+        role = 'mechanic';
+        break;
+      case 2:
+        role = 'owner';
+        break;
+      case 3:
+        role = 'manager';
+        break;
+      case 4:
+        role = 'admin';
+        break;
+    }
+
+    role ??= () {
+      switch (info.roleId) {
+        case 1:
+          return 'mechanic';
+        case 2:
+          return 'manager';
+        case 3:
+          return 'owner';
+        case 4:
+          return 'admin';
+        default:
+          return null;
+      }
+    }();
+
+    if (role == null) return;
+
+    if (role == 'mechanic') {
+      await LocalAuthStorage.clearOwnerState();
+      await LocalAuthStorage.setMechanicRegistered(true);
+    } else if (role == 'owner') {
+      await LocalAuthStorage.clearMechanicState();
+      await LocalAuthStorage.setOwnerRegistered(true);
+    } else {
+      await LocalAuthStorage.clearMechanicState();
+      await LocalAuthStorage.clearOwnerState();
+    }
+
+    await LocalAuthStorage.setRegisteredRole(role);
   }
 
   @override

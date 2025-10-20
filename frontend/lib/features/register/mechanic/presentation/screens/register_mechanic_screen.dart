@@ -10,6 +10,8 @@ import '../../../../../shared/widgets/chips/radio_group_horizontal.dart';
 import '../../../../../shared/widgets/layout/common_ui.dart';
 import '../../../../../core/utils/validators.dart';
 import '../../../../../core/services/auth_service.dart';
+import '../../../../../core/services/local_auth_storage.dart';
+import '../../../../../core/routing/routes.dart';
 
 class RegisterMechanicScreen extends StatefulWidget {
   const RegisterMechanicScreen({Key? key}) : super(key: key);
@@ -82,6 +84,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       initialDate: birthDate ?? DateTime(now.year - 18),
       firstDate: DateTime(1900),
       lastDate: now,
+      locale: const Locale('ru'),
     );
     if (picked != null) {
       setState(() {
@@ -158,11 +161,42 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     };
 
     final success = await AuthService.registerMechanic(data);
-    if (success) {
-      _showBar('Регистрация механика успешна');
-    } else {
+    if (!success) {
       _showBar('Ошибка при отправке данных');
+      return;
     }
+
+    final trimmedPhone = _phone.text.trim();
+    final trimmedClub = _currentClub.text.trim();
+    final trimmedStatus = status?.trim();
+    final clubsCache = List<String>.from(places);
+    if (clubsCache.isEmpty && trimmedClub.isNotEmpty) {
+      clubsCache.add(trimmedClub);
+    }
+
+    final profileData = {
+      'fullName': _fio.text.trim(),
+      'phone': trimmedPhone,
+      'clubName': clubsCache.isNotEmpty ? clubsCache.first : trimmedClub,
+      'address': clubsCache.isNotEmpty ? clubsCache.first : trimmedClub,
+      'status': trimmedStatus ?? 'Самозанятый',
+      'birthDate': birthDate?.toIso8601String(),
+      'clubs': clubsCache,
+      'workplaceVerified': false,
+    };
+    final password = data['password']?.toString() ?? 'password123';
+    final loginResult = await AuthService.login(phone: trimmedPhone, password: password);
+    if (loginResult == null) {
+      _showBar('Не удалось войти с новыми данными, попробуйте позже');
+      return;
+    }
+
+    await LocalAuthStorage.saveMechanicProfile(profileData);
+    await LocalAuthStorage.setMechanicRegistered(true);
+    await LocalAuthStorage.setRegisteredRole('mechanic');
+
+    if (!mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil(Routes.profileMechanic, (route) => false);
   }
 
   @override
