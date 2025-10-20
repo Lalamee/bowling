@@ -1,25 +1,26 @@
 import 'package:dio/dio.dart';
-import 'api_core.dart';
-import '../models/login_response_dto.dart';
-import '../models/user_login_dto.dart';
-import '../models/user_info_dto.dart';
-import '../models/register_request_dto.dart';
-import '../models/refresh_token_request_dto.dart';
-import '../models/password_change_request_dto.dart';
-import '../models/standard_response_dto.dart';
-import '../models/maintenance_request_response_dto.dart';
-import '../models/part_request_dto.dart';
-import '../models/approve_reject_request_dto.dart';
-import '../models/parts_catalog_response_dto.dart';
-import '../models/parts_search_dto.dart';
-import '../models/work_log_dto.dart';
-import '../models/work_log_search_dto.dart';
-import '../models/page_response.dart';
-import '../models/service_history_dto.dart';
-import '../models/order_parts_request_dto.dart';
-import '../models/delivery_request_dto.dart';
-import '../models/issue_request_dto.dart';
-import '../models/close_request_dto.dart';
+import 'package:flutter_application_1/api/api_core.dart';
+import 'package:flutter_application_1/core/network/dio_client.dart';
+import 'package:flutter_application_1/models/approve_reject_request_dto.dart';
+import 'package:flutter_application_1/models/close_request_dto.dart';
+import 'package:flutter_application_1/models/delivery_request_dto.dart';
+import 'package:flutter_application_1/models/issue_request_dto.dart';
+import 'package:flutter_application_1/models/login_response_dto.dart';
+import 'package:flutter_application_1/models/maintenance_request_response_dto.dart';
+import 'package:flutter_application_1/models/order_parts_request_dto.dart';
+import 'package:flutter_application_1/models/page_response.dart';
+import 'package:flutter_application_1/models/part_request_dto.dart';
+import 'package:flutter_application_1/models/password_change_request_dto.dart';
+import 'package:flutter_application_1/models/parts_catalog_response_dto.dart';
+import 'package:flutter_application_1/models/parts_search_dto.dart';
+import 'package:flutter_application_1/models/refresh_token_request_dto.dart';
+import 'package:flutter_application_1/models/register_request_dto.dart';
+import 'package:flutter_application_1/models/service_history_dto.dart';
+import 'package:flutter_application_1/models/standard_response_dto.dart';
+import 'package:flutter_application_1/models/user_info_dto.dart';
+import 'package:flutter_application_1/models/user_login_dto.dart';
+import 'package:flutter_application_1/models/work_log_dto.dart';
+import 'package:flutter_application_1/models/work_log_search_dto.dart';
 
 /// Типизированный API сервис для взаимодействия с backend
 class ApiService {
@@ -329,12 +330,11 @@ class ApiService {
 
   /// Сохранение токенов после успешной авторизации
   Future<void> saveTokens(LoginResponseDto loginResponse) async {
-    await _core.storage.write(key: 'jwt_token', value: loginResponse.accessToken);
-    await _core.storage.write(key: 'refresh_token', value: loginResponse.refreshToken);
+    await DioClient.saveTokens(accessToken: loginResponse.accessToken, refreshToken: loginResponse.refreshToken);
   }
 
   /// Очистка токенов при выходе
   Future<void> clearTokens() async {
-    await _core.clearToken();
+    await DioClient.clearTokens();
   }
 }

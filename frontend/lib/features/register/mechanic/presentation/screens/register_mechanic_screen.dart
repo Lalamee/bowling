@@ -10,7 +10,7 @@ import '../../../../../shared/widgets/chips/radio_group_horizontal.dart';
 import '../../../../../shared/widgets/layout/common_ui.dart';
 import '../../../../../core/utils/validators.dart';
 import '../../../../../core/utils/phone_utils.dart';
-import '../../../../../core/services/auth_service.dart';
+import '../../../../../features/auth/data/auth_service.dart';
 import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/routing/routes.dart';
 
@@ -322,8 +322,12 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'workplaceVerified': false,
     };
     final password = data['password']?.toString() ?? 'password123';
-    final loginResult = await AuthService.login(phone: normalizedPhone, password: password);
-    if (loginResult == null) {
+    try {
+      await AuthService.login(identifier: normalizedPhone, password: password);
+    } on AuthException {
+      _showBar('Не удалось войти с новыми данными, попробуйте позже');
+      return;
+    } catch (_) {
       _showBar('Не удалось войти с новыми данными, попробуйте позже');
       return;
     }

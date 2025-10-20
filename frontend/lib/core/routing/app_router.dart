@@ -1,50 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/routing/route_args.dart';
+import 'package:flutter_application_1/core/routing/routes.dart';
+import 'package:flutter_application_1/features/auth/presentation/screens/recover_ask_login_screen.dart';
+import 'package:flutter_application_1/features/auth/presentation/screens/recover_code_screen.dart';
+import 'package:flutter_application_1/features/auth/presentation/screens/recover_new_password_screen.dart';
+import 'package:flutter_application_1/features/auth/ui/login_page.dart';
+import 'package:flutter_application_1/features/clubs/presentation/screens/club_screen.dart';
+import 'package:flutter_application_1/features/clubs/presentation/screens/club_search_screen.dart';
+import 'package:flutter_application_1/features/clubs/presentation/screens/club_staff_screen.dart';
+import 'package:flutter_application_1/features/clubs/presentation/screens/club_warehouse_screen.dart';
+import 'package:flutter_application_1/features/knowledge_base/presentation/screens/knowledge_base_screen.dart';
+import 'package:flutter_application_1/features/knowledge_base/presentation/screens/pdf_reader_screen.dart';
+import 'package:flutter_application_1/features/onboarding/presentation/screens/onboarding_screen.dart';
+import 'package:flutter_application_1/features/onboarding/presentation/screens/register_role_selection.dart';
+import 'package:flutter_application_1/features/onboarding/presentation/screens/splash_first_time.dart';
+import 'package:flutter_application_1/features/onboarding/presentation/screens/splash_screen.dart';
+import 'package:flutter_application_1/features/onboarding/presentation/screens/welcome_screen.dart';
 import 'package:flutter_application_1/features/orders/presentation/screens/admin_orders_screen.dart';
+import 'package:flutter_application_1/features/orders/presentation/screens/club_orders_history_screen.dart';
+import 'package:flutter_application_1/features/orders/presentation/screens/create_maintenance_request_screen.dart';
+import 'package:flutter_application_1/features/orders/presentation/screens/maintenance_requests_screen.dart';
+import 'package:flutter_application_1/features/orders/presentation/screens/manager_orders_history_screen.dart';
+import 'package:flutter_application_1/features/orders/presentation/screens/order_summary_screen.dart';
+import 'package:flutter_application_1/features/orders/presentation/screens/orders_screen.dart';
+import 'package:flutter_application_1/features/orders/presentation/screens/service_history_screen.dart';
+import 'package:flutter_application_1/features/orders/presentation/screens/work_logs_screen.dart';
 import 'package:flutter_application_1/features/profile/admin/presentation/screens/admin_clubs_screen.dart';
 import 'package:flutter_application_1/features/profile/admin/presentation/screens/admin_mechanics_screen.dart';
 import 'package:flutter_application_1/features/profile/admin/presentation/screens/admin_profile_screen.dart';
-import 'routes.dart';
-import 'route_args.dart';
-
-import '../../features/onboarding/presentation/screens/splash_screen.dart';
-import '../../features/onboarding/presentation/screens/splash_first_time.dart';
-import '../../features/onboarding/presentation/screens/welcome_screen.dart';
-import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
-import '../../features/onboarding/presentation/screens/register_role_selection.dart';
-
-import '../../features/register/mechanic/presentation/screens/register_mechanic_screen.dart';
-import '../../features/register/owner/presentation/screens/register_owner_screen.dart';
-
-import '../../features/orders/presentation/screens/orders_screen.dart';
-import '../../features/orders/presentation/screens/order_summary_screen.dart';
-import '../../features/orders/presentation/screens/manager_orders_history_screen.dart';
-import '../../features/orders/presentation/screens/club_orders_history_screen.dart';
-import '../../features/orders/presentation/screens/maintenance_requests_screen.dart';
-import '../../features/orders/presentation/screens/create_maintenance_request_screen.dart';
-import '../../features/orders/presentation/screens/work_logs_screen.dart';
-import '../../features/orders/presentation/screens/service_history_screen.dart';
-
-import '../../features/clubs/presentation/screens/club_screen.dart';
-import '../../features/clubs/presentation/screens/club_search_screen.dart';
-import '../../features/clubs/presentation/screens/club_warehouse_screen.dart';
-import '../../features/clubs/presentation/screens/club_staff_screen.dart';
-
-import '../../features/profile/mechanic/presentation/screens/mechanic_profile_screen.dart';
-import '../../features/profile/mechanic/presentation/screens/edit_mechanic_profile_screen.dart';
-
-import '../../features/profile/owner/presentation/screens/owner_profile_screen.dart';
-import '../../features/profile/owner/presentation/screens/edit_owner_profile_screen.dart';
-
-import '../../features/profile/manager/presentation/screens/manager_profile_screen.dart';
-import '../../features/profile/manager/presentation/screens/manager_notifications_screen.dart';
-
-import '../../features/knowledge_base/presentation/screens/knowledge_base_screen.dart';
-import '../../features/knowledge_base/presentation/screens/pdf_reader_screen.dart';
-
-import '../../features/auth/presentation/screens/login_screen.dart';
-import '../../features/auth/presentation/screens/recover_ask_login_screen.dart';
-import '../../features/auth/presentation/screens/recover_code_screen.dart';
-import '../../features/auth/presentation/screens/recover_new_password_screen.dart';
+import 'package:flutter_application_1/features/profile/manager/presentation/screens/manager_notifications_screen.dart';
+import 'package:flutter_application_1/features/profile/manager/presentation/screens/manager_profile_screen.dart';
+import 'package:flutter_application_1/features/profile/mechanic/presentation/screens/edit_mechanic_profile_screen.dart';
+import 'package:flutter_application_1/features/profile/mechanic/presentation/screens/mechanic_profile_screen.dart';
+import 'package:flutter_application_1/features/profile/owner/presentation/screens/edit_owner_profile_screen.dart';
+import 'package:flutter_application_1/features/profile/owner/presentation/screens/owner_profile_screen.dart';
+import 'package:flutter_application_1/features/register/mechanic/presentation/screens/register_mechanic_screen.dart';
+import 'package:flutter_application_1/features/register/owner/presentation/screens/register_owner_screen.dart';
 
 class AppRouter {
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
@@ -110,7 +101,7 @@ class AppRouter {
       }
 
       case Routes.authLogin:
-        return MaterialPageRoute(builder: (_) => const LoginScreen());
+        return MaterialPageRoute(builder: (_) => const LoginPage());
       case Routes.recoverAsk:
         return MaterialPageRoute(builder: (_) => const RecoverAskLoginScreen());
       case Routes.recoverCode:

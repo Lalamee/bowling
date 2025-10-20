@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/routing/routes.dart';
-import '../../../../../core/services/auth_service.dart';
+import '../../../../../features/auth/data/auth_service.dart';
 import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/utils/net_ui.dart';
@@ -142,8 +142,14 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
         throw Exception('Не удалось зарегистрировать владельца. Попробуйте ещё раз.');
       }
 
-      final loginResult = await AuthService.login(phone: normalizedPhone, password: password);
-      if (loginResult == null) {
+      try {
+        await AuthService.login(identifier: normalizedPhone, password: password);
+      } on AuthException catch (e) {
+        final message = e.message.isNotEmpty
+            ? e.message
+            : 'Регистрация выполнена, но не удалось войти. Попробуйте выполнить вход вручную.';
+        throw Exception(message);
+      } catch (_) {
         throw Exception('Регистрация выполнена, но не удалось войти. Попробуйте выполнить вход вручную.');
       }
 
