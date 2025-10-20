@@ -46,13 +46,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       return;
     }
     var role = _registeredRole?.trim().toLowerCase();
+    if ((role == null || role.isEmpty) && TestOverrides.enabled) {
+      role = TestOverrides.userRole.toLowerCase();
+    }
     if (role == null || role.isEmpty) {
-      if (TestOverrides.enabled) {
-        role = TestOverrides.userRole.toLowerCase();
-      } else {
-        Navigator.pushReplacementNamed(context, Routes.authLogin);
-        return;
-      }
+      return;
     }
     if (role == 'owner') {
       Navigator.pushReplacementNamed(context, Routes.profileOwner);

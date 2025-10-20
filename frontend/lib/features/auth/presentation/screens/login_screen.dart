@@ -1,6 +1,7 @@
 import '../../../../core/utils/net_ui.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/local_auth_storage.dart';
+import '../../../../core/utils/phone_utils.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/colors.dart';
@@ -29,12 +30,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _onLogin() async {
     final phone = _login.text.trim();
+    final normalizedPhone = PhoneUtils.normalize(phone);
     final password = _password.text;
     if (phone.isEmpty || password.isEmpty) {
       showSnack(context, 'Введите телефон и пароль');
       return;
     }
-    final res = await withLoader(context, () => AuthService.login(phone: phone, password: password));
+    final res = await withLoader(context, () => AuthService.login(phone: normalizedPhone, password: password));
     if (res != null && mounted) {
       await _cacheRole();
       Navigator.of(context).pushReplacementNamed(Routes.orders);
