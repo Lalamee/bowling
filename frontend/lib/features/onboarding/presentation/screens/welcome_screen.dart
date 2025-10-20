@@ -50,6 +50,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       role = TestOverrides.userRole.toLowerCase();
     }
     if (role == null || role.isEmpty) {
+      Navigator.pushReplacementNamed(context, Routes.authLogin);
       return;
     }
     if (role == 'owner') {

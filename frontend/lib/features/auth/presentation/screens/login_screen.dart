@@ -38,16 +38,18 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     final res = await withLoader(context, () => AuthService.login(phone: normalizedPhone, password: password));
     if (res != null && mounted) {
-      await _cacheRole();
-      Navigator.of(context).pushReplacementNamed(Routes.orders);
+      final role = await _cacheRole();
+      if (!mounted) return;
+      final destination = _routeForRole(role);
+      Navigator.of(context).pushReplacementNamed(destination);
     } else if (mounted) {
       showSnack(context, 'Неверный телефон или пароль');
     }
   }
 
-  Future<void> _cacheRole() async {
+  Future<String?> _cacheRole() async {
     final info = await AuthService.currentUser();
-    if (info == null) return;
+    if (info == null) return null;
 
     String? role;
     switch (info.accountTypeId) {
@@ -80,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }();
 
-    if (role == null) return;
+    if (role == null) return null;
 
     if (role == 'mechanic') {
       await LocalAuthStorage.clearOwnerState();
@@ -94,6 +96,20 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     await LocalAuthStorage.setRegisteredRole(role);
+    return role;
+  }
+
+  String _routeForRole(String? role) {
+    switch (role) {
+      case 'owner':
+        return Routes.profileOwner;
+      case 'manager':
+        return Routes.profileManager;
+      case 'admin':
+        return Routes.profileAdmin;
+      default:
+        return Routes.profileMechanic;
+    }
   }
 
   @override
