@@ -4,6 +4,8 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val isReleaseTask = gradle.startParameter.taskNames.any { it.contains("Release") }
+
 android {
     namespace = "com.example.flutter_application_1"
     compileSdk = flutter.compileSdkVersion
@@ -39,6 +41,17 @@ android {
         debug {
             isMinifyEnabled = false
             isShrinkResources = false
+        }
+    }
+
+    splits {
+        abi {
+            isEnable = isReleaseTask
+            if (isReleaseTask) {
+                reset()
+                include("armeabi-v7a", "arm64-v8a")
+                isUniversalApk = false
+            }
         }
     }
 }
