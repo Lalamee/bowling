@@ -52,35 +52,75 @@ class _LoginScreenState extends State<LoginScreen> {
     if (info == null) return null;
 
     String? role;
-    switch (info.accountTypeId) {
-      case 1:
-        role = 'mechanic';
-        break;
-      case 2:
+    String? normalize(String? value) => value?.toLowerCase().trim();
+
+    final typeName = normalize(info.accountTypeName);
+    if (typeName != null && typeName.isNotEmpty) {
+      if (typeName.contains('влад') || typeName.contains('owner')) {
         role = 'owner';
-        break;
-      case 3:
+      } else if (typeName.contains('менедж')) {
         role = 'manager';
-        break;
-      case 4:
+      } else if (typeName.contains('админ')) {
         role = 'admin';
-        break;
+      } else if (typeName.contains('механ')) {
+        role = 'mechanic';
+      }
     }
 
-    role ??= () {
+    if (role == null) {
+      final roleName = normalize(info.roleName);
+      if (roleName != null && roleName.isNotEmpty) {
+        if (roleName.contains('admin')) {
+          role = 'admin';
+        } else if (roleName.contains('owner')) {
+          role = 'owner';
+        } else if (roleName.contains('manager') || roleName.contains('staff')) {
+          role = 'manager';
+        } else if (roleName.contains('mechanic')) {
+          role = 'mechanic';
+        }
+      }
+    }
+
+    if (role == null && info.accountTypeId != null) {
+      switch (info.accountTypeId) {
+        case 1:
+          role = 'owner';
+          break;
+        case 2:
+          role = 'mechanic';
+          break;
+        case 3:
+          role = 'mechanic';
+          break;
+        case 4:
+          role = 'admin';
+          break;
+        case 5:
+          role = 'manager';
+          break;
+      }
+    }
+
+    if (role == null && info.roleId != null) {
       switch (info.roleId) {
         case 1:
-          return 'mechanic';
+          role = 'admin';
+          break;
         case 2:
-          return 'manager';
+          role = 'owner';
+          break;
         case 3:
-          return 'owner';
+          role = 'mechanic';
+          break;
         case 4:
-          return 'admin';
-        default:
-          return null;
+          role = 'manager';
+          break;
+        case 5:
+          role = 'manager';
+          break;
       }
-    }();
+    }
 
     if (role == null) return null;
 

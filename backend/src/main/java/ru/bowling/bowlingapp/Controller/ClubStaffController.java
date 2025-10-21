@@ -1,37 +1,37 @@
 package ru.bowling.bowlingapp.Controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import ru.bowling.bowlingapp.DTO.CreateManagerRequestDTO;
+import ru.bowling.bowlingapp.DTO.CreateManagerResponseDTO;
 import ru.bowling.bowlingapp.DTO.StandardResponseDTO;
-
-import java.util.List;
-import java.util.Map;
+import ru.bowling.bowlingapp.Service.ClubStaffService;
 
 @RestController
 @RequestMapping("/api/clubs")
 @RequiredArgsConstructor
 public class ClubStaffController {
 
-    /**
-     * Получить список сотрудников клуба
-     * GET /api/clubs/{clubId}/staff
-     */
+    private final ClubStaffService clubStaffService;
+
     @GetMapping("/{clubId}/staff")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CLUB_OWNER', 'MANAGER')")
     public ResponseEntity<?> getClubStaff(@PathVariable Long clubId) {
-        // TODO: Реализовать получение списка сотрудников
-        // Возвращаем пример данных для тестирования
-        return ResponseEntity.ok(List.of(
-            Map.of(
-                "userId", 1,
-                "fullName", "Иван Иванов",
-                "phone", "+7 (980) 001-01-01",
-                "role", "MANAGER",
-                "isActive", true
-            )
-        ));
+        return ResponseEntity.ok(clubStaffService.getClubStaff(clubId));
+    }
+
+    @PostMapping("/{clubId}/managers")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CLUB_OWNER')")
+    public ResponseEntity<CreateManagerResponseDTO> createManager(
+            @PathVariable Long clubId,
+            @Valid @RequestBody CreateManagerRequestDTO requestDTO
+    ) {
+        CreateManagerResponseDTO response = clubStaffService.createManager(clubId, requestDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
@@ -39,7 +39,7 @@ public class ClubStaffController {
      * POST /api/clubs/{clubId}/staff/{userId}
      */
     @PostMapping("/{clubId}/staff/{userId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CLUB_OWNER')")
     public ResponseEntity<?> assignStaff(
         @PathVariable Long clubId,
         @PathVariable Long userId,
@@ -59,7 +59,7 @@ public class ClubStaffController {
      * DELETE /api/clubs/{clubId}/staff/{userId}
      */
     @DeleteMapping("/{clubId}/staff/{userId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CLUB_OWNER')")
     public ResponseEntity<?> removeStaff(
         @PathVariable Long clubId,
         @PathVariable Long userId
@@ -78,7 +78,7 @@ public class ClubStaffController {
      * PUT /api/clubs/{clubId}/staff/{userId}/role
      */
     @PutMapping("/{clubId}/staff/{userId}/role")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CLUB_OWNER')")
     public ResponseEntity<?> updateStaffRole(
         @PathVariable Long clubId,
         @PathVariable Long userId,

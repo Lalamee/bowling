@@ -5,6 +5,7 @@ import '../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../core/routing/routes.dart';
 import '../../../../core/repositories/club_staff_repository.dart';
 import '../../../../core/utils/net_ui.dart';
+import '../../../../core/utils/phone_utils.dart';
 
 class ClubStaffScreen extends StatefulWidget {
   final int? clubId;
@@ -111,14 +112,28 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
   }
 
   Future<void> _openAssignSheet() async {
-    final result = await showModalBottomSheet<_Employee>(
+    final draft = await showModalBottomSheet<_ManagerDraft>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _AssignEmployeeSheet(dec: _dec, suffixEdit: _suffixEdit),
     );
-    if (result != null) {
-      setState(() => _employees.add(result));
+    if (draft == null) return;
+
+    if (draft.role.toLowerCase().contains('менедж')) {
+      await _createManager(draft);
+    } else {
+      setState(() {
+        _employees.add(
+          _Employee(
+            fio: draft.fullName,
+            workplaces: draft.workplaces.isEmpty ? ['Боулинг клуб'] : draft.workplaces,
+            address: draft.workplaces.isEmpty ? '—' : draft.workplaces.first,
+            phone: draft.phone,
+            role: draft.role,
+          ),
+        );
+      });
     }
   }
 
@@ -139,6 +154,73 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
         Navigator.pushReplacementNamed(context, Routes.profileMechanic);
         break;
     }
+  }
+
+  Future<void> _createManager(_ManagerDraft draft) async {
+    if (widget.clubId == null) {
+      showSnack(context, 'Клуб не выбран');
+      return;
+    }
+
+    final normalizedPhone = PhoneUtils.normalize(draft.phone);
+    final result = await handleApiCall<Map<String, dynamic>?>(
+      context,
+      () => _repo.createManager(
+        widget.clubId!,
+        fullName: draft.fullName,
+        phone: normalizedPhone,
+        email: draft.email,
+      ),
+      successMessage: 'Менеджер добавлен',
+    );
+
+    if (!mounted || result == null) return;
+
+    final password = result['password']?.toString() ?? '';
+    final phone = result['phone']?.toString() ?? normalizedPhone;
+    final fullName = result['fullName']?.toString() ?? draft.fullName;
+
+    setState(() {
+      _employees.add(
+        _Employee(
+          userId: (result['userId'] as num?)?.toInt(),
+          fio: fullName,
+          workplaces: draft.workplaces.isEmpty ? ['Боулинг клуб'] : draft.workplaces,
+          address: draft.workplaces.isEmpty ? '—' : draft.workplaces.first,
+          phone: phone,
+          role: 'Менеджер',
+          tempPassword: password.isNotEmpty ? password : null,
+        ),
+      );
+    });
+
+    if (password.isNotEmpty) {
+      await _showCredentialsDialog(phone, password);
+    }
+  }
+
+  Future<void> _showCredentialsDialog(String phone, String password) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Доступы менеджера'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Передайте менеджеру данные для входа:'),
+            const SizedBox(height: 12),
+            Text('Телефон: $phone', style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Text('Пароль: $password', style: const TextStyle(fontWeight: FontWeight.w600)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Готово')),
+        ],
+      ),
+    );
   }
 
   @override
@@ -203,6 +285,7 @@ class _Employee {
   String address;
   String phone;
   String role;
+  String? tempPassword;
 
   _Employee({
     this.userId,
@@ -211,6 +294,23 @@ class _Employee {
     required this.address,
     required this.phone,
     required this.role,
+    this.tempPassword,
+  });
+}
+
+class _ManagerDraft {
+  final String fullName;
+  final String phone;
+  final String? email;
+  final String role;
+  final List<String> workplaces;
+
+  const _ManagerDraft({
+    required this.fullName,
+    required this.phone,
+    required this.role,
+    this.email,
+    this.workplaces = const [],
   });
 }
 
@@ -328,6 +428,29 @@ class _EmployeeCardState extends State<_EmployeeCard> {
                 },
               ),
             ),
+            if (widget.employee.tempPassword != null && widget.employee.tempPassword!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.lightGray),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Пароль для входа', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
+                    const SizedBox(height: 6),
+                    Text(
+                      widget.employee.tempPassword!,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             SizedBox(
               height: 48,
@@ -362,6 +485,7 @@ class _AssignEmployeeSheet extends StatefulWidget {
 class _AssignEmployeeSheetState extends State<_AssignEmployeeSheet> {
   final _fio = TextEditingController(text: 'Менеджер Иван Иванович');
   final _phone = TextEditingController(text: '+7 (980) 001 01 01');
+  final _email = TextEditingController();
   final List<TextEditingController> _work = [TextEditingController(text: 'Боулинг клуб "Кегли"')];
   String _role = 'Менеджер';
 
@@ -369,6 +493,7 @@ class _AssignEmployeeSheetState extends State<_AssignEmployeeSheet> {
   void dispose() {
     _fio.dispose();
     _phone.dispose();
+    _email.dispose();
     for (final c in _work) c.dispose();
     super.dispose();
   }
@@ -386,15 +511,17 @@ class _AssignEmployeeSheetState extends State<_AssignEmployeeSheet> {
   }
 
   void _submit() {
-    if (_fio.text.trim().isEmpty) return;
-    final emp = _Employee(
-      fio: _fio.text.trim(),
-      workplaces: _work.map((c) => c.text.trim()).where((s) => s.isNotEmpty).toList(),
-      address: 'г. Воронеж, ул. Тверская, д. 45',
-      phone: _phone.text.trim(),
+    final name = _fio.text.trim();
+    final phone = _phone.text.trim();
+    if (name.isEmpty || phone.isEmpty) return;
+    final draft = _ManagerDraft(
+      fullName: name,
+      phone: phone,
+      email: _email.text.trim().isEmpty ? null : _email.text.trim(),
       role: _role,
+      workplaces: _work.map((c) => c.text.trim()).where((s) => s.isNotEmpty).toList(),
     );
-    Navigator.pop(context, emp);
+    Navigator.pop(context, draft);
   }
 
   @override
@@ -484,6 +611,14 @@ class _AssignEmployeeSheetState extends State<_AssignEmployeeSheet> {
             const Text('Номер телефона', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
             const SizedBox(height: 6),
             TextField(controller: _phone, decoration: dec(suffix: widget.suffixEdit(() {}))),
+            const SizedBox(height: 16),
+            const Text('Email', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _email,
+              decoration: dec(hint: 'email@example.com'),
+              keyboardType: TextInputType.emailAddress,
+            ),
             const SizedBox(height: 16),
             const Text('Ваш статус:', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
             const SizedBox(height: 8),
