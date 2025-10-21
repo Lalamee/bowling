@@ -3,6 +3,8 @@ class UserInfoDto {
   final String phone;
   final int? roleId;
   final int? accountTypeId;
+  final String? roleName;
+  final String? accountTypeName;
   final bool? isVerified;
   final DateTime? registrationDate;
 
@@ -11,6 +13,8 @@ class UserInfoDto {
     required this.phone,
     this.roleId,
     this.accountTypeId,
+    this.roleName,
+    this.accountTypeName,
     this.isVerified,
     this.registrationDate,
   });
@@ -22,6 +26,8 @@ class UserInfoDto {
       phone: json['phone'] as String,
       roleId: (json['roleId'] as num?)?.toInt(),
       accountTypeId: (json['accountTypeId'] as num?)?.toInt(),
+      roleName: json['role']?.toString(),
+      accountTypeName: json['accountType']?.toString(),
       isVerified: json['isVerified'] as bool?,
       registrationDate: parseDate(json['registrationDate']),
     );
@@ -32,6 +38,8 @@ class UserInfoDto {
         'phone': phone,
         'roleId': roleId,
         'accountTypeId': accountTypeId,
+        'role': roleName,
+        'accountType': accountTypeName,
         'isVerified': isVerified,
         'registrationDate': registrationDate?.toIso8601String(),
       };

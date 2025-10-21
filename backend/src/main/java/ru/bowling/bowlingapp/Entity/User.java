@@ -54,4 +54,7 @@ public class User {
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
     private OwnerProfile ownerProfile;
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
+    private ManagerProfile managerProfile;
 }

@@ -39,13 +39,29 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
 
       final ownerProfile = me?['ownerProfile'];
       final mechanicProfile = me?['mechanicProfile'];
+      final managerProfile = me?['managerProfile'];
 
-      final clubs = _resolveClubs([ownerProfile, mechanicProfile, me]);
+      if (managerProfile is Map) {
+        final map = Map<String, dynamic>.from(managerProfile);
+        fullName = _asString(map['fullName']) ?? fullName;
+        phone = _asString(map['contactPhone']) ?? phone;
+        email = _asString(map['contactEmail']) ?? email;
+      }
+
+      final clubs = _resolveClubs([ownerProfile, mechanicProfile, managerProfile, me]);
       if (clubs.isNotEmpty) {
         clubName = clubs.first;
       }
 
-      final resolvedAddress = _resolveAddress([ownerProfile, mechanicProfile, me]);
+      if (managerProfile is Map) {
+        final map = Map<String, dynamic>.from(managerProfile);
+        final managerClub = _asString(map['clubName']);
+        if (managerClub != null && managerClub.isNotEmpty) {
+          clubName = managerClub;
+        }
+      }
+
+      final resolvedAddress = _resolveAddress([managerProfile, ownerProfile, mechanicProfile, me]);
       if (resolvedAddress != null) {
         address = resolvedAddress;
       }
@@ -122,6 +138,10 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
           ProfileTile(icon: Icons.person, text: fullName, onEdit: () {}),
           const SizedBox(height: 10),
           ProfileTile(icon: Icons.phone, text: phone, onEdit: () {}),
+          if (email.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            ProfileTile(icon: Icons.email_outlined, text: email, onEdit: () {}),
+          ],
           const SizedBox(height: 10),
           ProfileTile(icon: Icons.menu_book_rounded, text: 'База знаний', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen()))),
           const SizedBox(height: 10),

@@ -5,7 +5,8 @@ import ru.bowling.bowlingapp.Entity.AccountType;
 
 import java.util.Optional;
 
-public interface AccountTypeRepository extends JpaRepository<AccountType, Integer> {
+public interface AccountTypeRepository extends JpaRepository<AccountType, Long> {
     Optional<AccountType> findByName(String name);
+    Optional<AccountType> findByNameIgnoreCase(String name);
 }
 
