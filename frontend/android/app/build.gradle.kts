@@ -26,6 +26,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        resourceConfigurations += listOf("ru", "en")
     }
 
     buildTypes {
@@ -52,6 +53,22 @@ android {
                 include("armeabi-v7a", "arm64-v8a")
                 isUniversalApk = false
             }
+        }
+    }
+
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/LICENSE-notice.md",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/AL2.0",
+                "META-INF/LGPL2.1",
+                "META-INF/versions/9/previous-compilation-data.bin",
+            )
         }
     }
 }
