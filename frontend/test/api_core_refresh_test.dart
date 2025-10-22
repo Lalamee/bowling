@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_application_1/api/api_core.dart';
+import 'package:bowling_market/api/api_core.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 
 void main() {

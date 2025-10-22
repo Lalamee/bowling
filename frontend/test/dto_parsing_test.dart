@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_application_1/models/login_response_dto.dart';
-import 'package:flutter_application_1/models/user_info_dto.dart';
-import 'package:flutter_application_1/models/maintenance_request_response_dto.dart';
-import 'package:flutter_application_1/models/parts_catalog_response_dto.dart';
-import 'package:flutter_application_1/models/work_log_dto.dart';
-import 'package:flutter_application_1/models/service_history_dto.dart';
+import 'package:bowling_market/models/login_response_dto.dart';
+import 'package:bowling_market/models/user_info_dto.dart';
+import 'package:bowling_market/models/maintenance_request_response_dto.dart';
+import 'package:bowling_market/models/parts_catalog_response_dto.dart';
+import 'package:bowling_market/models/work_log_dto.dart';
+import 'package:bowling_market/models/service_history_dto.dart';
 
 void main() {
   test('LoginResponseDto parse', () {

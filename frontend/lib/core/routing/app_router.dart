@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/features/orders/presentation/screens/admin_orders_screen.dart';
-import 'package:flutter_application_1/features/profile/admin/presentation/screens/admin_clubs_screen.dart';
-import 'package:flutter_application_1/features/profile/admin/presentation/screens/admin_mechanics_screen.dart';
-import 'package:flutter_application_1/features/profile/admin/presentation/screens/admin_profile_screen.dart';
+import 'package:bowling_market/features/orders/presentation/screens/admin_orders_screen.dart';
+import 'package:bowling_market/features/profile/admin/presentation/screens/admin_clubs_screen.dart';
+import 'package:bowling_market/features/profile/admin/presentation/screens/admin_mechanics_screen.dart';
+import 'package:bowling_market/features/profile/admin/presentation/screens/admin_profile_screen.dart';
 import 'routes.dart';
 import 'route_args.dart';
 
