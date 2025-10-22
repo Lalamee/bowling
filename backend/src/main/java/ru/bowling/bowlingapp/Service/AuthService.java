@@ -15,8 +15,8 @@ import ru.bowling.bowlingapp.Security.UserPrincipal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -344,9 +344,25 @@ public class AuthService implements UserDetailsService {
                 .map(String::trim)
                 .collect(Collectors.toList());
 
+        List<Map<String, Object>> clubDetails = clubs.stream()
+                .map(club -> {
+                    Map<String, Object> clubInfo = new LinkedHashMap<>();
+                    clubInfo.put("id", club.getClubId());
+                    clubInfo.put("name", trimOrNull(club.getName()));
+                    clubInfo.put("address", trimOrNull(club.getAddress()));
+                    return clubInfo;
+                })
+                .collect(Collectors.toList());
+
         if (!clubNames.isEmpty()) {
             result.put("clubName", clubNames.get(0));
         }
+
+        clubs.stream()
+                .map(BowlingClub::getClubId)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .ifPresent(id -> result.put("clubId", id));
 
         String address = clubs.stream()
                 .map(BowlingClub::getAddress)
@@ -360,6 +376,9 @@ public class AuthService implements UserDetailsService {
         }
 
         result.put("clubs", clubNames);
+        if (!clubDetails.isEmpty()) {
+            result.put("clubsDetailed", clubDetails);
+        }
         result.put("status", Boolean.TRUE.equals(profile.getIsEntrepreneur()) ? "Самозанятый" : "Штатный механик");
         result.put("workplaceVerified", Boolean.TRUE.equals(profile.getIsDataVerified()));
 
