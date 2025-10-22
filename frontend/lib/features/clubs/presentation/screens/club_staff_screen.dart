@@ -4,6 +4,7 @@ import '../../../../shared/widgets/chips/radio_group_horizontal.dart';
 import '../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../core/routing/routes.dart';
 import '../../../../core/repositories/club_staff_repository.dart';
+import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../core/utils/phone_utils.dart';
 
@@ -18,46 +19,162 @@ class ClubStaffScreen extends StatefulWidget {
 
 class _ClubStaffScreenState extends State<ClubStaffScreen> {
   final _repo = ClubStaffRepository();
+  final _userRepo = UserRepository();
   int _navIndex = 3;
   bool _isLoading = true;
+  List<_OwnerClub> _ownerClubs = [];
+  int? _selectedClubId;
   List<_Employee> _employees = [];
+  final Map<int, String> _pendingPasswords = {};
 
   @override
   void initState() {
     super.initState();
-    _loadStaff();
+    _init();
   }
 
-  Future<void> _loadStaff() async {
-    if (widget.clubId == null) {
-      setState(() => _isLoading = false);
-      return;
-    }
+  Future<void> _init() async {
+    await _loadOwnerClubs();
+    await _loadStaff();
+  }
 
-    setState(() => _isLoading = true);
+  Future<void> _loadOwnerClubs() async {
     try {
-      final data = await _repo.getClubStaff(widget.clubId!);
+      final data = await _userRepo.me();
+      if (!mounted || data == null) return;
+
+      final clubs = _extractOwnerClubs(data);
+      int? desiredClubId = widget.clubId;
+      if (desiredClubId != null && clubs.every((club) => club.id != desiredClubId)) {
+        desiredClubId = null;
+      }
+      desiredClubId ??= _selectedClubId;
+      if (desiredClubId == null && clubs.isNotEmpty) {
+        desiredClubId = clubs.first.id;
+      }
+
+      setState(() {
+        _ownerClubs = clubs;
+        _selectedClubId = desiredClubId;
+      });
+    } catch (e) {
+      if (mounted) {
+        showApiError(context, e);
+      }
+    }
+  }
+
+  Future<void> _loadStaff({int? clubId}) async {
+    final id = clubId ?? _selectedClubId;
+    if (id == null) {
       if (mounted) {
         setState(() {
-          _employees = data.map((item) {
-            return _Employee(
-              userId: item['userId'],
-              fio: item['fullName'] ?? 'Без имени',
-              workplaces: ['Боулинг клуб'],
-              address: 'г. Воронеж, ул. Тверская, д. 45',
-              phone: item['phone'] ?? '+7 (XXX) XXX-XX-XX',
-              role: _mapRoleToRussian(item['role'] ?? 'MECHANIC'),
-            );
-          }).toList();
+          _employees = [];
           _isLoading = false;
         });
       }
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _selectedClubId = id;
+    });
+
+    try {
+      final data = await _repo.getClubStaff(id);
+      if (!mounted) return;
+
+      final club = _clubById(id);
+      setState(() {
+        _employees = data.map((item) {
+          final userId = (item['userId'] as num?)?.toInt();
+          final tempPassword = userId != null ? _pendingPasswords.remove(userId) : null;
+          return _Employee(
+            userId: userId,
+            fio: (item['fullName'] as String?)?.trim().isNotEmpty == true
+                ? item['fullName'] as String
+                : 'Без имени',
+            workplaces: club != null ? [club.name] : ['Боулинг клуб'],
+            address: club?.address ?? '—',
+            phone: (item['phone'] as String?)?.trim().isNotEmpty == true
+                ? item['phone'] as String
+                : '+7 (XXX) XXX-XX-XX',
+            role: _mapRoleToRussian(item['role']?.toString() ?? 'MECHANIC'),
+            tempPassword: tempPassword,
+          );
+        }).toList();
+        _isLoading = false;
+      });
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         showApiError(context, e);
       }
     }
+  }
+
+  List<_OwnerClub> _extractOwnerClubs(Map<String, dynamic> data) {
+    final clubs = <_OwnerClub>[];
+    final ownerProfile = data['ownerProfile'];
+    if (ownerProfile is Map) {
+      final map = Map<String, dynamic>.from(ownerProfile);
+      final detailed = map['clubsDetailed'];
+      if (detailed is Iterable) {
+        for (final entry in detailed) {
+          if (entry is Map) {
+            final club = Map<String, dynamic>.from(entry);
+            final id = (club['id'] as num?)?.toInt();
+            final name = club['name']?.toString().trim();
+            if (id != null && name != null && name.isNotEmpty) {
+              clubs.add(
+                _OwnerClub(
+                  id: id,
+                  name: name,
+                  address: club['address']?.toString(),
+                ),
+              );
+            }
+          }
+        }
+      }
+
+      if (clubs.isEmpty) {
+        final id = (map['clubId'] as num?)?.toInt();
+        final name = map['clubName']?.toString().trim();
+        final address = map['address']?.toString();
+        if (id != null && name != null && name.isNotEmpty) {
+          clubs.add(_OwnerClub(id: id, name: name, address: address));
+        }
+      }
+    }
+    return clubs;
+  }
+
+  _OwnerClub? _clubById(int id) {
+    for (final club in _ownerClubs) {
+      if (club.id == id) return club;
+    }
+    return null;
+  }
+
+  void _onClubChanged(int? id) {
+    if (id == null || id == _selectedClubId) return;
+    setState(() {
+      _selectedClubId = id;
+    });
+    _loadStaff(clubId: id);
+  }
+
+  String _roleKeyForRequest(String role) {
+    final normalized = role.toLowerCase();
+    if (normalized.contains('manager') || normalized.contains('менедж')) {
+      return 'MANAGER';
+    }
+    if (normalized.contains('mechanic') || normalized.contains('механ')) {
+      return 'MECHANIC';
+    }
+    return role.toUpperCase();
   }
 
   String _mapRoleToRussian(String role) {
@@ -112,29 +229,25 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
   }
 
   Future<void> _openAssignSheet() async {
-    final draft = await showModalBottomSheet<_ManagerDraft>(
+    if (_ownerClubs.isEmpty) {
+      showSnack(context, 'Сначала добавьте клуб');
+      return;
+    }
+
+    final draft = await showModalBottomSheet<_StaffDraft>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AssignEmployeeSheet(dec: _dec, suffixEdit: _suffixEdit),
+      builder: (_) => _AssignEmployeeSheet(
+        dec: _dec,
+        suffixEdit: _suffixEdit,
+        clubs: _ownerClubs,
+        initialClubId: _selectedClubId,
+      ),
     );
     if (draft == null) return;
 
-    if (draft.role.toLowerCase().contains('менедж')) {
-      await _createManager(draft);
-    } else {
-      setState(() {
-        _employees.add(
-          _Employee(
-            fio: draft.fullName,
-            workplaces: draft.workplaces.isEmpty ? ['Боулинг клуб'] : draft.workplaces,
-            address: draft.workplaces.isEmpty ? '—' : draft.workplaces.first,
-            phone: draft.phone,
-            role: draft.role,
-          ),
-        );
-      });
-    }
+    await _createStaff(draft);
   }
 
   void _onNavTap(int i) {
@@ -156,43 +269,40 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
     }
   }
 
-  Future<void> _createManager(_ManagerDraft draft) async {
-    if (widget.clubId == null) {
-      showSnack(context, 'Клуб не выбран');
-      return;
-    }
+  Future<void> _createStaff(_StaffDraft draft) async {
+    final clubId = draft.clubId;
+
+    setState(() {
+      _selectedClubId = clubId;
+    });
 
     final normalizedPhone = PhoneUtils.normalize(draft.phone);
+    final roleKey = _roleKeyForRequest(draft.role);
     final result = await handleApiCall<Map<String, dynamic>?>(
       context,
-      () => _repo.createManager(
-        widget.clubId!,
+      () => _repo.createStaff(
+        clubId,
         fullName: draft.fullName,
         phone: normalizedPhone,
+        role: roleKey,
         email: draft.email,
       ),
-      successMessage: 'Менеджер добавлен',
+      successMessage: '${draft.role} добавлен',
     );
 
     if (!mounted || result == null) return;
 
     final password = result['password']?.toString() ?? '';
     final phone = result['phone']?.toString() ?? normalizedPhone;
-    final fullName = result['fullName']?.toString() ?? draft.fullName;
+    final userId = (result['userId'] as num?)?.toInt();
 
-    setState(() {
-      _employees.add(
-        _Employee(
-          userId: (result['userId'] as num?)?.toInt(),
-          fio: fullName,
-          workplaces: draft.workplaces.isEmpty ? ['Боулинг клуб'] : draft.workplaces,
-          address: draft.workplaces.isEmpty ? '—' : draft.workplaces.first,
-          phone: phone,
-          role: 'Менеджер',
-          tempPassword: password.isNotEmpty ? password : null,
-        ),
-      );
-    });
+    if (userId != null && password.isNotEmpty) {
+      _pendingPasswords[userId] = password;
+    }
+
+    await _loadStaff(clubId: clubId);
+
+    if (!mounted) return;
 
     if (password.isNotEmpty) {
       await _showCredentialsDialog(phone, password);
@@ -204,12 +314,12 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Доступы менеджера'),
+        title: const Text('Доступы сотрудника'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Передайте менеджеру данные для входа:'),
+            const Text('Передайте сотруднику данные для входа:'),
             const SizedBox(height: 12),
             Text('Телефон: $phone', style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
@@ -239,7 +349,10 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: AppColors.primary),
-            onPressed: _loadStaff,
+            onPressed: () async {
+              await _loadOwnerClubs();
+              await _loadStaff();
+            },
           ),
         ],
       ),
@@ -249,10 +362,37 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
           : ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
+          if (_ownerClubs.isNotEmpty) ...[
+            const Text('Клуб', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
+            const SizedBox(height: 6),
+            DropdownButtonFormField<int>(
+              value: _selectedClubId,
+              items: _ownerClubs
+                  .map((club) => DropdownMenuItem(value: club.id, child: Text(club.name)))
+                  .toList(),
+              onChanged: _onClubChanged,
+              decoration: _dec(),
+            ),
+            const SizedBox(height: 16),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.lightGray),
+              ),
+              child: const Text(
+                'Добавьте клуб в профиле владельца, чтобы назначать сотрудников.',
+                style: TextStyle(color: AppColors.darkGray),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           SizedBox(
             height: 48,
             child: ElevatedButton.icon(
-              onPressed: _openAssignSheet,
+              onPressed: _ownerClubs.isEmpty ? null : _openAssignSheet,
               icon: const Icon(Icons.add, color: AppColors.white),
               label: const Text('Назначить сотрудника'),
               style: ElevatedButton.styleFrom(
@@ -298,19 +438,29 @@ class _Employee {
   });
 }
 
-class _ManagerDraft {
+class _OwnerClub {
+  final int id;
+  final String name;
+  final String? address;
+
+  const _OwnerClub({required this.id, required this.name, this.address});
+}
+
+class _StaffDraft {
   final String fullName;
   final String phone;
   final String? email;
   final String role;
-  final List<String> workplaces;
+  final int clubId;
+  final String clubName;
 
-  const _ManagerDraft({
+  const _StaffDraft({
     required this.fullName,
     required this.phone,
     required this.role,
+    required this.clubId,
+    required this.clubName,
     this.email,
-    this.workplaces = const [],
   });
 }
 
@@ -475,8 +625,16 @@ class _EmployeeCardState extends State<_EmployeeCard> {
 class _AssignEmployeeSheet extends StatefulWidget {
   final InputDecoration Function({String? hint, Color? fill, bool enabled, bool focusedRed, Widget? suffix}) dec;
   final Widget Function(VoidCallback onPressed) suffixEdit;
+  final List<_OwnerClub> clubs;
+  final int? initialClubId;
 
-  const _AssignEmployeeSheet({Key? key, required this.dec, required this.suffixEdit}) : super(key: key);
+  const _AssignEmployeeSheet({
+    Key? key,
+    required this.dec,
+    required this.suffixEdit,
+    required this.clubs,
+    this.initialClubId,
+  }) : super(key: key);
 
   @override
   State<_AssignEmployeeSheet> createState() => _AssignEmployeeSheetState();
@@ -486,40 +644,49 @@ class _AssignEmployeeSheetState extends State<_AssignEmployeeSheet> {
   final _fio = TextEditingController(text: 'Менеджер Иван Иванович');
   final _phone = TextEditingController(text: '+7 (980) 001 01 01');
   final _email = TextEditingController();
-  final List<TextEditingController> _work = [TextEditingController(text: 'Боулинг клуб "Кегли"')];
   String _role = 'Менеджер';
+  int? _selectedClubId;
+  String? _clubError;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedClubId = widget.initialClubId ?? (widget.clubs.isNotEmpty ? widget.clubs.first.id : null);
+  }
 
   @override
   void dispose() {
     _fio.dispose();
     _phone.dispose();
     _email.dispose();
-    for (final c in _work) c.dispose();
     super.dispose();
-  }
-
-  void _addWork() {
-    setState(() => _work.add(TextEditingController()));
-  }
-
-  void _removeWork(int i) {
-    if (_work.length <= 1) return;
-    setState(() {
-      final c = _work.removeAt(i);
-      c.dispose();
-    });
   }
 
   void _submit() {
     final name = _fio.text.trim();
     final phone = _phone.text.trim();
     if (name.isEmpty || phone.isEmpty) return;
-    final draft = _ManagerDraft(
+    _OwnerClub? club;
+    if (_selectedClubId != null) {
+      for (final c in widget.clubs) {
+        if (c.id == _selectedClubId) {
+          club = c;
+          break;
+        }
+      }
+    }
+    club ??= widget.clubs.isNotEmpty ? widget.clubs.first : null;
+    if (club == null) {
+      setState(() => _clubError = 'Выберите клуб');
+      return;
+    }
+    final draft = _StaffDraft(
       fullName: name,
       phone: phone,
       email: _email.text.trim().isEmpty ? null : _email.text.trim(),
       role: _role,
-      workplaces: _work.map((c) => c.text.trim()).where((s) => s.isNotEmpty).toList(),
+      clubId: club.id,
+      clubName: club.name,
     );
     Navigator.pop(context, draft);
   }
@@ -554,59 +721,25 @@ class _AssignEmployeeSheetState extends State<_AssignEmployeeSheet> {
             const SizedBox(height: 6),
             TextField(controller: _fio, decoration: dec(focusedRed: true, suffix: widget.suffixEdit(() {}))),
             const SizedBox(height: 16),
-            const Text('Место работы', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
+            const Text('Клуб', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
             const SizedBox(height: 6),
-            ...List.generate(_work.length, (i) {
-              final isLast = i == _work.length - 1;
-              return Padding(
-                padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
-                child: Row(
-                  children: [
-                    Expanded(child: TextField(controller: _work[i], decoration: dec(hint: 'Боулинг клуб'))),
-                    const SizedBox(width: 8),
-                    if (_work.length > 1)
-                      SizedBox(
-                        height: 44,
-                        width: 44,
-                        child: ElevatedButton(
-                          onPressed: () => _removeWork(i),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: const BorderSide(color: AppColors.lightGray),
-                            ),
-                          ),
-                          child: const Icon(Icons.remove, color: AppColors.textDark),
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            }),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _addWork,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.white,
-                  foregroundColor: AppColors.primary,
-                  elevation: 0,
-                  side: const BorderSide(color: AppColors.lightGray),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.add),
-                    SizedBox(width: 8),
-                    Text('Добавить клуб'),
-                  ],
-                ),
-              ),
+            DropdownButtonFormField<int>(
+              value: _selectedClubId,
+              items: widget.clubs
+                  .map((club) => DropdownMenuItem(value: club.id, child: Text(club.name)))
+                  .toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedClubId = value;
+                  _clubError = null;
+                });
+              },
+              decoration: dec(),
             ),
+            if (_clubError != null) ...[
+              const SizedBox(height: 4),
+              Text(_clubError!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+            ],
             const SizedBox(height: 16),
             const Text('Номер телефона', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
             const SizedBox(height: 6),

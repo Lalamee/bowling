@@ -5,11 +5,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import ru.bowling.bowlingapp.DTO.CreateManagerRequestDTO;
-import ru.bowling.bowlingapp.DTO.CreateManagerResponseDTO;
+import ru.bowling.bowlingapp.DTO.CreateStaffRequestDTO;
+import ru.bowling.bowlingapp.DTO.CreateStaffResponseDTO;
 import ru.bowling.bowlingapp.DTO.StandardResponseDTO;
 import ru.bowling.bowlingapp.Service.ClubStaffService;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/clubs")
@@ -24,13 +27,15 @@ public class ClubStaffController {
         return ResponseEntity.ok(clubStaffService.getClubStaff(clubId));
     }
 
-    @PostMapping("/{clubId}/managers")
+    @PostMapping("/{clubId}/staff")
     @PreAuthorize("hasAnyRole('ADMIN', 'CLUB_OWNER')")
-    public ResponseEntity<CreateManagerResponseDTO> createManager(
+    public ResponseEntity<CreateStaffResponseDTO> createStaff(
             @PathVariable Long clubId,
-            @Valid @RequestBody CreateManagerRequestDTO requestDTO
+            @Valid @RequestBody CreateStaffRequestDTO requestDTO,
+            Authentication authentication
     ) {
-        CreateManagerResponseDTO response = clubStaffService.createManager(clubId, requestDTO);
+        String requestedBy = authentication != null ? authentication.getName() : null;
+        CreateStaffResponseDTO response = clubStaffService.createStaff(clubId, requestDTO, requestedBy);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

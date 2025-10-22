@@ -51,10 +51,11 @@ class ClubStaffRepository {
     }
   }
 
-  Future<Map<String, dynamic>?> createManager(
+  Future<Map<String, dynamic>?> createStaff(
     int clubId, {
     required String fullName,
     required String phone,
+    required String role,
     String? email,
     String? password,
   }) async {
@@ -62,10 +63,11 @@ class ClubStaffRepository {
       final payload = <String, dynamic>{
         'fullName': fullName,
         'phone': phone,
+        'role': role,
         if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
         if (password != null && password.trim().isNotEmpty) 'password': password.trim(),
       };
-      final res = await _dio.post('/api/clubs/$clubId/managers', data: payload);
+      final res = await _dio.post('/api/clubs/$clubId/staff', data: payload);
       if ((res.statusCode == 200 || res.statusCode == 201) && res.data is Map) {
         return Map<String, dynamic>.from(res.data as Map);
       }
