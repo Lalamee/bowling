@@ -168,6 +168,9 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
 
   String _roleKeyForRequest(String role) {
     final normalized = role.toLowerCase();
+    if (normalized.contains('admin') || normalized.contains('админ')) {
+      return 'ADMINISTRATOR';
+    }
     if (normalized.contains('manager') || normalized.contains('менедж')) {
       return 'MANAGER';
     }
@@ -179,6 +182,10 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
 
   String _mapRoleToRussian(String role) {
     switch (role) {
+      case 'ADMINISTRATOR':
+      case 'STAFF':
+      case 'ADMIN':
+        return 'Администратор';
       case 'MANAGER':
         return 'Менеджер';
       case 'MECHANIC':
@@ -756,7 +763,7 @@ class _AssignEmployeeSheetState extends State<_AssignEmployeeSheet> {
             const Text('Ваш статус:', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
             const SizedBox(height: 8),
             RadioGroupHorizontal(
-              options: const ['Механик', 'Менеджер'],
+              options: const ['Механик', 'Менеджер', 'Администратор'],
               groupValue: _role,
               onChanged: (v) => setState(() => _role = v ?? _role),
             ),
