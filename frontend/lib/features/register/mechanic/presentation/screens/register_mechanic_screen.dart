@@ -13,6 +13,8 @@ import '../../../../../core/utils/phone_utils.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/routing/routes.dart';
+import '../../../../../core/repositories/clubs_repository.dart';
+import '../../../../../models/club_summary_dto.dart';
 
 class RegisterMechanicScreen extends StatefulWidget {
   const RegisterMechanicScreen({Key? key}) : super(key: key);
@@ -35,13 +37,18 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
 
   final _workYears = TextEditingController();
   final _bowlingYears = TextEditingController();
-  final _currentClub = TextEditingController();
   final _bowlingHistory = TextEditingController();
   final _skills = TextEditingController();
 
   /// здесь храним именно **id** в виде строки, например "1"
   String? educationLevelId;
   String? status;
+
+  final _clubsRepository = ClubsRepository();
+  List<ClubSummaryDto> _clubs = [];
+  bool _isLoadingClubs = true;
+  String? _clubsError;
+  ClubSummaryDto? _selectedClub;
 
   /// маппинг названия уровня образования в id
   static const _eduMap = <String, String>{
@@ -68,14 +75,57 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _loadClubs();
+  }
+
+  @override
   void dispose() {
     [
       _fio, _birth, _phone,
       _educationName, _extraEducation,
       _workYears, _bowlingYears,
-      _currentClub, _bowlingHistory, _skills
+      _bowlingHistory, _skills
     ].forEach((c) => c.dispose());
     super.dispose();
+  }
+
+  Future<void> _loadClubs() async {
+    setState(() {
+      _isLoadingClubs = true;
+      _clubsError = null;
+    });
+    try {
+      final clubs = await _clubsRepository.getClubs();
+      setState(() {
+        _clubs = clubs;
+        _isLoadingClubs = false;
+        if (clubs.isEmpty) {
+          _clubsError = 'Список клубов пуст. Обратитесь к администратору.';
+        }
+      });
+    } catch (_) {
+      setState(() {
+        _isLoadingClubs = false;
+        _clubsError = 'Не удалось загрузить список клубов';
+      });
+    }
+  }
+
+  void _handleClubChange(int? clubId) {
+    if (clubId == null) {
+      setState(() => _selectedClub = null);
+      return;
+    }
+    ClubSummaryDto? selected;
+    for (final club in _clubs) {
+      if (club.id == clubId) {
+        selected = club;
+        break;
+      }
+    }
+    setState(() => _selectedClub = selected);
   }
 
   Future<void> _pickBirthDate() async {
@@ -121,59 +171,19 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       return;
     }
 
-    String normalizeSpaces(String value) => value.replaceAll(RegExp(r'\s+'), ' ').trim();
-    const timelineSuffixPattern =
-        r'(?:\d{1,2}\.\d{1,2}\.\d{4}|\d{1,2}\.\d{4}|[а-яa-z]+\s+\d{4}|\d{4}|н\.в\.?|наст\.?)';
-    final parentheticalTimelinePattern = RegExp(r'\s*\((?:[^()]*\d{4}[^()]*)\)\s*$');
-    final dashTimelinePattern = RegExp(
-      r'\s*[-–—]\s*(?:с\s*)?' + timelineSuffixPattern + r'(?:\s*(?:[-–—]|\bпо\b)\s*' + timelineSuffixPattern + r')?\s*$',
-      caseSensitive: false,
-    );
-    final commaTimelinePattern = RegExp(
-      r'\s*,\s*(?:с\s*)?' + timelineSuffixPattern + r'(?:\s*(?:[-–—]|\bпо\b)\s*' + timelineSuffixPattern + r')?\s*$',
-      caseSensitive: false,
-    );
-    bool looksLikeTimeline(String value) {
-      final lower = value.toLowerCase();
-      if (!RegExp(r'\d{4}').hasMatch(lower)) return false;
-      return RegExp(r'(?:[-–—]|\bс\b|\bпо\b|н\.в\.?|наст\.?|текущ)').hasMatch(lower);
+    if (_selectedClub == null) {
+      _showBar('Выберите клуб из списка');
+      return;
     }
 
-    String stripTimeline(String value) {
-      var result = normalizeSpaces(value);
-      if (parentheticalTimelinePattern.hasMatch(result)) {
-        result = normalizeSpaces(result.replaceFirst(parentheticalTimelinePattern, ''));
-      }
-      if (dashTimelinePattern.hasMatch(result)) {
-        result = normalizeSpaces(result.replaceFirst(dashTimelinePattern, ''));
-      }
-      if (commaTimelinePattern.hasMatch(result)) {
-        result = normalizeSpaces(result.replaceFirst(commaTimelinePattern, ''));
-      }
-      return result;
-    }
-
-    String sanitizeClubLabel(String value) {
-      final cleaned = stripTimeline(value);
-      if (cleaned.isEmpty) return '';
-      if (looksLikeTimeline(cleaned)) return '';
-      return cleaned;
-    }
-
-    String sanitizeAddress(String? value, String clubName) {
-      final trimmed = value == null ? '' : normalizeSpaces(value);
-      if (trimmed.isEmpty) return '';
-      if (looksLikeTimeline(trimmed)) return '';
-      if (sanitizeClubLabel(trimmed) == clubName) return '';
-      return trimmed;
-    }
+    final selectedClub = _selectedClub!;
 
     final entries = Validators.parseEmploymentHistory(_bowlingHistory.text.trim());
     final places = <String>[];
     final periods = <String>[];
 
     for (final e in entries) {
-      final place = sanitizeClubLabel(e.place);
+      final place = e.place.trim();
       if (place.isEmpty) continue;
       places.add(place);
       final y1 = e.from?.year;
@@ -185,102 +195,32 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       }
     }
 
-    final trimmedClub = _currentClub.text.trim();
+    if (!places.contains(selectedClub.name)) {
+      places.insert(0, selectedClub.name);
+    }
+
     final trimmedStatus = status?.trim();
-
-    String rawNameCandidate = trimmedClub;
-    String? addressCandidate;
-
-    final lineParts = trimmedClub
-        .split(RegExp(r'[\r\n]+'))
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-    if (lineParts.isNotEmpty) {
-      rawNameCandidate = lineParts.first;
-      if (lineParts.length > 1) {
-        addressCandidate = lineParts.sublist(1).join(', ');
-      }
-    }
-
-    if (addressCandidate == null) {
-      final commaParts = trimmedClub
-          .split(',')
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList();
-      if (commaParts.length > 1) {
-        rawNameCandidate = commaParts.first;
-        addressCandidate = commaParts.sublist(1).join(', ');
-      }
-    }
-
-    if (addressCandidate == null) {
-      final dashMatch = RegExp(r'\s[-–—]\s').firstMatch(trimmedClub);
-      if (dashMatch != null) {
-        final before = trimmedClub.substring(0, dashMatch.start).trim();
-        final after = trimmedClub.substring(dashMatch.end).trim();
-        if (after.isNotEmpty && !looksLikeTimeline(after)) {
-          rawNameCandidate = before;
-          addressCandidate = after;
-        }
-      }
-    }
-
-    final historyFallbackName = places.isNotEmpty ? places.first : '';
-    final nameCandidates = <String>[
-      sanitizeClubLabel(rawNameCandidate),
-      sanitizeClubLabel(trimmedClub),
-      historyFallbackName,
-    ];
-
-    var displayClubName = '';
-    for (final candidate in nameCandidates) {
-      if (candidate.isNotEmpty) {
-        displayClubName = candidate;
-        break;
-      }
-    }
-    if (displayClubName.isEmpty) {
-      final fallbackName = sanitizeClubLabel(trimmedClub);
-      displayClubName = fallbackName.isNotEmpty ? fallbackName : trimmedClub;
-    }
-
-    final displayAddress = sanitizeAddress(addressCandidate, displayClubName);
-
-    if (displayClubName.isNotEmpty) {
-      final already = places.contains(displayClubName);
-      if (!already) {
-        places.insert(0, displayClubName);
-      }
-    } else if (places.isEmpty && trimmedClub.isNotEmpty) {
-      final fallbackName = sanitizeClubLabel(trimmedClub);
-      places.add(fallbackName.isNotEmpty ? fallbackName : trimmedClub);
-    }
-
-    if (places.isEmpty && trimmedClub.isNotEmpty) {
-      final fallbackName = sanitizeClubLabel(trimmedClub);
-      places.add(fallbackName.isNotEmpty ? fallbackName : trimmedClub);
-    }
-
     final normalizedPhone = PhoneUtils.normalize(_phone.text);
     final data = {
       'fio': _fio.text.trim(),
       'birth': DateFormat('yyyy-MM-dd').format(birthDate!),
       'phone': normalizedPhone,
       'password': 'password123',
-      'educationLevelId': educationLevelId!, // уже "1".."5"
+      'educationLevelId': educationLevelId!,
       'educationName': _educationName.text.trim(),
       'specializationId': '1',
       'advantages': _extraEducation.text.trim(),
       'workYears': _workYears.text.trim(),
       'bowlingYears': _bowlingYears.text.trim(),
-      'currentClub': trimmedClub,
+      'currentClub': selectedClub.name,
       'bowlingHistory': _bowlingHistory.text.trim(),
       'skills': _skills.text.trim(),
       'status': trimmedStatus ?? status,
       'workPlaces': places.join(', '),
       'workPeriods': periods.join(', '),
+      'clubId': selectedClub.id,
+      'clubName': selectedClub.name,
+      'clubAddress': selectedClub.address,
     };
 
     final success = await AuthService.registerMechanic(data);
@@ -290,10 +230,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     }
 
     final clubsCache = List<String>.from(places);
-    if (clubsCache.isEmpty && displayClubName.isNotEmpty) {
-      clubsCache.add(displayClubName);
-    } else if (clubsCache.isEmpty && trimmedClub.isNotEmpty) {
-      clubsCache.add(trimmedClub);
+    if (clubsCache.isEmpty) {
+      clubsCache.add(selectedClub.name);
     }
 
     final normalizedStatus = () {
@@ -310,12 +248,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     final profileData = {
       'fullName': _fio.text.trim(),
       'phone': normalizedPhone,
-      'clubName': displayClubName.isNotEmpty
-          ? displayClubName
-          : (clubsCache.isNotEmpty ? clubsCache.first : trimmedClub),
-      'address': displayAddress.isNotEmpty
-          ? displayAddress
-          : (clubsCache.isNotEmpty ? clubsCache.first : trimmedClub),
+      'clubName': selectedClub.name,
+      'address': selectedClub.address ?? '',
       'status': normalizedStatus,
       'birthDate': birthDate?.toIso8601String(),
       'clubs': clubsCache,
@@ -436,7 +370,55 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
           },
           keyboardType: TextInputType.number,
         ),
-        LabeledTextField(label: 'Текущее место работы', controller: _currentClub, validator: Validators.notEmpty),
+        const SizedBox(height: 16),
+        formDescription('Выберите клуб, в котором вы работаете:'),
+        const SizedBox(height: 8),
+        if (_isLoadingClubs)
+          const Center(child: CircularProgressIndicator())
+        else if (_clubsError != null)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _clubsError!,
+                style: AppTextStyles.formHint.copyWith(color: Colors.red),
+              ),
+              TextButton(onPressed: _loadClubs, child: const Text('Повторить попытку')),
+            ],
+          )
+        else
+          DropdownButtonFormField<int>(
+            value: _selectedClub?.id,
+            items: _clubs
+                .map(
+                  (club) => DropdownMenuItem<int>(
+                    value: club.id,
+                    child: Text(
+                      club.address != null && club.address!.trim().isNotEmpty
+                          ? '${club.name} — ${club.address}'
+                          : club.name,
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: _handleClubChange,
+            decoration: const InputDecoration(labelText: 'Клуб'),
+            validator: (value) {
+              if (value == null) {
+                return 'Выберите клуб';
+              }
+              return null;
+            },
+          ),
+        if (_selectedClub != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _selectedClub!.address != null && _selectedClub!.address!.trim().isNotEmpty
+                ? 'Адрес: ${_selectedClub!.address}'
+                : 'Адрес не указан',
+            style: AppTextStyles.formHint,
+          ),
+        ],
         LabeledTextField(label: 'Где и когда работали в боулинге', controller: _bowlingHistory, validator: Validators.bowlingHistorySoft),
         Padding(
           padding: const EdgeInsets.only(bottom: 16),

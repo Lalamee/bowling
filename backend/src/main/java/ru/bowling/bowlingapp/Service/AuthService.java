@@ -27,6 +27,7 @@ public class AuthService implements UserDetailsService {
     private final AccountTypeRepository accountTypeRepository;
     private final PasswordEncoder passwordEncoder;
     private final BowlingClubRepository bowlingClubRepository;
+    private final ClubStaffRepository clubStaffRepository;
 
     private static final Pattern RUSSIAN_PHONE_PATTERN = Pattern.compile("^\\+7\\d{10}$");
 
@@ -151,6 +152,8 @@ public class AuthService implements UserDetailsService {
 
         String accountTypeName = accountType.getName();
 
+        BowlingClub mechanicClub = null;
+
         if (isMechanicAccountType(accountTypeName)) {
             MechanicProfile profile = MechanicProfile.builder()
                     .user(user)
@@ -170,6 +173,11 @@ public class AuthService implements UserDetailsService {
                     .createdAt(LocalDate.now())
                     .updatedAt(LocalDate.now())
                     .build();
+            if (mechanicDto.getClubId() != null) {
+                mechanicClub = bowlingClubRepository.findById(mechanicDto.getClubId())
+                        .orElseThrow(() -> new IllegalArgumentException("Selected club not found"));
+                profile.setClubs(new ArrayList<>(Collections.singletonList(mechanicClub)));
+            }
             user.setMechanicProfile(profile);
         } else if (isOwnerAccountType(accountTypeName)) {
             OwnerProfile profile = OwnerProfile.builder()
@@ -203,6 +211,21 @@ public class AuthService implements UserDetailsService {
         if (isOwnerAccountType(accountTypeName)) {
             OwnerProfile ownerProfile = user.getOwnerProfile();
             attachClubToOwner(ownerProfile, ownerDto, clubDto);
+        }
+
+        if (mechanicClub != null) {
+            ClubStaff clubStaff = clubStaffRepository.findByClubAndUser(mechanicClub, user)
+                    .orElseGet(() -> ClubStaff.builder()
+                            .club(mechanicClub)
+                            .user(user)
+                            .assignedAt(LocalDateTime.now())
+                            .isActive(true)
+                            .build());
+            clubStaff.setRole(user.getRole());
+            if (clubStaff.getAssignedAt() == null) {
+                clubStaff.setAssignedAt(LocalDateTime.now());
+            }
+            clubStaffRepository.save(clubStaff);
         }
     }
 
@@ -262,6 +285,9 @@ public class AuthService implements UserDetailsService {
             }
             if (mechanicDto.getBowlingExperienceYears() == null || mechanicDto.getBowlingExperienceYears() < 0) {
                 throw new IllegalArgumentException("Bowling experience years must be non-negative");
+            }
+            if (mechanicDto.getClubId() == null) {
+                throw new IllegalArgumentException("Club selection is required for mechanic profile");
             }
         } else if (isOwnerAccountType(accountType.getName())) {
             if (ownerDto == null) {
