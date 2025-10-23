@@ -415,7 +415,7 @@ public class AuthService implements UserDetailsService {
         result.put("isVerified", profile.getIsDataVerified());
         result.put("workplaceVerified", Boolean.TRUE.equals(profile.getIsDataVerified()));
 
-        List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs()).orElse(Collections.emptyList());
+        List<BowlingClub> clubs = resolveOwnerClubs(profile);
         List<String> clubNames = clubs.stream()
                 .map(BowlingClub::getName)
                 .filter(this::isNotBlank)
@@ -694,6 +694,24 @@ public class AuthService implements UserDetailsService {
         if (!alreadyLinked) {
             ownerProfile.getClubs().add(savedClub);
         }
+    }
+
+    private List<BowlingClub> resolveOwnerClubs(OwnerProfile profile) {
+        if (profile == null) {
+            return Collections.emptyList();
+        }
+
+        List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs()).orElse(Collections.emptyList());
+        if (!clubs.isEmpty()) {
+            return clubs;
+        }
+
+        Long ownerId = profile.getOwnerId();
+        if (ownerId == null) {
+            return Collections.emptyList();
+        }
+
+        return bowlingClubRepository.findAllByOwnerOwnerId(ownerId);
     }
 
     private boolean isNotBlank(String value) {
