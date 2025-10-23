@@ -87,20 +87,28 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
 
       final club = _clubById(id);
       setState(() {
-        _employees = data.map((item) {
+        _employees = data.map((raw) {
+          final item = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
           final userId = (item['userId'] as num?)?.toInt();
           final tempPassword = userId != null ? _pendingPasswords.remove(userId) : null;
+          final rawRole = (item['role']?.toString() ?? 'MECHANIC').toUpperCase();
+          final roleLabel = _mapRoleToRussian(rawRole);
+          final email = (item['email'] as String?)?.trim();
+          final phone = (item['phone'] as String?)?.trim();
+          final fio = (item['fullName'] as String?)?.trim();
+          final isActive = item['isActive'] is bool ? item['isActive'] as bool : true;
+
           return _Employee(
             userId: userId,
-            fio: (item['fullName'] as String?)?.trim().isNotEmpty == true
-                ? item['fullName'] as String
-                : 'Без имени',
+            fio: (fio != null && fio.isNotEmpty) ? fio : 'Без имени',
             workplaces: club != null ? [club.name] : ['Боулинг клуб'],
             address: club?.address ?? '—',
-            phone: (item['phone'] as String?)?.trim().isNotEmpty == true
-                ? item['phone'] as String
-                : '+7 (XXX) XXX-XX-XX',
-            role: _mapRoleToRussian(item['role']?.toString() ?? 'MECHANIC'),
+            phone: (phone != null && phone.isNotEmpty) ? phone : '+7 (XXX) XXX-XX-XX',
+            roleLabel: roleLabel,
+            roleKey: rawRole,
+            email: email,
+            isActive: isActive,
+            isOwner: rawRole == 'OWNER',
             tempPassword: tempPassword,
           );
         }).toList();
@@ -177,6 +185,9 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
     if (normalized.contains('mechanic') || normalized.contains('механ')) {
       return 'MECHANIC';
     }
+    if (normalized.contains('owner') || normalized.contains('влад')) {
+      return 'OWNER';
+    }
     return role.toUpperCase();
   }
 
@@ -186,12 +197,14 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
       case 'STAFF':
       case 'ADMIN':
         return 'Администратор';
+      case 'HEAD_MECHANIC':
       case 'MANAGER':
         return 'Менеджер';
       case 'MECHANIC':
         return 'Механик';
+      case 'CLUB_OWNER':
       case 'OWNER':
-        return 'Владелец';
+        return 'Владелец клуба';
       default:
         return 'Механик';
     }
@@ -226,7 +239,7 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
     );
   }
 
-  Widget _suffixEdit(VoidCallback onPressed) {
+  Widget _suffixEdit(VoidCallback? onPressed) {
     return IconButton(
       onPressed: onPressed,
       icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
@@ -412,12 +425,15 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
           ),
           const SizedBox(height: 16),
           ..._employees.map((e) => _EmployeeCard(
-            key: ValueKey(e.fio),
+            key: ValueKey(e.userId ?? e.fio),
             employee: e,
             dec: _dec,
             suffixEdit: _suffixEdit,
             onDelete: () => setState(() => _employees.remove(e)),
-            onChangeRole: (v) => setState(() => e.role = v),
+            onChangeRole: (v) => setState(() {
+              e.roleLabel = v;
+              e.roleKey = _roleKeyForRequest(v);
+            }),
           )),
         ],
       ),
@@ -431,8 +447,14 @@ class _Employee {
   List<String> workplaces;
   String address;
   String phone;
-  String role;
+  String roleLabel;
+  String roleKey;
+  String? email;
+  bool isActive;
+  bool isOwner;
   String? tempPassword;
+
+  bool get canModify => !isOwner;
 
   _Employee({
     this.userId,
@@ -440,7 +462,11 @@ class _Employee {
     required this.workplaces,
     required this.address,
     required this.phone,
-    required this.role,
+    required this.roleLabel,
+    required this.roleKey,
+    this.email,
+    this.isActive = true,
+    this.isOwner = false,
     this.tempPassword,
   });
 }
@@ -474,7 +500,7 @@ class _StaffDraft {
 class _EmployeeCard extends StatefulWidget {
   final _Employee employee;
   final InputDecoration Function({String? hint, Color? fill, bool enabled, bool focusedRed, Widget? suffix}) dec;
-  final Widget Function(VoidCallback onPressed) suffixEdit;
+  final Widget Function(VoidCallback? onPressed) suffixEdit;
   final VoidCallback onDelete;
   final ValueChanged<String> onChangeRole;
 
@@ -531,7 +557,11 @@ class _EmployeeCardState extends State<_EmployeeCard> {
             const SizedBox(height: 6),
             TextField(
               controller: _fio,
-              decoration: widget.dec(focusedRed: true, suffix: widget.suffixEdit(() {})),
+              enabled: widget.employee.canModify,
+              decoration: widget.dec(
+                focusedRed: true,
+                suffix: widget.suffixEdit(widget.employee.canModify ? () {} : null),
+              ),
             ),
             const SizedBox(height: 16),
             const Text('Место работы', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
@@ -542,13 +572,19 @@ class _EmployeeCardState extends State<_EmployeeCard> {
                 padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
                 child: Row(
                   children: [
-                    Expanded(child: TextField(controller: _works[i], decoration: widget.dec(hint: 'Боулинг клуб'))),
+                    Expanded(
+                      child: TextField(
+                        controller: _works[i],
+                        enabled: widget.employee.canModify,
+                        decoration: widget.dec(hint: 'Боулинг клуб', enabled: widget.employee.canModify),
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     SizedBox(
                       height: 44,
                       width: 44,
                       child: ElevatedButton(
-                        onPressed: () {},
+                        onPressed: widget.employee.canModify ? () {} : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.white,
                           elevation: 0,
@@ -565,25 +601,77 @@ class _EmployeeCardState extends State<_EmployeeCard> {
               );
             }),
             const SizedBox(height: 12),
-            TextField(controller: _addr, decoration: widget.dec(hint: 'г. Воронеж, ул. Тверская, д. 45')),
+            TextField(
+              controller: _addr,
+              enabled: widget.employee.canModify,
+              decoration: widget.dec(
+                hint: 'г. Воронеж, ул. Тверская, д. 45',
+                enabled: widget.employee.canModify,
+              ),
+            ),
             const SizedBox(height: 16),
             const Text('Номер телефона', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
             const SizedBox(height: 6),
-            TextField(controller: _phone, decoration: widget.dec(fill: const Color(0xFFF0DADF), suffix: widget.suffixEdit(() {}))),
+            TextField(
+              controller: _phone,
+              enabled: widget.employee.canModify,
+              decoration: widget.dec(
+                fill: const Color(0xFFF0DADF),
+                suffix: widget.suffixEdit(widget.employee.canModify ? () {} : null),
+                enabled: widget.employee.canModify,
+              ),
+            ),
+            if (widget.employee.email != null && widget.employee.email!.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text('Email', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.lightGray),
+                ),
+                child: Text(
+                  widget.employee.email!,
+                  style: const TextStyle(fontSize: 15),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             const Text('Статус:', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
               child: RadioGroupHorizontal(
-                options: const ['Менеджер', 'Механик'],
-                groupValue: widget.employee.role,
-                onChanged: (v) {
-                  if (v == null) return;
-                  widget.onChangeRole(v);
-                  setState(() {});
-                },
+                options: widget.employee.isOwner
+                    ? const ['Владелец клуба']
+                    : const ['Механик', 'Менеджер', 'Администратор'],
+                groupValue: widget.employee.isOwner ? 'Владелец клуба' : widget.employee.roleLabel,
+                onChanged: widget.employee.canModify
+                    ? (v) {
+                        if (v == null) return;
+                        widget.onChangeRole(v);
+                        setState(() {});
+                      }
+                    : (_) {},
               ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  widget.employee.isActive ? Icons.check_circle_outline : Icons.remove_circle_outline,
+                  color: widget.employee.isActive ? const Color(0xFF2E7D32) : const Color(0xFFB00020),
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  widget.employee.isActive ? 'Аккаунт активен' : 'Аккаунт отключен',
+                  style: const TextStyle(fontSize: 13, color: AppColors.darkGray),
+                ),
+              ],
             ),
             if (widget.employee.tempPassword != null && widget.employee.tempPassword!.isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -613,15 +701,22 @@ class _EmployeeCardState extends State<_EmployeeCard> {
               height: 48,
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: widget.onDelete,
+                onPressed: widget.employee.canModify ? widget.onDelete : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Удалить сотрудника'),
+                child: Text(widget.employee.canModify ? 'Удалить сотрудника' : 'Удаление недоступно'),
               ),
             ),
+            if (!widget.employee.canModify) ...[
+              const SizedBox(height: 6),
+              const Text(
+                'Владелец клуба не может быть удалён из списка сотрудников.',
+                style: TextStyle(fontSize: 12, color: AppColors.darkGray),
+              ),
+            ],
           ],
         ),
       ),
@@ -648,8 +743,8 @@ class _AssignEmployeeSheet extends StatefulWidget {
 }
 
 class _AssignEmployeeSheetState extends State<_AssignEmployeeSheet> {
-  final _fio = TextEditingController(text: 'Менеджер Иван Иванович');
-  final _phone = TextEditingController(text: '+7 (980) 001 01 01');
+  final _fio = TextEditingController();
+  final _phone = TextEditingController();
   final _email = TextEditingController();
   String _role = 'Менеджер';
   int? _selectedClubId;

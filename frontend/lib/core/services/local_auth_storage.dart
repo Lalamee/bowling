@@ -7,6 +7,8 @@ class LocalAuthStorage {
   static const String _mechanicProfileKey = 'mechanic_profile';
   static const String _ownerRegisteredKey = 'owner_registered';
   static const String _ownerProfileKey = 'owner_profile';
+  static const String _managerProfileKey = 'manager_profile';
+  static const String _adminProfileKey = 'admin_profile';
   static const String _registeredRoleKey = 'registered_role';
 
   static Future<void> setMechanicRegistered(bool value) async {
@@ -96,6 +98,52 @@ class LocalAuthStorage {
     await _clearRegisteredRoleIfMatches('owner');
   }
 
+  static Future<void> saveManagerProfile(Map<String, dynamic> data) async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setString(_managerProfileKey, jsonEncode(data));
+  }
+
+  static Future<Map<String, dynamic>?> loadManagerProfile() async {
+    final sp = await SharedPreferences.getInstance();
+    final raw = sp.getString(_managerProfileKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<void> clearManagerState() async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.remove(_managerProfileKey);
+    await _clearRegisteredRoleIfMatches('manager');
+  }
+
+  static Future<void> saveAdminProfile(Map<String, dynamic> data) async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setString(_adminProfileKey, jsonEncode(data));
+  }
+
+  static Future<Map<String, dynamic>?> loadAdminProfile() async {
+    final sp = await SharedPreferences.getInstance();
+    final raw = sp.getString(_adminProfileKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<void> clearAdminState() async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.remove(_adminProfileKey);
+    await _clearRegisteredRoleIfMatches('admin');
+  }
+
   static Future<void> setRegisteredRole(String role) async {
     final sp = await SharedPreferences.getInstance();
     await sp.setString(_registeredRoleKey, role);
@@ -119,6 +167,8 @@ class LocalAuthStorage {
     await sp.remove(_mechanicProfileKey);
     await sp.remove(_ownerRegisteredKey);
     await sp.remove(_ownerProfileKey);
+    await sp.remove(_managerProfileKey);
+    await sp.remove(_adminProfileKey);
     await sp.remove(_registeredRoleKey);
   }
 

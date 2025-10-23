@@ -109,7 +109,10 @@ public class AuthService implements UserDetailsService {
         String normalized = normalizeAccountTypeName(accountTypeName);
         return "INDIVIDUAL".equals(normalized)
                 || "МЕХАНИК".equals(normalized)
-                || "ГЛАВНЫЙ МЕХАНИК".equals(normalized);
+                || "ГЛАВНЫЙ МЕХАНИК".equals(normalized)
+                || "ФИЗИЧЕСКОЕ ЛИЦО".equals(normalized)
+                || "ФИЗ ЛИЦО".equals(normalized)
+                || "ФИЗЛИЦО".equals(normalized);
     }
 
     private boolean isOwnerAccountType(String accountTypeName) {
@@ -608,21 +611,49 @@ public class AuthService implements UserDetailsService {
     }
 
     private Role roleByName(String name) {
-        return roleRepository.findByNameIgnoreCase(name)
-                .or(() -> roleRepository.findByName(name))
-                .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("Role not found");
+        }
+
+        Optional<Role> directMatch = roleRepository.findByNameIgnoreCase(name)
+                .or(() -> roleRepository.findByName(name));
+        if (directMatch.isPresent()) {
+            return directMatch.get();
+        }
+
+        String normalized = name.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "HEAD_MECHANIC" -> roleRepository.findByNameIgnoreCase("HEAD_MECHANIC")
+                    .or(() -> roleRepository.findByNameIgnoreCase("MANAGER"))
+                    .or(() -> roleRepository.findByNameIgnoreCase("STAFF"))
+                    .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+            case "ADMIN" -> roleRepository.findByNameIgnoreCase("ADMIN")
+                    .or(() -> roleRepository.findByNameIgnoreCase("ADMINISTRATOR"))
+                    .or(() -> roleRepository.findByNameIgnoreCase("STAFF"))
+                    .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+            case "MECHANIC" -> roleRepository.findByNameIgnoreCase("MECHANIC")
+                    .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+            case "CLUB_OWNER" -> roleRepository.findByNameIgnoreCase("CLUB_OWNER")
+                    .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+            default -> throw new IllegalArgumentException("Role not found");
+        };
     }
+
+    private static final int ROLE_ADMIN_ID = 1;
+    private static final int ROLE_MECHANIC_ID = 4;
+    private static final int ROLE_CLUB_OWNER_ID = 5;
+    private static final int ROLE_HEAD_MECHANIC_ID = 6;
+
+    private static final int ACCOUNT_TYPE_INDIVIDUAL_ID = 1;
+    private static final int ACCOUNT_TYPE_CLUB_OWNER_ID = 2;
 
     private String accountTypeNameByCode(Integer code) {
         if (code == null) {
             return null;
         }
         return switch (code) {
-            case 1 -> "Механик";
-            case 2 -> "Владелец";
-            case 3 -> "Менеджер";
-            case 4 -> "Администратор";
-            case 5 -> "Главный механик";
+            case ACCOUNT_TYPE_INDIVIDUAL_ID -> "INDIVIDUAL";
+            case ACCOUNT_TYPE_CLUB_OWNER_ID -> "CLUB_OWNER";
             default -> null;
         };
     }
@@ -632,11 +663,8 @@ public class AuthService implements UserDetailsService {
             return null;
         }
         return switch (code) {
-            case 1 -> "Механик";
-            case 2 -> "Главный механик";
-            case 3 -> "Владелец";
-            case 4 -> "Администратор";
-            case 5 -> "Менеджер";
+            case ROLE_CLUB_OWNER_ID -> "CLUB_OWNER";
+            case ROLE_ADMIN_ID, ROLE_MECHANIC_ID, ROLE_HEAD_MECHANIC_ID -> "INDIVIDUAL";
             default -> null;
         };
     }
@@ -646,11 +674,10 @@ public class AuthService implements UserDetailsService {
             return null;
         }
         return switch (code) {
-            case 1 -> "MECHANIC";
-            case 2 -> "MECHANIC";
-            case 3 -> "CLUB_OWNER";
-            case 4 -> "ADMIN";
-            case 5 -> "MANAGER";
+            case ROLE_ADMIN_ID -> "ADMIN";
+            case ROLE_MECHANIC_ID -> "MECHANIC";
+            case ROLE_CLUB_OWNER_ID -> "CLUB_OWNER";
+            case ROLE_HEAD_MECHANIC_ID -> "HEAD_MECHANIC";
             default -> null;
         };
     }
@@ -658,7 +685,9 @@ public class AuthService implements UserDetailsService {
     private boolean isManagerAccountType(String accountTypeName) {
         String normalized = normalizeAccountTypeName(accountTypeName);
         return "MANAGER".equals(normalized)
-                || "МЕНЕДЖЕР".equals(normalized);
+                || "HEADMECHANIC".equals(normalized)
+                || "МЕНЕДЖЕР".equals(normalized)
+                || "ГЛАВНЫЙМЕХАНИК".equals(normalized);
     }
 
     private void attachClubToOwner(OwnerProfile ownerProfile, OwnerProfileDTO ownerDto, BowlingClubDTO clubDto) {

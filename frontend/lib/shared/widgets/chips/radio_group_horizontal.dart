@@ -35,8 +35,8 @@ class RadioGroupHorizontal extends StatelessWidget {
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 Container(
-                  width: 113,
-                  height: 29,
+                  constraints: const BoxConstraints(minHeight: 29, minWidth: 80),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: AppColors.white,
@@ -57,6 +57,8 @@ class RadioGroupHorizontal extends StatelessWidget {
                     label,
                     style: RadioChipStyle.textStyle(isSelected),
                     textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
