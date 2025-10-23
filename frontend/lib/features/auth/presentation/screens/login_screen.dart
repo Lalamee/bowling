@@ -58,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (typeName != null && typeName.isNotEmpty) {
       if (typeName.contains('влад') || typeName.contains('owner')) {
         role = 'owner';
-      } else if (typeName.contains('менедж')) {
+      } else if (typeName.contains('менедж') || typeName.contains('главн')) {
         role = 'manager';
       } else if (typeName.contains('админ')) {
         role = 'admin';
@@ -74,31 +74,11 @@ class _LoginScreenState extends State<LoginScreen> {
           role = 'admin';
         } else if (roleName.contains('owner')) {
           role = 'owner';
-        } else if (roleName.contains('manager') || roleName.contains('staff')) {
+        } else if (roleName.contains('manager') || roleName.contains('staff') || roleName.contains('head')) {
           role = 'manager';
         } else if (roleName.contains('mechanic')) {
           role = 'mechanic';
         }
-      }
-    }
-
-    if (role == null && info.accountTypeId != null) {
-      switch (info.accountTypeId) {
-        case 1:
-          role = 'owner';
-          break;
-        case 2:
-          role = 'mechanic';
-          break;
-        case 3:
-          role = 'mechanic';
-          break;
-        case 4:
-          role = 'admin';
-          break;
-        case 5:
-          role = 'manager';
-          break;
       }
     }
 
@@ -107,17 +87,25 @@ class _LoginScreenState extends State<LoginScreen> {
         case 1:
           role = 'admin';
           break;
+        case 4:
+          role = 'mechanic';
+          break;
+        case 5:
+          role = 'owner';
+          break;
+        case 6:
+          role = 'manager';
+          break;
+      }
+    }
+
+    if (role == null && info.accountTypeId != null) {
+      switch (info.accountTypeId) {
         case 2:
           role = 'owner';
           break;
-        case 3:
+        case 1:
           role = 'mechanic';
-          break;
-        case 4:
-          role = 'manager';
-          break;
-        case 5:
-          role = 'manager';
           break;
       }
     }

@@ -37,7 +37,7 @@ class AuthService {
         user: RegisterUserDto(
           phone: data['phone'],
           password: data['password'] ?? 'password123',
-          roleId: 3,
+          roleId: 5,
           accountTypeId: 2,
         ),
         ownerProfile: OwnerProfileDto(
@@ -100,7 +100,7 @@ class AuthService {
         user: RegisterUserDto(
           phone: data['phone'],
           password: data['password'] ?? 'password123',
-          roleId: 1,
+          roleId: 4,
           accountTypeId: 1,
         ),
         mechanicProfile: MechanicProfileDto(

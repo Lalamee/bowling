@@ -35,9 +35,7 @@ public class ClubStaffService {
         ADMINISTRATOR
     }
 
-    private static final long ACCOUNT_TYPE_ADMINISTRATOR_ID = 1L;
-    private static final long ACCOUNT_TYPE_MECHANIC_ID = 4L;
-    private static final long ACCOUNT_TYPE_HEAD_MECHANIC_ID = 6L;
+    private static final long ACCOUNT_TYPE_INDIVIDUAL_ID = 1L;
 
     @Transactional(readOnly = true)
     public List<ClubStaffMemberDTO> getClubStaff(Long clubId) {
@@ -109,9 +107,9 @@ public class ClubStaffService {
         String rawPassword = resolvePassword(request.getPassword());
 
         return switch (staffRole) {
-            case MANAGER -> createManagerStaff(club, request, normalizedPhone, rawPassword);
-            case MECHANIC -> createMechanicStaff(club, request, normalizedPhone, rawPassword);
-            case ADMINISTRATOR -> createAdministratorStaff(club, request, normalizedPhone, rawPassword);
+            case MANAGER -> createManagerStaff(club, request, normalizedPhone, rawPassword, requestedBy);
+            case MECHANIC -> createMechanicStaff(club, request, normalizedPhone, rawPassword, requestedBy);
+            case ADMINISTRATOR -> createAdministratorStaff(club, request, normalizedPhone, rawPassword, requestedBy);
         };
     }
 
@@ -119,7 +117,8 @@ public class ClubStaffService {
             BowlingClub club,
             CreateStaffRequestDTO request,
             String normalizedPhone,
-            String rawPassword
+            String rawPassword,
+            User requestedBy
     ) {
         AccountType accountType = resolveManagerAccountType();
         Role role = resolveManagerRole();
@@ -149,7 +148,8 @@ public class ClubStaffService {
             BowlingClub club,
             CreateStaffRequestDTO request,
             String normalizedPhone,
-            String rawPassword
+            String rawPassword,
+            User requestedBy
     ) {
         AccountType accountType = resolveMechanicAccountType();
         Role role = resolveMechanicRole();
@@ -182,7 +182,8 @@ public class ClubStaffService {
             BowlingClub club,
             CreateStaffRequestDTO request,
             String normalizedPhone,
-            String rawPassword
+            String rawPassword,
+            User requestedBy
     ) {
         AccountType accountType = resolveAdministratorAccountType();
         Role role = resolveAdministratorRole();
@@ -259,9 +260,9 @@ public class ClubStaffService {
     private String staffRoleToResponse(StaffRole staffRole, Role role) {
         if (staffRole != null) {
             return switch (staffRole) {
-                case MANAGER -> "MANAGER";
+                case MANAGER -> "HEAD_MECHANIC";
                 case MECHANIC -> "MECHANIC";
-                case ADMINISTRATOR -> "ADMINISTRATOR";
+                case ADMINISTRATOR -> "ADMIN";
             };
         }
         if (role != null && role.getName() != null) {
@@ -291,10 +292,15 @@ public class ClubStaffService {
         if (user == null) {
             return StaffRole.MANAGER;
         }
-        if (isAdministratorAccountType(user.getAccountType()) || hasRole(user, "ADMINISTRATOR") || hasRole(user, "STAFF")) {
+        if (isAdministratorAccountType(user.getAccountType())
+                || hasRole(user, "ADMINISTRATOR")
+                || hasRole(user, "ADMIN")
+                || hasRole(user, "STAFF")) {
             return StaffRole.ADMINISTRATOR;
         }
-        if (hasRole(user, "MANAGER") || isManagerAccountType(user.getAccountType())) {
+        if (hasRole(user, "HEAD_MECHANIC")
+                || hasRole(user, "MANAGER")
+                || isManagerAccountType(user.getAccountType())) {
             return StaffRole.MANAGER;
         }
         return StaffRole.MANAGER;
@@ -349,37 +355,48 @@ public class ClubStaffService {
 
     private boolean isAdministratorAccountType(AccountType accountType) {
         return matchesAccountType(accountType,
-                ACCOUNT_TYPE_ADMINISTRATOR_ID,
+                ACCOUNT_TYPE_INDIVIDUAL_ID,
+                "INDIVIDUAL",
                 "ADMINISTRATOR",
                 "ADMIN",
-                "Администратор");
+                "Администратор",
+                "Физическое лицо");
     }
 
     private boolean isManagerAccountType(AccountType accountType) {
         return matchesAccountType(accountType,
-                ACCOUNT_TYPE_HEAD_MECHANIC_ID,
-                "MANAGER",
+                ACCOUNT_TYPE_INDIVIDUAL_ID,
+                "INDIVIDUAL",
                 "HEAD_MECHANIC",
+                "MANAGER",
                 "Менеджер",
-                "Главный механик");
+                "Главный механик",
+                "Физическое лицо");
     }
 
     private AccountType resolveManagerAccountType() {
-        return resolveAccountType(ACCOUNT_TYPE_HEAD_MECHANIC_ID,
-                "HEAD_MECHANIC",
+        return resolveAccountType(ACCOUNT_TYPE_INDIVIDUAL_ID,
+                "INDIVIDUAL",
                 "MANAGER",
-                "Менеджер");
+                "HEAD_MECHANIC",
+                "Менеджер",
+                "Главный механик",
+                "Физическое лицо");
     }
 
     private Role resolveManagerRole() {
-        return roleRepository.findByNameIgnoreCase("MANAGER")
+        return roleRepository.findByNameIgnoreCase("HEAD_MECHANIC")
+                .or(() -> roleRepository.findByNameIgnoreCase("MANAGER"))
+                .or(() -> roleRepository.findByNameIgnoreCase("STAFF"))
                 .orElseThrow(() -> new IllegalStateException("Manager role is not configured"));
     }
 
     private AccountType resolveMechanicAccountType() {
-        return resolveAccountType(ACCOUNT_TYPE_MECHANIC_ID,
+        return resolveAccountType(ACCOUNT_TYPE_INDIVIDUAL_ID,
+                "INDIVIDUAL",
                 "MECHANIC",
-                "Механик");
+                "Механик",
+                "Физическое лицо");
     }
 
     private AccountType resolveAccountType(long id, String... fallbackNames) {
@@ -407,14 +424,17 @@ public class ClubStaffService {
     }
 
     private AccountType resolveAdministratorAccountType() {
-        return resolveAccountType(ACCOUNT_TYPE_ADMINISTRATOR_ID,
+        return resolveAccountType(ACCOUNT_TYPE_INDIVIDUAL_ID,
+                "INDIVIDUAL",
                 "ADMINISTRATOR",
                 "ADMIN",
-                "Администратор");
+                "Администратор",
+                "Физическое лицо");
     }
 
     private Role resolveAdministratorRole() {
-        return roleRepository.findByNameIgnoreCase("STAFF")
+        return roleRepository.findByNameIgnoreCase("ADMIN")
+                .or(() -> roleRepository.findByNameIgnoreCase("STAFF"))
                 .or(() -> roleRepository.findByNameIgnoreCase("ADMINISTRATOR"))
                 .orElseThrow(() -> new IllegalStateException("Administrator role is not configured"));
     }

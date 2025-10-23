@@ -19,8 +19,8 @@ void main() {
     final json = {
       'id': 1,
       'phone': '+79991112233',
-      'roleId': 2,
-      'accountTypeId': 3,
+      'roleId': 5,
+      'accountTypeId': 2,
       'isVerified': true,
       'registrationDate': '2024-01-01'
     };

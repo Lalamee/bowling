@@ -21,9 +21,9 @@ public class RegisterUserDTO {
     private String password;
 
     @NotNull
-    private Integer roleId; // 1 = механик, 2 = гл. механик, 3 = владелец
+    private Integer roleId; // см. таблицу role: 1 = ADMIN, 4 = MECHANIC, 5 = CLUB_OWNER, 6 = HEAD_MECHANIC
 
     @NotNull
-    private Integer accountTypeId; // 1 = физлицо, 2 = владелец клуба
+    private Integer accountTypeId; // см. таблицу account_type: 1 = INDIVIDUAL, 2 = CLUB_OWNER
 }
 
