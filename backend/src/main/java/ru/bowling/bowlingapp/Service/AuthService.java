@@ -26,6 +26,7 @@ public class AuthService implements UserDetailsService {
     private final RoleRepository roleRepository;
     private final AccountTypeRepository accountTypeRepository;
     private final PasswordEncoder passwordEncoder;
+    private final BowlingClubRepository bowlingClubRepository;
 
     private static final Pattern RUSSIAN_PHONE_PATTERN = Pattern.compile("^\\+7\\d{10}$");
 
@@ -124,8 +125,8 @@ public class AuthService implements UserDetailsService {
     }
 
     @Transactional
-    public void registerUser(RegisterUserDTO dto, MechanicProfileDTO mechanicDto, OwnerProfileDTO ownerDto) {
-        AccountType accountType = validateRegistrationData(dto, mechanicDto, ownerDto);
+    public void registerUser(RegisterUserDTO dto, MechanicProfileDTO mechanicDto, OwnerProfileDTO ownerDto, BowlingClubDTO clubDto) {
+        AccountType accountType = validateRegistrationData(dto, mechanicDto, ownerDto, clubDto);
 
         String normalizedPhone = normalizePhone(dto.getPhone());
         if (normalizedPhone == null) {
@@ -182,6 +183,7 @@ public class AuthService implements UserDetailsService {
                     .createdAt(LocalDate.now())
                     .updatedAt(LocalDate.now())
                     .build();
+            profile.setClubs(new ArrayList<>());
             user.setOwnerProfile(profile);
         } else if (isManagerAccountType(accountTypeName)) {
             ManagerProfile profile = ManagerProfile.builder()
@@ -197,6 +199,11 @@ public class AuthService implements UserDetailsService {
         }
 
         userRepository.save(user);
+
+        if (isOwnerAccountType(accountTypeName)) {
+            OwnerProfile ownerProfile = user.getOwnerProfile();
+            attachClubToOwner(ownerProfile, ownerDto, clubDto);
+        }
     }
 
     @Transactional
@@ -221,7 +228,7 @@ public class AuthService implements UserDetailsService {
         userRepository.save(user);
     }
     
-    private AccountType validateRegistrationData(RegisterUserDTO dto, MechanicProfileDTO mechanicDto, OwnerProfileDTO ownerDto) {
+    private AccountType validateRegistrationData(RegisterUserDTO dto, MechanicProfileDTO mechanicDto, OwnerProfileDTO ownerDto, BowlingClubDTO clubDto) {
         if (dto == null) {
             throw new IllegalArgumentException("User registration data is required");
         }
@@ -262,6 +269,18 @@ public class AuthService implements UserDetailsService {
             }
             if (ownerDto.getInn() == null || ownerDto.getInn().trim().isEmpty()) {
                 throw new IllegalArgumentException("INN is required for owner profile");
+            }
+            if (clubDto == null) {
+                throw new IllegalArgumentException("Club data is required for club owner account type");
+            }
+            if (clubDto.getName() == null || clubDto.getName().trim().isEmpty()) {
+                throw new IllegalArgumentException("Club name is required");
+            }
+            if (clubDto.getAddress() == null || clubDto.getAddress().trim().isEmpty()) {
+                throw new IllegalArgumentException("Club address is required");
+            }
+            if (clubDto.getLanesCount() == null || clubDto.getLanesCount() <= 0) {
+                throw new IllegalArgumentException("Club lanes count must be greater than zero");
             }
         }
 
@@ -396,7 +415,7 @@ public class AuthService implements UserDetailsService {
         result.put("isVerified", profile.getIsDataVerified());
         result.put("workplaceVerified", Boolean.TRUE.equals(profile.getIsDataVerified()));
 
-        List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs()).orElse(Collections.emptyList());
+        List<BowlingClub> clubs = resolveOwnerClubs(profile);
         List<String> clubNames = clubs.stream()
                 .map(BowlingClub::getName)
                 .filter(this::isNotBlank)
@@ -614,6 +633,85 @@ public class AuthService implements UserDetailsService {
         String normalized = normalizeAccountTypeName(accountTypeName);
         return "MANAGER".equals(normalized)
                 || "МЕНЕДЖЕР".equals(normalized);
+    }
+
+    private void attachClubToOwner(OwnerProfile ownerProfile, OwnerProfileDTO ownerDto, BowlingClubDTO clubDto) {
+        if (ownerProfile == null || clubDto == null) {
+            return;
+        }
+
+        String clubName = trimOrNull(clubDto.getName());
+        if (clubName == null && ownerDto != null) {
+            clubName = trimOrNull(ownerDto.getLegalName());
+        }
+
+        String clubAddress = trimOrNull(clubDto.getAddress());
+        if (clubName == null || clubAddress == null) {
+            return;
+        }
+
+        String contactPhone = trimOrNull(clubDto.getContactPhone());
+        if (contactPhone == null && ownerDto != null) {
+            contactPhone = trimOrNull(ownerDto.getContactPhone());
+        }
+
+        String contactEmail = trimOrNull(clubDto.getContactEmail());
+        if (contactEmail == null && ownerDto != null) {
+            contactEmail = trimOrNull(ownerDto.getContactEmail());
+        }
+
+        Integer lanesCount = clubDto.getLanesCount();
+
+        BowlingClub club = bowlingClubRepository
+                .findByNameIgnoreCaseAndAddressIgnoreCase(clubName, clubAddress)
+                .orElseGet(() -> BowlingClub.builder()
+                        .name(clubName)
+                        .address(clubAddress)
+                        .build());
+
+        boolean isNewClub = club.getClubId() == null;
+
+        club.setOwner(ownerProfile);
+        club.setContactPhone(contactPhone);
+        club.setContactEmail(contactEmail);
+        club.setLanesCount(lanesCount);
+        if (isNewClub) {
+            club.setCreatedAt(LocalDate.now());
+            club.setIsActive(Boolean.TRUE);
+            club.setIsVerified(Boolean.FALSE);
+        }
+        club.setUpdatedAt(LocalDate.now());
+
+        BowlingClub savedClub = bowlingClubRepository.save(club);
+
+        if (ownerProfile.getClubs() == null) {
+            ownerProfile.setClubs(new ArrayList<>());
+        }
+
+        boolean alreadyLinked = ownerProfile.getClubs().stream()
+                .anyMatch(existing -> Objects.equals(existing.getClubId(), savedClub.getClubId()));
+
+        if (!alreadyLinked) {
+            ownerProfile.getClubs().add(savedClub);
+        }
+    }
+
+    private List<BowlingClub> resolveOwnerClubs(OwnerProfile profile) {
+        if (profile == null) {
+            return Collections.emptyList();
+        }
+
+        List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs()).orElse(Collections.emptyList());
+        if (!clubs.isEmpty()) {
+            return clubs;
+        }
+
+        Long ownerId = profile.getOwnerId();
+        if (ownerId == null) {
+            return Collections.emptyList();
+        }
+
+        return bowlingClubRepository.findAllByOwnerOwnerId(ownerId);
     }
 
     private boolean isNotBlank(String value) {

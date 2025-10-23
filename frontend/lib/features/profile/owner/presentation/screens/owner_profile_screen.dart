@@ -358,7 +358,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                           child: ProfileTile(
                             icon: Icons.location_searching_rounded,
                             text: club,
-                            showAlertBadge: !profile.workplaceVerified && i == 0,
+                            showAlertBadge: false,
                             onTap: () => _openEdit(OwnerEditFocus.none),
                           ),
                         );

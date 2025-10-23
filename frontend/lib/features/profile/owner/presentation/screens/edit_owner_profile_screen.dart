@@ -270,21 +270,6 @@ class _EditOwnerProfileScreenState extends State<EditOwnerProfileScreen> {
           ),
           const SizedBox(height: 20),
 
-          const Text('Подтверждение', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
-          const SizedBox(height: 6),
-          SizedBox(
-            height: 48,
-            child: ElevatedButton(
-              onPressed: _saveAndPop,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.darkGray,
-                foregroundColor: AppColors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Отправить запрос на подтверждение', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
-            ),
-          ),
           const SizedBox(height: 18),
 
           const Text('Дата рождения', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
