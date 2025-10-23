@@ -30,9 +30,11 @@ public class ClubStaffService {
 
     private enum StaffRole {
         MANAGER,
-        MECHANIC
+        MECHANIC,
+        ADMINISTRATOR
     }
 
+    private static final long ACCOUNT_TYPE_ADMINISTRATOR_ID = 1L;
     private static final long ACCOUNT_TYPE_MECHANIC_ID = 4L;
     private static final long ACCOUNT_TYPE_HEAD_MECHANIC_ID = 6L;
 
@@ -59,12 +61,13 @@ public class ClubStaffService {
         List<ManagerProfile> managers = managerProfileRepository.findByClub_ClubId(clubId);
         for (ManagerProfile manager : managers) {
             User managerUser = manager.getUser();
+            StaffRole managerRole = determineManagerStaffRole(managerUser);
             staff.add(ClubStaffMemberDTO.builder()
                     .userId(managerUser != null ? managerUser.getUserId() : null)
                     .fullName(trim(manager.getFullName(), managerUser != null ? managerUser.getPhone() : null))
                     .phone(manager.getContactPhone() != null ? manager.getContactPhone() : (managerUser != null ? managerUser.getPhone() : null))
                     .email(manager.getContactEmail())
-                    .role("MANAGER")
+                    .role(staffRoleToResponse(managerRole, managerUser != null ? managerUser.getRole() : null))
                     .isActive(managerUser != null ? managerUser.getIsActive() : Boolean.TRUE)
                     .build());
         }
@@ -76,7 +79,7 @@ public class ClubStaffService {
                     .userId(mechanicUser != null ? mechanicUser.getUserId() : null)
                     .fullName(trim(mechanic.getFullName(), mechanicUser != null ? mechanicUser.getPhone() : null))
                     .phone(mechanicUser != null ? mechanicUser.getPhone() : null)
-                    .role("MECHANIC")
+                    .role(staffRoleToResponse(StaffRole.MECHANIC, mechanicUser != null ? mechanicUser.getRole() : null))
                     .isActive(mechanicUser != null ? mechanicUser.getIsActive() : Boolean.TRUE)
                     .build());
         }
@@ -107,6 +110,7 @@ public class ClubStaffService {
         return switch (staffRole) {
             case MANAGER -> createManagerStaff(club, request, normalizedPhone, rawPassword);
             case MECHANIC -> createMechanicStaff(club, request, normalizedPhone, rawPassword);
+            case ADMINISTRATOR -> createAdministratorStaff(club, request, normalizedPhone, rawPassword);
         };
     }
 
@@ -135,7 +139,7 @@ public class ClubStaffService {
         user.setManagerProfile(profile);
         userRepository.save(user);
 
-        return buildResponse(user, profile.getFullName(), rawPassword, role, club);
+        return buildResponse(user, profile.getFullName(), rawPassword, role, club, StaffRole.MANAGER);
     }
 
     private CreateStaffResponseDTO createMechanicStaff(
@@ -166,7 +170,35 @@ public class ClubStaffService {
         user.setMechanicProfile(profile);
         userRepository.save(user);
 
-        return buildResponse(user, profile.getFullName(), rawPassword, role, club);
+        return buildResponse(user, profile.getFullName(), rawPassword, role, club, StaffRole.MECHANIC);
+    }
+
+    private CreateStaffResponseDTO createAdministratorStaff(
+            BowlingClub club,
+            CreateStaffRequestDTO request,
+            String normalizedPhone,
+            String rawPassword
+    ) {
+        AccountType accountType = resolveAdministratorAccountType();
+        Role role = resolveAdministratorRole();
+
+        User user = prepareUser(normalizedPhone, rawPassword, role, accountType);
+
+        ManagerProfile profile = ManagerProfile.builder()
+                .user(user)
+                .club(club)
+                .fullName(trim(request.getFullName(), normalizedPhone))
+                .contactPhone(normalizedPhone)
+                .contactEmail(trimNullable(request.getEmail()))
+                .isDataVerified(false)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        user.setManagerProfile(profile);
+        userRepository.save(user);
+
+        return buildResponse(user, profile.getFullName(), rawPassword, role, club, StaffRole.ADMINISTRATOR);
     }
 
     private User prepareUser(String phone, String rawPassword, Role role, AccountType accountType) {
@@ -181,16 +213,30 @@ public class ClubStaffService {
                 .build();
     }
 
-    private CreateStaffResponseDTO buildResponse(User user, String fullName, String rawPassword, Role role, BowlingClub club) {
+    private CreateStaffResponseDTO buildResponse(User user, String fullName, String rawPassword, Role role, BowlingClub club, StaffRole staffRole) {
         return CreateStaffResponseDTO.builder()
                 .userId(user.getUserId())
                 .fullName(trim(fullName, user.getPhone()))
                 .phone(user.getPhone())
                 .password(rawPassword)
-                .role(role != null ? role.getName() : null)
+                .role(staffRoleToResponse(staffRole, role))
                 .clubId(club.getClubId())
                 .clubName(club.getName())
                 .build();
+    }
+
+    private String staffRoleToResponse(StaffRole staffRole, Role role) {
+        if (staffRole != null) {
+            return switch (staffRole) {
+                case MANAGER -> "MANAGER";
+                case MECHANIC -> "MECHANIC";
+                case ADMINISTRATOR -> "ADMINISTRATOR";
+            };
+        }
+        if (role != null && role.getName() != null) {
+            return role.getName();
+        }
+        return null;
     }
 
     private StaffRole resolveStaffRole(String role) {
@@ -204,7 +250,23 @@ public class ClubStaffService {
         if (normalized.contains("MECHANIC") || normalized.contains("МЕХАН")) {
             return StaffRole.MECHANIC;
         }
+        if (normalized.contains("ADMIN") || normalized.contains("АДМИН")) {
+            return StaffRole.ADMINISTRATOR;
+        }
         throw new IllegalArgumentException("Unsupported role: " + role);
+    }
+
+    private StaffRole determineManagerStaffRole(User user) {
+        if (user == null) {
+            return StaffRole.MANAGER;
+        }
+        if (isAdministratorAccountType(user.getAccountType()) || hasRole(user, "ADMINISTRATOR") || hasRole(user, "STAFF")) {
+            return StaffRole.ADMINISTRATOR;
+        }
+        if (hasRole(user, "MANAGER") || isManagerAccountType(user.getAccountType())) {
+            return StaffRole.MANAGER;
+        }
+        return StaffRole.MANAGER;
     }
 
     private void ensurePhoneAvailable(String normalizedPhone) {
@@ -254,6 +316,23 @@ public class ClubStaffService {
         return roleName.equalsIgnoreCase(user.getRole().getName());
     }
 
+    private boolean isAdministratorAccountType(AccountType accountType) {
+        return matchesAccountType(accountType,
+                ACCOUNT_TYPE_ADMINISTRATOR_ID,
+                "ADMINISTRATOR",
+                "ADMIN",
+                "Администратор");
+    }
+
+    private boolean isManagerAccountType(AccountType accountType) {
+        return matchesAccountType(accountType,
+                ACCOUNT_TYPE_HEAD_MECHANIC_ID,
+                "MANAGER",
+                "HEAD_MECHANIC",
+                "Менеджер",
+                "Главный механик");
+    }
+
     private AccountType resolveManagerAccountType() {
         return resolveAccountType(ACCOUNT_TYPE_HEAD_MECHANIC_ID,
                 "HEAD_MECHANIC",
@@ -274,7 +353,7 @@ public class ClubStaffService {
 
     private AccountType resolveAccountType(long id, String... fallbackNames) {
         Optional<AccountType> accountType = accountTypeRepository.findById(id);
-        if (accountType.isPresent()) {
+        if (accountType.isPresent() && matchesAccountType(accountType.get(), id, fallbackNames)) {
             return accountType.get();
         }
         if (fallbackNames != null) {
@@ -294,6 +373,57 @@ public class ClubStaffService {
     private Role resolveMechanicRole() {
         return roleRepository.findByNameIgnoreCase("MECHANIC")
                 .orElseThrow(() -> new IllegalStateException("Mechanic role is not configured"));
+    }
+
+    private AccountType resolveAdministratorAccountType() {
+        return resolveAccountType(ACCOUNT_TYPE_ADMINISTRATOR_ID,
+                "ADMINISTRATOR",
+                "ADMIN",
+                "Администратор");
+    }
+
+    private Role resolveAdministratorRole() {
+        return roleRepository.findByNameIgnoreCase("STAFF")
+                .or(() -> roleRepository.findByNameIgnoreCase("ADMINISTRATOR"))
+                .orElseThrow(() -> new IllegalStateException("Administrator role is not configured"));
+    }
+
+    private boolean matchesAccountType(AccountType accountType, long expectedId, String... names) {
+        if (accountType == null) {
+            return false;
+        }
+        Long accountTypeId = accountType.getAccountTypeId();
+        if (accountTypeId != null && accountTypeId.longValue() == expectedId) {
+            return true;
+        }
+        return matchesAccountTypeByName(accountType, names);
+    }
+
+    private boolean matchesAccountTypeByName(AccountType accountType, String... names) {
+        if (accountType == null) {
+            return false;
+        }
+        if (names == null || names.length == 0) {
+            return true;
+        }
+        String actual = normalizeAccountTypeName(accountType.getName());
+        if (actual == null) {
+            return false;
+        }
+        for (String name : names) {
+            String normalized = normalizeAccountTypeName(name);
+            if (normalized != null && normalized.equals(actual)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String normalizeAccountTypeName(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.replaceAll("[\\s_\-]", "").toUpperCase(Locale.ROOT);
     }
 
     private String normalizePhone(String rawPhone) {
