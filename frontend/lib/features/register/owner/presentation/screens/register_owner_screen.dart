@@ -107,6 +107,12 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
     final normalizedPhone = PhoneUtils.normalize(_phone.text);
     const password = 'password123';
 
+    final lanesCount = int.tryParse(trimmedLanes);
+    if (lanesCount == null || lanesCount <= 0) {
+      _showBar('Количество дорожек должно быть положительным числом');
+      return;
+    }
+
     final data = {
       'phone': normalizedPhone,
       'password': password,
@@ -115,6 +121,10 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
       'contactPerson': trimmedFullName,
       'contactPhone': normalizedPhone,
       'contactEmail': trimmedEmail,
+      'clubName': trimmedClub,
+      'clubAddress': trimmedAddress,
+      'lanesCount': lanesCount,
+      'clubPhone': normalizedPhone,
     };
 
     final clubs = <String>[];

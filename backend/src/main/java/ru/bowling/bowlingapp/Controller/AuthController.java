@@ -25,7 +25,12 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequestDTO request) {
-        authService.registerUser(request.getUser(), request.getMechanicProfile(), request.getOwnerProfile());
+        authService.registerUser(
+                request.getUser(),
+                request.getMechanicProfile(),
+                request.getOwnerProfile(),
+                request.getClub()
+        );
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(StandardResponseDTO.builder().message("User registered successfully").status("success").build());
     }

@@ -12,13 +12,16 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RegisterRequestDTO {
-	@Valid
-	@NotNull
-	private RegisterUserDTO user;
+    @Valid
+    @NotNull
+    private RegisterUserDTO user;
 
-	@Valid
-	private MechanicProfileDTO mechanicProfile;
+    @Valid
+    private MechanicProfileDTO mechanicProfile;
 
-	@Valid
-	private OwnerProfileDTO ownerProfile;
-} 
+    @Valid
+    private OwnerProfileDTO ownerProfile;
+
+    @Valid
+    private BowlingClubDTO club;
+}

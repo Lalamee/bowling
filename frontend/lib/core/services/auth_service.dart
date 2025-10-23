@@ -5,6 +5,7 @@ import '../../models/register_request_dto.dart';
 import '../../models/register_user_dto.dart';
 import '../../models/mechanic_profile_dto.dart';
 import '../../models/owner_profile_dto.dart';
+import '../../models/bowling_club_dto.dart';
 import '../../models/user_info_dto.dart';
 
 class AuthService {
@@ -46,6 +47,32 @@ class AuthService {
           contactPhone: _nullable(data['contactPhone']),
           contactEmail: _nullable(data['contactEmail']),
         ),
+        club: () {
+          final String? clubName = _nullable(data['clubName']) ?? _nullable(data['legalName']);
+          final String? clubAddress = _nullable(data['clubAddress']) ?? _nullable(data['address']);
+          final dynamic rawLanes = data['lanesCount'] ?? data['lanes'];
+          final int? lanesCount = rawLanes is int
+              ? rawLanes
+              : int.tryParse(rawLanes?.toString() ?? '');
+
+          if (clubName == null || clubName.isEmpty) {
+            throw ApiException('Укажите название клуба');
+          }
+          if (clubAddress == null || clubAddress.isEmpty) {
+            throw ApiException('Укажите адрес клуба');
+          }
+          if (lanesCount == null || lanesCount <= 0) {
+            throw ApiException('Количество дорожек должно быть положительным числом');
+          }
+
+          return BowlingClubDto(
+            name: clubName,
+            address: clubAddress,
+            lanesCount: lanesCount,
+            contactPhone: _nullable(data['clubPhone']) ?? _nullable(data['contactPhone']),
+            contactEmail: _nullable(data['contactEmail']),
+          );
+        }(),
       );
       final response = await _api.register(request);
       if (!response.isSuccess) {
