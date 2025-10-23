@@ -20,6 +20,7 @@ import '../models/order_parts_request_dto.dart';
 import '../models/delivery_request_dto.dart';
 import '../models/issue_request_dto.dart';
 import '../models/close_request_dto.dart';
+import '../models/club_summary_dto.dart';
 
 /// Типизированный API сервис для взаимодействия с backend
 class ApiService {
@@ -40,6 +41,14 @@ class ApiService {
   Future<StandardResponseDto> register(RegisterRequestDto request) async {
     final response = await _dio.post('/api/auth/register', data: request.toJson());
     return StandardResponseDto.fromJson(response.data);
+  }
+
+  /// GET /api/public/clubs - Получение списка клубов
+  Future<List<ClubSummaryDto>> getPublicClubs() async {
+    final response = await _dio.get('/api/public/clubs');
+    return (response.data as List)
+        .map((e) => ClubSummaryDto.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   /// POST /api/auth/refresh - Обновление токена

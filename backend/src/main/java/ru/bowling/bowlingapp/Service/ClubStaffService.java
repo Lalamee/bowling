@@ -26,6 +26,7 @@ public class ClubStaffService {
     private final AccountTypeRepository accountTypeRepository;
     private final ManagerProfileRepository managerProfileRepository;
     private final MechanicProfileRepository mechanicProfileRepository;
+    private final ClubStaffRepository clubStaffRepository;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     private enum StaffRole {
@@ -139,6 +140,8 @@ public class ClubStaffService {
         user.setManagerProfile(profile);
         userRepository.save(user);
 
+        registerClubStaff(club, user, role, requestedBy);
+
         return buildResponse(user, profile.getFullName(), rawPassword, role, club, StaffRole.MANAGER);
     }
 
@@ -170,6 +173,8 @@ public class ClubStaffService {
         user.setMechanicProfile(profile);
         userRepository.save(user);
 
+        registerClubStaff(club, user, role, requestedBy);
+
         return buildResponse(user, profile.getFullName(), rawPassword, role, club, StaffRole.MECHANIC);
     }
 
@@ -198,7 +203,33 @@ public class ClubStaffService {
         user.setManagerProfile(profile);
         userRepository.save(user);
 
+        registerClubStaff(club, user, role, requestedBy);
+
         return buildResponse(user, profile.getFullName(), rawPassword, role, club, StaffRole.ADMINISTRATOR);
+    }
+
+    private void registerClubStaff(BowlingClub club, User user, Role role, User requestedBy) {
+        if (club == null || user == null) {
+            return;
+        }
+
+        ClubStaff clubStaff = clubStaffRepository.findByClubAndUser(club, user)
+                .orElseGet(() -> ClubStaff.builder()
+                        .club(club)
+                        .user(user)
+                        .assignedAt(LocalDateTime.now())
+                        .build());
+
+        clubStaff.setRole(role);
+        clubStaff.setIsActive(Boolean.TRUE);
+        if (clubStaff.getAssignedAt() == null) {
+            clubStaff.setAssignedAt(LocalDateTime.now());
+        }
+        if (requestedBy != null) {
+            clubStaff.setAssignedBy(requestedBy.getUserId());
+        }
+
+        clubStaffRepository.save(clubStaff);
     }
 
     private User prepareUser(String phone, String rawPassword, Role role, AccountType accountType) {

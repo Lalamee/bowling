@@ -88,10 +88,14 @@ class AuthService {
 
   static Future<bool> registerMechanic(Map<String, dynamic> data) async {
     try {
-      final birthDate = data['birth'] is DateTime 
-          ? data['birth'] as DateTime 
+      final birthDate = data['birth'] is DateTime
+          ? data['birth'] as DateTime
           : DateTime.tryParse(data['birth']?.toString() ?? '') ?? DateTime.now();
-      
+      final dynamic rawClubId = data['clubId'];
+      final int? clubId = rawClubId is int
+          ? rawClubId
+          : int.tryParse(rawClubId?.toString() ?? '');
+
       final request = RegisterRequestDto(
         user: RegisterUserDto(
           phone: data['phone'],
@@ -108,11 +112,12 @@ class AuthService {
           advantages: data['advantages'],
           totalExperienceYears: int.tryParse(data['workYears']?.toString() ?? '0') ?? 0,
           bowlingExperienceYears: int.tryParse(data['bowlingYears']?.toString() ?? '0') ?? 0,
-          isEntrepreneur: (data['status']?.toString().toLowerCase() == 'самозанятый' || 
+          isEntrepreneur: (data['status']?.toString().toLowerCase() == 'самозанятый' ||
                           data['status']?.toString().toLowerCase() == 'ип'),
           skills: data['skills'],
           workPlaces: data['workPlaces'],
           workPeriods: data['workPeriods'],
+          clubId: clubId,
         ),
       );
       final response = await _api.register(request);

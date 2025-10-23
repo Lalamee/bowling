@@ -11,6 +11,7 @@ class MechanicProfileDto {
   final String? advantages;
   final String? workPlaces;
   final String? workPeriods;
+  final int? clubId;
 
   MechanicProfileDto({
     required this.fullName,
@@ -25,6 +26,7 @@ class MechanicProfileDto {
     this.advantages,
     this.workPlaces,
     this.workPeriods,
+    this.clubId,
   });
 
   Map<String, dynamic> toJson() => {
@@ -40,6 +42,7 @@ class MechanicProfileDto {
         'advantages': advantages,
         'workPlaces': workPlaces,
         'workPeriods': workPeriods,
+        'clubId': clubId,
       };
 
   factory MechanicProfileDto.fromJson(Map<String, dynamic> json) {
@@ -56,6 +59,7 @@ class MechanicProfileDto {
       advantages: json['advantages'] as String?,
       workPlaces: json['workPlaces'] as String?,
       workPeriods: json['workPeriods'] as String?,
+      clubId: (json['clubId'] as num?)?.toInt(),
     );
   }
 }
