@@ -1,5 +1,5 @@
+import '../../api/api_service.dart';
 import '../../models/club_summary_dto.dart';
-import '../api/api_service.dart';
 
 class ClubsRepository {
   final ApiService _apiService = ApiService();
