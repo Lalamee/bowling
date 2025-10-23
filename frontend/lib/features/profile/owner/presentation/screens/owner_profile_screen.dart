@@ -109,17 +109,68 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
 
     if (ownerProfile is Map) {
       final map = Map<String, dynamic>.from(ownerProfile);
+
+      void addClubName(dynamic value) {
+        final resolved = asString(value);
+        if (resolved != null && !clubs.contains(resolved)) {
+          clubs.add(resolved);
+        }
+      }
+
+      final detailed = map['clubsDetailed'];
+      if (detailed is Iterable) {
+        for (final item in detailed) {
+          if (item is Map) {
+            final entry = Map<String, dynamic>.from(item);
+            addClubName(entry['name']);
+            if (address == null) {
+              final entryAddress = asString(entry['address']);
+              if (entryAddress != null) {
+                address = entryAddress;
+              }
+            }
+          }
+        }
+      }
+
+      if (clubs.isEmpty) {
+        final rawClubs = map['clubs'];
+        if (rawClubs is Iterable) {
+          for (final item in rawClubs) {
+            addClubName(item);
+          }
+        } else {
+          addClubName(rawClubs);
+        }
+      }
+
+      final mapClubName = asString(map['clubName']);
+      if (mapClubName != null) {
+        clubName = mapClubName;
+        addClubName(mapClubName);
+      } else if (clubName == null && clubs.isNotEmpty) {
+        clubName = clubs.first;
+      }
+
       final legalName = asString(map['legalName']);
       if (legalName != null) {
-        clubName = legalName;
-        clubs.add(legalName);
+        if (clubName == null) {
+          clubName = legalName;
+        }
+        if (clubs.isEmpty) {
+          clubs.add(legalName);
+        }
       }
+
+      if (address == null) {
+        final legalAddress = asString(map['address'] ?? map['legalAddress']);
+        if (legalAddress != null) {
+          address = legalAddress;
+        }
+      }
+
       contactPerson = asString(map['contactPerson']);
       contactPhone = asString(map['contactPhone']);
-      final legalAddress = asString(map['address'] ?? map['legalAddress']);
-      if (legalAddress != null) {
-        address = legalAddress;
-      }
       contactEmail = asString(map['contactEmail']);
       contactInn = asString(map['inn']);
       status = asString(map['status']) ?? profile.status;

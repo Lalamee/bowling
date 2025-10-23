@@ -403,9 +403,26 @@ public class AuthService implements UserDetailsService {
                 .map(String::trim)
                 .collect(Collectors.toList());
 
+        List<Map<String, Object>> clubDetails = clubs.stream()
+                .map(club -> {
+                    Map<String, Object> info = new LinkedHashMap<>();
+                    info.put("id", club.getClubId());
+                    info.put("name", trimOrNull(club.getName()));
+                    info.put("address", trimOrNull(club.getAddress()));
+                    return info;
+                })
+                .filter(info -> info.get("id") != null || info.get("name") != null)
+                .collect(Collectors.toList());
+
         if (!clubNames.isEmpty()) {
             result.put("clubName", clubNames.get(0));
         }
+
+        clubs.stream()
+                .map(BowlingClub::getClubId)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .ifPresent(id -> result.put("clubId", id));
 
         String address = clubs.stream()
                 .map(BowlingClub::getAddress)
@@ -416,6 +433,20 @@ public class AuthService implements UserDetailsService {
 
         if (address != null) {
             result.put("address", address);
+        }
+
+        if (!clubDetails.isEmpty()) {
+            result.put("clubsDetailed", clubDetails);
+            Map<String, Object> primaryClub = clubDetails.get(0);
+            result.putIfAbsent("clubId", primaryClub.get("id"));
+            Object primaryName = primaryClub.get("name");
+            if (primaryName instanceof String primaryNameStr && isNotBlank(primaryNameStr)) {
+                result.putIfAbsent("clubName", primaryNameStr);
+            }
+            Object primaryAddress = primaryClub.get("address");
+            if (primaryAddress instanceof String primaryAddressStr && isNotBlank(primaryAddressStr)) {
+                result.putIfAbsent("address", primaryAddressStr);
+            }
         }
 
         result.put("status", "Собственник");
