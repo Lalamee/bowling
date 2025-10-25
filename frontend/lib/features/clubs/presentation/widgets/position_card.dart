@@ -10,6 +10,7 @@ class PositionCard extends StatelessWidget {
   final TextEditingController cellCtrl;
   final TextEditingController shelfCtrl;
   final TextEditingController markCtrl;
+  final bool readOnly;
 
   const PositionCard({
     Key? key,
@@ -19,6 +20,7 @@ class PositionCard extends StatelessWidget {
     required this.cellCtrl,
     required this.shelfCtrl,
     required this.markCtrl,
+    this.readOnly = false,
   }) : super(key: key);
 
   @override
@@ -56,11 +58,11 @@ class PositionCard extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: Column(
               children: [
-                LabeledTextField(label: '№ Ячейки', controller: cellCtrl),
+                LabeledTextField(label: '№ Ячейки', controller: cellCtrl, readOnly: readOnly),
                 const SizedBox(height: 8),
-                LabeledTextField(label: '№ Номер полки', controller: shelfCtrl),
+                LabeledTextField(label: '№ Номер полки', controller: shelfCtrl, readOnly: readOnly),
                 const SizedBox(height: 8),
-                LabeledTextField(label: 'Ориентир', controller: markCtrl),
+                LabeledTextField(label: 'Ориентир', controller: markCtrl, readOnly: readOnly),
               ],
             ),
           ),
