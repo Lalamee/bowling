@@ -5,6 +5,7 @@ import '../../features/orders/presentation/screens/orders_screen.dart';
 import '../../features/orders/presentation/screens/manager_orders_history_screen.dart';
 import '../../features/orders/presentation/screens/admin_orders_screen.dart';
 
+import '../../features/catalog/presentation/screens/catalog_search_screen.dart';
 import '../../features/clubs/presentation/screens/club_screen.dart';
 
 import '../../features/profile/mechanic/presentation/screens/mechanic_profile_screen.dart';
@@ -29,7 +30,7 @@ class BottomNavDirect {
         }
         break;
       case 1:
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const _CatalogStub()));
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CatalogSearchScreen()));
         break;
       case 2:
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ClubScreen()));
@@ -46,13 +47,5 @@ class BottomNavDirect {
         }
         break;
     }
-  }
-}
-
-class _CatalogStub extends StatelessWidget {
-  const _CatalogStub({Key? key}) : super(key: key);
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: SafeArea(child: Center(child: Text('Каталог'))));
   }
 }

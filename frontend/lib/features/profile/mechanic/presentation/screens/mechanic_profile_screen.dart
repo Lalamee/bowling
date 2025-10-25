@@ -29,6 +29,8 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   bool _isLoading = true;
   bool _hasError = false;
   Map<String, dynamic>? _cachedRawProfile;
+  bool _canEditProfile = false;
+  String? _localRole;
 
   @override
   void initState() {
@@ -44,7 +46,23 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       status: '',
     );
     _loadLocalProfile();
+    _resolveLocalRole();
     _load();
+  }
+
+  Future<void> _resolveLocalRole() async {
+    final role = await LocalAuthStorage.getRegisteredRole();
+    if (!mounted) return;
+    setState(() {
+      _localRole = role;
+      _canEditProfile = _roleAllowsEditing(role);
+    });
+  }
+
+  bool _roleAllowsEditing(String? role) {
+    if (role == null) return false;
+    final normalized = role.trim().toUpperCase();
+    return normalized.contains('OWNER') || normalized.contains('ADMIN');
   }
 
   Future<void> _loadLocalProfile() async {
@@ -73,6 +91,13 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
           _hasError = true;
         });
         return;
+      }
+      final remoteRole = me['role']?.toString();
+      final allowEditing = _roleAllowsEditing(remoteRole) || _roleAllowsEditing(_localRole);
+      if (_canEditProfile != allowEditing) {
+        setState(() {
+          _canEditProfile = allowEditing;
+        });
       }
       final cache = _mapApiToCache(me);
       final normalized = _normalizeProfileData(cache);
@@ -425,6 +450,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     return normalized;
   }
   Future<void> _openEdit(EditFocus focus) async {
+    if (!_canEditProfile) return;
     final updated = await Navigator.push<MechanicProfile>(
       context,
       MaterialPageRoute(builder: (_) => EditMechanicProfileScreen(initial: profile, focus: focus)),
@@ -486,9 +512,17 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   children: [
-                    ProfileTile(icon: Icons.person, text: profile.fullName, onEdit: () => _openEdit(EditFocus.name)),
+                    ProfileTile(
+                      icon: Icons.person,
+                      text: profile.fullName,
+                      onEdit: _canEditProfile ? () => _openEdit(EditFocus.name) : null,
+                    ),
                     const SizedBox(height: 10),
-                    ProfileTile(icon: Icons.phone, text: profile.phone, onEdit: () => _openEdit(EditFocus.phone)),
+                    ProfileTile(
+                      icon: Icons.phone,
+                      text: profile.phone,
+                      onEdit: _canEditProfile ? () => _openEdit(EditFocus.phone) : null,
+                    ),
                     const SizedBox(height: 10),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -523,12 +557,16 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                           icon: Icons.location_searching_rounded,
                           text: club,
                           showAlertBadge: !profile.workplaceVerified && i == 0,
-                          onTap: () => _openEdit(EditFocus.none),
+                          onTap: _canEditProfile ? () => _openEdit(EditFocus.none) : null,
                         ),
                       );
                     }),
                     const SizedBox(height: 10),
-                    ProfileTile(icon: Icons.location_on_rounded, text: profile.address, onEdit: () => _openEdit(EditFocus.address)),
+                    ProfileTile(
+                      icon: Icons.location_on_rounded,
+                      text: profile.address,
+                      onEdit: _canEditProfile ? () => _openEdit(EditFocus.address) : null,
+                    ),
                     const SizedBox(height: 10),
                     ProfileTile(icon: Icons.history_rounded, text: 'История заказов', onTap: () => Navigator.pushNamed(context, Routes.ordersPersonalHistory)),
                     const SizedBox(height: 10),
