@@ -16,7 +16,7 @@ class CustomButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 344,
+      width: double.infinity,
       height: 65.5,
       child: isOutlined
           ? OutlinedButton(
