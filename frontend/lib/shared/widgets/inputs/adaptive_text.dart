@@ -6,8 +6,9 @@ class AdaptiveText extends StatelessWidget {
   final String text;
   final TextStyle? style;
   final TextAlign align;
+  final int? maxLines;
 
-  const AdaptiveText(this.text, {super.key, this.style, this.align = TextAlign.start});
+  const AdaptiveText(this.text, {super.key, this.style, this.align = TextAlign.start, this.maxLines});
 
   @override
   Widget build(BuildContext context) {
@@ -16,6 +17,8 @@ class AdaptiveText extends StatelessWidget {
       style: style ?? AppTextStyles.formInput.copyWith(color: AppColors.textDark),
       textAlign: align,
       softWrap: true,
+      maxLines: maxLines,
+      overflow: maxLines == null ? null : TextOverflow.ellipsis,
     );
   }
 }
