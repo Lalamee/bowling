@@ -3,7 +3,6 @@ import '../debug/test_overrides.dart';
 import '../services/local_auth_storage.dart';
 
 import '../../features/orders/presentation/screens/orders_screen.dart';
-import '../../features/orders/presentation/screens/manager_orders_history_screen.dart';
 import '../../features/orders/presentation/screens/admin_orders_screen.dart';
 
 import '../../features/catalog/presentation/screens/catalog_search_screen.dart';
@@ -23,9 +22,7 @@ class BottomNavDirect {
 
       switch (tapped) {
         case 0:
-          if (role == 'manager') {
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ManagerOrdersHistoryScreen()));
-          } else if (role == 'admin') {
+          if (role == 'admin') {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminOrdersScreen()));
           } else {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OrdersScreen()));
