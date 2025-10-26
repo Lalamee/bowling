@@ -171,7 +171,6 @@ public class MaintenanceRequestService {
 
                 if (request.getStatus() == MaintenanceRequestStatus.CLOSED
                                 || request.getStatus() == MaintenanceRequestStatus.UNREPAIRABLE
-                                || request.getStatus() == MaintenanceRequestStatus.COMPLETED
                                 || request.getStatus() == MaintenanceRequestStatus.DONE) {
                         throw new IllegalStateException("Parts cannot be added to closed or completed requests");
                 }

@@ -483,7 +483,7 @@ public class ClubStaffService {
         if (value == null) {
             return null;
         }
-        return value.replaceAll("[\\s_\-]", "").toUpperCase(Locale.ROOT);
+        return value.replaceAll("[\\s_\\-]", "").toUpperCase(Locale.ROOT);
     }
 
     private String normalizePhone(String rawPhone) {

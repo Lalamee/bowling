@@ -36,7 +36,7 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
   String? selectedEquipment;
 
   final List<String> _equipmentOptions = ['AMF', 'Brunswick', 'VIA', 'XIMA', 'другое'];
-  final List<String> _statusOptions = ['ИП', 'Самозанятый', 'Юр. лицо'];
+  final List<String> _statusOptions = ['ИП', 'Самозанятый'];
 
   GlobalKey<FormState> get formKey => _formKey;
   int get step => _step;

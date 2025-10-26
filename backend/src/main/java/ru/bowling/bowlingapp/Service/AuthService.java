@@ -232,9 +232,10 @@ public class AuthService implements UserDetailsService {
         }
 
         if (mechanicClub != null) {
+            BowlingClub finalMechanicClub = mechanicClub;
             ClubStaff clubStaff = clubStaffRepository.findByClubAndUser(mechanicClub, user)
                     .orElseGet(() -> ClubStaff.builder()
-                            .club(mechanicClub)
+                            .club(finalMechanicClub)
                             .user(user)
                             .assignedAt(LocalDateTime.now())
                             .isActive(true)
@@ -739,10 +740,11 @@ public class AuthService implements UserDetailsService {
 
         Integer lanesCount = clubDto.getLanesCount();
 
+        String finalClubName = clubName;
         BowlingClub club = bowlingClubRepository
                 .findByNameIgnoreCaseAndAddressIgnoreCase(clubName, clubAddress)
                 .orElseGet(() -> BowlingClub.builder()
-                        .name(clubName)
+                        .name(finalClubName)
                         .address(clubAddress)
                         .build());
 
