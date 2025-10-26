@@ -31,6 +31,7 @@ public class AuthService implements UserDetailsService {
     private final OwnerProfileRepository ownerProfileRepository;
     private final MechanicProfileRepository mechanicProfileRepository;
     private final ManagerProfileRepository managerProfileRepository;
+    private final ClubWarehouseService clubWarehouseService;
 
     private static final Pattern RUSSIAN_PHONE_PATTERN = Pattern.compile("^\\+7\\d{10}$");
 
@@ -759,6 +760,10 @@ public class AuthService implements UserDetailsService {
         club.setUpdatedAt(LocalDate.now());
 
         BowlingClub savedClub = bowlingClubRepository.save(club);
+
+        if (isNewClub) {
+            clubWarehouseService.initializeWarehouseForClub(savedClub);
+        }
 
         if (ownerProfile.getClubs() == null) {
             ownerProfile.setClubs(new ArrayList<>());

@@ -119,10 +119,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
         .fold<int>(0, (sum, item) => sum + item.quantity);
     final totalRequested = alreadyRequested + quantity;
 
-    if (available != null && totalRequested > available) {
-      showSnack(context, 'На складе доступно только $available шт.');
-      return;
-    }
+    final shortage = available != null && totalRequested > available;
 
     setState(() {
       final existingIndex = requestedParts.indexWhere((item) => item.inventoryId == selected.inventoryId);
@@ -141,10 +138,10 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
         requestedParts.add(RequestedPartDto(
           inventoryId: selected.inventoryId,
           catalogId: selected.catalogId,
-          catalogNumber: selected.catalogNumber,
+          catalogNumber: _resolveCatalogNumber(selected),
           partName: _resolvePartDisplayName(selected),
           quantity: quantity,
-          warehouseId: selected.warehouseId,
+          warehouseId: selected.warehouseId ?? _selectedClubId,
           location: selected.location,
         ));
       }
@@ -154,6 +151,11 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       _selectedCatalogPart = null;
       _partSuggestions = const <PartDto>[];
     });
+
+    if (shortage) {
+      final availableText = available ?? 0;
+      showSnack(context, 'На складе доступно только $availableText шт. Заявка отправлена на пополнение.');
+    }
   }
 
   void _removePart(int index) {
@@ -170,6 +172,14 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       }
     }
     return part.catalogNumber;
+  }
+
+  String _resolveCatalogNumber(PartDto part) {
+    final candidate = part.catalogNumber.trim();
+    if (candidate.isNotEmpty) {
+      return candidate;
+    }
+    return part.catalogId.toString();
   }
 
   void _onPartNameChanged(String value) {
@@ -214,7 +224,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     setState(() {
       _selectedCatalogPart = part;
       _partNameController.text = _resolvePartDisplayName(part);
-      _catalogNumberController.text = part.catalogNumber;
+      _catalogNumberController.text = _resolveCatalogNumber(part);
       _partSuggestions = const <PartDto>[];
     });
   }

@@ -10,6 +10,7 @@ import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
 import ru.bowling.bowlingapp.Repository.WarehouseInventoryRepository;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,25 +35,30 @@ public class InventoryServiceImpl implements InventoryService {
         if (normalizedQuery.isEmpty()) {
             List<WarehouseInventory> inventories = warehouseIdFilter != null
                     ? warehouseInventoryRepository.findByWarehouseId(warehouseIdFilter)
-                    : warehouseInventoryRepository.findByQuantityGreaterThan(0);
+                    : warehouseInventoryRepository.findAll();
 
             if (inventories.isEmpty()) {
-                return java.util.Collections.emptyList();
+                return Collections.emptyList();
             }
 
             Set<Long> catalogIds = inventories.stream()
                     .map(WarehouseInventory::getCatalogId)
                     .filter(Objects::nonNull)
-                    .map(Long::valueOf)
+                    .map(Integer::longValue)
                     .collect(Collectors.toSet());
 
-            Map<Long, PartsCatalog> catalogById = partsCatalogRepository.findAllById(catalogIds).stream()
-                    .collect(Collectors.toMap(PartsCatalog::getCatalogId, Function.identity()));
+            Map<Long, PartsCatalog> catalogById = catalogIds.isEmpty()
+                    ? Collections.emptyMap()
+                    : partsCatalogRepository.findAllById(catalogIds).stream()
+                            .collect(Collectors.toMap(PartsCatalog::getCatalogId, Function.identity()));
 
             return inventories.stream()
-                    .filter(inv -> inv.getQuantity() != null && inv.getQuantity() > 0)
                     .filter(inv -> warehouseIdFilter == null || Objects.equals(inv.getWarehouseId(), warehouseIdFilter))
-                    .map(inv -> convertToDto(catalogById.get(inv.getCatalogId() != null ? inv.getCatalogId().longValue() : null), inv))
+                    .map(inv -> {
+                        Long catalogId = inv.getCatalogId() != null ? inv.getCatalogId().longValue() : null;
+                        PartsCatalog catalog = catalogId != null ? catalogById.get(catalogId) : null;
+                        return convertToDto(catalog, inv);
+                    })
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList());
         }
@@ -66,9 +72,6 @@ public class InventoryServiceImpl implements InventoryService {
         for (PartsCatalog part : parts) {
             List<WarehouseInventory> inventories = warehouseInventoryRepository.findByCatalogId(part.getCatalogId().intValue());
             for (WarehouseInventory inventory : inventories) {
-                if (inventory.getQuantity() == null || inventory.getQuantity() <= 0) {
-                    continue;
-                }
                 if (warehouseIdFilter != null && !Objects.equals(warehouseIdFilter, inventory.getWarehouseId())) {
                     continue;
                 }
@@ -146,8 +149,8 @@ public class InventoryServiceImpl implements InventoryService {
             return null;
         }
         Integer quantity = inventory.getQuantity();
-        if (quantity == null || quantity <= 0) {
-            return null;
+        if (quantity == null) {
+            quantity = 0;
         }
 
         return PartDto.builder()

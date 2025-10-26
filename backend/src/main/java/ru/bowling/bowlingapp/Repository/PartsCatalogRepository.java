@@ -40,10 +40,16 @@ public interface PartsCatalogRepository extends JpaRepository<PartsCatalog, Long
 		Pageable pageable
 	);
 
-	@Query("select p from PartsCatalog p left join p.manufacturer m " +
-			"where lower(p.officialNameRu) like lower(concat('%', :query, '%')) " +
-			"or lower(p.officialNameEn) like lower(concat('%', :query, '%')) " +
-			"or lower(p.commonName) like lower(concat('%', :query, '%')) " +
-			"or lower(p.catalogNumber) like lower(concat('%', :query, '%'))")
-	List<PartsCatalog> searchByNameOrNumber(@Param("query") String query);
+        @Query("select p from PartsCatalog p left join p.manufacturer m " +
+                        "where lower(p.officialNameRu) like lower(concat('%', :query, '%')) " +
+                        "or lower(p.officialNameEn) like lower(concat('%', :query, '%')) " +
+                        "or lower(p.commonName) like lower(concat('%', :query, '%')) " +
+                        "or lower(p.catalogNumber) like lower(concat('%', :query, '%'))")
+        List<PartsCatalog> searchByNameOrNumber(@Param("query") String query);
+
+        @Query("select p from PartsCatalog p " +
+                        "where lower(p.commonName) = lower(:name) " +
+                        "or lower(p.officialNameRu) = lower(:name) " +
+                        "or lower(p.officialNameEn) = lower(:name)")
+        List<PartsCatalog> findByAnyNameIgnoreCase(@Param("name") String name);
 }
