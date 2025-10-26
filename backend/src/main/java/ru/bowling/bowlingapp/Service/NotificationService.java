@@ -7,12 +7,17 @@ import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Entity.enums.WorkLogStatus;
 
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
-    public void notifyMaintenanceRequestCreated(MaintenanceRequest request, List<ManagerProfile> managers) {
+    public void notifyMaintenanceRequestCreated(
+            MaintenanceRequest request,
+            List<OwnerProfile> owners,
+            List<ManagerProfile> managers
+    ) {
         if (request == null) {
             return;
         }
@@ -23,17 +28,33 @@ public class NotificationService {
 
         log.info("NOTIFICATION: Новая заявка на обслуживание #{} для клуба {} (дорожка {}), механик: {}", request.getRequestId(), clubName, request.getLaneNumber(), mechanicName);
 
-        OwnerProfile owner = club != null ? club.getOwner() : null;
-        if (owner != null && owner.getUser() != null) {
-            String ownerName = owner.getContactPerson() != null && !owner.getContactPerson().isBlank()
-                    ? owner.getContactPerson()
-                    : owner.getLegalName();
-            String ownerPhone = owner.getUser().getPhone();
-            log.info("NOTIFICATION -> Owner {} ({}) уведомлен о заявке #{}", ownerName, ownerPhone, request.getRequestId());
+        if (owners != null && !owners.isEmpty()) {
+            for (OwnerProfile owner : owners) {
+                if (owner == null) {
+                    continue;
+                }
+                String ownerName = owner.getContactPerson() != null && !owner.getContactPerson().isBlank()
+                        ? owner.getContactPerson()
+                        : Optional.ofNullable(owner.getLegalName()).filter(name -> !name.isBlank()).orElse("Владелец клуба");
+                String ownerPhone = owner.getUser() != null ? owner.getUser().getPhone() : owner.getContactPhone();
+                String ownerClub = owner.getClubs() != null && !owner.getClubs().isEmpty()
+                        ? owner.getClubs().get(0).getName()
+                        : clubName;
+                log.info("NOTIFICATION -> Owner {} ({}) уведомлен о заявке #{} (клуб: {})",
+                        ownerName,
+                        ownerPhone != null ? ownerPhone : "—",
+                        request.getRequestId(),
+                        ownerClub);
+            }
+        } else {
+            log.info("NOTIFICATION: Нет владельцев для уведомления по заявке #{}", request.getRequestId());
         }
 
         if (managers != null && !managers.isEmpty()) {
             for (ManagerProfile manager : managers) {
+                if (manager == null) {
+                    continue;
+                }
                 String managerName = manager.getFullName() != null && !manager.getFullName().isBlank()
                         ? manager.getFullName()
                         : "Менеджер";
@@ -41,10 +62,16 @@ public class NotificationService {
                 String contact = managerUser != null && managerUser.getPhone() != null
                         ? managerUser.getPhone()
                         : manager.getContactPhone();
-                log.info("NOTIFICATION -> Manager {} ({}) уведомлен о заявке #{}", managerName, contact, request.getRequestId());
+                String managerClub = manager.getClub() != null ? manager.getClub().getName() : clubName;
+                log.info("NOTIFICATION -> Manager {} ({}) уведомлен о заявке #{} (клуб: {})",
+                        managerName,
+                        contact != null ? contact : "—",
+                        request.getRequestId(),
+                        managerClub);
             }
         } else {
-            log.info("NOTIFICATION: Для клуба {} нет назначенных менеджеров для уведомления по заявке #{}", clubName, request.getRequestId());
+            log.info("NOTIFICATION: Для клубов механика и заявки нет назначенных менеджеров для уведомления по заявке #{}",
+                    request.getRequestId());
         }
     }
 

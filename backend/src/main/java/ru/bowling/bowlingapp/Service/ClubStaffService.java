@@ -36,6 +36,9 @@ public class ClubStaffService {
     }
 
     private static final long ACCOUNT_TYPE_INDIVIDUAL_ID = 1L;
+    private static final long ROLE_ADMIN_ID = 1L;
+    private static final long ROLE_MECHANIC_ID = 4L;
+    private static final long ROLE_HEAD_MECHANIC_ID = 6L;
 
     @Transactional(readOnly = true)
     public List<ClubStaffMemberDTO> getClubStaff(Long clubId) {
@@ -279,7 +282,10 @@ public class ClubStaffService {
             return StaffRole.MANAGER;
         }
         String normalized = role.trim().toUpperCase(Locale.ROOT);
-        if (normalized.contains("MANAGER") || normalized.contains("МЕНЕДЖ")) {
+        if (normalized.contains("HEAD_MECHANIC")
+                || normalized.contains("MANAGER")
+                || normalized.contains("ГЛАВНЫЙ")
+                || normalized.contains("МЕНЕДЖ")) {
             return StaffRole.MANAGER;
         }
         if (normalized.contains("MECHANIC") || normalized.contains("МЕХАН")) {
@@ -297,8 +303,7 @@ public class ClubStaffService {
         }
         if (isAdministratorAccountType(user.getAccountType())
                 || hasRole(user, "ADMINISTRATOR")
-                || hasRole(user, "ADMIN")
-                || hasRole(user, "STAFF")) {
+                || hasRole(user, "ADMIN")) {
             return StaffRole.ADMINISTRATOR;
         }
         if (hasRole(user, "HEAD_MECHANIC")
@@ -394,9 +399,9 @@ public class ClubStaffService {
     }
 
     private Role resolveManagerRole() {
-        return roleRepository.findByNameIgnoreCase("HEAD_MECHANIC")
+        return roleRepository.findById(ROLE_HEAD_MECHANIC_ID)
+                .or(() -> roleRepository.findByNameIgnoreCase("HEAD_MECHANIC"))
                 .or(() -> roleRepository.findByNameIgnoreCase("MANAGER"))
-                .or(() -> roleRepository.findByNameIgnoreCase("STAFF"))
                 .orElseThrow(() -> new IllegalStateException("Manager role is not configured"));
     }
 
@@ -428,7 +433,8 @@ public class ClubStaffService {
     }
 
     private Role resolveMechanicRole() {
-        return roleRepository.findByNameIgnoreCase("MECHANIC")
+        return roleRepository.findById(ROLE_MECHANIC_ID)
+                .or(() -> roleRepository.findByNameIgnoreCase("MECHANIC"))
                 .orElseThrow(() -> new IllegalStateException("Mechanic role is not configured"));
     }
 
@@ -442,8 +448,8 @@ public class ClubStaffService {
     }
 
     private Role resolveAdministratorRole() {
-        return roleRepository.findByNameIgnoreCase("ADMIN")
-                .or(() -> roleRepository.findByNameIgnoreCase("STAFF"))
+        return roleRepository.findById(ROLE_ADMIN_ID)
+                .or(() -> roleRepository.findByNameIgnoreCase("ADMIN"))
                 .or(() -> roleRepository.findByNameIgnoreCase("ADMINISTRATOR"))
                 .orElseThrow(() -> new IllegalStateException("Administrator role is not configured"));
     }
