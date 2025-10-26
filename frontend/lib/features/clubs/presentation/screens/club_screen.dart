@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
+import '../../../../core/routing/routes.dart';
+import '../../../../core/services/auth_service.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
@@ -56,6 +58,12 @@ class _ClubScreenState extends State<ClubScreen> {
       });
       showApiError(context, e);
     }
+  }
+
+  Future<void> _logout() async {
+    await AuthService.logout();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
   }
 
   List<_ClubInfo> _extractClubs(Map<String, dynamic>? data) {
@@ -206,6 +214,11 @@ class _ClubScreenState extends State<ClubScreen> {
               ),
               child: const Text('Повторить'),
             ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: _logout,
+              child: const Text('Выйти из аккаунта'),
+            ),
           ],
         ),
       );
@@ -325,6 +338,29 @@ class _OrderSelectionSheetState extends State<_OrderSelectionSheet> {
     _load();
   }
 
+  String _statusName(String status) {
+    switch (status.toUpperCase()) {
+      case 'NEW':
+        return 'Новая заявка';
+      case 'APPROVED':
+        return 'Одобрено';
+      case 'IN_PROGRESS':
+        return 'В работе';
+      case 'DONE':
+        return 'Выполнено';
+      case 'COMPLETED':
+        return 'Завершено';
+      case 'CLOSED':
+        return 'Закрыто';
+      case 'UNREPAIRABLE':
+        return 'Неремонтопригодно';
+      case 'REJECTED':
+        return 'Отклонено';
+      default:
+        return status;
+    }
+  }
+
   Future<void> _load() async {
     setState(() {
       _isLoading = true;
@@ -440,7 +476,7 @@ class _OrderSelectionSheetState extends State<_OrderSelectionSheet> {
                 if (order.laneNumber != null)
                   Text('Дорожка ${order.laneNumber}', style: const TextStyle(color: AppColors.darkGray)),
                 if (order.status != null && order.status!.isNotEmpty)
-                  Text('Статус: ${order.status}', style: const TextStyle(color: AppColors.darkGray)),
+                  Text('Статус: ${_statusName(order.status!)}', style: const TextStyle(color: AppColors.darkGray)),
               ],
             ),
             trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.darkGray),
