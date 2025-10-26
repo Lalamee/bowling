@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/models/user_club.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/chips/radio_group_horizontal.dart';
 import '../../../../shared/widgets/nav/app_bottom_nav.dart';
@@ -7,6 +8,7 @@ import '../../../../core/repositories/club_staff_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../core/utils/phone_utils.dart';
+import '../../../../core/utils/user_club_resolver.dart';
 
 class ClubStaffScreen extends StatefulWidget {
   final int? clubId;
@@ -22,7 +24,7 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
   final _userRepo = UserRepository();
   int _navIndex = 3;
   bool _isLoading = true;
-  List<_OwnerClub> _ownerClubs = [];
+  List<UserClub> _ownerClubs = const [];
   int? _selectedClubId;
   List<_Employee> _employees = [];
   final Map<int, String> _pendingPasswords = {};
@@ -43,7 +45,7 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
       final data = await _userRepo.me();
       if (!mounted || data == null) return;
 
-      final clubs = _extractOwnerClubs(data);
+      final clubs = resolveUserClubs(data);
       int? desiredClubId = widget.clubId;
       if (desiredClubId != null && clubs.every((club) => club.id != desiredClubId)) {
         desiredClubId = null;
@@ -122,44 +124,7 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
     }
   }
 
-  List<_OwnerClub> _extractOwnerClubs(Map<String, dynamic> data) {
-    final clubs = <_OwnerClub>[];
-    final ownerProfile = data['ownerProfile'];
-    if (ownerProfile is Map) {
-      final map = Map<String, dynamic>.from(ownerProfile);
-      final detailed = map['clubsDetailed'];
-      if (detailed is Iterable) {
-        for (final entry in detailed) {
-          if (entry is Map) {
-            final club = Map<String, dynamic>.from(entry);
-            final id = (club['id'] as num?)?.toInt();
-            final name = club['name']?.toString().trim();
-            if (id != null && name != null && name.isNotEmpty) {
-              clubs.add(
-                _OwnerClub(
-                  id: id,
-                  name: name,
-                  address: club['address']?.toString(),
-                ),
-              );
-            }
-          }
-        }
-      }
-
-      if (clubs.isEmpty) {
-        final id = (map['clubId'] as num?)?.toInt();
-        final name = map['clubName']?.toString().trim();
-        final address = map['address']?.toString();
-        if (id != null && name != null && name.isNotEmpty) {
-          clubs.add(_OwnerClub(id: id, name: name, address: address));
-        }
-      }
-    }
-    return clubs;
-  }
-
-  _OwnerClub? _clubById(int id) {
+  UserClub? _clubById(int id) {
     for (final club in _ownerClubs) {
       if (club.id == id) return club;
     }
@@ -471,14 +436,6 @@ class _Employee {
   });
 }
 
-class _OwnerClub {
-  final int id;
-  final String name;
-  final String? address;
-
-  const _OwnerClub({required this.id, required this.name, this.address});
-}
-
 class _StaffDraft {
   final String fullName;
   final String phone;
@@ -726,8 +683,8 @@ class _EmployeeCardState extends State<_EmployeeCard> {
 
 class _AssignEmployeeSheet extends StatefulWidget {
   final InputDecoration Function({String? hint, Color? fill, bool enabled, bool focusedRed, Widget? suffix}) dec;
-  final Widget Function(VoidCallback onPressed) suffixEdit;
-  final List<_OwnerClub> clubs;
+  final Widget Function(VoidCallback? onPressed) suffixEdit;
+  final List<UserClub> clubs;
   final int? initialClubId;
 
   const _AssignEmployeeSheet({
@@ -768,7 +725,7 @@ class _AssignEmployeeSheetState extends State<_AssignEmployeeSheet> {
     final name = _fio.text.trim();
     final phone = _phone.text.trim();
     if (name.isEmpty || phone.isEmpty) return;
-    _OwnerClub? club;
+    UserClub? club;
     if (_selectedClubId != null) {
       for (final c in widget.clubs) {
         if (c.id == _selectedClubId) {

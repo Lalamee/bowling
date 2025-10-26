@@ -6,6 +6,8 @@ import '../../../../core/routing/routes.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/net_ui.dart';
+import '../../../../core/utils/user_club_resolver.dart';
+import '../../../../core/models/user_club.dart';
 import '../../../../models/part_request_dto.dart';
 import '../../../../shared/widgets/buttons/custom_button.dart';
 
@@ -34,7 +36,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
   bool _hasError = false;
   int? _mechanicProfileId;
   int? _selectedClubId;
-  List<_MechanicClub> _clubs = const [];
+  List<UserClub> _clubs = const [];
 
   List<RequestedPartDto> requestedParts = [];
 
@@ -62,7 +64,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     try {
       final me = await _userRepository.me();
       if (!mounted) return;
-      final clubs = _resolveMechanicClubs(me);
+      final clubs = resolveUserClubs(me);
       final mechanicProfileId = _extractMechanicProfileId(me);
       final resolvedClubId = _resolveInitialClubId(clubs, widget.initialClubId);
       setState(() {
@@ -536,47 +538,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     return null;
   }
 
-  List<_MechanicClub> _resolveMechanicClubs(Map<String, dynamic>? me) {
-    if (me == null) {
-      return const [];
-    }
-    final profile = me['mechanicProfile'];
-    if (profile is! Map) {
-      return const [];
-    }
-
-    final result = <_MechanicClub>[];
-    final seen = <int>{};
-    void addClub({required int? id, required String? name, String? address}) {
-      if (id == null || !seen.add(id)) return;
-      final displayName = (name?.trim().isNotEmpty ?? false) ? name!.trim() : 'Клуб #$id';
-      result.add(_MechanicClub(id: id, name: displayName, address: address?.trim().isNotEmpty == true ? address!.trim() : null));
-    }
-
-    final detailed = profile['clubsDetailed'];
-    if (detailed is List) {
-      for (final entry in detailed) {
-        if (entry is Map) {
-          final map = Map<String, dynamic>.from(entry);
-          addClub(
-            id: (map['id'] as num?)?.toInt(),
-            name: map['name'] as String?,
-            address: map['address'] as String?,
-          );
-        }
-      }
-    }
-
-    addClub(
-      id: (profile['clubId'] as num?)?.toInt(),
-      name: profile['clubName'] as String?,
-      address: profile['address'] as String?,
-    );
-
-    return result;
-  }
-
-  int? _resolveInitialClubId(List<_MechanicClub> clubs, int? desiredId) {
+  int? _resolveInitialClubId(List<UserClub> clubs, int? desiredId) {
     if (clubs.isEmpty) {
       return null;
     }
@@ -589,12 +551,4 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     }
     return clubs.first.id;
   }
-}
-
-class _MechanicClub {
-  final int id;
-  final String name;
-  final String? address;
-
-  const _MechanicClub({required this.id, required this.name, this.address});
 }

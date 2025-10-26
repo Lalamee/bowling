@@ -7,6 +7,8 @@ import '../../../../core/services/auth_service.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
+import '../../../../core/utils/user_club_resolver.dart';
+import '../../../../core/models/user_club.dart';
 import '../../../../models/maintenance_request_response_dto.dart';
 import '../../../../shared/widgets/nav/app_bottom_nav.dart';
 import 'order_summary_screen.dart';
@@ -25,7 +27,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   bool _isLoading = true;
   bool _hasError = false;
   List<MaintenanceRequestResponseDto> _allRequests = [];
-  List<_MechanicClub> _clubs = const [];
+  List<UserClub> _clubs = const [];
   int? _selectedClubId;
   int? _selectedLane;
   int? _expandedIndex;
@@ -231,7 +233,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     try {
       final me = await _userRepository.me();
       if (!mounted) return;
-      final clubs = _resolveMechanicClubs(me);
+      final clubs = resolveUserClubs(me);
       final selectedClubId = _resolveSelectedClubId(clubs, _selectedClubId);
       final requests = await _fetchRequestsForClubs(clubs);
       if (!mounted) return;
@@ -317,7 +319,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     return _allRequests.where((element) => element.clubId == clubId).toList();
   }
 
-  int? _resolveSelectedClubId(List<_MechanicClub> clubs, int? current) {
+  int? _resolveSelectedClubId(List<UserClub> clubs, int? current) {
     if (clubs.isEmpty) {
       return null;
     }
@@ -327,47 +329,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     return clubs.first.id;
   }
 
-  List<_MechanicClub> _resolveMechanicClubs(Map<String, dynamic>? me) {
-    if (me == null) {
-      return const [];
-    }
-    final profile = me['mechanicProfile'];
-    if (profile is! Map) {
-      return const [];
-    }
-
-    final result = <_MechanicClub>[];
-    final seen = <int>{};
-    void addClub({required int? id, required String? name, String? address}) {
-      if (id == null || !seen.add(id)) return;
-      final displayName = (name?.trim().isNotEmpty ?? false) ? name!.trim() : 'Клуб #$id';
-      result.add(_MechanicClub(id: id, name: displayName, address: address?.trim().isNotEmpty == true ? address!.trim() : null));
-    }
-
-    final detailed = profile['clubsDetailed'];
-    if (detailed is List) {
-      for (final entry in detailed) {
-        if (entry is Map) {
-          final map = Map<String, dynamic>.from(entry);
-          addClub(
-            id: (map['id'] as num?)?.toInt(),
-            name: map['name'] as String?,
-            address: map['address'] as String?,
-          );
-        }
-      }
-    }
-
-    addClub(
-      id: (profile['clubId'] as num?)?.toInt(),
-      name: profile['clubName'] as String?,
-      address: profile['address'] as String?,
-    );
-
-    return result;
-  }
-
-  Future<List<MaintenanceRequestResponseDto>> _fetchRequestsForClubs(List<_MechanicClub> clubs) async {
+  Future<List<MaintenanceRequestResponseDto>> _fetchRequestsForClubs(List<UserClub> clubs) async {
     if (clubs.isEmpty) {
       return const [];
     }
@@ -657,14 +619,6 @@ class _OrderCard extends StatelessWidget {
         return 'Статус: $status';
     }
   }
-}
-
-class _MechanicClub {
-  final int id;
-  final String name;
-  final String? address;
-
-  const _MechanicClub({required this.id, required this.name, this.address});
 }
 
 enum _OrdersFilter { all, active, archive }
