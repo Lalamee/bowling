@@ -462,10 +462,11 @@ public class ClubStaffService {
     }
 
     private Role resolveManagerRole() {
-        return roleRepository.findById(ROLE_HEAD_MECHANIC_ID)
-                .or(() -> roleRepository.findByNameIgnoreCase("HEAD_MECHANIC"))
-                .or(() -> roleRepository.findByNameIgnoreCase("MANAGER"))
-                .orElseThrow(() -> new IllegalStateException("Manager role is not configured"));
+        return resolveRole(ROLE_HEAD_MECHANIC_ID,
+                "HEAD_MECHANIC",
+                "MANAGER",
+                "Менеджер",
+                "Главный механик");
     }
 
     private AccountType resolveMechanicAccountType() {
@@ -491,14 +492,20 @@ public class ClubStaffService {
                     return byName.get();
                 }
             }
+            for (String name : fallbackNames) {
+                AccountType created = createAccountTypeIfMissing(name);
+                if (created != null) {
+                    return created;
+                }
+            }
         }
         throw new IllegalStateException("Account type not configured for id=" + id);
     }
 
     private Role resolveMechanicRole() {
-        return roleRepository.findById(ROLE_MECHANIC_ID)
-                .or(() -> roleRepository.findByNameIgnoreCase("MECHANIC"))
-                .orElseThrow(() -> new IllegalStateException("Mechanic role is not configured"));
+        return resolveRole(ROLE_MECHANIC_ID,
+                "MECHANIC",
+                "Механик");
     }
 
     private AccountType resolveAdministratorAccountType() {
@@ -511,10 +518,56 @@ public class ClubStaffService {
     }
 
     private Role resolveAdministratorRole() {
-        return roleRepository.findById(ROLE_ADMIN_ID)
-                .or(() -> roleRepository.findByNameIgnoreCase("ADMIN"))
-                .or(() -> roleRepository.findByNameIgnoreCase("ADMINISTRATOR"))
-                .orElseThrow(() -> new IllegalStateException("Administrator role is not configured"));
+        return resolveRole(ROLE_ADMIN_ID,
+                "ADMIN",
+                "ADMINISTRATOR",
+                "Администратор");
+    }
+
+    private Role resolveRole(long id, String... fallbackNames) {
+        Optional<Role> role = roleRepository.findById(id);
+        if (role.isPresent() && matchesRole(role.get(), id, fallbackNames)) {
+            return role.get();
+        }
+        if (fallbackNames != null) {
+            for (String name : fallbackNames) {
+                Role byName = findRoleByName(name);
+                if (byName != null) {
+                    return byName;
+                }
+            }
+            for (String name : fallbackNames) {
+                Role created = createRoleIfMissing(name);
+                if (created != null) {
+                    return created;
+                }
+            }
+        }
+        throw new IllegalStateException("Role not configured for id=" + id);
+    }
+
+    private Role findRoleByName(String name) {
+        if (name == null) {
+            return null;
+        }
+        String trimmed = name.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return roleRepository.findByNameIgnoreCase(trimmed).orElse(null);
+    }
+
+    private Role createRoleIfMissing(String candidateName) {
+        String normalized = normalizeRoleName(candidateName);
+        if (normalized == null) {
+            return null;
+        }
+        String trimmed = candidateName.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return roleRepository.findByNameIgnoreCase(trimmed)
+                .orElseGet(() -> roleRepository.saveAndFlush(Role.builder().name(trimmed).build()));
     }
 
     private boolean matchesAccountType(AccountType accountType, long expectedId, String... names) {
@@ -546,6 +599,50 @@ public class ClubStaffService {
             }
         }
         return false;
+    }
+
+    private AccountType createAccountTypeIfMissing(String candidateName) {
+        String normalized = normalizeAccountTypeName(candidateName);
+        if (normalized == null) {
+            return null;
+        }
+        String trimmed = candidateName.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return accountTypeRepository.findByNameIgnoreCase(trimmed)
+                .orElseGet(() -> accountTypeRepository.saveAndFlush(AccountType.builder().name(trimmed).build()));
+    }
+
+    private boolean matchesRole(Role role, long expectedId, String... names) {
+        if (role == null) {
+            return false;
+        }
+        Long roleId = role.getRoleId();
+        if (roleId != null && roleId.longValue() == expectedId) {
+            return true;
+        }
+        if (names == null || names.length == 0) {
+            return true;
+        }
+        String actual = normalizeRoleName(role.getName());
+        if (actual == null) {
+            return false;
+        }
+        for (String name : names) {
+            String normalized = normalizeRoleName(name);
+            if (normalized != null && normalized.equals(actual)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String normalizeRoleName(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.replaceAll("[\\s_\\-]", "").toUpperCase(Locale.ROOT);
     }
 
     private String normalizeAccountTypeName(String value) {
