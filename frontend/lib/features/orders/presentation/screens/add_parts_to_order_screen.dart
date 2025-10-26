@@ -152,11 +152,7 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
         .where((item) => item.inventoryId == selected.inventoryId)
         .fold<int>(0, (sum, item) => sum + item.quantity);
     final totalRequested = alreadyRequested + quantity;
-
-    if (available != null && totalRequested > available) {
-      showSnack(context, 'На складе доступно только $available шт.');
-      return;
-    }
+    final shortage = available != null && totalRequested > available;
 
     setState(() {
       final existingIndex = _pendingParts.indexWhere((item) => item.inventoryId == selected.inventoryId);
@@ -176,10 +172,10 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
           RequestedPartDto(
             inventoryId: selected.inventoryId,
             catalogId: selected.catalogId,
-            catalogNumber: selected.catalogNumber,
+            catalogNumber: _resolveCatalogNumber(selected),
             partName: _resolvePartDisplayName(selected),
             quantity: quantity,
-            warehouseId: selected.warehouseId,
+            warehouseId: selected.warehouseId ?? order.clubId,
             location: selected.location,
           ),
         );
@@ -191,6 +187,11 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
       _selectedCatalogPart = null;
       _partSuggestions = const [];
     });
+
+    if (shortage) {
+      final availableText = available ?? 0;
+      showSnack(context, 'На складе доступно только $availableText шт. Заявка отправлена на пополнение.');
+    }
   }
 
   void _removePart(int index) {
@@ -404,7 +405,7 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
     setState(() {
       _selectedCatalogPart = part;
       _partNameController.text = _resolvePartDisplayName(part);
-      _catalogController.text = part.catalogNumber;
+      _catalogController.text = _resolveCatalogNumber(part);
       _partSuggestions = const [];
     });
   }
@@ -417,6 +418,14 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
       }
     }
     return part.catalogNumber;
+  }
+
+  String _resolveCatalogNumber(PartDto part) {
+    final candidate = part.catalogNumber.trim();
+    if (candidate.isNotEmpty) {
+      return candidate;
+    }
+    return part.catalogId.toString();
   }
 }
 

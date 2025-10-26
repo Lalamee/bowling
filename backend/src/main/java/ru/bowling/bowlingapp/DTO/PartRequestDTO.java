@@ -40,7 +40,6 @@ public class PartRequestDTO {
 
         private Long catalogId;
 
-        @NotBlank(message = "Catalog number is required")
         private String catalogNumber;
 
         @NotNull(message = "Part name is required")

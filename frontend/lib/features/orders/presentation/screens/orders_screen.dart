@@ -39,7 +39,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
   final Set<int> _pendingRequestIds = <int>{};
 
   bool get _isMechanic => (_role ?? 'mechanic') == 'mechanic';
-  bool get _isManagerLike => _role == 'manager' || _role == 'owner';
+  bool get _isManagerLike =>
+      _role == 'manager' || _role == 'owner' || _role == 'admin';
 
   @override
   Widget build(BuildContext context) {
