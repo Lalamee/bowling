@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
+import '../../../../core/routing/routes.dart';
+import '../../../../core/services/auth_service.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../models/part_request_dto.dart';
@@ -77,6 +79,12 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       });
       showApiError(context, e);
     }
+  }
+
+  Future<void> _logout() async {
+    await AuthService.logout();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
   }
 
   void _addPart() {
@@ -195,6 +203,11 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
               CustomButton(
                 text: 'Повторить попытку',
                 onPressed: _loadUserData,
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: _logout,
+                child: const Text('Выйти из аккаунта'),
               ),
             ],
           ),

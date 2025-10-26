@@ -74,7 +74,7 @@ public class MaintenanceController {
                 if (authentication == null || !authentication.isAuthenticated()) {
                         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
                 }
-                List<MaintenanceRequestResponseDTO> requests = maintenanceRequestService.getRequestsByClub(clubId);
+                List<MaintenanceRequestResponseDTO> requests = maintenanceRequestService.getRequestsByClub(clubId, authentication.getName());
                 return ResponseEntity.ok(requests);
         }
 

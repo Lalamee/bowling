@@ -9,27 +9,35 @@ import ru.bowling.bowlingapp.DTO.ReservationRequestDto;
 import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Entity.enums.MaintenanceRequestStatus;
 import ru.bowling.bowlingapp.Entity.enums.PartStatus;
+import ru.bowling.bowlingapp.Repository.BowlingClubRepository;
+import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
 import ru.bowling.bowlingapp.Repository.MaintenanceRequestRepository;
 import ru.bowling.bowlingapp.Repository.MechanicProfileRepository;
 import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
 import ru.bowling.bowlingapp.Repository.RequestPartRepository;
+import ru.bowling.bowlingapp.Repository.UserRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class MaintenanceRequestService {
 
-	private final MaintenanceRequestRepository maintenanceRequestRepository;
-	private final RequestPartRepository requestPartRepository;
-	private final MechanicProfileRepository mechanicProfileRepository;
-	private final PartsCatalogRepository partsCatalogRepository;
-	private final InventoryService inventoryService; 
-	private final SupplierService supplierService; 
+        private final MaintenanceRequestRepository maintenanceRequestRepository;
+        private final RequestPartRepository requestPartRepository;
+        private final MechanicProfileRepository mechanicProfileRepository;
+        private final PartsCatalogRepository partsCatalogRepository;
+        private final BowlingClubRepository bowlingClubRepository;
+        private final ClubStaffRepository clubStaffRepository;
+        private final UserRepository userRepository;
+        private final InventoryService inventoryService;
+        private final SupplierService supplierService;
 
         @Transactional
         public MaintenanceRequestResponseDTO createPartRequest(PartRequestDTO requestDTO) {
@@ -38,22 +46,28 @@ public class MaintenanceRequestService {
                         throw new IllegalArgumentException("Mechanic not found");
                 }
 
+                if (requestDTO.getClubId() == null) {
+                        throw new IllegalArgumentException("Club is required");
+                }
+
+                BowlingClub club = bowlingClubRepository.findById(requestDTO.getClubId())
+                                .orElseThrow(() -> new IllegalArgumentException("Club not found"));
+
+                MechanicProfile mechanicProfile = mechanic.get();
+                if (!mechanicWorksInClub(mechanicProfile, club.getClubId())) {
+                        throw new IllegalArgumentException("Mechanic is not assigned to the specified club");
+                }
+
                 validateRequestedParts(requestDTO.getRequestedParts());
 
-		if (requestDTO.getClubId() == null) {
-			throw new IllegalArgumentException("Club is required");
-		}
-		if (requestDTO.getLaneNumber() == null || requestDTO.getLaneNumber() <= 0) {
-			throw new IllegalArgumentException("Lane number must be > 0");
-		}
-		BowlingClub club = BowlingClub.builder()
-				.clubId(requestDTO.getClubId())
-				.build();
+                if (requestDTO.getLaneNumber() == null || requestDTO.getLaneNumber() <= 0) {
+                        throw new IllegalArgumentException("Lane number must be > 0");
+                }
 
-		MaintenanceRequest request = MaintenanceRequest.builder()
-				.club(club)
-				.laneNumber(requestDTO.getLaneNumber())
-				.mechanic(mechanic.get())
+                MaintenanceRequest request = MaintenanceRequest.builder()
+                                .club(club)
+                                .laneNumber(requestDTO.getLaneNumber())
+                                .mechanic(mechanicProfile)
 				.requestDate(LocalDateTime.now())
 				.status(MaintenanceRequestStatus.NEW)
 				.managerNotes(requestDTO.getManagerNotes())
@@ -126,7 +140,24 @@ public class MaintenanceRequestService {
         }
 
         @Transactional(readOnly = true)
-        public List<MaintenanceRequestResponseDTO> getRequestsByClub(Long clubId) {
+        public List<MaintenanceRequestResponseDTO> getRequestsByClub(Long clubId, String requestedByLogin) {
+                if (clubId == null) {
+                        throw new IllegalArgumentException("Club is required");
+                }
+
+                BowlingClub club = bowlingClubRepository.findById(clubId)
+                                .orElseThrow(() -> new IllegalArgumentException("Club not found"));
+
+                if (requestedByLogin != null && !requestedByLogin.isBlank()) {
+                        User requester = findUserByLogin(requestedByLogin);
+                        if (requester == null) {
+                                throw new IllegalArgumentException("User not found");
+                        }
+                        if (!userHasAccessToClub(requester, club)) {
+                                throw new IllegalArgumentException("You do not have access to this club");
+                        }
+                }
+
                 List<MaintenanceRequest> requests = maintenanceRequestRepository.findByClubClubIdOrderByRequestDateDesc(clubId);
                 return requests.stream()
                                 .map(request -> {
@@ -167,6 +198,90 @@ public class MaintenanceRequestService {
 
                 List<RequestPart> parts = requestPartRepository.findByRequestRequestId(request.getRequestId());
                 return convertToResponseDTO(request, parts);
+        }
+
+        private boolean mechanicWorksInClub(MechanicProfile mechanicProfile, Long clubId) {
+                if (clubId == null) {
+                        return false;
+                }
+                return Optional.ofNullable(mechanicProfile.getClubs())
+                                .orElse(List.of())
+                                .stream()
+                                .map(BowlingClub::getClubId)
+                                .filter(Objects::nonNull)
+                                .anyMatch(id -> id.equals(clubId));
+        }
+
+        private boolean userHasAccessToClub(User user, BowlingClub club) {
+                if (user == null || club == null) {
+                        return false;
+                }
+
+                if (isGlobalAdministrator(user)) {
+                        return true;
+                }
+
+                OwnerProfile owner = club.getOwner();
+                if (owner != null && owner.getUser() != null && Objects.equals(owner.getUser().getUserId(), user.getUserId())) {
+                        return true;
+                }
+
+                if (clubStaffRepository.existsByClubAndUser(club, user)) {
+                        return true;
+                }
+
+                ManagerProfile managerProfile = user.getManagerProfile();
+                if (managerProfile != null && managerProfile.getClub() != null
+                                && Objects.equals(managerProfile.getClub().getClubId(), club.getClubId())) {
+                        return true;
+                }
+
+                MechanicProfile mechanicProfile = user.getMechanicProfile();
+                if (mechanicProfile != null && mechanicWorksInClub(mechanicProfile, club.getClubId())) {
+                        return true;
+                }
+
+                return false;
+        }
+
+        private boolean isGlobalAdministrator(User user) {
+                if (user == null || user.getRole() == null || user.getRole().getName() == null) {
+                        return false;
+                }
+                String roleName = user.getRole().getName().toUpperCase(Locale.ROOT);
+                return roleName.contains("ADMIN");
+        }
+
+        private User findUserByLogin(String login) {
+                if (login == null || login.isBlank()) {
+                        return null;
+                }
+                Optional<User> direct = userRepository.findByPhone(login);
+                if (direct.isPresent()) {
+                        return direct.get();
+                }
+                String normalized = normalizePhone(login);
+                if (normalized != null) {
+                        return userRepository.findByPhone(normalized).orElse(null);
+                }
+                return null;
+        }
+
+        private String normalizePhone(String rawPhone) {
+                if (rawPhone == null) {
+                        return null;
+                }
+                String digits = rawPhone.replaceAll("\\D", "");
+                if (digits.length() == 11 && digits.startsWith("8")) {
+                        digits = "7" + digits.substring(1);
+                }
+                if (digits.length() == 10) {
+                        digits = "7" + digits;
+                }
+                if (digits.length() != 11 || !digits.startsWith("7")) {
+                        return null;
+                }
+                return "+" + digits.charAt(0) + digits.substring(1);
         }
 
         private void validateRequestedParts(List<PartRequestDTO.RequestedPartDTO> parts) {

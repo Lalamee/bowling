@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/routing/routes.dart';
+import '../../../../core/services/auth_service.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
@@ -28,6 +29,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
   int? _selectedClubId;
   int? _selectedLane;
   int? _expandedIndex;
+  _OrdersFilter _filter = _OrdersFilter.all;
+
+  static const Set<String> _archiveStatuses = {
+    'DONE',
+    'COMPLETED',
+    'CLOSED',
+    'UNREPAIRABLE',
+    'REJECTED',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -44,12 +54,35 @@ class _OrdersScreenState extends State<OrdersScreen> {
               if (_hasError) {
                 return ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  children: const [
-                    SizedBox(height: 200),
+                  children: [
+                    const SizedBox(height: 160),
                     Center(
-                      child: Text(
-                        'Не удалось загрузить заказы',
-                        style: TextStyle(color: AppColors.darkGray),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.cloud_off, size: 56, color: AppColors.darkGray),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Не удалось загрузить заказы',
+                            style: TextStyle(color: AppColors.darkGray, fontSize: 16),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _load,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            ),
+                            child: const Text('Повторить попытку'),
+                          ),
+                          TextButton(
+                            onPressed: _logout,
+                            child: const Text('Выйти из аккаунта'),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -58,12 +91,23 @@ class _OrdersScreenState extends State<OrdersScreen> {
               if (_clubs.isEmpty) {
                 return ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  children: const [
-                    SizedBox(height: 200),
+                  children: [
+                    const SizedBox(height: 200),
                     Center(
-                      child: Text(
-                        'Вы не привязаны ни к одному клубу',
-                        style: TextStyle(color: AppColors.darkGray, fontSize: 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Вы не привязаны ни к одному клубу',
+                            style: TextStyle(color: AppColors.darkGray, fontSize: 16),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          TextButton(
+                            onPressed: _logout,
+                            child: const Text('Выйти из аккаунта'),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -72,14 +116,27 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
               final requests = _filteredRequests;
               if (requests.isEmpty) {
+                String emptyText;
+                switch (_filter) {
+                  case _OrdersFilter.archive:
+                    emptyText = 'Архивных заказов нет';
+                    break;
+                  case _OrdersFilter.active:
+                    emptyText = 'Нет текущих заказов';
+                    break;
+                  default:
+                    emptyText = 'Заказы отсутствуют';
+                    break;
+                }
                 return ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  children: const [
-                    SizedBox(height: 200),
+                  children: [
+                    const SizedBox(height: 200),
                     Center(
                       child: Text(
-                        'Заказов нет',
-                        style: TextStyle(color: AppColors.darkGray, fontSize: 16),
+                        emptyText,
+                        style: const TextStyle(color: AppColors.darkGray, fontSize: 16),
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ],
@@ -110,6 +167,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     const SizedBox(height: 12),
                     _laneDropdown(),
                   ],
+                  const SizedBox(height: 12),
+                  _statusFilterChips(),
                   const SizedBox(height: 12),
                   ...List.generate(requests.length, (index) {
                     final request = requests[index];
@@ -197,6 +256,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
+  Future<void> _logout() async {
+    await AuthService.logout();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
+  }
+
   Future<void> _openCreateRequest() async {
     if (_clubs.isEmpty) {
       showSnack(context, 'Вы не привязаны ни к одному клубу');
@@ -225,12 +290,23 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   List<MaintenanceRequestResponseDto> get _filteredRequests {
-    final base = _requestsForSelectedClub;
-    final selected = _selectedLane;
-    if (selected == null) {
-      return base;
+    var base = _requestsForSelectedClub;
+    if (_filter != _OrdersFilter.all) {
+      final archive = _filter == _OrdersFilter.archive;
+      base = base
+          .where((request) {
+            final status = request.status?.toUpperCase();
+            final isArchived = status != null && _archiveStatuses.contains(status);
+            return archive ? isArchived : !isArchived;
+          })
+          .toList();
     }
-    return base.where((element) => element.laneNumber == selected).toList();
+
+    final selected = _selectedLane;
+    if (selected != null) {
+      base = base.where((element) => element.laneNumber == selected).toList();
+    }
+    return base;
   }
 
   List<MaintenanceRequestResponseDto> get _requestsForSelectedClub {
@@ -323,6 +399,48 @@ class _OrdersScreenState extends State<OrdersScreen> {
     });
 
     return combined;
+  }
+
+  Widget _statusFilterChips() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _OrdersFilter.values.map((filter) {
+        final isSelected = _filter == filter;
+        return ChoiceChip(
+          label: Text(
+            _filterLabel(filter),
+            style: TextStyle(
+              color: isSelected ? Colors.white : AppColors.textDark,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          selected: isSelected,
+          selectedColor: AppColors.primary,
+          backgroundColor: Colors.white,
+          side: BorderSide(color: isSelected ? AppColors.primary : AppColors.lightGray),
+          onSelected: (value) {
+            if (!value) return;
+            setState(() {
+              _filter = filter;
+              _expandedIndex = null;
+            });
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  String _filterLabel(_OrdersFilter filter) {
+    switch (filter) {
+      case _OrdersFilter.active:
+        return 'Текущие';
+      case _OrdersFilter.archive:
+        return 'Архив';
+      case _OrdersFilter.all:
+      default:
+        return 'Все';
+    }
   }
 
   Widget _laneDropdown() {
@@ -548,3 +666,5 @@ class _MechanicClub {
 
   const _MechanicClub({required this.id, required this.name, this.address});
 }
+
+enum _OrdersFilter { all, active, archive }

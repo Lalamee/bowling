@@ -28,6 +28,9 @@ public class AuthService implements UserDetailsService {
     private final PasswordEncoder passwordEncoder;
     private final BowlingClubRepository bowlingClubRepository;
     private final ClubStaffRepository clubStaffRepository;
+    private final OwnerProfileRepository ownerProfileRepository;
+    private final MechanicProfileRepository mechanicProfileRepository;
+    private final ManagerProfileRepository managerProfileRepository;
 
     private static final Pattern RUSSIAN_PHONE_PATTERN = Pattern.compile("^\\+7\\d{10}$");
 
@@ -156,9 +159,12 @@ public class AuthService implements UserDetailsService {
         String accountTypeName = accountType.getName();
 
         BowlingClub mechanicClub = null;
+        MechanicProfile mechanicProfile = null;
+        OwnerProfile ownerProfile = null;
+        ManagerProfile managerProfile = null;
 
         if (isMechanicAccountType(accountTypeName)) {
-            MechanicProfile profile = MechanicProfile.builder()
+            mechanicProfile = MechanicProfile.builder()
                     .user(user)
                     .fullName(mechanicDto.getFullName())
                     .birthDate(mechanicDto.getBirthDate())
@@ -179,11 +185,11 @@ public class AuthService implements UserDetailsService {
             if (mechanicDto.getClubId() != null) {
                 mechanicClub = bowlingClubRepository.findById(mechanicDto.getClubId())
                         .orElseThrow(() -> new IllegalArgumentException("Selected club not found"));
-                profile.setClubs(new ArrayList<>(Collections.singletonList(mechanicClub)));
+                mechanicProfile.setClubs(new ArrayList<>(Collections.singletonList(mechanicClub)));
             }
-            user.setMechanicProfile(profile);
+            user.setMechanicProfile(mechanicProfile);
         } else if (isOwnerAccountType(accountTypeName)) {
-            OwnerProfile profile = OwnerProfile.builder()
+            ownerProfile = OwnerProfile.builder()
                     .user(user)
                     .inn(ownerDto.getInn())
                     .legalName(ownerDto.getLegalName())
@@ -194,10 +200,10 @@ public class AuthService implements UserDetailsService {
                     .createdAt(LocalDate.now())
                     .updatedAt(LocalDate.now())
                     .build();
-            profile.setClubs(new ArrayList<>());
-            user.setOwnerProfile(profile);
+            ownerProfile.setClubs(new ArrayList<>());
+            user.setOwnerProfile(ownerProfile);
         } else if (isManagerAccountType(accountTypeName)) {
-            ManagerProfile profile = ManagerProfile.builder()
+            managerProfile = ManagerProfile.builder()
                     .user(user)
                     .fullName(ownerDto != null ? ownerDto.getContactPerson() : null)
                     .contactPhone(normalizedPhone)
@@ -206,14 +212,22 @@ public class AuthService implements UserDetailsService {
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
                     .build();
-            user.setManagerProfile(profile);
+            user.setManagerProfile(managerProfile);
         }
 
         userRepository.save(user);
 
-        if (isOwnerAccountType(accountTypeName)) {
-            OwnerProfile ownerProfile = user.getOwnerProfile();
+        if (mechanicProfile != null) {
+            mechanicProfileRepository.save(mechanicProfile);
+        }
+
+        if (managerProfile != null) {
+            managerProfileRepository.save(managerProfile);
+        }
+
+        if (ownerProfile != null) {
             attachClubToOwner(ownerProfile, ownerDto, clubDto);
+            ownerProfileRepository.save(ownerProfile);
         }
 
         if (mechanicClub != null) {
