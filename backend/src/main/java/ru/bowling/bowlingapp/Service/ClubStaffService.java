@@ -6,8 +6,23 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.DTO.ClubStaffMemberDTO;
 import ru.bowling.bowlingapp.DTO.CreateStaffRequestDTO;
 import ru.bowling.bowlingapp.DTO.CreateStaffResponseDTO;
-import ru.bowling.bowlingapp.Entity.*;
-import ru.bowling.bowlingapp.Repository.*;
+import ru.bowling.bowlingapp.Entity.AccountType;
+import ru.bowling.bowlingapp.Entity.AdministratorProfile;
+import ru.bowling.bowlingapp.Entity.BowlingClub;
+import ru.bowling.bowlingapp.Entity.ClubStaff;
+import ru.bowling.bowlingapp.Entity.ManagerProfile;
+import ru.bowling.bowlingapp.Entity.MechanicProfile;
+import ru.bowling.bowlingapp.Entity.OwnerProfile;
+import ru.bowling.bowlingapp.Entity.Role;
+import ru.bowling.bowlingapp.Entity.User;
+import ru.bowling.bowlingapp.Repository.AccountTypeRepository;
+import ru.bowling.bowlingapp.Repository.AdministratorProfileRepository;
+import ru.bowling.bowlingapp.Repository.BowlingClubRepository;
+import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
+import ru.bowling.bowlingapp.Repository.ManagerProfileRepository;
+import ru.bowling.bowlingapp.Repository.MechanicProfileRepository;
+import ru.bowling.bowlingapp.Repository.RoleRepository;
+import ru.bowling.bowlingapp.Repository.UserRepository;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -15,6 +30,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +42,7 @@ public class ClubStaffService {
     private final RoleRepository roleRepository;
     private final AccountTypeRepository accountTypeRepository;
     private final ManagerProfileRepository managerProfileRepository;
+    private final AdministratorProfileRepository administratorProfileRepository;
     private final MechanicProfileRepository mechanicProfileRepository;
     private final ClubStaffRepository clubStaffRepository;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
@@ -71,6 +89,19 @@ public class ClubStaffService {
                     .email(manager.getContactEmail())
                     .role(staffRoleToResponse(managerRole, managerUser != null ? managerUser.getRole() : null))
                     .isActive(managerUser != null ? managerUser.getIsActive() : Boolean.TRUE)
+                    .build());
+        }
+
+        List<AdministratorProfile> administrators = administratorProfileRepository.findByClub_ClubId(clubId);
+        for (AdministratorProfile administrator : administrators) {
+            User administratorUser = administrator.getUser();
+            staff.add(ClubStaffMemberDTO.builder()
+                    .userId(administratorUser != null ? administratorUser.getUserId() : null)
+                    .fullName(trim(administrator.getFullName(), administratorUser != null ? administratorUser.getPhone() : null))
+                    .phone(administrator.getContactPhone() != null ? administrator.getContactPhone() : (administratorUser != null ? administratorUser.getPhone() : null))
+                    .email(administrator.getContactEmail())
+                    .role(staffRoleToResponse(StaffRole.ADMINISTRATOR, administratorUser != null ? administratorUser.getRole() : null))
+                    .isActive(administratorUser != null ? administratorUser.getIsActive() : Boolean.TRUE)
                     .build());
         }
 
@@ -128,20 +159,27 @@ public class ClubStaffService {
 
         User user = prepareUser(normalizedPhone, rawPassword, role, accountType);
 
+        LocalDateTime now = LocalDateTime.now();
+
         ManagerProfile profile = ManagerProfile.builder()
-                .user(user)
-                .club(club)
                 .fullName(trim(request.getFullName(), normalizedPhone))
                 .contactPhone(normalizedPhone)
                 .contactEmail(trimNullable(request.getEmail()))
                 .isDataVerified(false)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .createdAt(now)
+                .updatedAt(now)
                 .build();
 
-        user.setManagerProfile(profile);
-        userRepository.save(user);
-        managerProfileRepository.save(profile);
+        persistUserWithProfile(
+                user,
+                profile,
+                (persistedUser, persistedProfile) -> {
+                    persistedProfile.setUser(persistedUser);
+                    persistedProfile.setClub(club);
+                    persistedUser.setManagerProfile(persistedProfile);
+                },
+                managerProfileRepository::saveAndFlush
+        );
 
         registerClubStaff(club, user, role, requestedBy);
 
@@ -160,13 +198,14 @@ public class ClubStaffService {
 
         User user = prepareUser(normalizedPhone, rawPassword, role, accountType);
 
+        LocalDate today = LocalDate.now();
+
         MechanicProfile profile = MechanicProfile.builder()
-                .user(user)
                 .fullName(trim(request.getFullName(), normalizedPhone))
                 .isEntrepreneur(false)
                 .isDataVerified(false)
-                .createdAt(LocalDate.now())
-                .updatedAt(LocalDate.now())
+                .createdAt(today)
+                .updatedAt(today)
                 .workPlaces(club.getName())
                 .build();
 
@@ -174,9 +213,15 @@ public class ClubStaffService {
         clubs.add(club);
         profile.setClubs(clubs);
 
-        user.setMechanicProfile(profile);
-        userRepository.save(user);
-        mechanicProfileRepository.save(profile);
+        persistUserWithProfile(
+                user,
+                profile,
+                (persistedUser, persistedProfile) -> {
+                    persistedProfile.setUser(persistedUser);
+                    persistedUser.setMechanicProfile(persistedProfile);
+                },
+                mechanicProfileRepository::saveAndFlush
+        );
 
         registerClubStaff(club, user, role, requestedBy);
 
@@ -195,24 +240,42 @@ public class ClubStaffService {
 
         User user = prepareUser(normalizedPhone, rawPassword, role, accountType);
 
-        ManagerProfile profile = ManagerProfile.builder()
-                .user(user)
-                .club(club)
+        LocalDateTime now = LocalDateTime.now();
+
+        AdministratorProfile profile = AdministratorProfile.builder()
                 .fullName(trim(request.getFullName(), normalizedPhone))
                 .contactPhone(normalizedPhone)
                 .contactEmail(trimNullable(request.getEmail()))
                 .isDataVerified(false)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .createdAt(now)
+                .updatedAt(now)
                 .build();
 
-        user.setManagerProfile(profile);
-        userRepository.save(user);
-        managerProfileRepository.save(profile);
+        persistUserWithProfile(
+                user,
+                profile,
+                (persistedUser, persistedProfile) -> {
+                    persistedProfile.setUser(persistedUser);
+                    persistedProfile.setClub(club);
+                    persistedUser.setAdministratorProfile(persistedProfile);
+                },
+                administratorProfileRepository::saveAndFlush
+        );
 
         registerClubStaff(club, user, role, requestedBy);
 
         return buildResponse(user, profile.getFullName(), rawPassword, role, club, StaffRole.ADMINISTRATOR);
+    }
+
+    private <P> void persistUserWithProfile(
+            User user,
+            P profile,
+            BiConsumer<User, P> linkUserToProfile,
+            Consumer<P> profileSaver
+    ) {
+        linkUserToProfile.accept(user, profile);
+        userRepository.saveAndFlush(user);
+        profileSaver.accept(profile);
     }
 
     private void registerClubStaff(BowlingClub club, User user, Role role, User requestedBy) {
