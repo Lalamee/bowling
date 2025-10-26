@@ -36,6 +36,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
   bool _hasError = false;
   int? _mechanicProfileId;
   int? _selectedClubId;
+  int? _selectedLane;
   List<UserClub> _clubs = const [];
 
   List<RequestedPartDto> requestedParts = [];
@@ -71,6 +72,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
         _mechanicProfileId = mechanicProfileId;
         _clubs = clubs;
         _selectedClubId = resolvedClubId;
+        _selectedLane = null;
         _isLoading = false;
       });
     } catch (e) {
@@ -140,9 +142,17 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       return;
     }
 
-    final lane = int.tryParse(_laneController.text.trim());
+    final laneOptions = _availableLaneNumbers;
+    int? lane = laneOptions.isNotEmpty ? _selectedLane : int.tryParse(_laneController.text.trim());
+
     if (lane == null || lane <= 0) {
       showSnack(context, 'Укажите корректный номер дорожки');
+      return;
+    }
+
+    final laneLimit = _laneLimitForSelectedClub();
+    if (laneLimit != null && lane > laneLimit) {
+      showSnack(context, 'В клубе только $laneLimit дорожек');
       return;
     }
 
@@ -272,28 +282,17 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
                   ),
                 )
                 .toList(),
-            onChanged: (value) => setState(() => _selectedClubId = value),
+            onChanged: (value) => setState(() {
+              _selectedClubId = value;
+              _selectedLane = null;
+              _laneController.clear();
+            }),
             validator: (value) => value == null ? 'Выберите клуб' : null,
           ),
           const SizedBox(height: 16),
 
           // Номер дорожки
-          _buildTextField(
-            label: 'Номер дорожки',
-            hint: 'Введите номер дорожки',
-            keyboardType: TextInputType.number,
-            controller: _laneController,
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Укажите номер дорожки';
-              }
-              final lane = int.tryParse(value.trim());
-              if (lane == null || lane <= 0) {
-                return 'Номер дорожки должен быть больше нуля';
-              }
-              return null;
-            },
-          ),
+          _buildLaneField(),
           const SizedBox(height: 16),
 
           // Заметки менеджера
@@ -455,6 +454,58 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     );
   }
 
+  Widget _buildLaneField() {
+    final options = _availableLaneNumbers;
+    if (options.isEmpty) {
+      return _buildTextField(
+        label: 'Номер дорожки *',
+        hint: 'Введите номер дорожки',
+        keyboardType: TextInputType.number,
+        controller: _laneController,
+        validator: (value) {
+          if (value == null || value.trim().isEmpty) {
+            return 'Укажите номер дорожки';
+          }
+          final lane = int.tryParse(value.trim());
+          if (lane == null || lane <= 0) {
+            return 'Номер дорожки должен быть больше нуля';
+          }
+          final limit = _laneLimitForSelectedClub();
+          if (limit != null && (lane < 1 || lane > limit)) {
+            return 'Доступно дорожек: $limit';
+          }
+          return null;
+        },
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Номер дорожки *',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<int>(
+          value: _selectedLane,
+          decoration: _inputDecoration(),
+          hint: const Text('Выберите дорожку'),
+          items: options
+              .map(
+                (lane) => DropdownMenuItem<int>(
+                  value: lane,
+                  child: Text('Дорожка $lane'),
+                ),
+              )
+              .toList(),
+          onChanged: (value) => setState(() => _selectedLane = value),
+          validator: (value) => value == null ? 'Выберите дорожку' : null,
+        ),
+      ],
+    );
+  }
+
   Widget _buildTextField({
     required String label,
     required String hint,
@@ -500,6 +551,39 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
         borderSide: const BorderSide(color: AppColors.primary),
       ),
     );
+  }
+
+  UserClub? get _currentClub {
+    final id = _selectedClubId;
+    if (id == null) return null;
+    for (final club in _clubs) {
+      if (club.id == id) return club;
+    }
+    return null;
+  }
+
+  int? _laneLimitForSelectedClub() {
+    final club = _currentClub;
+    if (club == null) return null;
+    return _parseLaneCount(club.lanes);
+  }
+
+  List<int> get _availableLaneNumbers {
+    final limit = _laneLimitForSelectedClub();
+    if (limit == null || limit <= 0) {
+      return const [];
+    }
+    return List<int>.generate(limit, (index) => index + 1);
+  }
+
+  int? _parseLaneCount(String? raw) {
+    if (raw == null) return null;
+    final matches = RegExp(r'\d+').allMatches(raw);
+    if (matches.isEmpty) {
+      return int.tryParse(raw.trim());
+    }
+    final match = matches.first;
+    return int.tryParse(match.group(0)!);
   }
 
   int? _extractMechanicProfileId(Map<String, dynamic>? me) {
