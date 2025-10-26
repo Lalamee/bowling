@@ -138,6 +138,11 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                         padding: const EdgeInsets.only(top: 4),
                         child: Text('Каталожный номер: ${part.catalogNumber}', style: t.formInput),
                       ),
+                    if (part.inventoryLocation != null && part.inventoryLocation!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text('Локация: ${part.inventoryLocation}', style: t.formInput),
+                      ),
                     if (part.quantity != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),

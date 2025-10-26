@@ -9,8 +9,12 @@ import ru.bowling.bowlingapp.Entity.WarehouseInventory;
 import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
 import ru.bowling.bowlingapp.Repository.WarehouseInventoryRepository;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,8 +29,32 @@ public class InventoryServiceImpl implements InventoryService {
     @Override
     public List<PartDto> searchParts(String query, Long clubId) {
         String normalizedQuery = query != null ? query.trim() : "";
+        Integer warehouseIdFilter = clubId != null ? clubId.intValue() : null;
+
         if (normalizedQuery.isEmpty()) {
-            return java.util.Collections.emptyList();
+            List<WarehouseInventory> inventories = warehouseIdFilter != null
+                    ? warehouseInventoryRepository.findByWarehouseId(warehouseIdFilter)
+                    : warehouseInventoryRepository.findByQuantityGreaterThan(0);
+
+            if (inventories.isEmpty()) {
+                return java.util.Collections.emptyList();
+            }
+
+            Set<Long> catalogIds = inventories.stream()
+                    .map(WarehouseInventory::getCatalogId)
+                    .filter(Objects::nonNull)
+                    .map(Long::valueOf)
+                    .collect(Collectors.toSet());
+
+            Map<Long, PartsCatalog> catalogById = partsCatalogRepository.findAllById(catalogIds).stream()
+                    .collect(Collectors.toMap(PartsCatalog::getCatalogId, Function.identity()));
+
+            return inventories.stream()
+                    .filter(inv -> inv.getQuantity() != null && inv.getQuantity() > 0)
+                    .filter(inv -> warehouseIdFilter == null || Objects.equals(inv.getWarehouseId(), warehouseIdFilter))
+                    .map(inv -> convertToDto(catalogById.get(inv.getCatalogId() != null ? inv.getCatalogId().longValue() : null), inv))
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
         }
 
         List<PartsCatalog> parts = partsCatalogRepository.searchByNameOrNumber(normalizedQuery);
@@ -34,30 +62,51 @@ public class InventoryServiceImpl implements InventoryService {
             return java.util.Collections.emptyList();
         }
 
-        Integer warehouseId = clubId != null ? clubId.intValue() : null;
-
-        return parts.stream()
-                .map(part -> convertToDto(part, warehouseId))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+        List<PartDto> results = new ArrayList<>();
+        for (PartsCatalog part : parts) {
+            List<WarehouseInventory> inventories = warehouseInventoryRepository.findByCatalogId(part.getCatalogId().intValue());
+            for (WarehouseInventory inventory : inventories) {
+                if (inventory.getQuantity() == null || inventory.getQuantity() <= 0) {
+                    continue;
+                }
+                if (warehouseIdFilter != null && !Objects.equals(warehouseIdFilter, inventory.getWarehouseId())) {
+                    continue;
+                }
+                PartDto dto = convertToDto(part, inventory);
+                if (dto != null) {
+                    results.add(dto);
+                }
+            }
+        }
+        return results;
     }
 
     @Override
     public PartDto getPartById(Long partId) {
-        PartsCatalog part = partsCatalogRepository.findById(partId)
+        WarehouseInventory inventory = warehouseInventoryRepository.findById(partId)
+                .orElseThrow(() -> new RuntimeException("Part inventory not found"));
+        Integer catalogId = inventory.getCatalogId();
+        if (catalogId == null) {
+            throw new RuntimeException("Inventory item is not linked to a catalog entry");
+        }
+        PartsCatalog part = partsCatalogRepository.findById(Long.valueOf(catalogId))
                 .orElseThrow(() -> new RuntimeException("Part not found"));
-        PartDto dto = convertToDto(part, null);
+        PartDto dto = convertToDto(part, inventory);
         if (dto == null) {
-            return new PartDto(
-                    part.getCatalogId(),
-                    part.getOfficialNameEn(),
-                    part.getOfficialNameRu(),
-                    part.getCommonName(),
-                    part.getDescription(),
-                    part.getCatalogNumber(),
-                    0,
-                    null
-            );
+            return PartDto.builder()
+                    .inventoryId(inventory.getInventoryId())
+                    .catalogId(part.getCatalogId())
+                    .catalogNumber(part.getCatalogNumber())
+                    .officialNameEn(part.getOfficialNameEn())
+                    .officialNameRu(part.getOfficialNameRu())
+                    .commonName(part.getCommonName())
+                    .description(part.getDescription())
+                    .quantity(inventory.getQuantity())
+                    .warehouseId(inventory.getWarehouseId())
+                    .location(inventory.getLocationReference())
+                    .unique(Boolean.TRUE.equals(inventory.getIsUnique()))
+                    .lastChecked(inventory.getLastChecked())
+                    .build();
         }
         return dto;
     }
@@ -92,45 +141,28 @@ public class InventoryServiceImpl implements InventoryService {
         // TODO: Add transaction logging
     }
 
-    private PartDto convertToDto(PartsCatalog part) {
-        return convertToDto(part, null);
-    }
-
-    private PartDto convertToDto(PartsCatalog part, Integer warehouseFilterId) {
-        List<WarehouseInventory> inventories = warehouseInventoryRepository.findByCatalogId(part.getCatalogId().intValue());
-        int totalQuantity = 0;
-        String location = null;
-
-        for (WarehouseInventory inventory : inventories) {
-            Integer quantity = inventory.getQuantity();
-            if (quantity == null || quantity <= 0) {
-                continue;
-            }
-            if (warehouseFilterId != null && !warehouseFilterId.equals(inventory.getWarehouseId())) {
-                continue;
-            }
-            totalQuantity += quantity;
-            if (location == null) {
-                String reference = inventory.getLocationReference();
-                if (reference != null && !reference.isBlank()) {
-                    location = reference;
-                }
-            }
+    private PartDto convertToDto(PartsCatalog part, WarehouseInventory inventory) {
+        if (part == null || inventory == null) {
+            return null;
         }
-
-        if (totalQuantity <= 0) {
+        Integer quantity = inventory.getQuantity();
+        if (quantity == null || quantity <= 0) {
             return null;
         }
 
-        return new PartDto(
-                part.getCatalogId(),
-                part.getOfficialNameEn(),
-                part.getOfficialNameRu(),
-                part.getCommonName(),
-                part.getDescription(),
-                part.getCatalogNumber(),
-                totalQuantity,
-                location
-        );
+        return PartDto.builder()
+                .inventoryId(inventory.getInventoryId())
+                .catalogId(part.getCatalogId())
+                .officialNameEn(part.getOfficialNameEn())
+                .officialNameRu(part.getOfficialNameRu())
+                .commonName(part.getCommonName())
+                .description(part.getDescription())
+                .catalogNumber(part.getCatalogNumber())
+                .quantity(quantity)
+                .location(inventory.getLocationReference())
+                .warehouseId(inventory.getWarehouseId())
+                .unique(Boolean.TRUE.equals(inventory.getIsUnique()))
+                .lastChecked(inventory.getLastChecked())
+                .build();
     }
 }

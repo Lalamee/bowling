@@ -19,7 +19,7 @@ class UserRepository {
           responseType: ResponseType.json,
           headers: {
             'Accept': 'application/json',
-            'Authorization': 'Bearer $token',
+            'Authorization': 'Bearer ${token.trim()}',
           },
         ),
       );

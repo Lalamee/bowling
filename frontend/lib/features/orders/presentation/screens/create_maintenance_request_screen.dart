@@ -115,7 +115,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     final selected = _selectedCatalogPart!;
     final available = selected.quantity;
     final alreadyRequested = requestedParts
-        .where((item) => item.catalogNumber == selected.catalogNumber)
+        .where((item) => item.inventoryId == selected.inventoryId)
         .fold<int>(0, (sum, item) => sum + item.quantity);
     final totalRequested = alreadyRequested + quantity;
 
@@ -125,19 +125,27 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     }
 
     setState(() {
-      final existingIndex = requestedParts.indexWhere((item) => item.catalogNumber == selected.catalogNumber);
+      final existingIndex = requestedParts.indexWhere((item) => item.inventoryId == selected.inventoryId);
       if (existingIndex >= 0) {
         final existing = requestedParts[existingIndex];
         requestedParts[existingIndex] = RequestedPartDto(
+          inventoryId: existing.inventoryId,
+          catalogId: existing.catalogId,
           catalogNumber: existing.catalogNumber,
           partName: existing.partName,
           quantity: totalRequested,
+          warehouseId: existing.warehouseId,
+          location: existing.location,
         );
       } else {
         requestedParts.add(RequestedPartDto(
+          inventoryId: selected.inventoryId,
+          catalogId: selected.catalogId,
           catalogNumber: selected.catalogNumber,
           partName: _resolvePartDisplayName(selected),
           quantity: quantity,
+          warehouseId: selected.warehouseId,
+          location: selected.location,
         ));
       }
       _catalogNumberController.clear();
@@ -496,6 +504,11 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
                                   'Кат. №: ${part.catalogNumber}',
                                   style: const TextStyle(fontSize: 12, color: AppColors.darkGray),
                                 ),
+                                if (part.location != null && part.location!.isNotEmpty)
+                                  Text(
+                                    'Локация: ${part.location}',
+                                    style: const TextStyle(fontSize: 12, color: AppColors.darkGray),
+                                  ),
                                 Text(
                                   'Кол-во: ${part.quantity}',
                                   style: const TextStyle(fontSize: 12, color: AppColors.darkGray),

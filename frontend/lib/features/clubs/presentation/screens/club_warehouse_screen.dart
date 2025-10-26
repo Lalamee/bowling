@@ -123,7 +123,7 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
     final current = _selectedPart;
     if (current != null) {
       for (final part in data) {
-        if (part.id == current.id) {
+        if (part.inventoryId == current.inventoryId) {
           return part;
         }
       }
@@ -206,7 +206,7 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
               child: _InventoryItemTile(
                 title: _partDisplayName(part),
                 part: part,
-                selected: _selectedPart?.id == part.id,
+                selected: _selectedPart?.inventoryId == part.inventoryId,
                 onTap: () => _selectPart(part),
               ),
             );

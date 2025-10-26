@@ -295,6 +295,16 @@ class _ExpandedOrderCard extends StatelessWidget {
                         part.partName ?? part.catalogNumber ?? 'Неизвестная деталь',
                         style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textDark),
                       ),
+                      if (part.catalogNumber != null && part.catalogNumber!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text('Каталожный номер: ${part.catalogNumber}', style: const TextStyle(color: AppColors.darkGray)),
+                        ),
+                      if (part.inventoryLocation != null && part.inventoryLocation!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text('Локация: ${part.inventoryLocation}', style: const TextStyle(color: AppColors.darkGray)),
+                        ),
                       if (part.quantity != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
