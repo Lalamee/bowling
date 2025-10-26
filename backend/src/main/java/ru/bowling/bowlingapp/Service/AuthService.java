@@ -355,7 +355,7 @@ public class AuthService implements UserDetailsService {
         response.put("id", user.getUserId());
         response.put("phone", user.getPhone());
         response.put("roleId", user.getRole() != null ? user.getRole().getRoleId() : null);
-        response.put("role", user.getRole() != null ? user.getRole().getName() : null);
+        response.put("role", mapRoleNameForResponse(user.getRole()));
         response.put("accountTypeId", user.getAccountType() != null ? user.getAccountType().getAccountTypeId() : null);
         response.put("accountType", user.getAccountType() != null ? user.getAccountType().getName() : null);
         response.put("isVerified", user.getIsVerified());
@@ -680,7 +680,7 @@ public class AuthService implements UserDetailsService {
                 return roleByName("MECHANIC");
             }
             if (isManagerAccountType(normalized)) {
-                return roleByName("MANAGER");
+                return roleByName("HEAD_MECHANIC");
             }
         }
 
@@ -843,6 +843,36 @@ public class AuthService implements UserDetailsService {
         if (!alreadyLinked) {
             ownerProfile.getClubs().add(savedClub);
         }
+    }
+
+    private String mapRoleNameForResponse(Role role) {
+        if (role == null || role.getName() == null) {
+            return null;
+        }
+        return mapRoleNameForResponse(role.getName());
+    }
+
+    private String mapRoleNameForResponse(String roleName) {
+        if (roleName == null) {
+            return null;
+        }
+        String normalized = normalizeRoleName(roleName);
+        if (normalized == null) {
+            return roleName;
+        }
+        if (normalized.contains("HEADMECHANIC")
+                || normalized.contains("CHIEFMECHANIC")
+                || normalized.contains("GLAVNYIMECHANIK")) {
+            return "MANAGER";
+        }
+        return roleName;
+    }
+
+    private String normalizeRoleName(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.replaceAll("[\\s_\\-]", "").toUpperCase(Locale.ROOT);
     }
 
     private List<BowlingClub> resolveOwnerClubs(OwnerProfile profile) {

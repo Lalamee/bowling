@@ -327,17 +327,17 @@ public class ClubStaffService {
     }
 
     private String staffRoleToResponse(StaffRole staffRole, Role role) {
+        String result = null;
         if (staffRole != null) {
-            return switch (staffRole) {
-                case MANAGER -> "HEAD_MECHANIC";
+            result = switch (staffRole) {
+                case MANAGER -> "MANAGER";
                 case MECHANIC -> "MECHANIC";
                 case ADMINISTRATOR -> "ADMIN";
             };
+        } else if (role != null && role.getName() != null) {
+            result = role.getName();
         }
-        if (role != null && role.getName() != null) {
-            return role.getName();
-        }
-        return null;
+        return mapRoleNameForResponse(result);
     }
 
     private StaffRole resolveStaffRole(String role) {
@@ -464,9 +464,24 @@ public class ClubStaffService {
     private Role resolveManagerRole() {
         return resolveRole(ROLE_HEAD_MECHANIC_ID,
                 "HEAD_MECHANIC",
-                "MANAGER",
-                "Менеджер",
+                "CHIEF_MECHANIC",
                 "Главный механик");
+    }
+
+    private String mapRoleNameForResponse(String roleName) {
+        if (roleName == null) {
+            return null;
+        }
+        String normalized = normalizeRoleName(roleName);
+        if (normalized == null) {
+            return roleName;
+        }
+        if (normalized.contains("HEADMECHANIC")
+                || normalized.contains("CHIEFMECHANIC")
+                || normalized.contains("GLAVNYIMECHANIK")) {
+            return "MANAGER";
+        }
+        return roleName;
     }
 
     private AccountType resolveMechanicAccountType() {
