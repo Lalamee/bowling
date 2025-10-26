@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../debug/test_overrides.dart';
+import '../services/local_auth_storage.dart';
 
 import '../../features/orders/presentation/screens/orders_screen.dart';
 import '../../features/orders/presentation/screens/manager_orders_history_screen.dart';
@@ -17,35 +18,55 @@ class BottomNavDirect {
   static void go(BuildContext context, int current, int tapped) {
     if (tapped == current) return;
 
-    final role = TestOverrides.userRole.toLowerCase();
+    () async {
+      final role = await _resolveRole();
 
-    switch (tapped) {
-      case 0:
-        if (role == 'manager') {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ManagerOrdersHistoryScreen()));
-        } else if (role == 'admin') {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminOrdersScreen()));
-        } else {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OrdersScreen()));
-        }
-        break;
-      case 1:
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CatalogSearchScreen()));
-        break;
-      case 2:
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ClubScreen()));
-        break;
-      case 3:
-        if (role == 'owner') {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OwnerProfileScreen()));
-        } else if (role == 'manager') {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ManagerProfileScreen()));
-        } else if (role == 'admin') {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminProfileScreen()));
-        } else {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MechanicProfileScreen()));
-        }
-        break;
+      switch (tapped) {
+        case 0:
+          if (role == 'manager') {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ManagerOrdersHistoryScreen()));
+          } else if (role == 'admin') {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminOrdersScreen()));
+          } else {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OrdersScreen()));
+          }
+          break;
+        case 1:
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CatalogSearchScreen()));
+          break;
+        case 2:
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ClubScreen()));
+          break;
+        case 3:
+          if (role == 'owner') {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OwnerProfileScreen()));
+          } else if (role == 'manager') {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ManagerProfileScreen()));
+          } else if (role == 'admin') {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminProfileScreen()));
+          } else {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MechanicProfileScreen()));
+          }
+          break;
+      }
+    }();
+  }
+
+  static Future<String> _resolveRole() async {
+    if (TestOverrides.enabled) {
+      final forced = TestOverrides.userRole.trim().toLowerCase();
+      if (forced.isNotEmpty) {
+        return forced;
+      }
     }
+
+    final stored = await LocalAuthStorage.getRegisteredRole();
+    final normalized = stored?.trim().toLowerCase();
+    if (normalized != null && normalized.isNotEmpty) {
+      return normalized;
+    }
+
+    final fallback = TestOverrides.userRole.trim().toLowerCase();
+    return fallback.isNotEmpty ? fallback : 'mechanic';
   }
 }

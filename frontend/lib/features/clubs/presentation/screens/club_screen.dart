@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/models/user_club.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/routing/routes.dart';
@@ -7,6 +8,7 @@ import '../../../../core/services/auth_service.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
+import '../../../../core/utils/user_club_resolver.dart';
 import '../../../../models/maintenance_request_response_dto.dart';
 import '../../../../shared/widgets/buttons/custom_button.dart';
 import '../../../../shared/widgets/layout/common_ui.dart';
@@ -27,7 +29,7 @@ class _ClubScreenState extends State<ClubScreen> {
 
   bool _isLoading = true;
   bool _hasError = false;
-  List<_ClubInfo> _clubs = const [];
+  List<UserClub> _clubs = const [];
   int? _selectedIndex;
 
   @override
@@ -44,7 +46,7 @@ class _ClubScreenState extends State<ClubScreen> {
     try {
       final me = await _userRepository.me();
       if (!mounted) return;
-      final clubs = _extractClubs(me);
+      final clubs = resolveUserClubs(me);
       setState(() {
         _clubs = clubs;
         _selectedIndex = clubs.isNotEmpty ? 0 : null;
@@ -66,94 +68,6 @@ class _ClubScreenState extends State<ClubScreen> {
     Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
   }
 
-  List<_ClubInfo> _extractClubs(Map<String, dynamic>? data) {
-    if (data == null) return const [];
-    final result = <_ClubInfo>[];
-    final seenIds = <int>{};
-    final seenNames = <String>{};
-
-    void addClub({int? id, required String name, String? address, String? lanes, String? equipment}) {
-      final trimmed = name.trim();
-      if (trimmed.isEmpty) return;
-      if (id != null) {
-        if (!seenIds.add(id)) return;
-      } else {
-        final key = trimmed.toLowerCase();
-        if (!seenNames.add(key)) return;
-      }
-      result.add(_ClubInfo(id: id, name: trimmed, address: address, lanes: lanes, equipment: equipment));
-    }
-
-    final ownerProfile = data['ownerProfile'];
-    if (ownerProfile is Map) {
-      final map = Map<String, dynamic>.from(ownerProfile);
-      final detailed = map['clubsDetailed'];
-      if (detailed is Iterable) {
-        for (final entry in detailed) {
-          if (entry is Map) {
-            final club = Map<String, dynamic>.from(entry);
-            addClub(
-              id: (club['id'] as num?)?.toInt(),
-              name: (club['name'] ?? '') as String,
-              address: club['address']?.toString(),
-              lanes: club['lanes']?.toString(),
-              equipment: club['equipment']?.toString(),
-            );
-          }
-        }
-      }
-      final clubName = map['clubName']?.toString();
-      if (clubName != null) {
-        addClub(
-          id: (map['clubId'] as num?)?.toInt(),
-          name: clubName,
-          address: map['address']?.toString() ?? map['legalAddress']?.toString(),
-          lanes: map['lanes']?.toString(),
-          equipment: map['equipment']?.toString(),
-        );
-      }
-    }
-
-    final managerProfile = data['managerProfile'];
-    if (managerProfile is Map) {
-      final map = Map<String, dynamic>.from(managerProfile);
-      final clubs = map['clubs'];
-      if (clubs is Iterable) {
-        for (final raw in clubs) {
-          if (raw == null) continue;
-          addClub(id: (map['clubId'] as num?)?.toInt(), name: raw.toString(), address: map['address']?.toString());
-        }
-      }
-      final clubName = map['clubName']?.toString();
-      if (clubName != null) {
-        addClub(id: (map['clubId'] as num?)?.toInt(), name: clubName, address: map['address']?.toString());
-      }
-    }
-
-    final mechanicProfile = data['mechanicProfile'];
-    if (mechanicProfile is Map) {
-      final map = Map<String, dynamic>.from(mechanicProfile);
-      final clubs = map['clubs'];
-      if (clubs is Iterable) {
-        for (final raw in clubs) {
-          if (raw == null) continue;
-          addClub(id: (map['clubId'] as num?)?.toInt(), name: raw.toString(), address: map['address']?.toString());
-        }
-      }
-      final clubName = map['clubName']?.toString();
-      if (clubName != null) {
-        addClub(id: (map['clubId'] as num?)?.toInt(), name: clubName, address: map['address']?.toString());
-      }
-    }
-
-    final fallbackName = data['clubName']?.toString();
-    if (fallbackName != null) {
-      addClub(id: (data['clubId'] as num?)?.toInt(), name: fallbackName, address: data['address']?.toString());
-    }
-
-    return result;
-  }
-
   void _onSelect(int index) {
     if (_selectedIndex == index) return;
     setState(() => _selectedIndex = index);
@@ -169,15 +83,10 @@ class _ClubScreenState extends State<ClubScreen> {
       showSnack(context, 'Выберите клуб');
       return;
     }
-    if (selected.id == null) {
-      showSnack(context, 'Для выбранного клуба отсутствует идентификатор');
-      return;
-    }
-
     final selectedOrder = await showModalBottomSheet<MaintenanceRequestResponseDto>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _OrderSelectionSheet(clubId: selected.id!, clubName: selected.name),
+      builder: (_) => _OrderSelectionSheet(clubId: selected.id, clubName: selected.name),
     );
 
     if (!mounted || selectedOrder == null) return;
@@ -285,7 +194,7 @@ class _ClubScreenState extends State<ClubScreen> {
 }
 
 class _ClubDetailsCard extends StatelessWidget {
-  final _ClubInfo club;
+  final UserClub club;
 
   const _ClubDetailsCard({required this.club});
 
@@ -309,6 +218,14 @@ class _ClubDetailsCard extends StatelessWidget {
           if (club.equipment != null && club.equipment!.trim().isNotEmpty) ...[
             const SizedBox(height: 8),
             _InfoRow(icon: Icons.memory_rounded, label: 'Оборудование', value: club.equipment!),
+          ],
+          if (club.phone != null && club.phone!.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _InfoRow(icon: Icons.phone, label: 'Телефон', value: club.phone!),
+          ],
+          if (club.email != null && club.email!.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _InfoRow(icon: Icons.email_outlined, label: 'Email', value: club.email!),
           ],
         ],
       ),
@@ -522,18 +439,3 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _ClubInfo {
-  final int? id;
-  final String name;
-  final String? address;
-  final String? lanes;
-  final String? equipment;
-
-  const _ClubInfo({
-    this.id,
-    required this.name,
-    this.address,
-    this.lanes,
-    this.equipment,
-  });
-}
