@@ -14,7 +14,7 @@ public class InvitationController {
     private final InvitationService invitationService;
 
     @PostMapping("/club/{clubId}/mechanic/{mechanicId}")
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAnyRole('OWNER', 'CLUB_OWNER')")
     public ResponseEntity<?> inviteMechanic(@PathVariable Long clubId, @PathVariable Long mechanicId) {
         invitationService.inviteMechanic(clubId, mechanicId);
         return ResponseEntity.ok().build();
