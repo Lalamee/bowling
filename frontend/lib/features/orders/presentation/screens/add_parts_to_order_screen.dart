@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../../core/repositories/inventory_repository.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../models/maintenance_request_response_dto.dart';
 import '../../../../models/part_request_dto.dart';
+import '../../../../models/part_dto.dart';
 import '../../../../shared/widgets/buttons/custom_button.dart';
 
 class AddPartsToOrderScreen extends StatefulWidget {
@@ -17,22 +21,28 @@ class AddPartsToOrderScreen extends StatefulWidget {
 }
 
 class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
+  final _partNameController = TextEditingController();
   final _catalogController = TextEditingController();
-  final _nameController = TextEditingController();
   final _quantityController = TextEditingController();
   final _partFormKey = GlobalKey<FormState>();
   final _repository = MaintenanceRepository();
+  final _inventoryRepository = InventoryRepository();
 
   final List<RequestedPartDto> _pendingParts = [];
   bool _isSubmitting = false;
+  bool _isSearchingParts = false;
+  List<PartDto> _partSuggestions = const [];
+  PartDto? _selectedCatalogPart;
+  Timer? _partsSearchDebounce;
 
   MaintenanceRequestResponseDto get order => widget.order;
 
   @override
   void dispose() {
     _catalogController.dispose();
-    _nameController.dispose();
+    _partNameController.dispose();
     _quantityController.dispose();
+    _partsSearchDebounce?.cancel();
     super.dispose();
   }
 
@@ -60,25 +70,19 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildTextField(
-                  label: 'Каталожный номер *',
-                  hint: 'Введите каталожный номер',
-                  controller: _catalogController,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Укажите каталожный номер';
-                    }
-                    return null;
-                  },
-                ),
+                _buildPartNameSelector(),
                 const SizedBox(height: 16),
                 _buildTextField(
-                  label: 'Название детали *',
-                  hint: 'Введите название',
-                  controller: _nameController,
+                  label: 'Каталожный номер',
+                  hint: 'Будет заполнен автоматически',
+                  controller: _catalogController,
+                  readOnly: true,
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Укажите название детали';
+                    if (_pendingParts.isNotEmpty) {
+                      return null;
+                    }
+                    if (_selectedCatalogPart == null) {
+                      return 'Выберите запчасть из каталога';
                     }
                     return null;
                   },
@@ -131,18 +135,61 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
       return;
     }
 
-    final quantity = int.parse(_quantityController.text.trim());
+    final selected = _selectedCatalogPart;
+    if (selected == null) {
+      showSnack(context, 'Выберите запчасть из каталога');
+      return;
+    }
+
+    final quantity = int.tryParse(_quantityController.text.trim());
+    if (quantity == null || quantity <= 0) {
+      showSnack(context, 'Количество должно быть больше нуля');
+      return;
+    }
+
+    final available = selected.quantity;
+    final alreadyRequested = _pendingParts
+        .where((item) => item.inventoryId == selected.inventoryId)
+        .fold<int>(0, (sum, item) => sum + item.quantity);
+    final totalRequested = alreadyRequested + quantity;
+
+    if (available != null && totalRequested > available) {
+      showSnack(context, 'На складе доступно только $available шт.');
+      return;
+    }
+
     setState(() {
-      _pendingParts.add(
-        RequestedPartDto(
-          catalogNumber: _catalogController.text.trim(),
-          partName: _nameController.text.trim(),
-          quantity: quantity,
-        ),
-      );
+      final existingIndex = _pendingParts.indexWhere((item) => item.inventoryId == selected.inventoryId);
+      if (existingIndex >= 0) {
+        final existing = _pendingParts[existingIndex];
+        _pendingParts[existingIndex] = RequestedPartDto(
+          inventoryId: existing.inventoryId,
+          catalogId: existing.catalogId,
+          catalogNumber: existing.catalogNumber,
+          partName: existing.partName,
+          quantity: totalRequested,
+          warehouseId: existing.warehouseId,
+          location: existing.location,
+        );
+      } else {
+        _pendingParts.add(
+          RequestedPartDto(
+            inventoryId: selected.inventoryId,
+            catalogId: selected.catalogId,
+            catalogNumber: selected.catalogNumber,
+            partName: _resolvePartDisplayName(selected),
+            quantity: quantity,
+            warehouseId: selected.warehouseId,
+            location: selected.location,
+          ),
+        );
+      }
+
+      _partNameController.clear();
       _catalogController.clear();
-      _nameController.clear();
       _quantityController.clear();
+      _selectedCatalogPart = null;
+      _partSuggestions = const [];
     });
   }
 
@@ -186,6 +233,8 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
     required TextEditingController controller,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
+    bool readOnly = false,
+    void Function(String)? onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -198,7 +247,9 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
+          readOnly: readOnly,
           validator: validator,
+          onChanged: onChanged,
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
@@ -219,6 +270,153 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildPartNameSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Название детали *',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _partNameController,
+          decoration: InputDecoration(
+            hintText: 'Начните вводить название запчасти',
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.lightGray),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.lightGray),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.primary),
+            ),
+          ),
+          validator: (value) {
+            if (_pendingParts.isNotEmpty) {
+              return null;
+            }
+            if (_selectedCatalogPart == null) {
+              return 'Выберите запчасть из каталога';
+            }
+            return null;
+          },
+          onChanged: _onPartNameChanged,
+        ),
+        if (_isSearchingParts)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: LinearProgressIndicator(minHeight: 2),
+          ),
+        if (_partSuggestions.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.lightGray),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemBuilder: (context, index) {
+                final part = _partSuggestions[index];
+                final quantity = part.quantity;
+                final subtitleBuffer = StringBuffer(part.catalogNumber);
+                if (quantity != null) {
+                  subtitleBuffer.write(' · Остаток: $quantity');
+                }
+                if (part.location != null && part.location!.trim().isNotEmpty) {
+                  subtitleBuffer.write(' · ${part.location!.trim()}');
+                }
+                return ListTile(
+                  leading: const Icon(Icons.settings_suggest_rounded, color: AppColors.primary),
+                  title: Text(_resolvePartDisplayName(part)),
+                  subtitle: Text(subtitleBuffer.toString()),
+                  onTap: () => _selectSuggestedPart(part),
+                );
+              },
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemCount: _partSuggestions.length,
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _onPartNameChanged(String value) {
+    _partsSearchDebounce?.cancel();
+    _selectedCatalogPart = null;
+    _catalogController.clear();
+    final trimmed = value.trim();
+    if (trimmed.length < 2) {
+      setState(() {
+        _partSuggestions = const [];
+        _isSearchingParts = false;
+      });
+      return;
+    }
+    _partsSearchDebounce = Timer(const Duration(milliseconds: 350), () {
+      _searchParts(trimmed);
+    });
+  }
+
+  Future<void> _searchParts(String query) async {
+    setState(() {
+      _isSearchingParts = true;
+    });
+    try {
+      final results = await _inventoryRepository.search(
+        query,
+        clubId: order.clubId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _partSuggestions = results.take(10).toList();
+        _isSearchingParts = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _partSuggestions = const [];
+        _isSearchingParts = false;
+      });
+    }
+  }
+
+  void _selectSuggestedPart(PartDto part) {
+    _partsSearchDebounce?.cancel();
+    setState(() {
+      _selectedCatalogPart = part;
+      _partNameController.text = _resolvePartDisplayName(part);
+      _catalogController.text = part.catalogNumber;
+      _partSuggestions = const [];
+    });
+  }
+
+  String _resolvePartDisplayName(PartDto part) {
+    final candidates = [part.commonName, part.officialNameRu, part.officialNameEn];
+    for (final candidate in candidates) {
+      if (candidate != null && candidate.trim().isNotEmpty) {
+        return candidate.trim();
+      }
+    }
+    return part.catalogNumber;
   }
 }
 
@@ -301,6 +499,11 @@ class _ExistingPartsList extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 4),
                     child: Text('Каталожный номер: ${part.catalogNumber}', style: const TextStyle(color: AppColors.darkGray)),
                   ),
+                if (part.inventoryLocation != null && part.inventoryLocation!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text('Локация: ${part.inventoryLocation}', style: const TextStyle(color: AppColors.darkGray)),
+                  ),
                 if (part.quantity != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -357,6 +560,10 @@ class _PendingPartsList extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text('Каталожный номер: ${part.catalogNumber}', style: const TextStyle(color: AppColors.darkGray)),
                       const SizedBox(height: 4),
+                      if (part.location != null && part.location!.isNotEmpty) ...[
+                        Text('Локация: ${part.location}', style: const TextStyle(color: AppColors.darkGray)),
+                        const SizedBox(height: 4),
+                      ],
                       Text('Количество: ${part.quantity}', style: const TextStyle(color: AppColors.darkGray)),
                     ],
                   ),

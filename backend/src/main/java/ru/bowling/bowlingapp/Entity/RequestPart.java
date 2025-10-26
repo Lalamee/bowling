@@ -36,6 +36,18 @@ public class RequestPart {
     @Column(name = "quantity")
     private Integer quantity;
 
+    @Column(name = "inventory_id")
+    private Long inventoryId;
+
+    @Column(name = "catalog_id")
+    private Long catalogId;
+
+    @Column(name = "warehouse_id")
+    private Integer warehouseId;
+
+    @Column(name = "inventory_location")
+    private String inventoryLocation;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     private PartStatus status;

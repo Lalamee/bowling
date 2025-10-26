@@ -18,38 +18,38 @@ public class MaintenanceRequestController {
     private final MaintenanceRequestService maintenanceRequestService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('MECHANIC', 'CHIEF_MECHANIC', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('MECHANIC', 'CHIEF_MECHANIC', 'HEAD_MECHANIC', 'ADMIN')")
     public ResponseEntity<MaintenanceRequestResponseDTO> createRequest(@RequestBody PartRequestDTO requestDTO) {
         MaintenanceRequestResponseDTO response = maintenanceRequestService.createPartRequest(requestDTO);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CHIEF_MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'CHIEF_MECHANIC', 'HEAD_MECHANIC', 'STAFF')")
     public ResponseEntity<List<MaintenanceRequestResponseDTO>> getAllRequests() {
         return ResponseEntity.ok(maintenanceRequestService.getAllRequests());
     }
 
     @GetMapping("/status/{status}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CHIEF_MECHANIC', 'MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'CHIEF_MECHANIC', 'HEAD_MECHANIC', 'MECHANIC', 'STAFF')")
     public ResponseEntity<List<MaintenanceRequestResponseDTO>> getRequestsByStatus(@PathVariable String status) {
         return ResponseEntity.ok(maintenanceRequestService.getRequestsByStatus(status));
     }
 
     @GetMapping("/mechanic/{mechanicId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CHIEF_MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'CHIEF_MECHANIC', 'HEAD_MECHANIC', 'STAFF')")
     public ResponseEntity<List<MaintenanceRequestResponseDTO>> getRequestsByMechanic(@PathVariable Long mechanicId) {
         return ResponseEntity.ok(maintenanceRequestService.getRequestsByMechanic(mechanicId));
     }
 
     @PatchMapping("/{requestId}/approve")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'STAFF')")
     public ResponseEntity<MaintenanceRequestResponseDTO> approveRequest(@PathVariable Long requestId, @RequestBody(required = false) String managerNotes) {
         return ResponseEntity.ok(maintenanceRequestService.approveRequest(requestId, managerNotes));
     }
 
     @PatchMapping("/{requestId}/reject")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'STAFF')")
     public ResponseEntity<MaintenanceRequestResponseDTO> rejectRequest(@PathVariable Long requestId, @RequestBody(required = false) String managerNotes) {
         return ResponseEntity.ok(maintenanceRequestService.rejectRequest(requestId, managerNotes));
     }

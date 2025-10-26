@@ -67,13 +67,6 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
       }
       final me = await _repo.me();
       if (!mounted) return;
-      if (me == null) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
-        return;
-      }
       final cache = _mapApiToCache(me);
       await LocalAuthStorage.saveOwnerProfile(cache);
       if (!mounted) return;

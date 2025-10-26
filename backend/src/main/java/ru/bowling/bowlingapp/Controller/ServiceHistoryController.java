@@ -21,14 +21,14 @@ public class ServiceHistoryController {
     private final ServiceHistoryService serviceHistoryService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'STAFF')")
     public ResponseEntity<ServiceHistoryDTO> createServiceHistory(@RequestBody ServiceHistoryDTO dto, @AuthenticationPrincipal UserPrincipal userPrincipal) {
         ServiceHistory serviceHistory = serviceHistoryService.createServiceRecord(convertToEntity(dto), userPrincipal.getId());
         return ResponseEntity.ok(convertToDto(serviceHistory));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'MECHANIC', 'STAFF')")
     public ResponseEntity<ServiceHistoryDTO> getServiceHistory(@PathVariable Long id) {
         ServiceHistory serviceHistory = serviceHistoryService.getServiceHistoryById(id)
                 .orElseThrow(() -> new RuntimeException("ServiceHistory not found"));
@@ -36,7 +36,7 @@ public class ServiceHistoryController {
     }
 
     @GetMapping("/club/{clubId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'STAFF')")
     public ResponseEntity<List<ServiceHistoryDTO>> getServiceHistoryByClub(@PathVariable Long clubId) {
         List<ServiceHistory> histories = serviceHistoryService.getServiceHistoryByClub(clubId);
         return ResponseEntity.ok(histories.stream().map(this::convertToDto).collect(Collectors.toList()));

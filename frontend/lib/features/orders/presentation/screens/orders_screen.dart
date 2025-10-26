@@ -4,6 +4,7 @@ import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/routing/routes.dart';
 import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/local_auth_storage.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
@@ -11,6 +12,8 @@ import '../../../../core/utils/user_club_resolver.dart';
 import '../../../../core/models/user_club.dart';
 import '../../../../models/maintenance_request_response_dto.dart';
 import '../../../../shared/widgets/nav/app_bottom_nav.dart';
+import '../../domain/order_status.dart';
+import '../widgets/order_status_badge.dart';
 import 'order_summary_screen.dart';
 
 
@@ -32,14 +35,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
   int? _selectedLane;
   int? _expandedIndex;
   _OrdersFilter _filter = _OrdersFilter.all;
+  String? _role;
+  final Set<int> _pendingRequestIds = <int>{};
 
-  static const Set<String> _archiveStatuses = {
-    'DONE',
-    'COMPLETED',
-    'CLOSED',
-    'UNREPAIRABLE',
-    'REJECTED',
-  };
+  bool get _isMechanic => (_role ?? 'mechanic') == 'mechanic';
+  bool get _isManagerLike => _role == 'manager' || _role == 'owner';
 
   @override
   Widget build(BuildContext context) {
@@ -175,27 +175,24 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ...List.generate(requests.length, (index) {
                     final request = requests[index];
                     final isExpanded = _expandedIndex == index;
+                    final statusCategory = mapOrderStatus(request.status);
+                    final canConfirm = _canConfirmRequest(request);
+                    final confirmInProgress = _pendingRequestIds.contains(request.requestId);
                     return Padding(
                       padding: EdgeInsets.only(bottom: index == requests.length - 1 ? 0 : 12),
                       child: _OrderCard(
                         request: request,
                         expanded: isExpanded,
+                        statusCategory: statusCategory,
+                        canConfirm: canConfirm,
+                        confirmInProgress: confirmInProgress,
                         onToggle: () {
                           setState(() {
                             _expandedIndex = isExpanded ? null : index;
                           });
                         },
-                        onOpenSummary: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => OrderSummaryScreen(
-                                orderNumber: 'Заявка №${request.requestId}',
-                                order: request,
-                              ),
-                            ),
-                          );
-                        },
+                        onOpenSummary: () => _openSummary(request),
+                        onConfirm: canConfirm ? () => _openSummary(request) : null,
                       ),
                     );
                   }),
@@ -205,7 +202,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ),
         ),
       ),
-      floatingActionButton: _clubs.isEmpty
+      floatingActionButton: (!_isMechanic || _clubs.isEmpty)
           ? null
           : FloatingActionButton(
               onPressed: _openCreateRequest,
@@ -232,12 +229,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
     });
     try {
       final me = await _userRepository.me();
+      final resolvedRole = await _resolveRole(me);
       if (!mounted) return;
       final clubs = resolveUserClubs(me);
       final selectedClubId = _resolveSelectedClubId(clubs, _selectedClubId);
       final requests = await _fetchRequestsForClubs(clubs);
       if (!mounted) return;
       setState(() {
+        _role = resolvedRole;
         _clubs = clubs;
         _selectedClubId = selectedClubId;
         _allRequests = requests;
@@ -297,8 +296,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       final archive = _filter == _OrdersFilter.archive;
       base = base
           .where((request) {
-            final status = request.status?.toUpperCase();
-            final isArchived = status != null && _archiveStatuses.contains(status);
+            final isArchived = isArchivedStatus(request.status);
             return archive ? isArchived : !isArchived;
           })
           .toList();
@@ -329,6 +327,91 @@ class _OrdersScreenState extends State<OrdersScreen> {
     return clubs.first.id;
   }
 
+  bool _canConfirmRequest(MaintenanceRequestResponseDto request) {
+    if (!_isManagerLike) return false;
+    return mapOrderStatus(request.status) == OrderStatusCategory.pending;
+  }
+
+  bool? _guessAvailabilityFromNotes(String? notes) {
+    if (notes == null) return null;
+    final normalized = notes.toLowerCase();
+    if (normalized.contains('нет') && normalized.contains('детал')) {
+      return false;
+    }
+    if (normalized.contains('есть') && normalized.contains('детал')) {
+      return true;
+    }
+    return null;
+  }
+
+  Future<bool> _confirmRequest(
+    MaintenanceRequestResponseDto request, {
+    required bool partsAvailable,
+    String? comment,
+  }) async {
+    final noteParts = <String>[
+      partsAvailable ? 'Детали в наличии' : 'Деталей нет',
+    ];
+    if (comment != null && comment.trim().isNotEmpty) {
+      noteParts.add(comment.trim());
+    }
+    final payload = noteParts.join('. ');
+
+    setState(() {
+      _pendingRequestIds.add(request.requestId);
+    });
+
+    try {
+      final updated = await _maintenanceRepository.approve(request.requestId, payload);
+      if (!mounted) return true;
+      setState(() {
+        _pendingRequestIds.remove(request.requestId);
+        if (updated != null) {
+          final index = _allRequests.indexWhere((e) => e.requestId == updated.requestId);
+          if (index != -1) {
+            _allRequests[index] = updated;
+          } else {
+            _allRequests = [..._allRequests, updated];
+          }
+          _sortRequests(_allRequests);
+        }
+      });
+      if (mounted) {
+        showSnack(context, 'Заказ подтверждён');
+      }
+      return true;
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _pendingRequestIds.remove(request.requestId);
+        });
+        showApiError(context, e);
+      }
+      return false;
+    }
+  }
+
+  Future<void> _openSummary(MaintenanceRequestResponseDto request) async {
+    final canConfirm = _canConfirmRequest(request);
+    final initialAvailability = _guessAvailabilityFromNotes(request.managerNotes);
+
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OrderSummaryScreen(
+          orderNumber: 'Заявка №${request.requestId}',
+          order: request,
+          canConfirm: canConfirm,
+          initialAvailability: initialAvailability,
+          onConfirm: canConfirm
+              ? ({required bool partsAvailable, String? comment}) =>
+                  _confirmRequest(request, partsAvailable: partsAvailable, comment: comment)
+              : null,
+        ),
+      ),
+    );
+  }
+
   Future<List<MaintenanceRequestResponseDto>> _fetchRequestsForClubs(List<UserClub> clubs) async {
     if (clubs.isEmpty) {
       return const [];
@@ -349,7 +432,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
       }
     }
 
-    combined.sort((a, b) {
+    _sortRequests(combined);
+
+    return combined;
+  }
+
+  void _sortRequests(List<MaintenanceRequestResponseDto> list) {
+    list.sort((a, b) {
       final aDate = a.requestDate;
       final bDate = b.requestDate;
       if (aDate == null && bDate == null) {
@@ -359,8 +448,72 @@ class _OrdersScreenState extends State<OrdersScreen> {
       if (bDate == null) return -1;
       return bDate.compareTo(aDate);
     });
+  }
 
-    return combined;
+  Future<String> _resolveRole(Map<String, dynamic> me) async {
+    String? mapRole(String? value) {
+      final normalized = value?.toLowerCase().trim();
+      if (normalized == null || normalized.isEmpty) return null;
+      if (normalized.contains('admin') || normalized.contains('админ')) return 'admin';
+      if (normalized.contains('owner') || normalized.contains('влад')) return 'owner';
+      if (normalized.contains('manager') || normalized.contains('менедж') || normalized.contains('chief') || normalized.contains('head')) {
+        return 'manager';
+      }
+      if (normalized.contains('mechanic') || normalized.contains('механ')) return 'mechanic';
+      return null;
+    }
+
+    String? resolved;
+
+    resolved ??= mapRole(me['accountTypeName']?.toString());
+    resolved ??= mapRole(me['accountType']?.toString());
+
+    final role = me['role'];
+    if (resolved == null && role is Map) {
+      resolved = mapRole(role['name']?.toString()) ?? mapRole(role['roleName']?.toString()) ?? mapRole(role['key']?.toString());
+    } else if (resolved == null && role is String) {
+      resolved = mapRole(role);
+    }
+
+    resolved ??= mapRole(me['roleName']?.toString());
+    resolved ??= mapRole(me['roleKey']?.toString());
+
+    final roleId = (me['roleId'] as num?)?.toInt();
+    if (resolved == null && roleId != null) {
+      switch (roleId) {
+        case 1:
+          resolved = 'admin';
+          break;
+        case 4:
+          resolved = 'mechanic';
+          break;
+        case 5:
+          resolved = 'owner';
+          break;
+        case 6:
+          resolved = 'manager';
+          break;
+      }
+    }
+
+    final accountTypeId = (me['accountTypeId'] as num?)?.toInt();
+    if (resolved == null && accountTypeId != null) {
+      switch (accountTypeId) {
+        case 2:
+          resolved = 'owner';
+          break;
+        case 1:
+          resolved = 'mechanic';
+          break;
+      }
+    }
+
+    if (resolved == null) {
+      final stored = await LocalAuthStorage.getRegisteredRole();
+      resolved = stored?.toLowerCase();
+    }
+
+    return resolved ?? 'mechanic';
   }
 
   Widget _statusFilterChips() {
@@ -489,14 +642,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
 class _OrderCard extends StatelessWidget {
   final MaintenanceRequestResponseDto request;
   final bool expanded;
+  final OrderStatusCategory statusCategory;
+  final bool canConfirm;
+  final bool confirmInProgress;
   final VoidCallback onToggle;
   final VoidCallback onOpenSummary;
+  final VoidCallback? onConfirm;
 
   const _OrderCard({
     required this.request,
     required this.expanded,
+    required this.statusCategory,
+    required this.canConfirm,
+    required this.confirmInProgress,
     required this.onToggle,
     required this.onOpenSummary,
+    this.onConfirm,
   });
 
   @override
@@ -511,7 +672,7 @@ class _OrderCard extends StatelessWidget {
       child: Column(
         children: [
           ListTile(
-            onTap: onToggle,
+            onTap: onOpenSummary,
             title: Text(
               'Заявка №${request.requestId}',
               style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textDark),
@@ -523,11 +684,23 @@ class _OrderCard extends StatelessWidget {
                   Text(request.clubName!, style: const TextStyle(color: AppColors.darkGray)),
                 if (request.laneNumber != null)
                   Text('Дорожка ${request.laneNumber}', style: const TextStyle(color: AppColors.darkGray)),
-                if (request.status != null)
-                  Text(_statusName(request.status!), style: const TextStyle(color: AppColors.darkGray)),
               ],
             ),
-            trailing: Icon(expanded ? Icons.expand_less : Icons.expand_more, color: AppColors.darkGray),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                OrderStatusBadge(category: statusCategory),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: onToggle,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(expanded ? Icons.expand_less : Icons.expand_more, color: AppColors.darkGray),
+                  ),
+                ),
+              ],
+            ),
           ),
           if (expanded)
             Padding(
@@ -561,6 +734,16 @@ class _OrderCard extends StatelessWidget {
                               part.partName ?? part.catalogNumber ?? 'Неизвестная деталь',
                               style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textDark),
                             ),
+                            if (part.catalogNumber != null && part.catalogNumber!.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text('Каталожный номер: ${part.catalogNumber}', style: const TextStyle(color: AppColors.darkGray)),
+                              ),
+                            if (part.inventoryLocation != null && part.inventoryLocation!.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text('Локация: ${part.inventoryLocation}', style: const TextStyle(color: AppColors.darkGray)),
+                              ),
                             if (part.quantity != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
@@ -576,14 +759,36 @@ class _OrderCard extends StatelessWidget {
                       ),
                     ),
                   const SizedBox(height: 12),
+                  if (canConfirm && onConfirm != null) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: ElevatedButton(
+                        onPressed: confirmInProgress ? null : onConfirm,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: confirmInProgress
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Подтвердить заказ'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   SizedBox(
                     width: double.infinity,
                     height: 44,
-                    child: ElevatedButton(
+                    child: OutlinedButton(
                       onPressed: onOpenSummary,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: const Text('Подробнее'),

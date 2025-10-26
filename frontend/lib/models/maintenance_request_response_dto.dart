@@ -72,6 +72,10 @@ class RequestPartResponseDto {
   final String? catalogNumber;
   final String? partName;
   final int? quantity;
+  final int? inventoryId;
+  final int? catalogId;
+  final int? warehouseId;
+  final String? inventoryLocation;
   final String? status;
   final String? rejectionReason;
   final int? supplierId;
@@ -85,6 +89,10 @@ class RequestPartResponseDto {
     this.catalogNumber,
     this.partName,
     this.quantity,
+    this.inventoryId,
+    this.catalogId,
+    this.warehouseId,
+    this.inventoryLocation,
     this.status,
     this.rejectionReason,
     this.supplierId,
@@ -101,6 +109,10 @@ class RequestPartResponseDto {
       catalogNumber: json['catalogNumber'] as String?,
       partName: json['partName'] as String?,
       quantity: (json['quantity'] as num?)?.toInt(),
+      inventoryId: (json['inventoryId'] as num?)?.toInt(),
+      catalogId: (json['catalogId'] as num?)?.toInt(),
+      warehouseId: (json['warehouseId'] as num?)?.toInt(),
+      inventoryLocation: json['inventoryLocation'] as String?,
       status: json['status'] as String?,
       rejectionReason: json['rejectionReason'] as String?,
       supplierId: (json['supplierId'] as num?)?.toInt(),
@@ -116,6 +128,10 @@ class RequestPartResponseDto {
         'catalogNumber': catalogNumber,
         'partName': partName,
         'quantity': quantity,
+        'inventoryId': inventoryId,
+        'catalogId': catalogId,
+        'warehouseId': warehouseId,
+        'inventoryLocation': inventoryLocation,
         'status': status,
         'rejectionReason': rejectionReason,
         'supplierId': supplierId,

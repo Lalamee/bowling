@@ -16,6 +16,7 @@ import ru.bowling.bowlingapp.Repository.MechanicProfileRepository;
 import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
 import ru.bowling.bowlingapp.Repository.RequestPartRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
+import ru.bowling.bowlingapp.Repository.WarehouseInventoryRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -38,6 +39,7 @@ public class MaintenanceRequestService {
         private final UserRepository userRepository;
         private final InventoryService inventoryService;
         private final SupplierService supplierService;
+        private final WarehouseInventoryRepository warehouseInventoryRepository;
 
         @Transactional
         public MaintenanceRequestResponseDTO createPartRequest(PartRequestDTO requestDTO) {
@@ -76,18 +78,25 @@ public class MaintenanceRequestService {
 
 		MaintenanceRequest savedRequest = maintenanceRequestRepository.save(request);
 
-		List<RequestPart> requestParts = requestDTO.getRequestedParts().stream()
-				.map(partDTO -> {
-					RequestPart requestPart = RequestPart.builder()
-							.request(savedRequest)
-							.catalogNumber(partDTO.getCatalogNumber())
-							.partName(partDTO.getPartName())
-							.quantity(partDTO.getQuantity())
-							.status(null)
-							.build();
-					return requestPartRepository.save(requestPart);
-				})
-				.collect(Collectors.toList());
+                List<RequestPart> requestParts = requestDTO.getRequestedParts().stream()
+                                .map(partDTO -> {
+                                        WarehouseInventory inventory = resolveInventory(partDTO);
+                                        PartsCatalog catalogPart = resolveCatalog(partDTO, inventory);
+
+                                        RequestPart requestPart = RequestPart.builder()
+                                                        .request(savedRequest)
+                                                        .catalogNumber(partDTO.getCatalogNumber())
+                                                        .partName(partDTO.getPartName())
+                                                        .quantity(partDTO.getQuantity())
+                                                        .status(null)
+                                                        .inventoryId(inventory != null ? inventory.getInventoryId() : null)
+                                                        .catalogId(catalogPart != null ? catalogPart.getCatalogId() : null)
+                                                        .warehouseId(inventory != null ? inventory.getWarehouseId() : null)
+                                                        .inventoryLocation(inventory != null ? inventory.getLocationReference() : partDTO.getLocation())
+                                                        .build();
+                                        return requestPartRepository.save(requestPart);
+                                })
+                                .collect(Collectors.toList());
 
 		return convertToResponseDTO(savedRequest, requestParts);
 	}
@@ -186,12 +195,19 @@ public class MaintenanceRequestService {
                 validateRequestedParts(partsToAdd);
 
                 for (PartRequestDTO.RequestedPartDTO partDTO : partsToAdd) {
+                        WarehouseInventory inventory = resolveInventory(partDTO);
+                        PartsCatalog catalogPart = resolveCatalog(partDTO, inventory);
+
                         RequestPart requestPart = RequestPart.builder()
                                         .request(request)
                                         .catalogNumber(partDTO.getCatalogNumber())
                                         .partName(partDTO.getPartName())
                                         .quantity(partDTO.getQuantity())
                                         .status(null)
+                                        .inventoryId(inventory != null ? inventory.getInventoryId() : null)
+                                        .catalogId(catalogPart != null ? catalogPart.getCatalogId() : null)
+                                        .warehouseId(inventory != null ? inventory.getWarehouseId() : null)
+                                        .inventoryLocation(inventory != null ? inventory.getLocationReference() : partDTO.getLocation())
                                         .build();
                         requestPartRepository.save(requestPart);
                 }
@@ -295,15 +311,97 @@ public class MaintenanceRequestService {
                                 throw new IllegalArgumentException("Catalog number is required");
                         }
 
-                        PartsCatalog catalogPart = partsCatalogRepository.findByCatalogNumber(catalogNumber)
-                                        .orElseThrow(() -> new IllegalArgumentException("Запчасть с номером '" + catalogNumber + "' не найдена в каталоге."));
-                        try {
-                                inventoryService.reservePart(new ReservationRequestDto(catalogPart.getCatalogId(), partDTO.getQuantity(), null));
-                                inventoryService.releasePart(new ReservationRequestDto(catalogPart.getCatalogId(), partDTO.getQuantity(), null));
-                        } catch (RuntimeException e) {
-                                throw new IllegalArgumentException("Ошибка проверки запчасти '" + partDTO.getPartName() + "': " + e.getMessage());
+                        WarehouseInventory inventory = resolveInventory(partDTO);
+                        if (inventory == null) {
+                                throw new IllegalArgumentException("Запчасть не найдена на складе");
+                        }
+
+                        Integer quantity = inventory.getQuantity();
+                        if (quantity == null || quantity <= 0) {
+                                throw new IllegalArgumentException("На складе нет доступного остатка для каталожного номера '" + catalogNumber + "'");
+                        }
+
+                        if (partDTO.getQuantity() != null && partDTO.getQuantity() > quantity) {
+                                throw new IllegalArgumentException("Недостаточно остатков для каталожного номера '" + catalogNumber + "'");
+                        }
+
+                        PartsCatalog catalogPart = resolveCatalog(partDTO, inventory);
+                        if (catalogPart == null) {
+                                throw new IllegalArgumentException("Запчасть с номером '" + catalogNumber + "' не найдена в каталоге.");
                         }
                 }
+        }
+
+        private WarehouseInventory resolveInventory(PartRequestDTO.RequestedPartDTO partDTO) {
+                if (partDTO == null) {
+                        return null;
+                }
+
+                if (partDTO.getInventoryId() != null) {
+                        return warehouseInventoryRepository.findById(partDTO.getInventoryId())
+                                .orElseThrow(() -> new IllegalArgumentException("Запчасть не найдена на складе"));
+                }
+
+                if (partDTO.getCatalogId() != null) {
+                        List<WarehouseInventory> inventories = warehouseInventoryRepository.findByCatalogId(partDTO.getCatalogId().intValue());
+                        Integer warehouseId = partDTO.getWarehouseId();
+                        if (warehouseId != null) {
+                                return inventories.stream()
+                                        .filter(inv -> inv.getQuantity() != null && inv.getQuantity() > 0)
+                                        .filter(inv -> Objects.equals(inv.getWarehouseId(), warehouseId))
+                                        .findFirst()
+                                        .orElseGet(() -> inventories.stream()
+                                                .filter(inv -> inv.getQuantity() != null && inv.getQuantity() > 0)
+                                                .findFirst()
+                                                .orElse(null));
+                        }
+                        return inventories.stream()
+                                .filter(inv -> inv.getQuantity() != null && inv.getQuantity() > 0)
+                                .findFirst()
+                                .orElse(null);
+                }
+
+                if (partDTO.getCatalogNumber() != null) {
+                        PartsCatalog catalogPart = partsCatalogRepository.findByCatalogNumber(partDTO.getCatalogNumber()).orElse(null);
+                        if (catalogPart != null) {
+                                List<WarehouseInventory> inventories = warehouseInventoryRepository.findByCatalogId(catalogPart.getCatalogId().intValue());
+                                Integer warehouseId = partDTO.getWarehouseId();
+                                if (warehouseId != null) {
+                                        return inventories.stream()
+                                                .filter(inv -> inv.getQuantity() != null && inv.getQuantity() > 0)
+                                                .filter(inv -> Objects.equals(inv.getWarehouseId(), warehouseId))
+                                                .findFirst()
+                                                .orElseGet(() -> inventories.stream()
+                                                        .filter(inv -> inv.getQuantity() != null && inv.getQuantity() > 0)
+                                                        .findFirst()
+                                                        .orElse(null));
+                                }
+                                return inventories.stream()
+                                        .filter(inv -> inv.getQuantity() != null && inv.getQuantity() > 0)
+                                        .findFirst()
+                                        .orElse(null);
+                        }
+                }
+                return null;
+        }
+
+        private PartsCatalog resolveCatalog(PartRequestDTO.RequestedPartDTO partDTO, WarehouseInventory inventory) {
+                if (partDTO != null && partDTO.getCatalogId() != null) {
+                        return partsCatalogRepository.findById(partDTO.getCatalogId())
+                                .orElseThrow(() -> new IllegalArgumentException("Запчасть не найдена в каталоге"));
+                }
+
+                if (inventory != null && inventory.getCatalogId() != null) {
+                        return partsCatalogRepository.findById(Long.valueOf(inventory.getCatalogId()))
+                                .orElseThrow(() -> new IllegalArgumentException("Запчасть не найдена в каталоге"));
+                }
+
+                if (partDTO != null && partDTO.getCatalogNumber() != null) {
+                        return partsCatalogRepository.findByCatalogNumber(partDTO.getCatalogNumber())
+                                .orElseThrow(() -> new IllegalArgumentException("Запчасть с номером '" + partDTO.getCatalogNumber() + "' не найдена в каталоге."));
+                }
+
+                return null;
         }
 
 	@Transactional
@@ -514,6 +612,10 @@ public class MaintenanceRequestService {
                                                         .catalogNumber(part.getCatalogNumber())
                                                         .partName(part.getPartName())
                                                         .quantity(part.getQuantity())
+                                                        .inventoryId(part.getInventoryId())
+                                                        .catalogId(part.getCatalogId())
+                                                        .warehouseId(part.getWarehouseId())
+                                                        .inventoryLocation(part.getInventoryLocation())
                                                         .status(part.getStatus() != null ? part.getStatus().name() : null)
                                                         .rejectionReason(part.getRejectionReason())
                                                         .supplierId(part.getSupplierId())
