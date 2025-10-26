@@ -13,6 +13,10 @@ class MaintenanceRepository {
     return await _api.getAllMaintenanceRequests();
   }
 
+  Future<List<MaintenanceRequestResponseDto>> getRequestsByClub(int clubId) async {
+    return await _api.getMaintenanceRequestsByClub(clubId);
+  }
+
   /// Получить заявки по статусу
   Future<List<MaintenanceRequestResponseDto>> getRequestsByStatus(String status) async {
     return await _api.getMaintenanceRequestsByStatus(status);
@@ -40,6 +44,17 @@ class MaintenanceRepository {
   Future<MaintenanceRequestResponseDto?> create(PartRequestDto request) async {
     try {
       return await _api.createMaintenanceRequest(request);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<MaintenanceRequestResponseDto> addPartsToRequest(
+    int requestId,
+    List<RequestedPartDto> parts,
+  ) async {
+    try {
+      return await _api.addPartsToMaintenanceRequest(requestId, parts);
     } catch (e) {
       rethrow;
     }

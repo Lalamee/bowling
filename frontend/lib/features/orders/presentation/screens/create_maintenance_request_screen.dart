@@ -9,7 +9,9 @@ import '../../../../shared/widgets/buttons/custom_button.dart';
 
 /// Экран создания новой заявки на обслуживание
 class CreateMaintenanceRequestScreen extends StatefulWidget {
-  const CreateMaintenanceRequestScreen({super.key});
+  final int? initialClubId;
+
+  const CreateMaintenanceRequestScreen({super.key, this.initialClubId});
 
   @override
   State<CreateMaintenanceRequestScreen> createState() => _CreateMaintenanceRequestScreenState();
@@ -60,10 +62,11 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       if (!mounted) return;
       final clubs = _resolveMechanicClubs(me);
       final mechanicProfileId = _extractMechanicProfileId(me);
+      final resolvedClubId = _resolveInitialClubId(clubs, widget.initialClubId);
       setState(() {
         _mechanicProfileId = mechanicProfileId;
         _clubs = clubs;
-        _selectedClubId = clubs.isNotEmpty ? clubs.first.id : null;
+        _selectedClubId = resolvedClubId;
         _isLoading = false;
       });
     } catch (e) {
@@ -558,6 +561,20 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     );
 
     return result;
+  }
+
+  int? _resolveInitialClubId(List<_MechanicClub> clubs, int? desiredId) {
+    if (clubs.isEmpty) {
+      return null;
+    }
+    if (desiredId != null) {
+      for (final club in clubs) {
+        if (club.id == desiredId) {
+          return desiredId;
+        }
+      }
+    }
+    return clubs.first.id;
   }
 }
 

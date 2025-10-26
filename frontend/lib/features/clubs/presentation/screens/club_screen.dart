@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
-import '../../../../core/routing/routes.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
+import '../../../../models/maintenance_request_response_dto.dart';
 import '../../../../shared/widgets/buttons/custom_button.dart';
 import '../../../../shared/widgets/layout/common_ui.dart';
 import '../../../../shared/widgets/layout/section_list.dart';
 import '../../../../shared/widgets/nav/app_bottom_nav.dart';
+import '../../../orders/presentation/screens/add_parts_to_order_screen.dart';
 import 'club_warehouse_screen.dart';
 
 class ClubScreen extends StatefulWidget {
@@ -59,14 +61,19 @@ class _ClubScreenState extends State<ClubScreen> {
   List<_ClubInfo> _extractClubs(Map<String, dynamic>? data) {
     if (data == null) return const [];
     final result = <_ClubInfo>[];
-    final seen = <String>{};
+    final seenIds = <int>{};
+    final seenNames = <String>{};
 
-    void addClub({required String name, String? address, String? lanes, String? equipment}) {
+    void addClub({int? id, required String name, String? address, String? lanes, String? equipment}) {
       final trimmed = name.trim();
       if (trimmed.isEmpty) return;
-      if (seen.contains(trimmed.toLowerCase())) return;
-      seen.add(trimmed.toLowerCase());
-      result.add(_ClubInfo(name: trimmed, address: address, lanes: lanes, equipment: equipment));
+      if (id != null) {
+        if (!seenIds.add(id)) return;
+      } else {
+        final key = trimmed.toLowerCase();
+        if (!seenNames.add(key)) return;
+      }
+      result.add(_ClubInfo(id: id, name: trimmed, address: address, lanes: lanes, equipment: equipment));
     }
 
     final ownerProfile = data['ownerProfile'];
@@ -78,6 +85,7 @@ class _ClubScreenState extends State<ClubScreen> {
           if (entry is Map) {
             final club = Map<String, dynamic>.from(entry);
             addClub(
+              id: (club['id'] as num?)?.toInt(),
               name: (club['name'] ?? '') as String,
               address: club['address']?.toString(),
               lanes: club['lanes']?.toString(),
@@ -89,6 +97,7 @@ class _ClubScreenState extends State<ClubScreen> {
       final clubName = map['clubName']?.toString();
       if (clubName != null) {
         addClub(
+          id: (map['clubId'] as num?)?.toInt(),
           name: clubName,
           address: map['address']?.toString() ?? map['legalAddress']?.toString(),
           lanes: map['lanes']?.toString(),
@@ -104,12 +113,12 @@ class _ClubScreenState extends State<ClubScreen> {
       if (clubs is Iterable) {
         for (final raw in clubs) {
           if (raw == null) continue;
-          addClub(name: raw.toString(), address: map['address']?.toString());
+          addClub(id: (map['clubId'] as num?)?.toInt(), name: raw.toString(), address: map['address']?.toString());
         }
       }
       final clubName = map['clubName']?.toString();
       if (clubName != null) {
-        addClub(name: clubName, address: map['address']?.toString());
+        addClub(id: (map['clubId'] as num?)?.toInt(), name: clubName, address: map['address']?.toString());
       }
     }
 
@@ -120,18 +129,18 @@ class _ClubScreenState extends State<ClubScreen> {
       if (clubs is Iterable) {
         for (final raw in clubs) {
           if (raw == null) continue;
-          addClub(name: raw.toString(), address: map['address']?.toString());
+          addClub(id: (map['clubId'] as num?)?.toInt(), name: raw.toString(), address: map['address']?.toString());
         }
       }
       final clubName = map['clubName']?.toString();
       if (clubName != null) {
-        addClub(name: clubName, address: map['address']?.toString());
+        addClub(id: (map['clubId'] as num?)?.toInt(), name: clubName, address: map['address']?.toString());
       }
     }
 
     final fallbackName = data['clubName']?.toString();
     if (fallbackName != null) {
-      addClub(name: fallbackName, address: data['address']?.toString());
+      addClub(id: (data['clubId'] as num?)?.toInt(), name: fallbackName, address: data['address']?.toString());
     }
 
     return result;
@@ -146,8 +155,33 @@ class _ClubScreenState extends State<ClubScreen> {
     Navigator.push(context, MaterialPageRoute(builder: (_) => const ClubWarehouseScreen()));
   }
 
-  void _openCreateRequest() {
-    Navigator.pushNamed(context, Routes.createMaintenanceRequest);
+  Future<void> _openAddPartFlow() async {
+    final selected = _selectedIndex != null ? _clubs[_selectedIndex!] : null;
+    if (selected == null) {
+      showSnack(context, 'Выберите клуб');
+      return;
+    }
+    if (selected.id == null) {
+      showSnack(context, 'Для выбранного клуба отсутствует идентификатор');
+      return;
+    }
+
+    final selectedOrder = await showModalBottomSheet<MaintenanceRequestResponseDto>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _OrderSelectionSheet(clubId: selected.id!, clubName: selected.name),
+    );
+
+    if (!mounted || selectedOrder == null) return;
+
+    final result = await Navigator.push<MaintenanceRequestResponseDto>(
+      context,
+      MaterialPageRoute(builder: (_) => AddPartsToOrderScreen(order: selectedOrder)),
+    );
+
+    if (result != null && mounted) {
+      showSnack(context, 'Детали добавлены в заявку №${result.requestId}');
+    }
   }
 
   Widget _buildBody() {
@@ -217,7 +251,7 @@ class _ClubScreenState extends State<ClubScreen> {
         const SizedBox(height: 16),
         if (selectedClub != null) _ClubDetailsCard(club: selectedClub),
         const SizedBox(height: 20),
-        CustomButton(text: 'Добавить деталь в заказ', onPressed: _openCreateRequest),
+        CustomButton(text: 'Добавить деталь в заказ', onPressed: _openAddPartFlow),
         const SizedBox(height: 12),
         CustomButton(text: 'Открыть склад', isOutlined: true, onPressed: _openWarehouse),
       ],
@@ -269,6 +303,157 @@ class _ClubDetailsCard extends StatelessWidget {
   }
 }
 
+class _OrderSelectionSheet extends StatefulWidget {
+  final int clubId;
+  final String clubName;
+
+  const _OrderSelectionSheet({required this.clubId, required this.clubName});
+
+  @override
+  State<_OrderSelectionSheet> createState() => _OrderSelectionSheetState();
+}
+
+class _OrderSelectionSheetState extends State<_OrderSelectionSheet> {
+  final _repository = MaintenanceRepository();
+  bool _isLoading = true;
+  bool _hasError = false;
+  List<MaintenanceRequestResponseDto> _orders = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+    try {
+      final orders = await _repository.getRequestsByClub(widget.clubId);
+      if (!mounted) return;
+      setState(() {
+        _orders = orders;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
+      showApiError(context, e);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return SafeArea(
+      child: FractionallySizedBox(
+        heightFactor: 0.8,
+        child: Container(
+          padding: EdgeInsets.fromLTRB(16, 12, 16, bottom + 16),
+          decoration: const BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.lightGray,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Выберите заказ для клуба "${widget.clubName}"',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Expanded(child: _buildBody()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_hasError) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off, size: 48, color: AppColors.darkGray),
+            const SizedBox(height: 12),
+            const Text('Не удалось загрузить заказы', style: TextStyle(color: AppColors.darkGray)),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _load,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Повторить'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_orders.isEmpty) {
+      return const Center(
+        child: Text(
+          'Для выбранного клуба пока нет заявок',
+          style: TextStyle(color: AppColors.darkGray),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemBuilder: (context, index) {
+          final order = _orders[index];
+          return ListTile(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            tileColor: Colors.white,
+            title: Text(
+              'Заявка №${order.requestId}',
+              style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textDark),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (order.laneNumber != null)
+                  Text('Дорожка ${order.laneNumber}', style: const TextStyle(color: AppColors.darkGray)),
+                if (order.status != null && order.status!.isNotEmpty)
+                  Text('Статус: ${order.status}', style: const TextStyle(color: AppColors.darkGray)),
+              ],
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.darkGray),
+            onTap: () => Navigator.pop(context, order),
+          );
+        },
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemCount: _orders.length,
+      ),
+    );
+  }
+}
+
 class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -302,12 +487,14 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _ClubInfo {
+  final int? id;
   final String name;
   final String? address;
   final String? lanes;
   final String? equipment;
 
   const _ClubInfo({
+    this.id,
     required this.name,
     this.address,
     this.lanes,

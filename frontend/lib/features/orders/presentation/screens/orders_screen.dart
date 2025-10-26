@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
+import '../../../../core/routing/routes.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
@@ -143,6 +144,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ),
         ),
       ),
+      floatingActionButton: _clubs.isEmpty
+          ? null
+          : FloatingActionButton(
+              onPressed: _openCreateRequest,
+              backgroundColor: AppColors.primary,
+              child: const Icon(Icons.add, color: Colors.white),
+            ),
       bottomNavigationBar: AppBottomNav(
         currentIndex: 0,
         onTap: (i) => BottomNavDirect.go(context, 0, i),
@@ -166,12 +174,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
       if (!mounted) return;
       final clubs = _resolveMechanicClubs(me);
       final selectedClubId = _resolveSelectedClubId(clubs, _selectedClubId);
-      final requests = await _maintenanceRepository.getAllRequests();
+      final requests = await _fetchRequestsForClubs(clubs);
       if (!mounted) return;
       setState(() {
         _clubs = clubs;
         _selectedClubId = selectedClubId;
-        _allRequests = _filterAllowedClubs(requests, clubs);
+        _allRequests = requests;
         final lanes = _laneOptions;
         if (!lanes.contains(_selectedLane)) {
           _selectedLane = null;
@@ -186,6 +194,23 @@ class _OrdersScreenState extends State<OrdersScreen> {
         _hasError = true;
       });
       showApiError(context, e);
+    }
+  }
+
+  Future<void> _openCreateRequest() async {
+    if (_clubs.isEmpty) {
+      showSnack(context, 'Вы не привязаны ни к одному клубу');
+      return;
+    }
+
+    final result = await Navigator.pushNamed(
+      context,
+      Routes.createMaintenanceRequest,
+      arguments: {'clubId': _selectedClubId},
+    );
+
+    if (result == true) {
+      await _load();
     }
   }
 
@@ -214,20 +239,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
       return const [];
     }
     return _allRequests.where((element) => element.clubId == clubId).toList();
-  }
-
-  List<MaintenanceRequestResponseDto> _filterAllowedClubs(
-    List<MaintenanceRequestResponseDto> requests,
-    List<_MechanicClub> clubs,
-  ) {
-    final allowedIds = clubs.map((e) => e.id).toSet();
-    if (allowedIds.isEmpty) {
-      return const [];
-    }
-    return requests.where((element) {
-      final clubId = element.clubId;
-      return clubId != null && allowedIds.contains(clubId);
-    }).toList();
   }
 
   int? _resolveSelectedClubId(List<_MechanicClub> clubs, int? current) {
@@ -278,6 +289,40 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
 
     return result;
+  }
+
+  Future<List<MaintenanceRequestResponseDto>> _fetchRequestsForClubs(List<_MechanicClub> clubs) async {
+    if (clubs.isEmpty) {
+      return const [];
+    }
+
+    final responses = await Future.wait(
+      clubs.map((club) => _maintenanceRepository.getRequestsByClub(club.id)),
+    );
+
+    final combined = <MaintenanceRequestResponseDto>[];
+    final seen = <int>{};
+
+    for (final list in responses) {
+      for (final request in list) {
+        if (seen.add(request.requestId)) {
+          combined.add(request);
+        }
+      }
+    }
+
+    combined.sort((a, b) {
+      final aDate = a.requestDate;
+      final bDate = b.requestDate;
+      if (aDate == null && bDate == null) {
+        return b.requestId.compareTo(a.requestId);
+      }
+      if (aDate == null) return 1;
+      if (bDate == null) return -1;
+      return bDate.compareTo(aDate);
+    });
+
+    return combined;
   }
 
   Widget _laneDropdown() {
@@ -353,6 +398,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               _selectedLane = null;
               _expandedIndex = null;
             });
+            _load();
           },
         ),
       ),

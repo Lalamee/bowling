@@ -31,23 +31,14 @@ public class MaintenanceRequestService {
 	private final InventoryService inventoryService; 
 	private final SupplierService supplierService; 
 
-	@Transactional
-	public MaintenanceRequestResponseDTO createPartRequest(PartRequestDTO requestDTO) {
-		Optional<MechanicProfile> mechanic = mechanicProfileRepository.findById(requestDTO.getMechanicId());
-		if (mechanic.isEmpty()) {
-			throw new IllegalArgumentException("Mechanic not found");
-		}
+        @Transactional
+        public MaintenanceRequestResponseDTO createPartRequest(PartRequestDTO requestDTO) {
+                Optional<MechanicProfile> mechanic = mechanicProfileRepository.findById(requestDTO.getMechanicId());
+                if (mechanic.isEmpty()) {
+                        throw new IllegalArgumentException("Mechanic not found");
+                }
 
-		for (PartRequestDTO.RequestedPartDTO partDTO : requestDTO.getRequestedParts()) {
-			PartsCatalog catalogPart = partsCatalogRepository.findByCatalogNumber(partDTO.getCatalogNumber())
-					.orElseThrow(() -> new IllegalArgumentException("Запчасть с номером '" + partDTO.getCatalogNumber() + "' не найдена в каталоге."));
-			try {
-				inventoryService.reservePart(new ReservationRequestDto(catalogPart.getCatalogId(), partDTO.getQuantity(), null));
-				inventoryService.releasePart(new ReservationRequestDto(catalogPart.getCatalogId(), partDTO.getQuantity(), null));
-			} catch (RuntimeException e) {
-				throw new IllegalArgumentException("Ошибка проверки запчасти '" + partDTO.getPartName() + "': " + e.getMessage());
-			}
-		}
+                validateRequestedParts(requestDTO.getRequestedParts());
 
 		if (requestDTO.getClubId() == null) {
 			throw new IllegalArgumentException("Club is required");
@@ -123,16 +114,82 @@ public class MaintenanceRequestService {
 				.collect(Collectors.toList());
 	}
 
-	@Transactional(readOnly = true)
-	public List<MaintenanceRequestResponseDTO> getRequestsByMechanic(Long mechanicId) {
-		List<MaintenanceRequest> requests = maintenanceRequestRepository.findByMechanic_ProfileId(mechanicId);
-		return requests.stream()
-				.map(request -> {
-					List<RequestPart> parts = requestPartRepository.findByRequestRequestId(request.getRequestId());
-					return convertToResponseDTO(request, parts);
-				})
-				.collect(Collectors.toList());
-	}
+        @Transactional(readOnly = true)
+        public List<MaintenanceRequestResponseDTO> getRequestsByMechanic(Long mechanicId) {
+                List<MaintenanceRequest> requests = maintenanceRequestRepository.findByMechanic_ProfileId(mechanicId);
+                return requests.stream()
+                                .map(request -> {
+                                        List<RequestPart> parts = requestPartRepository.findByRequestRequestId(request.getRequestId());
+                                        return convertToResponseDTO(request, parts);
+                                })
+                                .collect(Collectors.toList());
+        }
+
+        @Transactional(readOnly = true)
+        public List<MaintenanceRequestResponseDTO> getRequestsByClub(Long clubId) {
+                List<MaintenanceRequest> requests = maintenanceRequestRepository.findByClubClubIdOrderByRequestDateDesc(clubId);
+                return requests.stream()
+                                .map(request -> {
+                                        List<RequestPart> parts = requestPartRepository.findByRequestRequestId(request.getRequestId());
+                                        return convertToResponseDTO(request, parts);
+                                })
+                                .collect(Collectors.toList());
+        }
+
+        @Transactional
+        public MaintenanceRequestResponseDTO addPartsToRequest(Long requestId, List<PartRequestDTO.RequestedPartDTO> partsToAdd) {
+                if (partsToAdd == null || partsToAdd.isEmpty()) {
+                        throw new IllegalArgumentException("At least one part must be provided");
+                }
+
+                MaintenanceRequest request = maintenanceRequestRepository.findById(requestId)
+                                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+
+                if (request.getStatus() == MaintenanceRequestStatus.CLOSED
+                                || request.getStatus() == MaintenanceRequestStatus.UNREPAIRABLE
+                                || request.getStatus() == MaintenanceRequestStatus.COMPLETED
+                                || request.getStatus() == MaintenanceRequestStatus.DONE) {
+                        throw new IllegalStateException("Parts cannot be added to closed or completed requests");
+                }
+
+                validateRequestedParts(partsToAdd);
+
+                for (PartRequestDTO.RequestedPartDTO partDTO : partsToAdd) {
+                        RequestPart requestPart = RequestPart.builder()
+                                        .request(request)
+                                        .catalogNumber(partDTO.getCatalogNumber())
+                                        .partName(partDTO.getPartName())
+                                        .quantity(partDTO.getQuantity())
+                                        .status(null)
+                                        .build();
+                        requestPartRepository.save(requestPart);
+                }
+
+                List<RequestPart> parts = requestPartRepository.findByRequestRequestId(request.getRequestId());
+                return convertToResponseDTO(request, parts);
+        }
+
+        private void validateRequestedParts(List<PartRequestDTO.RequestedPartDTO> parts) {
+                if (parts == null || parts.isEmpty()) {
+                        throw new IllegalArgumentException("At least one part must be provided");
+                }
+
+                for (PartRequestDTO.RequestedPartDTO partDTO : parts) {
+                        String catalogNumber = partDTO.getCatalogNumber();
+                        if (catalogNumber == null || catalogNumber.trim().isEmpty()) {
+                                throw new IllegalArgumentException("Catalog number is required");
+                        }
+
+                        PartsCatalog catalogPart = partsCatalogRepository.findByCatalogNumber(catalogNumber)
+                                        .orElseThrow(() -> new IllegalArgumentException("Запчасть с номером '" + catalogNumber + "' не найдена в каталоге."));
+                        try {
+                                inventoryService.reservePart(new ReservationRequestDto(catalogPart.getCatalogId(), partDTO.getQuantity(), null));
+                                inventoryService.releasePart(new ReservationRequestDto(catalogPart.getCatalogId(), partDTO.getQuantity(), null));
+                        } catch (RuntimeException e) {
+                                throw new IllegalArgumentException("Ошибка проверки запчасти '" + partDTO.getPartName() + "': " + e.getMessage());
+                        }
+                }
+        }
 
 	@Transactional
 	public MaintenanceRequestResponseDTO approveRequest(Long requestId, String managerNotes) {

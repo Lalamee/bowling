@@ -142,7 +142,23 @@ class AppRouter {
       case Routes.maintenanceRequests:
         return MaterialPageRoute(builder: (_) => const MaintenanceRequestsScreen());
       case Routes.createMaintenanceRequest:
-        return MaterialPageRoute(builder: (_) => const CreateMaintenanceRequestScreen());
+        int? initialClubId;
+        final args = settings.arguments;
+        if (args is Map) {
+          final value = args['clubId'];
+          if (value is int) {
+            initialClubId = value;
+          } else if (value is num) {
+            initialClubId = value.toInt();
+          }
+        } else if (args is int) {
+          initialClubId = args;
+        } else if (args is num) {
+          initialClubId = args.toInt();
+        }
+        return MaterialPageRoute(
+          builder: (_) => CreateMaintenanceRequestScreen(initialClubId: initialClubId),
+        );
       case Routes.workLogs:
         return MaterialPageRoute(builder: (_) => const WorkLogsScreen());
       case Routes.serviceHistory:
