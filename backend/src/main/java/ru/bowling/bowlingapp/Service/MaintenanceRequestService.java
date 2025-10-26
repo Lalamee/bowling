@@ -228,6 +228,12 @@ public class MaintenanceRequestService {
                         return true;
                 }
 
+                AdministratorProfile administratorProfile = user.getAdministratorProfile();
+                if (administratorProfile != null && administratorProfile.getClub() != null
+                                && Objects.equals(administratorProfile.getClub().getClubId(), club.getClubId())) {
+                        return true;
+                }
+
                 MechanicProfile mechanicProfile = user.getMechanicProfile();
                 if (mechanicProfile != null && mechanicWorksInClub(mechanicProfile, club.getClubId())) {
                         return true;

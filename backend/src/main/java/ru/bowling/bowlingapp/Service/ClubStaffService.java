@@ -6,8 +6,23 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.DTO.ClubStaffMemberDTO;
 import ru.bowling.bowlingapp.DTO.CreateStaffRequestDTO;
 import ru.bowling.bowlingapp.DTO.CreateStaffResponseDTO;
-import ru.bowling.bowlingapp.Entity.*;
-import ru.bowling.bowlingapp.Repository.*;
+import ru.bowling.bowlingapp.Entity.AccountType;
+import ru.bowling.bowlingapp.Entity.AdministratorProfile;
+import ru.bowling.bowlingapp.Entity.BowlingClub;
+import ru.bowling.bowlingapp.Entity.ClubStaff;
+import ru.bowling.bowlingapp.Entity.ManagerProfile;
+import ru.bowling.bowlingapp.Entity.MechanicProfile;
+import ru.bowling.bowlingapp.Entity.OwnerProfile;
+import ru.bowling.bowlingapp.Entity.Role;
+import ru.bowling.bowlingapp.Entity.User;
+import ru.bowling.bowlingapp.Repository.AccountTypeRepository;
+import ru.bowling.bowlingapp.Repository.AdministratorProfileRepository;
+import ru.bowling.bowlingapp.Repository.BowlingClubRepository;
+import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
+import ru.bowling.bowlingapp.Repository.ManagerProfileRepository;
+import ru.bowling.bowlingapp.Repository.MechanicProfileRepository;
+import ru.bowling.bowlingapp.Repository.RoleRepository;
+import ru.bowling.bowlingapp.Repository.UserRepository;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -15,6 +30,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +42,7 @@ public class ClubStaffService {
     private final RoleRepository roleRepository;
     private final AccountTypeRepository accountTypeRepository;
     private final ManagerProfileRepository managerProfileRepository;
+    private final AdministratorProfileRepository administratorProfileRepository;
     private final MechanicProfileRepository mechanicProfileRepository;
     private final ClubStaffRepository clubStaffRepository;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
@@ -71,6 +89,19 @@ public class ClubStaffService {
                     .email(manager.getContactEmail())
                     .role(staffRoleToResponse(managerRole, managerUser != null ? managerUser.getRole() : null))
                     .isActive(managerUser != null ? managerUser.getIsActive() : Boolean.TRUE)
+                    .build());
+        }
+
+        List<AdministratorProfile> administrators = administratorProfileRepository.findByClub_ClubId(clubId);
+        for (AdministratorProfile administrator : administrators) {
+            User administratorUser = administrator.getUser();
+            staff.add(ClubStaffMemberDTO.builder()
+                    .userId(administratorUser != null ? administratorUser.getUserId() : null)
+                    .fullName(trim(administrator.getFullName(), administratorUser != null ? administratorUser.getPhone() : null))
+                    .phone(administrator.getContactPhone() != null ? administrator.getContactPhone() : (administratorUser != null ? administratorUser.getPhone() : null))
+                    .email(administrator.getContactEmail())
+                    .role(staffRoleToResponse(StaffRole.ADMINISTRATOR, administratorUser != null ? administratorUser.getRole() : null))
+                    .isActive(administratorUser != null ? administratorUser.getIsActive() : Boolean.TRUE)
                     .build());
         }
 
@@ -128,20 +159,27 @@ public class ClubStaffService {
 
         User user = prepareUser(normalizedPhone, rawPassword, role, accountType);
 
+        LocalDateTime now = LocalDateTime.now();
+
         ManagerProfile profile = ManagerProfile.builder()
-                .user(user)
-                .club(club)
                 .fullName(trim(request.getFullName(), normalizedPhone))
                 .contactPhone(normalizedPhone)
                 .contactEmail(trimNullable(request.getEmail()))
                 .isDataVerified(false)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .createdAt(now)
+                .updatedAt(now)
                 .build();
 
-        user.setManagerProfile(profile);
-        userRepository.save(user);
-        managerProfileRepository.save(profile);
+        persistUserWithProfile(
+                user,
+                profile,
+                (persistedUser, persistedProfile) -> {
+                    persistedProfile.setUser(persistedUser);
+                    persistedProfile.setClub(club);
+                    persistedUser.setManagerProfile(persistedProfile);
+                },
+                managerProfileRepository::saveAndFlush
+        );
 
         registerClubStaff(club, user, role, requestedBy);
 
@@ -160,13 +198,14 @@ public class ClubStaffService {
 
         User user = prepareUser(normalizedPhone, rawPassword, role, accountType);
 
+        LocalDate today = LocalDate.now();
+
         MechanicProfile profile = MechanicProfile.builder()
-                .user(user)
                 .fullName(trim(request.getFullName(), normalizedPhone))
                 .isEntrepreneur(false)
                 .isDataVerified(false)
-                .createdAt(LocalDate.now())
-                .updatedAt(LocalDate.now())
+                .createdAt(today)
+                .updatedAt(today)
                 .workPlaces(club.getName())
                 .build();
 
@@ -174,9 +213,15 @@ public class ClubStaffService {
         clubs.add(club);
         profile.setClubs(clubs);
 
-        user.setMechanicProfile(profile);
-        userRepository.save(user);
-        mechanicProfileRepository.save(profile);
+        persistUserWithProfile(
+                user,
+                profile,
+                (persistedUser, persistedProfile) -> {
+                    persistedProfile.setUser(persistedUser);
+                    persistedUser.setMechanicProfile(persistedProfile);
+                },
+                mechanicProfileRepository::saveAndFlush
+        );
 
         registerClubStaff(club, user, role, requestedBy);
 
@@ -195,24 +240,42 @@ public class ClubStaffService {
 
         User user = prepareUser(normalizedPhone, rawPassword, role, accountType);
 
-        ManagerProfile profile = ManagerProfile.builder()
-                .user(user)
-                .club(club)
+        LocalDateTime now = LocalDateTime.now();
+
+        AdministratorProfile profile = AdministratorProfile.builder()
                 .fullName(trim(request.getFullName(), normalizedPhone))
                 .contactPhone(normalizedPhone)
                 .contactEmail(trimNullable(request.getEmail()))
                 .isDataVerified(false)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .createdAt(now)
+                .updatedAt(now)
                 .build();
 
-        user.setManagerProfile(profile);
-        userRepository.save(user);
-        managerProfileRepository.save(profile);
+        persistUserWithProfile(
+                user,
+                profile,
+                (persistedUser, persistedProfile) -> {
+                    persistedProfile.setUser(persistedUser);
+                    persistedProfile.setClub(club);
+                    persistedUser.setAdministratorProfile(persistedProfile);
+                },
+                administratorProfileRepository::saveAndFlush
+        );
 
         registerClubStaff(club, user, role, requestedBy);
 
         return buildResponse(user, profile.getFullName(), rawPassword, role, club, StaffRole.ADMINISTRATOR);
+    }
+
+    private <P> void persistUserWithProfile(
+            User user,
+            P profile,
+            BiConsumer<User, P> linkUserToProfile,
+            Consumer<P> profileSaver
+    ) {
+        linkUserToProfile.accept(user, profile);
+        userRepository.saveAndFlush(user);
+        profileSaver.accept(profile);
     }
 
     private void registerClubStaff(BowlingClub club, User user, Role role, User requestedBy) {
@@ -399,10 +462,11 @@ public class ClubStaffService {
     }
 
     private Role resolveManagerRole() {
-        return roleRepository.findById(ROLE_HEAD_MECHANIC_ID)
-                .or(() -> roleRepository.findByNameIgnoreCase("HEAD_MECHANIC"))
-                .or(() -> roleRepository.findByNameIgnoreCase("MANAGER"))
-                .orElseThrow(() -> new IllegalStateException("Manager role is not configured"));
+        return resolveRole(ROLE_HEAD_MECHANIC_ID,
+                "HEAD_MECHANIC",
+                "MANAGER",
+                "Менеджер",
+                "Главный механик");
     }
 
     private AccountType resolveMechanicAccountType() {
@@ -428,14 +492,20 @@ public class ClubStaffService {
                     return byName.get();
                 }
             }
+            for (String name : fallbackNames) {
+                AccountType created = createAccountTypeIfMissing(name);
+                if (created != null) {
+                    return created;
+                }
+            }
         }
         throw new IllegalStateException("Account type not configured for id=" + id);
     }
 
     private Role resolveMechanicRole() {
-        return roleRepository.findById(ROLE_MECHANIC_ID)
-                .or(() -> roleRepository.findByNameIgnoreCase("MECHANIC"))
-                .orElseThrow(() -> new IllegalStateException("Mechanic role is not configured"));
+        return resolveRole(ROLE_MECHANIC_ID,
+                "MECHANIC",
+                "Механик");
     }
 
     private AccountType resolveAdministratorAccountType() {
@@ -448,10 +518,56 @@ public class ClubStaffService {
     }
 
     private Role resolveAdministratorRole() {
-        return roleRepository.findById(ROLE_ADMIN_ID)
-                .or(() -> roleRepository.findByNameIgnoreCase("ADMIN"))
-                .or(() -> roleRepository.findByNameIgnoreCase("ADMINISTRATOR"))
-                .orElseThrow(() -> new IllegalStateException("Administrator role is not configured"));
+        return resolveRole(ROLE_ADMIN_ID,
+                "ADMIN",
+                "ADMINISTRATOR",
+                "Администратор");
+    }
+
+    private Role resolveRole(long id, String... fallbackNames) {
+        Optional<Role> role = roleRepository.findById(id);
+        if (role.isPresent() && matchesRole(role.get(), id, fallbackNames)) {
+            return role.get();
+        }
+        if (fallbackNames != null) {
+            for (String name : fallbackNames) {
+                Role byName = findRoleByName(name);
+                if (byName != null) {
+                    return byName;
+                }
+            }
+            for (String name : fallbackNames) {
+                Role created = createRoleIfMissing(name);
+                if (created != null) {
+                    return created;
+                }
+            }
+        }
+        throw new IllegalStateException("Role not configured for id=" + id);
+    }
+
+    private Role findRoleByName(String name) {
+        if (name == null) {
+            return null;
+        }
+        String trimmed = name.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return roleRepository.findByNameIgnoreCase(trimmed).orElse(null);
+    }
+
+    private Role createRoleIfMissing(String candidateName) {
+        String normalized = normalizeRoleName(candidateName);
+        if (normalized == null) {
+            return null;
+        }
+        String trimmed = candidateName.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return roleRepository.findByNameIgnoreCase(trimmed)
+                .orElseGet(() -> roleRepository.saveAndFlush(Role.builder().name(trimmed).build()));
     }
 
     private boolean matchesAccountType(AccountType accountType, long expectedId, String... names) {
@@ -483,6 +599,50 @@ public class ClubStaffService {
             }
         }
         return false;
+    }
+
+    private AccountType createAccountTypeIfMissing(String candidateName) {
+        String normalized = normalizeAccountTypeName(candidateName);
+        if (normalized == null) {
+            return null;
+        }
+        String trimmed = candidateName.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return accountTypeRepository.findByNameIgnoreCase(trimmed)
+                .orElseGet(() -> accountTypeRepository.saveAndFlush(AccountType.builder().name(trimmed).build()));
+    }
+
+    private boolean matchesRole(Role role, long expectedId, String... names) {
+        if (role == null) {
+            return false;
+        }
+        Long roleId = role.getRoleId();
+        if (roleId != null && roleId.longValue() == expectedId) {
+            return true;
+        }
+        if (names == null || names.length == 0) {
+            return true;
+        }
+        String actual = normalizeRoleName(role.getName());
+        if (actual == null) {
+            return false;
+        }
+        for (String name : names) {
+            String normalized = normalizeRoleName(name);
+            if (normalized != null && normalized.equals(actual)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String normalizeRoleName(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.replaceAll("[\\s_\\-]", "").toUpperCase(Locale.ROOT);
     }
 
     private String normalizeAccountTypeName(String value) {

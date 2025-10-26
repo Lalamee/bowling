@@ -31,6 +31,7 @@ public class AuthService implements UserDetailsService {
     private final OwnerProfileRepository ownerProfileRepository;
     private final MechanicProfileRepository mechanicProfileRepository;
     private final ManagerProfileRepository managerProfileRepository;
+    private final AdministratorProfileRepository administratorProfileRepository;
     private final ClubWarehouseService clubWarehouseService;
 
     private static final Pattern RUSSIAN_PHONE_PATTERN = Pattern.compile("^\\+7\\d{10}$");
@@ -163,6 +164,7 @@ public class AuthService implements UserDetailsService {
         MechanicProfile mechanicProfile = null;
         OwnerProfile ownerProfile = null;
         ManagerProfile managerProfile = null;
+        AdministratorProfile administratorProfile = null;
 
         if (isMechanicAccountType(accountTypeName)) {
             mechanicProfile = MechanicProfile.builder()
@@ -214,6 +216,17 @@ public class AuthService implements UserDetailsService {
                     .updatedAt(LocalDateTime.now())
                     .build();
             user.setManagerProfile(managerProfile);
+        } else if (isAdministratorAccountType(accountTypeName)) {
+            administratorProfile = AdministratorProfile.builder()
+                    .user(user)
+                    .fullName(ownerDto != null ? ownerDto.getContactPerson() : null)
+                    .contactPhone(normalizedPhone)
+                    .contactEmail(ownerDto != null ? ownerDto.getContactEmail() : null)
+                    .isDataVerified(false)
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+            user.setAdministratorProfile(administratorProfile);
         }
 
         userRepository.save(user);
@@ -224,6 +237,10 @@ public class AuthService implements UserDetailsService {
 
         if (managerProfile != null) {
             managerProfileRepository.save(managerProfile);
+        }
+
+        if (administratorProfile != null) {
+            administratorProfileRepository.save(administratorProfile);
         }
 
         if (ownerProfile != null) {
@@ -359,6 +376,10 @@ public class AuthService implements UserDetailsService {
             response.put("managerProfile", buildManagerProfile(user.getManagerProfile()));
         }
 
+        if (user.getAdministratorProfile() != null) {
+            response.put("administratorProfile", buildAdministratorProfile(user.getAdministratorProfile()));
+        }
+
         return response;
     }
 
@@ -378,6 +399,9 @@ public class AuthService implements UserDetailsService {
         if (user.getManagerProfile() != null && isNotBlank(user.getManagerProfile().getFullName())) {
             return user.getManagerProfile().getFullName().trim();
         }
+        if (user.getAdministratorProfile() != null && isNotBlank(user.getAdministratorProfile().getFullName())) {
+            return user.getAdministratorProfile().getFullName().trim();
+        }
         return user.getPhone();
     }
 
@@ -387,6 +411,9 @@ public class AuthService implements UserDetailsService {
         }
         if (user.getManagerProfile() != null && isNotBlank(user.getManagerProfile().getContactEmail())) {
             return user.getManagerProfile().getContactEmail().trim();
+        }
+        if (user.getAdministratorProfile() != null && isNotBlank(user.getAdministratorProfile().getContactEmail())) {
+            return user.getAdministratorProfile().getContactEmail().trim();
         }
         return null;
     }
@@ -581,6 +608,33 @@ public class AuthService implements UserDetailsService {
         return result;
     }
 
+    private Map<String, Object> buildAdministratorProfile(AdministratorProfile profile) {
+        Map<String, Object> result = new LinkedHashMap<>();
+
+        result.put("fullName", trimOrNull(profile.getFullName()));
+        result.put("contactPhone", trimOrNull(profile.getContactPhone()));
+        result.put("contactEmail", trimOrNull(profile.getContactEmail()));
+        result.put("status", "Администратор");
+        result.put("isVerified", profile.getIsDataVerified());
+
+        BowlingClub club = profile.getClub();
+        List<String> clubs = new ArrayList<>();
+        if (club != null) {
+            String clubName = trimOrNull(club.getName());
+            if (clubName != null) {
+                clubs.add(clubName);
+                result.put("clubName", clubName);
+            }
+            String address = trimOrNull(club.getAddress());
+            if (address != null) {
+                result.put("address", address);
+            }
+        }
+        result.put("clubs", clubs);
+
+        return result;
+    }
+
     private AccountType resolveAccountType(RegisterUserDTO dto) {
         if (dto.getAccountTypeId() != null) {
             Long id = dto.getAccountTypeId().longValue();
@@ -711,6 +765,18 @@ public class AuthService implements UserDetailsService {
                 || "HEADMECHANIC".equals(normalized)
                 || "МЕНЕДЖЕР".equals(normalized)
                 || "ГЛАВНЫЙМЕХАНИК".equals(normalized);
+    }
+
+    private boolean isAdministratorAccountType(String accountTypeName) {
+        String normalized = normalizeAccountTypeName(accountTypeName);
+        return "ADMINISTRATOR".equals(normalized)
+                || "ADMIN".equals(normalized)
+                || "АДМИНИСТРАТОР".equals(normalized)
+                || "INDIVIDUAL".equals(normalized)
+                || "ФИЗИЧЕСКОЕЛИЦО".equals(normalized)
+                || "ФИЗИЧЕСКОЕ ЛИЦО".equals(normalized)
+                || "ФИЗ ЛИЦО".equals(normalized)
+                || "ФИЗЛИЦО".equals(normalized);
     }
 
     private void attachClubToOwner(OwnerProfile ownerProfile, OwnerProfileDTO ownerDto, BowlingClubDTO clubDto) {
