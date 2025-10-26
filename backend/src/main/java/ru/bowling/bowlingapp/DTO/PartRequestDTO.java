@@ -5,6 +5,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.util.List;
@@ -34,6 +35,7 @@ public class PartRequestDTO {
     @NoArgsConstructor
     public static class RequestedPartDTO {
         
+        @NotBlank(message = "Catalog number is required")
         private String catalogNumber;
         
         @NotNull(message = "Part name is required")

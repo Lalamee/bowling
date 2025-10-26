@@ -96,6 +96,14 @@ class ApiService {
         .toList();
   }
 
+  /// GET /api/maintenance/requests/club/{clubId} - Получение заявок по клубу
+  Future<List<MaintenanceRequestResponseDto>> getMaintenanceRequestsByClub(int clubId) async {
+    final response = await _dio.get('/api/maintenance/requests/club/$clubId');
+    return (response.data as List)
+        .map((e) => MaintenanceRequestResponseDto.fromJson(e))
+        .toList();
+  }
+
   /// GET /api/maintenance/requests/status/{status} - Получение заявок по статусу
   Future<List<MaintenanceRequestResponseDto>> getMaintenanceRequestsByStatus(String status) async {
     final response = await _dio.get('/api/maintenance/requests/status/$status');
@@ -186,6 +194,20 @@ class ApiService {
     final response = await _dio.put(
       '/api/maintenance/requests/$id/unrepairable',
       data: request.toJson(),
+    );
+    return MaintenanceRequestResponseDto.fromJson(response.data);
+  }
+
+  /// POST /api/maintenance/requests/{id}/parts - Добавление деталей в существующую заявку
+  Future<MaintenanceRequestResponseDto> addPartsToMaintenanceRequest(
+    int id,
+    List<RequestedPartDto> parts,
+  ) async {
+    final response = await _dio.post(
+      '/api/maintenance/requests/$id/parts',
+      data: {
+        'requestedParts': parts.map((e) => e.toJson()).toList(),
+      },
     );
     return MaintenanceRequestResponseDto.fromJson(response.data);
   }

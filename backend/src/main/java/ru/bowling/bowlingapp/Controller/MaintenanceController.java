@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import ru.bowling.bowlingapp.DTO.AddRequestPartsDTO;
 import ru.bowling.bowlingapp.DTO.ApproveRejectRequestDTO;
 import ru.bowling.bowlingapp.DTO.MaintenanceRequestResponseDTO;
 import ru.bowling.bowlingapp.DTO.PartRequestDTO;
@@ -59,20 +60,29 @@ public class MaintenanceController {
 		return ResponseEntity.ok(requests);
 	}
 
-	@GetMapping("/requests/mechanic/{mechanicId}")
-	public ResponseEntity<List<MaintenanceRequestResponseDTO>> getRequestsByMechanic(@PathVariable Long mechanicId, Authentication authentication) {
-		if (authentication == null || !authentication.isAuthenticated()) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-		}
-		List<MaintenanceRequestResponseDTO> requests = maintenanceRequestService.getRequestsByMechanic(mechanicId);
-		return ResponseEntity.ok(requests);
-	}
+        @GetMapping("/requests/mechanic/{mechanicId}")
+        public ResponseEntity<List<MaintenanceRequestResponseDTO>> getRequestsByMechanic(@PathVariable Long mechanicId, Authentication authentication) {
+                if (authentication == null || !authentication.isAuthenticated()) {
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+                }
+                List<MaintenanceRequestResponseDTO> requests = maintenanceRequestService.getRequestsByMechanic(mechanicId);
+                return ResponseEntity.ok(requests);
+        }
 
-	@PutMapping("/requests/{requestId}/approve")
-	public ResponseEntity<?> approveRequest(@PathVariable Long requestId, @Valid @RequestBody ApproveRejectRequestDTO request, Authentication authentication) {
-		if (authentication == null || !authentication.isAuthenticated()) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-					.body(StandardResponseDTO.builder().message("User not authenticated").status("error").build());
+        @GetMapping("/requests/club/{clubId}")
+        public ResponseEntity<List<MaintenanceRequestResponseDTO>> getRequestsByClub(@PathVariable Long clubId, Authentication authentication) {
+                if (authentication == null || !authentication.isAuthenticated()) {
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+                }
+                List<MaintenanceRequestResponseDTO> requests = maintenanceRequestService.getRequestsByClub(clubId);
+                return ResponseEntity.ok(requests);
+        }
+
+        @PutMapping("/requests/{requestId}/approve")
+        public ResponseEntity<?> approveRequest(@PathVariable Long requestId, @Valid @RequestBody ApproveRejectRequestDTO request, Authentication authentication) {
+                if (authentication == null || !authentication.isAuthenticated()) {
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                        .body(StandardResponseDTO.builder().message("User not authenticated").status("error").build());
 		}
 		MaintenanceRequestResponseDTO response = maintenanceRequestService.approveRequest(requestId, request.getManagerNotes());
 		return ResponseEntity.ok(response);
@@ -118,8 +128,22 @@ public class MaintenanceController {
 		return ResponseEntity.ok(maintenanceRequestService.closeRequest(id, payload));
 	}
 
-	@PutMapping("/requests/{id}/unrepairable")
-	public ResponseEntity<?> unrepairable(@PathVariable("id") Long id, @RequestBody ApproveRejectRequestDTO request) {
-		return ResponseEntity.ok(maintenanceRequestService.markAsUnrepairable(id, request.getRejectionReason()));
-	}
+        @PutMapping("/requests/{id}/unrepairable")
+        public ResponseEntity<?> unrepairable(@PathVariable("id") Long id, @RequestBody ApproveRejectRequestDTO request) {
+                return ResponseEntity.ok(maintenanceRequestService.markAsUnrepairable(id, request.getRejectionReason()));
+        }
+
+        @PostMapping("/requests/{id}/parts")
+        public ResponseEntity<?> addPartsToRequest(@PathVariable("id") Long id, @Valid @RequestBody AddRequestPartsDTO request, Authentication authentication) {
+                if (authentication == null || !authentication.isAuthenticated()) {
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                        .body(StandardResponseDTO.builder().message("User not authenticated").status("error").build());
+                }
+                if (request == null || request.getRequestedParts() == null || request.getRequestedParts().isEmpty()) {
+                        return ResponseEntity.badRequest()
+                                        .body(StandardResponseDTO.builder().status("error").message("At least one part is required").build());
+                }
+                MaintenanceRequestResponseDTO response = maintenanceRequestService.addPartsToRequest(id, request.getRequestedParts());
+                return ResponseEntity.ok(response);
+        }
 }

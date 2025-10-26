@@ -14,7 +14,9 @@ public interface MaintenanceRequestRepository extends JpaRepository<MaintenanceR
 	
 	List<MaintenanceRequest> findByStatusOrderByRequestDateDesc(MaintenanceRequestStatus status);
 	
-	List<MaintenanceRequest> findByClubClubId(Long clubId);
+     List<MaintenanceRequest> findByClubClubId(Long clubId);
+
+     List<MaintenanceRequest> findByClubClubIdOrderByRequestDateDesc(Long clubId);
 	
 	List<MaintenanceRequest> findByMechanic_ProfileId(Long mechanicId);
 	
