@@ -378,6 +378,13 @@ public class AuthService implements UserDetailsService {
     private Map<String, Object> buildMechanicProfile(MechanicProfile profile) {
         Map<String, Object> result = new LinkedHashMap<>();
 
+        Long profileId = profile.getProfileId();
+
+        if (profileId != null) {
+            result.put("profileId", profileId);
+            result.put("id", profileId);
+        }
+
         result.put("fullName", trimOrNull(profile.getFullName()));
         result.put("birthDate", profile.getBirthDate() != null ? profile.getBirthDate().toString() : null);
         result.put("isEntrepreneur", profile.getIsEntrepreneur());

@@ -22,7 +22,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   bool _isLoading = true;
   bool _hasError = false;
-  List<MaintenanceRequestResponseDto> _requests = [];
+  List<MaintenanceRequestResponseDto> _allRequests = [];
+  List<_MechanicClub> _clubs = const [];
+  int? _selectedClubId;
   int? _selectedLane;
   int? _expandedIndex;
 
@@ -52,7 +54,23 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ],
                 );
               }
-              if (_requests.isEmpty) {
+              if (_clubs.isEmpty) {
+                return ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: const [
+                    SizedBox(height: 200),
+                    Center(
+                      child: Text(
+                        'Вы не привязаны ни к одному клубу',
+                        style: TextStyle(color: AppColors.darkGray, fontSize: 16),
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              final requests = _filteredRequests;
+              if (requests.isEmpty) {
                 return ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: const [
@@ -66,8 +84,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ],
                 );
               }
-
-              final requests = _filteredRequests;
               return ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 children: [
@@ -87,6 +103,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  _clubDropdown(),
                   if (_laneOptions.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     _laneDropdown(),
@@ -146,21 +164,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
     try {
       final me = await _userRepository.me();
       if (!mounted) return;
-      final mechanicId = (me?['id'] as num?)?.toInt();
-      if (mechanicId == null) {
-        setState(() {
-          _requests = [];
-          _selectedLane = null;
-          _expandedIndex = null;
-          _isLoading = false;
-        });
-        showSnack(context, 'Не удалось определить пользователя');
-        return;
-      }
-      final requests = await _maintenanceRepository.requestsForMechanic(mechanicId);
+      final clubs = _resolveMechanicClubs(me);
+      final selectedClubId = _resolveSelectedClubId(clubs, _selectedClubId);
+      final requests = await _maintenanceRepository.getAllRequests();
       if (!mounted) return;
       setState(() {
-        _requests = requests;
+        _clubs = clubs;
+        _selectedClubId = selectedClubId;
+        _allRequests = _filterAllowedClubs(requests, clubs);
         final lanes = _laneOptions;
         if (!lanes.contains(_selectedLane)) {
           _selectedLane = null;
@@ -179,7 +190,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   List<int> get _laneOptions {
-    final lanes = _requests
+    final lanes = _requestsForSelectedClub
         .map((e) => e.laneNumber)
         .whereType<int>()
         .toSet()
@@ -189,12 +200,84 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   List<MaintenanceRequestResponseDto> get _filteredRequests {
-    final lanes = _laneOptions;
+    final base = _requestsForSelectedClub;
     final selected = _selectedLane;
-    if (selected == null || lanes.isEmpty) {
-      return _requests;
+    if (selected == null) {
+      return base;
     }
-    return _requests.where((element) => element.laneNumber == selected).toList();
+    return base.where((element) => element.laneNumber == selected).toList();
+  }
+
+  List<MaintenanceRequestResponseDto> get _requestsForSelectedClub {
+    final clubId = _selectedClubId;
+    if (clubId == null) {
+      return const [];
+    }
+    return _allRequests.where((element) => element.clubId == clubId).toList();
+  }
+
+  List<MaintenanceRequestResponseDto> _filterAllowedClubs(
+    List<MaintenanceRequestResponseDto> requests,
+    List<_MechanicClub> clubs,
+  ) {
+    final allowedIds = clubs.map((e) => e.id).toSet();
+    if (allowedIds.isEmpty) {
+      return const [];
+    }
+    return requests.where((element) {
+      final clubId = element.clubId;
+      return clubId != null && allowedIds.contains(clubId);
+    }).toList();
+  }
+
+  int? _resolveSelectedClubId(List<_MechanicClub> clubs, int? current) {
+    if (clubs.isEmpty) {
+      return null;
+    }
+    if (current != null && clubs.any((club) => club.id == current)) {
+      return current;
+    }
+    return clubs.first.id;
+  }
+
+  List<_MechanicClub> _resolveMechanicClubs(Map<String, dynamic>? me) {
+    if (me == null) {
+      return const [];
+    }
+    final profile = me['mechanicProfile'];
+    if (profile is! Map) {
+      return const [];
+    }
+
+    final result = <_MechanicClub>[];
+    final seen = <int>{};
+    void addClub({required int? id, required String? name, String? address}) {
+      if (id == null || !seen.add(id)) return;
+      final displayName = (name?.trim().isNotEmpty ?? false) ? name!.trim() : 'Клуб #$id';
+      result.add(_MechanicClub(id: id, name: displayName, address: address?.trim().isNotEmpty == true ? address!.trim() : null));
+    }
+
+    final detailed = profile['clubsDetailed'];
+    if (detailed is List) {
+      for (final entry in detailed) {
+        if (entry is Map) {
+          final map = Map<String, dynamic>.from(entry);
+          addClub(
+            id: (map['id'] as num?)?.toInt(),
+            name: map['name'] as String?,
+            address: map['address'] as String?,
+          );
+        }
+      }
+    }
+
+    addClub(
+      id: (profile['clubId'] as num?)?.toInt(),
+      name: profile['clubName'] as String?,
+      address: profile['address'] as String?,
+    );
+
+    return result;
   }
 
   Widget _laneDropdown() {
@@ -229,6 +312,48 @@ class _OrdersScreenState extends State<OrdersScreen> {
             _selectedLane = v;
             _expandedIndex = null;
           }),
+        ),
+      ),
+    );
+  }
+
+  Widget _clubDropdown() {
+    if (_selectedClubId == null || _clubs.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.lightGray),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: _selectedClubId,
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.darkGray),
+          items: _clubs
+              .map(
+                (club) => DropdownMenuItem<int>(
+                  value: club.id,
+                  child: Text(
+                    club.name,
+                    style: const TextStyle(color: AppColors.textDark),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (value) {
+            if (value == null || value == _selectedClubId) return;
+            setState(() {
+              _selectedClubId = value;
+              _selectedLane = null;
+              _expandedIndex = null;
+            });
+          },
         ),
       ),
     );
@@ -348,16 +473,32 @@ class _OrderCard extends StatelessWidget {
 
   static String _statusName(String status) {
     switch (status.toUpperCase()) {
+      case 'NEW':
+        return 'Новая заявка';
       case 'APPROVED':
         return 'Одобрено';
       case 'REJECTED':
         return 'Отклонено';
       case 'IN_PROGRESS':
         return 'В работе';
+      case 'DONE':
+        return 'Выполнено';
       case 'COMPLETED':
         return 'Завершено';
+      case 'CLOSED':
+        return 'Закрыто';
+      case 'UNREPAIRABLE':
+        return 'Неремонтопригодно';
       default:
         return 'Статус: $status';
     }
   }
+}
+
+class _MechanicClub {
+  final int id;
+  final String name;
+  final String? address;
+
+  const _MechanicClub({required this.id, required this.name, this.address});
 }
