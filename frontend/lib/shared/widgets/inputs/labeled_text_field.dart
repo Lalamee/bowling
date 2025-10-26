@@ -135,33 +135,35 @@ class _LabeledTextFieldState extends State<LabeledTextField> {
               ],
             ),
             child: SizedBox(
-              width: 344,
-              height: 50,
-              child: TextFormField(
-                focusNode: _focusNode,
-                controller: widget.controller,
-                keyboardType: widget.keyboardType,
-                readOnly: widget.readOnly,
-                onTap: widget.onTap,
-                inputFormatters: inputFormatters,
-                decoration: InputDecoration(
-                  hintText: isPhone ? '+7 (980) 001 01 01' : widget.label,
-                  hintStyle: AppTextStyles.formLabel,
-                  prefixIcon: widget.icon != null
-                      ? Icon(widget.icon, size: 20, color: AppColors.primary)
-                      : null,
-                  border: OutlineInputBorder(
-                    borderSide: BorderSide.none,
-                    borderRadius: BorderRadius.circular(12.84),
+              width: double.infinity,
+              child: SizedBox(
+                height: 50,
+                child: TextFormField(
+                  focusNode: _focusNode,
+                  controller: widget.controller,
+                  keyboardType: widget.keyboardType,
+                  readOnly: widget.readOnly,
+                  onTap: widget.onTap,
+                  inputFormatters: inputFormatters,
+                  decoration: InputDecoration(
+                    hintText: isPhone ? '+7 (980) 001 01 01' : widget.label,
+                    hintStyle: AppTextStyles.formLabel,
+                    prefixIcon: widget.icon != null
+                        ? Icon(widget.icon, size: 20, color: AppColors.primary)
+                        : null,
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide.none,
+                      borderRadius: BorderRadius.circular(12.84),
+                    ),
+                    contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    errorText: null,
+                    fillColor: AppColors.white,
+                    filled: true,
                   ),
-                  contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                  errorText: null,
-                  fillColor: AppColors.white,
-                  filled: true,
+                  style: AppTextStyles.formInput,
+                  onChanged: _onChanged,
                 ),
-                style: AppTextStyles.formInput,
-                onChanged: _onChanged,
               ),
             ),
           ),

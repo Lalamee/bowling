@@ -35,12 +35,12 @@ class PartRequestDto {
 }
 
 class RequestedPartDto {
-  final String? catalogNumber;
+  final String catalogNumber;
   final String partName;
   final int quantity;
 
   RequestedPartDto({
-    this.catalogNumber,
+    required this.catalogNumber,
     required this.partName,
     required this.quantity,
   });
@@ -53,7 +53,7 @@ class RequestedPartDto {
 
   factory RequestedPartDto.fromJson(Map<String, dynamic> json) {
     return RequestedPartDto(
-      catalogNumber: json['catalogNumber'] as String?,
+      catalogNumber: json['catalogNumber']?.toString() ?? '',
       partName: json['partName'] as String,
       quantity: (json['quantity'] as num).toInt(),
     );

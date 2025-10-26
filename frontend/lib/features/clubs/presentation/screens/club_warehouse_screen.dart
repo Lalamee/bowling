@@ -7,6 +7,7 @@ import '../widgets/position_card.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/repositories/inventory_repository.dart';
 import '../../../../core/utils/net_ui.dart';
+import '../../../../models/part_dto.dart';
 import 'club_search_screen.dart';
 import '../../../../shared/widgets/inputs/adaptive_text.dart';
 
@@ -19,13 +20,15 @@ class ClubWarehouseScreen extends StatefulWidget {
 
 class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
   final _repo = InventoryRepository();
-  final _cellCtrl = TextEditingController(text: '25');
-  final _shelfCtrl = TextEditingController(text: '2');
-  final _markCtrl = TextEditingController(text: 'справа от входа стеллаж');
-  String _selectedItem = 'Пинспоттер';
+  final _cellCtrl = TextEditingController();
+  final _shelfCtrl = TextEditingController();
+  final _markCtrl = TextEditingController();
+  String _selectedItem = '';
   final _searchCtrl = TextEditingController();
-  List<dynamic> _inventory = [];
+  List<PartDto> _inventory = [];
+  PartDto? _selectedPart;
   bool _isLoading = false;
+  bool _hasError = false;
 
   @override
   void initState() {
@@ -43,20 +46,21 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
   }
 
   Future<void> _loadInventory() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
     try {
       final data = await _repo.search('');
-      if (mounted) {
-        setState(() {
-          _inventory = data;
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+      _applyInventory(data);
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        showApiError(context, e);
-      }
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
+      showApiError(context, e);
     }
   }
 
@@ -65,21 +69,22 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
       _loadInventory();
       return;
     }
-    
-    setState(() => _isLoading = true);
+
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
     try {
       final data = await _repo.search(query);
-      if (mounted) {
-        setState(() {
-          _inventory = data;
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+      _applyInventory(data);
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        showApiError(context, e);
-      }
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
+      showApiError(context, e);
     }
   }
 
@@ -89,11 +94,126 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
       MaterialPageRoute(builder: (_) => ClubSearchScreen(query: _searchCtrl.text)),
     );
     if (res != null && res.isNotEmpty) {
-      setState(() {
-        _selectedItem = res;
-        _searchCtrl.text = res;
-      });
+      final match = _findPartByName(res);
+      if (match != null) {
+        _selectPart(match);
+      } else {
+        setState(() {
+          _searchCtrl.text = res;
+        });
+        _searchInventory(res);
+      }
     }
+  }
+
+  void _applyInventory(List<PartDto> data) {
+    final selected = _resolveSelected(data);
+    setState(() {
+      _inventory = data;
+      _selectedPart = selected;
+      _selectedItem = selected != null ? _partDisplayName(selected) : '';
+      _isLoading = false;
+      _hasError = false;
+    });
+    _fillControllers(selected);
+  }
+
+  PartDto? _resolveSelected(List<PartDto> data) {
+    if (data.isEmpty) return null;
+    final current = _selectedPart;
+    if (current != null) {
+      for (final part in data) {
+        if (part.id == current.id) {
+          return part;
+        }
+      }
+    }
+    return data.first;
+  }
+
+  void _selectPart(PartDto part) {
+    setState(() {
+      _selectedPart = part;
+      _selectedItem = _partDisplayName(part);
+    });
+    _fillControllers(part);
+  }
+
+  PartDto? _findPartByName(String name) {
+    final normalized = name.trim().toLowerCase();
+    for (final part in _inventory) {
+      if (_partDisplayName(part).toLowerCase() == normalized) {
+        return part;
+      }
+    }
+    return null;
+  }
+
+  String _partDisplayName(PartDto part) {
+    final candidates = [
+      part.commonName,
+      part.officialNameRu,
+      part.officialNameEn,
+    ];
+    for (final candidate in candidates) {
+      if (candidate != null && candidate.trim().isNotEmpty) {
+        return candidate.trim();
+      }
+    }
+    return part.catalogNumber;
+  }
+
+  void _fillControllers(PartDto? part) {
+    if (part == null) {
+      _cellCtrl.text = '';
+      _shelfCtrl.text = '';
+      _markCtrl.text = '';
+      return;
+    }
+    final location = part.location?.trim();
+    _cellCtrl.text = location != null && location.isNotEmpty ? location : '';
+    _shelfCtrl.text = part.catalogNumber;
+    _markCtrl.text = part.quantity?.toString() ?? '';
+  }
+
+  Map<String, List<PartDto>> _groupInventory() {
+    final map = <String, List<PartDto>>{};
+    for (final part in _inventory) {
+      final location = part.location?.trim() ?? '';
+      final key = location.isEmpty ? 'Без указания локации' : location;
+      map.putIfAbsent(key, () => []).add(part);
+    }
+    return map;
+  }
+
+  List<Widget> _buildInventoryCards() {
+    final groups = _groupInventory().entries.toList();
+    if (groups.isEmpty) {
+      return const [];
+    }
+    return List.generate(groups.length, (index) {
+      final entry = groups[index];
+      final parts = entry.value;
+      return LaneCard(
+        title: entry.key,
+        initiallyOpen: index == 0,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: List.generate(parts.length, (i) {
+            final part = parts[i];
+            return Padding(
+              padding: EdgeInsets.only(bottom: i == parts.length - 1 ? 0 : 8),
+              child: _InventoryItemTile(
+                title: _partDisplayName(part),
+                part: part,
+                selected: _selectedPart?.id == part.id,
+                onTap: () => _selectPart(part),
+              ),
+            );
+          }),
+        ),
+      );
+    });
   }
 
   @override
@@ -139,75 +259,60 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
             const SizedBox(height: 12),
             CommonUI.card(
               padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  LaneCard(
-                    title: 'Дорожка №1',
-                    initiallyOpen: true,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        PositionCard(
-                          selected: true,
-                          title: _selectedItem,
-                          onEdit: _openSearchOverlay,
-                          cellCtrl: _cellCtrl,
-                          shelfCtrl: _shelfCtrl,
-                          markCtrl: _markCtrl,
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          height: 44,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFEDEDED), width: 1.5),
-                          ),
-                          alignment: Alignment.centerLeft,
-                          child: const AdaptiveText(
-                            'Черный пинспоттер',
-                            style: TextStyle(fontSize: 14, color: AppColors.textDark, fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          height: 44,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFEDEDED), width: 1.5),
-                          ),
-                          alignment: Alignment.centerLeft,
-                          child: const AdaptiveText(
-                            'Передний вал',
-                            style: TextStyle(fontSize: 14, color: AppColors.textDark, fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          height: 44,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFEDEDED), width: 1.5),
-                          ),
-                          alignment: Alignment.centerLeft,
-                          child: const AdaptiveText(
-                            'Профиль крепежный',
-                            style: TextStyle(fontSize: 14, color: AppColors.textDark, fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const LaneCard(title: 'Дорожка №2'),
-                  const LaneCard(title: 'Дорожка №3'),
-                  const LaneCard(title: 'Дорожка №4'),
-                ],
-              ),
+              child: _isLoading
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 32),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : _hasError
+                      ? Column(
+                          children: [
+                            const Icon(Icons.cloud_off, size: 56, color: AppColors.darkGray),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Не удалось загрузить склад',
+                              style: TextStyle(color: AppColors.darkGray),
+                            ),
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                              onPressed: _loadInventory,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              child: const Text('Повторить'),
+                            ),
+                          ],
+                        )
+                      : _inventory.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 32),
+                              child: Center(
+                                child: Text(
+                                  'На складе пока нет данных',
+                                  style: TextStyle(color: AppColors.darkGray),
+                                ),
+                              ),
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (_selectedPart != null) ...[
+                                  PositionCard(
+                                    selected: true,
+                                    title: _selectedItem.isEmpty ? 'Выберите позицию' : _selectedItem,
+                                    onEdit: _openSearchOverlay,
+                                    cellCtrl: _cellCtrl,
+                                    shelfCtrl: _shelfCtrl,
+                                    markCtrl: _markCtrl,
+                                    readOnly: true,
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
+                                ..._buildInventoryCards(),
+                              ],
+                            ),
             ),
           ],
         ),
@@ -215,6 +320,62 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
       bottomNavigationBar: AppBottomNav(
         currentIndex: 2,
         onTap: (i) => BottomNavDirect.go(context, 2, i),
+      ),
+    );
+  }
+}
+
+class _InventoryItemTile extends StatelessWidget {
+  final String title;
+  final PartDto part;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _InventoryItemTile({
+    Key? key,
+    required this.title,
+    required this.part,
+    required this.selected,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    const subtitleStyle = TextStyle(fontSize: 13, color: AppColors.darkGray);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary.withOpacity(0.08) : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: selected ? AppColors.primary : const Color(0xFFEDEDED), width: 1.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AdaptiveText(
+              title,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: selected ? AppColors.primary : AppColors.textDark,
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 6),
+            Text('Каталожный №: ${part.catalogNumber}', style: subtitleStyle),
+            if (part.quantity != null) ...[
+              const SizedBox(height: 4),
+              Text('Количество: ${part.quantity}', style: subtitleStyle),
+            ],
+            if (part.location != null && part.location!.trim().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text('Локация: ${part.location}', style: subtitleStyle),
+            ],
+          ],
+        ),
       ),
     );
   }

@@ -16,53 +16,55 @@ class RadioGroupHorizontal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: options.map((label) {
         final isSelected = label == groupValue;
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: GestureDetector(
-            onTap: () => onChanged(label),
-            child: Row(
-              children: [
-                Radio<String>(
-                  value: label,
-                  groupValue: groupValue,
-                  onChanged: (val) => onChanged(val),
-                  activeColor: AppColors.primary,
-                  visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                Container(
-                  constraints: const BoxConstraints(minHeight: 29, minWidth: 80),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isSelected ? AppColors.primary : AppColors.lightGray,
-                      width: 1.5,
+        return InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => onChanged(label),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Radio<String>(
+                value: label,
+                groupValue: groupValue,
+                onChanged: (val) => onChanged(val),
+                activeColor: AppColors.primary,
+                visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              Container(
+                constraints: const BoxConstraints(minHeight: 29, minWidth: 80),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected ? AppColors.primary : AppColors.lightGray,
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.shadowSoft,
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.shadowSoft,
-                        blurRadius: 3,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    label,
-                    style: RadioChipStyle.textStyle(isSelected),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  ],
                 ),
-              ],
-            ),
+                child: Text(
+                  label,
+                  style: RadioChipStyle.textStyle(isSelected),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         );
       }).toList(),
