@@ -281,10 +281,10 @@ class _AdminClubsScreenState extends State<AdminClubsScreen> {
     switch (roleKey) {
       case 'OWNER':
         return 'Владелец клуба';
-      case 'ADMINISTRATOR':
       case 'ADMIN':
-      case 'STAFF':
+      case 'ADMINISTRATOR':
         return 'Администратор';
+      case 'HEAD_MECHANIC':
       case 'MANAGER':
         return 'Менеджер';
       case 'MECHANIC':

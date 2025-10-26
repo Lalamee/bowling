@@ -12,7 +12,10 @@ import 'club_search_screen.dart';
 import '../../../../shared/widgets/inputs/adaptive_text.dart';
 
 class ClubWarehouseScreen extends StatefulWidget {
-  const ClubWarehouseScreen({Key? key}) : super(key: key);
+  final int clubId;
+  final String? clubName;
+
+  const ClubWarehouseScreen({Key? key, required this.clubId, this.clubName}) : super(key: key);
 
   @override
   State<ClubWarehouseScreen> createState() => _ClubWarehouseScreenState();
@@ -51,7 +54,7 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
       _hasError = false;
     });
     try {
-      final data = await _repo.search('');
+      final data = await _repo.search('', clubId: widget.clubId);
       if (!mounted) return;
       _applyInventory(data);
     } catch (e) {
@@ -75,7 +78,7 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
       _hasError = false;
     });
     try {
-      final data = await _repo.search(query);
+      final data = await _repo.search(query, clubId: widget.clubId);
       if (!mounted) return;
       _applyInventory(data);
     } catch (e) {
@@ -218,6 +221,9 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final title = widget.clubName != null && widget.clubName!.trim().isNotEmpty
+        ? 'Склад: ${widget.clubName}'
+        : 'Склад';
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -226,7 +232,7 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
           children: [
             Row(
               children: [
-                const Text('Склад', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+                Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textDark)),
                 const Spacer(),
                 IconButton(onPressed: _loadInventory, icon: const Icon(Icons.sync, color: AppColors.primary)),
               ],
