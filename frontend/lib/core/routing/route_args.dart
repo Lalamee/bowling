@@ -16,3 +16,10 @@ class EditMechanicProfileArgs {
   final String? mechanicId;
   const EditMechanicProfileArgs({this.mechanicId});
 }
+
+class ClubWarehouseArgs {
+  final int clubId;
+  final String? clubName;
+
+  const ClubWarehouseArgs({required this.clubId, this.clubName});
+}

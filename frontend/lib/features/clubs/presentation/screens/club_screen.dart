@@ -74,7 +74,20 @@ class _ClubScreenState extends State<ClubScreen> {
   }
 
   void _openWarehouse() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const ClubWarehouseScreen()));
+    final selected = _selectedIndex != null ? _clubs[_selectedIndex!] : null;
+    if (selected == null) {
+      showSnack(context, 'Выберите клуб');
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ClubWarehouseScreen(
+          clubId: selected.id,
+          clubName: selected.name,
+        ),
+      ),
+    );
   }
 
   Future<void> _openAddPartFlow() async {

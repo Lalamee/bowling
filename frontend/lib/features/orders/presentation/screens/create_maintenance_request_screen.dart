@@ -102,60 +102,61 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
   }
 
   void _addPart() {
-    if (_selectedCatalogPart == null) {
-      showSnack(context, 'Выберите запчасть из каталога');
+    final name = _partNameController.text.trim();
+    if (name.isEmpty) {
+      showSnack(context, 'Укажите название запчасти');
       return;
     }
+
     final quantity = int.tryParse(_quantityController.text.trim());
     if (quantity == null || quantity <= 0) {
       showSnack(context, 'Укажите корректное количество');
       return;
     }
 
-    final selected = _selectedCatalogPart!;
-    final available = selected.quantity;
-    final alreadyRequested = requestedParts
-        .where((item) => item.inventoryId == selected.inventoryId)
-        .fold<int>(0, (sum, item) => sum + item.quantity);
-    final totalRequested = alreadyRequested + quantity;
-
-    final shortage = available != null && totalRequested > available;
+    final selected = _selectedCatalogPart;
+    final catalogNumberInput = _catalogNumberController.text.trim();
+    final resolvedCatalogNumber = catalogNumberInput.isNotEmpty
+        ? catalogNumberInput
+        : (selected != null ? _resolveCatalogNumber(selected) : null);
 
     setState(() {
-      final existingIndex = requestedParts.indexWhere((item) => item.inventoryId == selected.inventoryId);
-      if (existingIndex >= 0) {
-        final existing = requestedParts[existingIndex];
-        requestedParts[existingIndex] = RequestedPartDto(
-          inventoryId: existing.inventoryId,
-          catalogId: existing.catalogId,
-          catalogNumber: existing.catalogNumber,
-          partName: existing.partName,
-          quantity: totalRequested,
-          warehouseId: existing.warehouseId,
-          location: existing.location,
-        );
+      final newItem = RequestedPartDto(
+        inventoryId: selected?.inventoryId,
+        catalogId: selected?.catalogId,
+        catalogNumber: resolvedCatalogNumber,
+        partName: name,
+        quantity: quantity,
+        warehouseId: selected?.warehouseId ?? _selectedClubId,
+        location: selected?.location,
+      );
+
+      if (newItem.inventoryId != null) {
+        final existingIndex = requestedParts.indexWhere((item) => item.inventoryId == newItem.inventoryId);
+        if (existingIndex >= 0) {
+          final existing = requestedParts[existingIndex];
+          requestedParts[existingIndex] = RequestedPartDto(
+            inventoryId: existing.inventoryId,
+            catalogId: existing.catalogId ?? newItem.catalogId,
+            catalogNumber: existing.catalogNumber ?? newItem.catalogNumber,
+            partName: existing.partName,
+            quantity: existing.quantity + quantity,
+            warehouseId: existing.warehouseId ?? newItem.warehouseId,
+            location: existing.location ?? newItem.location,
+          );
+        } else {
+          requestedParts.add(newItem);
+        }
       } else {
-        requestedParts.add(RequestedPartDto(
-          inventoryId: selected.inventoryId,
-          catalogId: selected.catalogId,
-          catalogNumber: _resolveCatalogNumber(selected),
-          partName: _resolvePartDisplayName(selected),
-          quantity: quantity,
-          warehouseId: selected.warehouseId ?? _selectedClubId,
-          location: selected.location,
-        ));
+        requestedParts.add(newItem);
       }
+
       _catalogNumberController.clear();
       _partNameController.clear();
       _quantityController.clear();
       _selectedCatalogPart = null;
       _partSuggestions = const <PartDto>[];
     });
-
-    if (shortage) {
-      final availableText = available ?? 0;
-      showSnack(context, 'На складе доступно только $availableText шт. Заявка отправлена на пополнение.');
-    }
   }
 
   void _removePart(int index) {
@@ -429,18 +430,9 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
           // Каталожный номер
           _buildTextField(
             label: 'Каталожный номер',
-            hint: 'Будет заполнен автоматически',
+            hint: 'Укажите номер (если известен)',
             controller: _catalogNumberController,
-            readOnly: true,
-            validator: (value) {
-              if (requestedParts.isNotEmpty) {
-                return null;
-              }
-              if (_selectedCatalogPart == null) {
-                return 'Выберите запчасть из каталога';
-              }
-              return null;
-            },
+            validator: (_) => null,
           ),
           const SizedBox(height: 16),
 
@@ -511,7 +503,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
                                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                                 ),
                                 Text(
-                                  'Кат. №: ${part.catalogNumber}',
+                                  'Кат. №: ${part.catalogNumber != null && part.catalogNumber!.trim().isNotEmpty ? part.catalogNumber : "—"}',
                                   style: const TextStyle(fontSize: 12, color: AppColors.darkGray),
                                 ),
                                 if (part.location != null && part.location!.isNotEmpty)
@@ -620,8 +612,8 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
             if (requestedParts.isNotEmpty) {
               return null;
             }
-            if (_selectedCatalogPart == null) {
-              return 'Выберите запчасть из каталога';
+            if (value == null || value.trim().isEmpty) {
+              return 'Укажите название запчасти';
             }
             return null;
           },

@@ -83,7 +83,16 @@ class AppRouter {
       case Routes.clubSearch:
         return MaterialPageRoute(builder: (_) => const ClubSearchScreen());
       case Routes.clubWarehouse:
-        return MaterialPageRoute(builder: (_) => const ClubWarehouseScreen());
+        final args = settings.arguments as ClubWarehouseArgs?;
+        if (args == null) {
+          return MaterialPageRoute(builder: (_) => const ClubScreen());
+        }
+        return MaterialPageRoute(
+          builder: (_) => ClubWarehouseScreen(
+            clubId: args.clubId,
+            clubName: args.clubName,
+          ),
+        );
       case Routes.clubStaff:
         return MaterialPageRoute(builder: (_) => const ClubStaffScreen());
 
