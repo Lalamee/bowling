@@ -10,7 +10,7 @@ import ru.bowling.bowlingapp.Service.InventoryService;
 import java.util.List;
 
 @RestController
-@RequestMapping("/inventory")
+@RequestMapping("/api/inventory")
 public class InventoryController {
 
     @Autowired
