@@ -138,6 +138,7 @@ public class ClubStaffService {
 
         user.setManagerProfile(profile);
         userRepository.save(user);
+        managerProfileRepository.save(profile);
 
         registerClubStaff(club, user, role, requestedBy);
 
@@ -203,6 +204,7 @@ public class ClubStaffService {
 
         user.setManagerProfile(profile);
         userRepository.save(user);
+        managerProfileRepository.save(profile);
 
         registerClubStaff(club, user, role, requestedBy);
 
