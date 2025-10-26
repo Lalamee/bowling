@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/repositories/maintenance_repository.dart';
+import '../../../../core/repositories/parts_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/routing/routes.dart';
 import '../../../../core/services/auth_service.dart';
@@ -9,6 +12,7 @@ import '../../../../core/utils/net_ui.dart';
 import '../../../../core/utils/user_club_resolver.dart';
 import '../../../../core/models/user_club.dart';
 import '../../../../models/part_request_dto.dart';
+import '../../../../models/parts_catalog_response_dto.dart';
 import '../../../../shared/widgets/buttons/custom_button.dart';
 
 /// Экран создания новой заявки на обслуживание
@@ -25,12 +29,14 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
   final _formKey = GlobalKey<FormState>();
   final _repo = MaintenanceRepository();
   final _userRepository = UserRepository();
+  final _partsRepository = PartsRepository();
 
   final _notesController = TextEditingController();
   final _laneController = TextEditingController();
   final _catalogNumberController = TextEditingController();
   final _partNameController = TextEditingController();
   final _quantityController = TextEditingController();
+  Timer? _partsSearchDebounce;
 
   bool _isLoading = true;
   bool _hasError = false;
@@ -40,6 +46,9 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
   List<UserClub> _clubs = const [];
 
   List<RequestedPartDto> requestedParts = [];
+  List<PartsCatalogResponseDto> _partSuggestions = const <PartsCatalogResponseDto>[];
+  bool _isSearchingParts = false;
+  PartsCatalogResponseDto? _selectedCatalogPart;
 
   @override
   void initState() {
@@ -54,6 +63,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     _catalogNumberController.dispose();
     _partNameController.dispose();
     _quantityController.dispose();
+    _partsSearchDebounce?.cancel();
     super.dispose();
   }
 
@@ -92,12 +102,8 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
   }
 
   void _addPart() {
-    if (_catalogNumberController.text.trim().isEmpty) {
-      showSnack(context, 'Укажите каталожный номер');
-      return;
-    }
-    if (_partNameController.text.trim().isEmpty) {
-      showSnack(context, 'Укажите название запчасти');
+    if (_selectedCatalogPart == null) {
+      showSnack(context, 'Выберите запчасть из каталога');
       return;
     }
     final quantity = int.tryParse(_quantityController.text.trim());
@@ -108,19 +114,78 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
 
     setState(() {
       requestedParts.add(RequestedPartDto(
-        catalogNumber: _catalogNumberController.text.trim(),
-        partName: _partNameController.text.trim(),
+        catalogNumber: _selectedCatalogPart!.catalogNumber,
+        partName: _resolvePartDisplayName(_selectedCatalogPart!),
         quantity: quantity,
       ));
       _catalogNumberController.clear();
       _partNameController.clear();
       _quantityController.clear();
+      _selectedCatalogPart = null;
+      _partSuggestions = const <PartsCatalogResponseDto>[];
     });
   }
 
   void _removePart(int index) {
     setState(() {
       requestedParts.removeAt(index);
+    });
+  }
+
+  String _resolvePartDisplayName(PartsCatalogResponseDto part) {
+    final names = [part.commonName, part.officialNameRu, part.officialNameEn];
+    for (final name in names) {
+      if (name != null && name.trim().isNotEmpty) {
+        return name.trim();
+      }
+    }
+    return part.catalogNumber;
+  }
+
+  void _onPartNameChanged(String value) {
+    _partsSearchDebounce?.cancel();
+    _selectedCatalogPart = null;
+    _catalogNumberController.clear();
+    final trimmed = value.trim();
+    if (trimmed.length < 2) {
+      setState(() {
+        _partSuggestions = const <PartsCatalogResponseDto>[];
+        _isSearchingParts = false;
+      });
+      return;
+    }
+    _partsSearchDebounce = Timer(const Duration(milliseconds: 350), () {
+      _searchParts(trimmed);
+    });
+  }
+
+  Future<void> _searchParts(String query) async {
+    setState(() {
+      _isSearchingParts = true;
+    });
+    try {
+      final results = await _partsRepository.search(query);
+      if (!mounted) return;
+      setState(() {
+        _partSuggestions = results.take(10).toList();
+        _isSearchingParts = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _partSuggestions = const <PartsCatalogResponseDto>[];
+        _isSearchingParts = false;
+      });
+    }
+  }
+
+  void _selectSuggestedPart(PartsCatalogResponseDto part) {
+    _partsSearchDebounce?.cancel();
+    setState(() {
+      _selectedCatalogPart = part;
+      _partNameController.text = _resolvePartDisplayName(part);
+      _catalogNumberController.text = part.catalogNumber;
+      _partSuggestions = const <PartsCatalogResponseDto>[];
     });
   }
 
@@ -317,34 +382,22 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
           ),
           const SizedBox(height: 16),
 
+          // Название запчасти
+          _buildPartNameSelector(),
+          const SizedBox(height: 16),
+
           // Каталожный номер
           _buildTextField(
             label: 'Каталожный номер',
-            hint: 'Введите каталожный номер',
+            hint: 'Будет заполнен автоматически',
             controller: _catalogNumberController,
+            readOnly: true,
             validator: (value) {
               if (requestedParts.isNotEmpty) {
                 return null;
               }
-              if (value == null || value.trim().isEmpty) {
-                return 'Укажите каталожный номер';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
-
-          // Название запчасти
-          _buildTextField(
-            label: 'Название запчасти *',
-            hint: 'Введите название',
-            controller: _partNameController,
-            validator: (value) {
-              if (requestedParts.isNotEmpty) {
-                return null;
-              }
-              if (value == null || value.trim().isEmpty) {
-                return 'Укажите название';
+              if (_selectedCatalogPart == null) {
+                return 'Выберите запчасть из каталога';
               }
               return null;
             },
@@ -506,6 +559,73 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     );
   }
 
+  Widget _buildPartNameSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Название запчасти *',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _partNameController,
+          decoration: _inputDecoration(hint: 'Начните вводить название запчасти'),
+          validator: (value) {
+            if (requestedParts.isNotEmpty) {
+              return null;
+            }
+            if (_selectedCatalogPart == null) {
+              return 'Выберите запчасть из каталога';
+            }
+            return null;
+          },
+          onChanged: _onPartNameChanged,
+        ),
+        if (_isSearchingParts)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: LinearProgressIndicator(minHeight: 2),
+          ),
+        if (_partSuggestions.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.lightGray),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemBuilder: (context, index) {
+                final part = _partSuggestions[index];
+                final manufacturer = part.manufacturerName;
+                final subtitle = manufacturer != null && manufacturer.trim().isNotEmpty
+                    ? '${part.catalogNumber} · ${manufacturer.trim()}'
+                    : part.catalogNumber;
+                return ListTile(
+                  leading: const Icon(Icons.settings_suggest_rounded, color: AppColors.primary),
+                  title: Text(_resolvePartDisplayName(part)),
+                  subtitle: Text(subtitle),
+                  onTap: () => _selectSuggestedPart(part),
+                );
+              },
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemCount: _partSuggestions.length,
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildTextField({
     required String label,
     required String hint,
@@ -513,6 +633,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     String? Function(String?)? validator,
     void Function(String)? onChanged,
     TextEditingController? controller,
+    bool readOnly = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -525,6 +646,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
+          readOnly: readOnly,
           decoration: _inputDecoration(hint: hint),
           validator: validator,
           onChanged: onChanged,

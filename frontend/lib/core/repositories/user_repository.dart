@@ -12,7 +12,7 @@ class UserRepository {
         '/api/auth/me',
         options: Options(
           responseType: ResponseType.json,
-          headers: const {
+          headers: {
             'Accept': 'application/json',
           },
         ),
@@ -28,9 +28,13 @@ class UserRepository {
       if (root is ApiException) {
         throw root;
       }
+      final statusCode = error.response?.statusCode;
+      if (statusCode == 403) {
+        throw ApiException('Доступ запрещён', statusCode: statusCode);
+      }
       throw ApiException(
         'Не удалось загрузить профиль пользователя',
-        statusCode: error.response?.statusCode,
+        statusCode: statusCode,
       );
     }
   }
