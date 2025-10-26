@@ -173,6 +173,7 @@ public class ClubStaffService {
 
         user.setMechanicProfile(profile);
         userRepository.save(user);
+        mechanicProfileRepository.save(profile);
 
         registerClubStaff(club, user, role, requestedBy);
 
@@ -318,6 +319,12 @@ public class ClubStaffService {
         return Optional.ofNullable(candidate)
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
+                .map(trimmed -> {
+                    if (trimmed.length() < 6 || trimmed.length() > 32) {
+                        throw new IllegalArgumentException("Password must be between 6 and 32 characters");
+                    }
+                    return trimmed;
+                })
                 .orElseGet(this::generatePassword);
     }
 
