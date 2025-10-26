@@ -8,12 +8,18 @@ class UserRepository {
 
   Future<Map<String, dynamic>> me() async {
     try {
+      final token = await ApiCore().storage.read(key: 'jwt_token');
+      if (token == null || token.isEmpty) {
+        throw ApiException('Требуется авторизация', statusCode: 401);
+      }
+
       final response = await _dio.get(
         '/api/auth/me',
         options: Options(
           responseType: ResponseType.json,
           headers: {
             'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
           },
         ),
       );

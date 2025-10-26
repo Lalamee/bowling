@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../core/repositories/maintenance_repository.dart';
-import '../../../../core/repositories/parts_repository.dart';
+import '../../../../core/repositories/inventory_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/routing/routes.dart';
 import '../../../../core/services/auth_service.dart';
@@ -12,7 +12,7 @@ import '../../../../core/utils/net_ui.dart';
 import '../../../../core/utils/user_club_resolver.dart';
 import '../../../../core/models/user_club.dart';
 import '../../../../models/part_request_dto.dart';
-import '../../../../models/parts_catalog_response_dto.dart';
+import '../../../../models/part_dto.dart';
 import '../../../../shared/widgets/buttons/custom_button.dart';
 
 /// Экран создания новой заявки на обслуживание
@@ -29,7 +29,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
   final _formKey = GlobalKey<FormState>();
   final _repo = MaintenanceRepository();
   final _userRepository = UserRepository();
-  final _partsRepository = PartsRepository();
+  final _inventoryRepository = InventoryRepository();
 
   final _notesController = TextEditingController();
   final _laneController = TextEditingController();
@@ -46,9 +46,9 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
   List<UserClub> _clubs = const [];
 
   List<RequestedPartDto> requestedParts = [];
-  List<PartsCatalogResponseDto> _partSuggestions = const <PartsCatalogResponseDto>[];
+  List<PartDto> _partSuggestions = const <PartDto>[];
   bool _isSearchingParts = false;
-  PartsCatalogResponseDto? _selectedCatalogPart;
+  PartDto? _selectedCatalogPart;
 
   @override
   void initState() {
@@ -112,17 +112,39 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       return;
     }
 
+    final selected = _selectedCatalogPart!;
+    final available = selected.quantity;
+    final alreadyRequested = requestedParts
+        .where((item) => item.catalogNumber == selected.catalogNumber)
+        .fold<int>(0, (sum, item) => sum + item.quantity);
+    final totalRequested = alreadyRequested + quantity;
+
+    if (available != null && totalRequested > available) {
+      showSnack(context, 'На складе доступно только $available шт.');
+      return;
+    }
+
     setState(() {
-      requestedParts.add(RequestedPartDto(
-        catalogNumber: _selectedCatalogPart!.catalogNumber,
-        partName: _resolvePartDisplayName(_selectedCatalogPart!),
-        quantity: quantity,
-      ));
+      final existingIndex = requestedParts.indexWhere((item) => item.catalogNumber == selected.catalogNumber);
+      if (existingIndex >= 0) {
+        final existing = requestedParts[existingIndex];
+        requestedParts[existingIndex] = RequestedPartDto(
+          catalogNumber: existing.catalogNumber,
+          partName: existing.partName,
+          quantity: totalRequested,
+        );
+      } else {
+        requestedParts.add(RequestedPartDto(
+          catalogNumber: selected.catalogNumber,
+          partName: _resolvePartDisplayName(selected),
+          quantity: quantity,
+        ));
+      }
       _catalogNumberController.clear();
       _partNameController.clear();
       _quantityController.clear();
       _selectedCatalogPart = null;
-      _partSuggestions = const <PartsCatalogResponseDto>[];
+      _partSuggestions = const <PartDto>[];
     });
   }
 
@@ -132,7 +154,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     });
   }
 
-  String _resolvePartDisplayName(PartsCatalogResponseDto part) {
+  String _resolvePartDisplayName(PartDto part) {
     final names = [part.commonName, part.officialNameRu, part.officialNameEn];
     for (final name in names) {
       if (name != null && name.trim().isNotEmpty) {
@@ -149,7 +171,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     final trimmed = value.trim();
     if (trimmed.length < 2) {
       setState(() {
-        _partSuggestions = const <PartsCatalogResponseDto>[];
+        _partSuggestions = const <PartDto>[];
         _isSearchingParts = false;
       });
       return;
@@ -164,7 +186,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       _isSearchingParts = true;
     });
     try {
-      final results = await _partsRepository.search(query);
+      final results = await _inventoryRepository.search(query, clubId: _selectedClubId);
       if (!mounted) return;
       setState(() {
         _partSuggestions = results.take(10).toList();
@@ -173,19 +195,19 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _partSuggestions = const <PartsCatalogResponseDto>[];
+        _partSuggestions = const <PartDto>[];
         _isSearchingParts = false;
       });
     }
   }
 
-  void _selectSuggestedPart(PartsCatalogResponseDto part) {
+  void _selectSuggestedPart(PartDto part) {
     _partsSearchDebounce?.cancel();
     setState(() {
       _selectedCatalogPart = part;
       _partNameController.text = _resolvePartDisplayName(part);
       _catalogNumberController.text = part.catalogNumber;
-      _partSuggestions = const <PartsCatalogResponseDto>[];
+      _partSuggestions = const <PartDto>[];
     });
   }
 
@@ -607,10 +629,16 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
               physics: const NeverScrollableScrollPhysics(),
               itemBuilder: (context, index) {
                 final part = _partSuggestions[index];
-                final manufacturer = part.manufacturerName;
-                final subtitle = manufacturer != null && manufacturer.trim().isNotEmpty
-                    ? '${part.catalogNumber} · ${manufacturer.trim()}'
-                    : part.catalogNumber;
+                final quantity = part.quantity;
+                final subtitleBuffer = StringBuffer(part.catalogNumber);
+                if (quantity != null) {
+                  subtitleBuffer.write(' · Остаток: $quantity');
+                }
+                final location = part.location;
+                if (location != null && location.trim().isNotEmpty) {
+                  subtitleBuffer.write(' · ${location.trim()}');
+                }
+                final subtitle = subtitleBuffer.toString();
                 return ListTile(
                   leading: const Icon(Icons.settings_suggest_rounded, color: AppColors.primary),
                   title: Text(_resolvePartDisplayName(part)),
