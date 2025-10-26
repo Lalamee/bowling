@@ -35,18 +35,18 @@ class PartRequestDto {
 }
 
 class RequestedPartDto {
-  final int inventoryId;
-  final int catalogId;
-  final String catalogNumber;
+  final int? inventoryId;
+  final int? catalogId;
+  final String? catalogNumber;
   final String partName;
   final int quantity;
   final int? warehouseId;
   final String? location;
 
   RequestedPartDto({
-    required this.inventoryId,
-    required this.catalogId,
-    required this.catalogNumber,
+    this.inventoryId,
+    this.catalogId,
+    this.catalogNumber,
     required this.partName,
     required this.quantity,
     this.warehouseId,
@@ -73,11 +73,10 @@ class RequestedPartDto {
 
     final dynamic inventoryRaw = json['inventoryId'] ?? json['inventory_id'];
     final dynamic catalogRaw = json['catalogId'] ?? json['catalog_id'];
-    final dynamic fallbackId = json['partId'] ?? json['id'];
     return RequestedPartDto(
-      inventoryId: _parseId(inventoryRaw ?? fallbackId),
-      catalogId: _parseId(catalogRaw ?? fallbackId),
-      catalogNumber: json['catalogNumber']?.toString() ?? '',
+      inventoryId: inventoryRaw != null ? _parseId(inventoryRaw) : null,
+      catalogId: catalogRaw != null ? _parseId(catalogRaw) : null,
+      catalogNumber: json['catalogNumber']?.toString(),
       partName: json['partName'] as String,
       quantity: (json['quantity'] as num).toInt(),
       warehouseId: (json['warehouseId'] as num?)?.toInt(),
