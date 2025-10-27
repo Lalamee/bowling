@@ -186,7 +186,7 @@ public class MaintenanceRequestService {
                         throw new IllegalStateException("Parts cannot be added to closed or completed requests");
                 }
 
-                validateRequestedParts(partsToAdd);
+                validateRequestedParts(partsToAdd, request.getClub());
 
                 for (PartRequestDTO.RequestedPartDTO partDTO : partsToAdd) {
                         RequestPart requestPart = buildRequestPart(request, partDTO);
@@ -261,7 +261,7 @@ public class MaintenanceRequestService {
 						.warehouseId(partUpdate.getWarehouseId())
 						.location(partUpdate.getLocation())
 						.build();
-					validateRequestedParts(List.of(newPart));
+                                        validateRequestedParts(List.of(newPart), savedRequest.getClub());
 					RequestPart requestPart = buildRequestPart(savedRequest, newPart);
 					requestPartRepository.save(requestPart);
 				}
