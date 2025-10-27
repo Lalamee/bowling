@@ -1,7 +1,9 @@
 package ru.bowling.bowlingapp.Controller;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -9,16 +11,15 @@ import org.springframework.web.bind.annotation.RestController;
 import ru.bowling.bowlingapp.DTO.GlobalSearchResponseDTO;
 import ru.bowling.bowlingapp.Security.UserPrincipal;
 import ru.bowling.bowlingapp.Service.GlobalSearchService;
+import ru.bowling.bowlingapp.Service.AuthService;
 
 @RestController
 @RequestMapping("/api/search")
+@RequiredArgsConstructor
 public class SearchController {
 
     private final GlobalSearchService globalSearchService;
-
-    public SearchController(GlobalSearchService globalSearchService) {
-        this.globalSearchService = globalSearchService;
-    }
+    private final AuthService authService;
 
     @GetMapping("/global")
     public ResponseEntity<GlobalSearchResponseDTO> search(
@@ -26,12 +27,17 @@ public class SearchController {
             @RequestParam(value = "limit", required = false) Integer limit,
             Authentication authentication
     ) {
-        if (authentication == null || !(authentication.getPrincipal() instanceof UserPrincipal userPrincipal)) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+
+        Long userId = resolveUserId(authentication);
+        if (userId == null) {
             return ResponseEntity.status(401).build();
         }
 
         int resolvedLimit = resolveLimit(limit);
-        GlobalSearchResponseDTO response = globalSearchService.search(query, resolvedLimit, userPrincipal.getId());
+        GlobalSearchResponseDTO response = globalSearchService.search(query, resolvedLimit, userId);
         return ResponseEntity.ok(response);
     }
 
@@ -41,5 +47,23 @@ public class SearchController {
         }
         int normalized = Math.max(1, Math.min(limit, 20));
         return normalized;
+    }
+
+    private Long resolveUserId(Authentication authentication) {
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserPrincipal userPrincipal && userPrincipal.getId() != null) {
+            return userPrincipal.getId();
+        }
+
+        String login = authentication.getName();
+        if (login == null || login.isBlank()) {
+            return null;
+        }
+
+        try {
+            return authService.findUserByPhone(login).getUserId();
+        } catch (UsernameNotFoundException ex) {
+            return null;
+        }
     }
 }
