@@ -17,7 +17,6 @@ import ru.bowling.bowlingapp.Repository.RoleRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -62,7 +61,7 @@ public class UserRepositoryIntegrationTest {
                 .passwordHash("hashed_password")
                 .role(savedRole)
                 .accountType(savedAccountType)
-                .registrationDate(LocalDateTime.now())
+                .registrationDate(LocalDate.now())
                 .isActive(true)
                 .isVerified(true)
                 .build();
