@@ -120,7 +120,7 @@ public class AuthService implements UserDetailsService {
 
     private boolean isOwnerAccountType(String accountTypeName) {
         String normalized = normalizeAccountTypeName(accountTypeName);
-        return "CLUBOWNER".equals(normalized)
+        return "CLUB_OWNER".equals(normalized)
                 || "ВЛАДЕЛЕЦ".equals(normalized);
     }
 
