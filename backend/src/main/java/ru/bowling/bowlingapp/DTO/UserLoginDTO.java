@@ -3,9 +3,11 @@ package ru.bowling.bowlingapp.DTO;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @AllArgsConstructor
+@NoArgsConstructor
 public class UserLoginDTO {
     @NotBlank(message = "Phone is required")
     private String phone;

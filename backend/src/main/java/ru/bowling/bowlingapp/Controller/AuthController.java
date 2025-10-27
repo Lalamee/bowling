@@ -8,6 +8,9 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
 import ru.bowling.bowlingapp.Config.JwtTokenProvider;
 import ru.bowling.bowlingapp.DTO.*;
@@ -37,26 +40,56 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody UserLoginDTO loginDto) {
-        User user = authService.authenticateUser(loginDto.getPhone(), loginDto.getPassword());
-
-        if (!user.getIsActive()) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(StandardResponseDTO.builder().message("Account is deactivated").status("error").build());
-        }
-
+        Authentication authentication;
         try {
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(loginDto.getPhone(), loginDto.getPassword())
-            );
-        } catch (AuthenticationException e) {
+            String phone = loginDto.getPhone() != null ? loginDto.getPhone().trim() : null;
+            UsernamePasswordAuthenticationToken authRequest =
+                    new UsernamePasswordAuthenticationToken(phone, loginDto.getPassword());
+            authentication = authenticationManager.authenticate(authRequest);
+        } catch (AuthenticationException ex) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(StandardResponseDTO.builder().message("Invalid phone or password").status("error").build());
+        }
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        String authenticatedPhone = resolveAuthenticatedPhone(authentication);
+        if (authenticatedPhone == null || authenticatedPhone.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(StandardResponseDTO.builder().message("Invalid phone or password").status("error").build());
+        }
+
+        User user;
+        try {
+            user = authService.findUserByPhone(authenticatedPhone);
+        } catch (UsernameNotFoundException ex) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(StandardResponseDTO.builder().message("Invalid phone or password").status("error").build());
+        }
+
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(StandardResponseDTO.builder().message("Account is deactivated").status("error").build());
         }
 
         String accessToken = jwtTokenProvider.generateAccessToken(user);
         String refreshToken = jwtTokenProvider.generateRefreshToken(user);
         LoginResponseDTO response = new LoginResponseDTO(accessToken, refreshToken);
         return ResponseEntity.ok(response);
+    }
+
+    private String resolveAuthenticatedPhone(Authentication authentication) {
+        if (authentication == null) {
+            return null;
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserDetails userDetails) {
+            return userDetails.getUsername();
+        }
+        if (principal instanceof String principalName) {
+            return principalName;
+        }
+        return authentication.getName();
     }
 
     @PostMapping("/refresh")

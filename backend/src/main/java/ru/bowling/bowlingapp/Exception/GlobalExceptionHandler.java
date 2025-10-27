@@ -7,6 +7,8 @@ import jakarta.validation.ValidationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -61,11 +63,17 @@ public class GlobalExceptionHandler {
 				.body(buildError(request, HttpStatus.UNAUTHORIZED, "JWT_INVALID", "Недействительный или истёкший токен"));
 	}
 
-	@ExceptionHandler(IllegalArgumentException.class)
-	public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-				.body(buildError(request, HttpStatus.BAD_REQUEST, "BAD_REQUEST", ex.getMessage()));
-	}
+        @ExceptionHandler({IllegalArgumentException.class})
+        public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                                .body(buildError(request, HttpStatus.BAD_REQUEST, "BAD_REQUEST", ex.getMessage()));
+        }
+
+        @ExceptionHandler({UsernameNotFoundException.class, AuthenticationException.class})
+        public ResponseEntity<Map<String, Object>> handleAuthentication(RuntimeException ex, HttpServletRequest request) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                .body(buildError(request, HttpStatus.UNAUTHORIZED, "AUTHENTICATION_FAILED", "Неверный телефон или пароль"));
+        }
 
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex, HttpServletRequest request) {
