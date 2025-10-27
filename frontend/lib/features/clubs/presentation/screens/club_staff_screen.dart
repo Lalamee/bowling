@@ -293,6 +293,50 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
     }
   }
 
+  Future<void> _removeStaff(_Employee employee) async {
+    final clubId = _selectedClubId;
+    final userId = employee.userId;
+
+    if (clubId == null) {
+      showSnack(context, 'Сначала выберите клуб');
+      return;
+    }
+
+    if (userId == null) {
+      showSnack(context, 'Не удалось определить пользователя');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удаление сотрудника'),
+        content: Text('Вы уверены, что хотите удалить ${employee.fio}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Удалить')),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final result = await handleApiCall<bool>(
+      context,
+      () => _repo.removeStaff(clubId, userId),
+    );
+
+    if (!mounted) return;
+
+    if (result == true) {
+      _pendingPasswords.remove(userId);
+      showSnack(context, 'Сотрудник удалён', success: true);
+      await _loadStaff(clubId: clubId);
+    } else if (result == false) {
+      showSnack(context, 'Не удалось удалить сотрудника');
+    }
+  }
+
   Future<void> _showCredentialsDialog(String phone, String password) async {
     if (!mounted) return;
     await showDialog<void>(
@@ -393,7 +437,7 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
             employee: e,
             dec: _dec,
             suffixEdit: _suffixEdit,
-            onDelete: () => setState(() => _employees.remove(e)),
+            onDelete: () => _removeStaff(e),
             onChangeRole: (v) => setState(() {
               e.roleLabel = v;
               e.roleKey = _roleKeyForRequest(v);
