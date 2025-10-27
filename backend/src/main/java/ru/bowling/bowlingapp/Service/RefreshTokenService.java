@@ -36,23 +36,33 @@ public class RefreshTokenService {
                 }
 
                 String tokenHash = hash(refreshToken);
-                refreshTokenRepository.findByTokenHash(tokenHash).ifPresent(existing -> {
-                        refreshTokenRepository.delete(existing);
-                });
 
                 var expirationDate = jwtTokenProvider.getExpirationDate(refreshToken);
                 if (expirationDate == null) {
                         throw new InvalidRefreshTokenException("Не удалось определить срок действия refresh токена");
                 }
+                LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
                 LocalDateTime expiresAt = LocalDateTime.ofInstant(expirationDate.toInstant(), ZoneOffset.UTC);
 
-                RefreshToken entity = RefreshToken.builder()
-                                .user(user)
-                                .tokenHash(tokenHash)
-                                .issuedAt(LocalDateTime.now(ZoneOffset.UTC))
-                                .expiresAt(expiresAt)
-                                .revoked(false)
-                                .build();
+                RefreshToken entity = refreshTokenRepository.findByTokenHash(tokenHash)
+                                .map(existing -> {
+                                        existing.setUser(user);
+                                        existing.setIssuedAt(now);
+                                        existing.setExpiresAt(expiresAt);
+                                        existing.setRevoked(false);
+                                        existing.setRevokedAt(null);
+                                        existing.setRevocationReason(null);
+                                        existing.setReplacedByTokenHash(null);
+                                        existing.setTokenHash(tokenHash);
+                                        return existing;
+                                })
+                                .orElseGet(() -> RefreshToken.builder()
+                                                .user(user)
+                                                .tokenHash(tokenHash)
+                                                .issuedAt(now)
+                                                .expiresAt(expiresAt)
+                                                .revoked(false)
+                                                .build());
 
                 RefreshToken saved = refreshTokenRepository.save(entity);
                 purgeExpiredTokens(user);
