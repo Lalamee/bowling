@@ -106,7 +106,13 @@ class _ClubScreenState extends State<ClubScreen> {
 
     final result = await Navigator.push<MaintenanceRequestResponseDto>(
       context,
-      MaterialPageRoute(builder: (_) => AddPartsToOrderScreen(order: selectedOrder)),
+      MaterialPageRoute(
+        builder: (_) => AddPartsToOrderScreen(
+          order: selectedOrder,
+          clubId: selected.id,
+          clubName: selected.name,
+        ),
+      ),
     );
 
     if (result != null && mounted) {

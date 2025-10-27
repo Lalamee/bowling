@@ -13,8 +13,15 @@ import '../../../../shared/widgets/buttons/custom_button.dart';
 
 class AddPartsToOrderScreen extends StatefulWidget {
   final MaintenanceRequestResponseDto order;
+  final int clubId;
+  final String? clubName;
 
-  const AddPartsToOrderScreen({super.key, required this.order});
+  const AddPartsToOrderScreen({
+    super.key,
+    required this.order,
+    required this.clubId,
+    this.clubName,
+  });
 
   @override
   State<AddPartsToOrderScreen> createState() => _AddPartsToOrderScreenState();
@@ -37,6 +44,20 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
 
   MaintenanceRequestResponseDto get order => widget.order;
 
+  int get _resolvedClubId => order.clubId ?? widget.clubId;
+
+  String? get _resolvedClubName {
+    final fromOrder = order.clubName?.trim();
+    if (fromOrder != null && fromOrder.isNotEmpty) {
+      return fromOrder;
+    }
+    final fallback = widget.clubName?.trim();
+    if (fallback != null && fallback.isNotEmpty) {
+      return fallback;
+    }
+    return null;
+  }
+
   @override
   void dispose() {
     _catalogController.dispose();
@@ -56,7 +77,7 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _OrderSummaryCard(order: order),
+          _OrderSummaryCard(order: order, clubNameOverride: _resolvedClubName),
           const SizedBox(height: 16),
           _ExistingPartsList(order: order),
           const SizedBox(height: 24),
@@ -175,7 +196,7 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
             catalogNumber: _resolveCatalogNumber(selected),
             partName: _resolvePartDisplayName(selected),
             quantity: quantity,
-            warehouseId: selected.warehouseId ?? order.clubId,
+            warehouseId: selected.warehouseId ?? _resolvedClubId,
             location: selected.location,
           ),
         );
@@ -384,7 +405,7 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
     try {
       final results = await _inventoryRepository.search(
         query,
-        clubId: order.clubId,
+        clubId: _resolvedClubId,
       );
       if (!mounted) return;
       setState(() {
@@ -431,11 +452,15 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
 
 class _OrderSummaryCard extends StatelessWidget {
   final MaintenanceRequestResponseDto order;
+  final String? clubNameOverride;
 
-  const _OrderSummaryCard({required this.order});
+  const _OrderSummaryCard({required this.order, this.clubNameOverride});
 
   @override
   Widget build(BuildContext context) {
+    final resolvedClubName = clubNameOverride ?? order.clubName;
+    final trimmedClubName = resolvedClubName?.trim();
+
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
@@ -444,9 +469,9 @@ class _OrderSummaryCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Заявка №${order.requestId}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textDark)),
-            if (order.clubName != null && order.clubName!.isNotEmpty) ...[
+            if (trimmedClubName != null && trimmedClubName.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text(order.clubName!, style: const TextStyle(color: AppColors.darkGray)),
+              Text(trimmedClubName, style: const TextStyle(color: AppColors.darkGray)),
             ],
             if (order.laneNumber != null) ...[
               const SizedBox(height: 4),
