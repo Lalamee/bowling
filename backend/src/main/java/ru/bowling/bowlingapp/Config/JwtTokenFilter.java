@@ -49,18 +49,24 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                     filterChain.doFilter(request, response);
                     return;
                 } else {
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.getWriter().write("Invalid or expired token");
+                    writeUnauthorized(response, "Invalid or expired token");
                     return;
                 }
             } catch (Exception ex) {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.getWriter().write("Invalid or expired token");
+                writeUnauthorized(response, "Invalid or expired token");
                 return;
             }
         }
 
         // No token and not a public path: continue; endpoint security will enforce access.
         filterChain.doFilter(request, response);
+    }
+
+    private void writeUnauthorized(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        String payload = String.format("{\"status\":\"error\",\"message\":\"%s\"}", message.replace("\"", "\\\""));
+        response.getWriter().write(payload);
     }
 }

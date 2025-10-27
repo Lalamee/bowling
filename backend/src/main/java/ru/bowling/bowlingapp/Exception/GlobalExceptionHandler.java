@@ -55,11 +55,17 @@ public class GlobalExceptionHandler {
 				.body(buildError(request, HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Доступ запрещён"));
 	}
 
-	@ExceptionHandler(JWTVerificationException.class)
-	public ResponseEntity<Map<String, Object>> handleJwt(JWTVerificationException ex, HttpServletRequest request) {
-		return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-				.body(buildError(request, HttpStatus.UNAUTHORIZED, "JWT_INVALID", "Недействительный или истёкший токен"));
-	}
+        @ExceptionHandler(JWTVerificationException.class)
+        public ResponseEntity<Map<String, Object>> handleJwt(JWTVerificationException ex, HttpServletRequest request) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                .body(buildError(request, HttpStatus.UNAUTHORIZED, "JWT_INVALID", "Недействительный или истёкший токен"));
+        }
+
+        @ExceptionHandler(InvalidRefreshTokenException.class)
+        public ResponseEntity<Map<String, Object>> handleInvalidRefreshToken(InvalidRefreshTokenException ex, HttpServletRequest request) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                .body(buildError(request, HttpStatus.UNAUTHORIZED, "REFRESH_TOKEN_INVALID", ex.getMessage()));
+        }
 
 	@ExceptionHandler(IllegalArgumentException.class)
 	public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {

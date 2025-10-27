@@ -88,4 +88,13 @@ public class JwtTokenProvider {
             throw new IllegalArgumentException("Invalid JWT token", e);
         }
     }
+
+    public Date getExpirationDate(String token) {
+        try {
+            DecodedJWT decoded = JWT.require(algorithm).build().verify(token);
+            return decoded.getExpiresAt();
+        } catch (JWTVerificationException e) {
+            throw new IllegalArgumentException("Invalid JWT token", e);
+        }
+    }
 }
