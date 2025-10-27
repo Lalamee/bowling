@@ -26,6 +26,7 @@ class OwnerProfileScreen extends StatefulWidget {
 class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
   final UserRepository _repo = UserRepository();
   late OwnerProfile profile;
+  static const String _ownerStatusLabel = 'Собственник';
   bool _isLoading = true;
   bool _hasError = false;
   String? email;
@@ -44,7 +45,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
       address: '—',
       workplaceVerified: false,
       birthDate: DateTime(1989, 1, 1),
-      status: 'Собственник',
+      status: _ownerStatusLabel,
     );
     _loadLocalProfile();
     _load();
@@ -66,13 +67,6 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
       }
       final me = await _repo.me();
       if (!mounted) return;
-      if (me == null) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
-        return;
-      }
       final cache = _mapApiToCache(me);
       await LocalAuthStorage.saveOwnerProfile(cache);
       if (!mounted) return;
@@ -99,7 +93,6 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
     final clubs = <String>[];
     String? clubName;
     String? address;
-    String? status;
     String? contactEmail;
     String? contactInn;
     String? clubEquipment;
@@ -173,7 +166,6 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
       contactPhone = asString(map['contactPhone']);
       contactEmail = asString(map['contactEmail']);
       contactInn = asString(map['inn']);
-      status = asString(map['status']) ?? profile.status;
       clubEquipment = asString(map['equipment']);
       clubLanes = asString(map['lanes']);
     }
@@ -199,7 +191,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
       'phone': phone,
       'clubName': clubName ?? (clubs.isNotEmpty ? clubs.first : profile.clubName),
       'address': address ?? profile.address,
-      'status': status ?? profile.status,
+      'status': _ownerStatusLabel,
       'clubs': clubs,
       'workplaceVerified': verified,
       'email': contactEmail ?? asString(me['email']),
@@ -229,7 +221,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
       phone: asString(raw['phone']) ?? profile.phone,
       clubName: asString(raw['clubName']) ?? (clubs.isNotEmpty ? clubs.first : profile.clubName),
       address: asString(raw['address']) ?? profile.address,
-      status: asString(raw['status']) ?? profile.status,
+      status: _ownerStatusLabel,
       clubs: clubs.isNotEmpty ? clubs : profile.clubs,
       workplaceVerified: raw['workplaceVerified'] as bool? ?? profile.workplaceVerified,
     );

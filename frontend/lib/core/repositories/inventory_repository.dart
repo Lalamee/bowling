@@ -12,18 +12,18 @@ class InventoryRepository {
     if (clubId != null) {
       params['clubId'] = clubId;
     }
-    final res = await _dio.get('/inventory/search', queryParameters: params);
+    final res = await _dio.get('/api/inventory/search', queryParameters: params);
     if (res.statusCode == 200 && res.data is List) {
       return (res.data as List)
           .whereType<Map>()
-          .map((e) => PartDto.fromJson(Map<String, dynamic>.from(e)))
+          .map((e) => PartDto.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     }
     return [];
   }
 
   Future<PartDto?> getById(String id) async {
-    final res = await _dio.get('/inventory/$id');
+    final res = await _dio.get('/api/inventory/$id');
     if (res.statusCode == 200 && res.data is Map) {
       return PartDto.fromJson(Map<String, dynamic>.from(res.data as Map));
     }

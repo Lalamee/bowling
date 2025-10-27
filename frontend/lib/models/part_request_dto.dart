@@ -35,27 +35,52 @@ class PartRequestDto {
 }
 
 class RequestedPartDto {
-  final String catalogNumber;
+  final int? inventoryId;
+  final int? catalogId;
+  final String? catalogNumber;
   final String partName;
   final int quantity;
+  final int? warehouseId;
+  final String? location;
 
   RequestedPartDto({
-    required this.catalogNumber,
+    this.inventoryId,
+    this.catalogId,
+    this.catalogNumber,
     required this.partName,
     required this.quantity,
+    this.warehouseId,
+    this.location,
   });
 
   Map<String, dynamic> toJson() => {
+        'inventoryId': inventoryId,
+        'catalogId': catalogId,
         'catalogNumber': catalogNumber,
         'partName': partName,
         'quantity': quantity,
+        'warehouseId': warehouseId,
+        'location': location,
       };
 
   factory RequestedPartDto.fromJson(Map<String, dynamic> json) {
+    int _parseId(dynamic value) {
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    final dynamic inventoryRaw = json['inventoryId'] ?? json['inventory_id'];
+    final dynamic catalogRaw = json['catalogId'] ?? json['catalog_id'];
     return RequestedPartDto(
-      catalogNumber: json['catalogNumber']?.toString() ?? '',
+      inventoryId: inventoryRaw != null ? _parseId(inventoryRaw) : null,
+      catalogId: catalogRaw != null ? _parseId(catalogRaw) : null,
+      catalogNumber: json['catalogNumber']?.toString(),
       partName: json['partName'] as String,
       quantity: (json['quantity'] as num).toInt(),
+      warehouseId: (json['warehouseId'] as num?)?.toInt(),
+      location: json['location']?.toString(),
     );
   }
 }

@@ -34,15 +34,22 @@ public class PartRequestDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class RequestedPartDTO {
-        
-        @NotBlank(message = "Catalog number is required")
+
+        private Long inventoryId;
+
+        private Long catalogId;
+
         private String catalogNumber;
-        
-        @NotNull(message = "Part name is required")
+
+        @NotBlank(message = "Part name is required")
         private String partName;
-        
+
         @NotNull(message = "Quantity is required")
         @Positive(message = "Quantity must be positive")
         private Integer quantity;
+
+        private Integer warehouseId;
+
+        private String location;
     }
 }

@@ -36,7 +36,7 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
   String? selectedEquipment;
 
   final List<String> _equipmentOptions = ['AMF', 'Brunswick', 'VIA', 'XIMA', 'другое'];
-  final List<String> _statusOptions = ['ИП', 'Самозанятый', 'Юр. лицо'];
+  final List<String> _statusOptions = ['ИП', 'Самозанятый'];
 
   GlobalKey<FormState> get formKey => _formKey;
   int get step => _step;
@@ -137,7 +137,8 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
       'phone': normalizedPhone,
       'clubName': trimmedClub,
       'address': trimmedAddress,
-      'status': trimmedStatus ?? status,
+      'status': 'Собственник',
+      if (trimmedStatus != null && trimmedStatus.isNotEmpty) 'businessStatus': trimmedStatus,
       'clubs': clubs,
       'email': trimmedEmail,
       'inn': trimmedInn,

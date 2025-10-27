@@ -2,12 +2,14 @@ package ru.bowling.bowlingapp.Controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import ru.bowling.bowlingapp.Config.JwtTokenProvider;
 import ru.bowling.bowlingapp.DTO.*;
@@ -92,13 +94,28 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> getCurrentUser(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
+    public ResponseEntity<?> getCurrentUser(
+            Authentication authentication,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader
+    ) {
+        Authentication resolvedAuth = authentication;
+
+        if ((resolvedAuth == null || !resolvedAuth.isAuthenticated())
+                && authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+            String token = authorizationHeader.substring(7);
+            try {
+                resolvedAuth = jwtTokenProvider.getAuthentication(token);
+                SecurityContextHolder.getContext().setAuthentication(resolvedAuth);
+            } catch (Exception ignored) {
+            }
+        }
+
+        if (resolvedAuth == null || !resolvedAuth.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(StandardResponseDTO.builder().message("User not authenticated").status("error").build());
         }
 
-        String login = authentication.getName();
+        String login = resolvedAuth.getName();
         return ResponseEntity.ok(authService.getCurrentUserInfo(login));
     }
 

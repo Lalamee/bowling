@@ -38,6 +38,10 @@ public class MaintenanceRequestResponseDTO {
         private String catalogNumber;
         private String partName;
         private Integer quantity;
+        private Long inventoryId;
+        private Long catalogId;
+        private Integer warehouseId;
+        private String inventoryLocation;
         private String status;
         private String rejectionReason;
         private Long supplierId;

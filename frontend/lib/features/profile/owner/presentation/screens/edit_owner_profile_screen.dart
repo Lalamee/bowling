@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 
 import '../../../../../core/theme/colors.dart';
 import '../../domain/owner_profile.dart';
-import '../../../../../shared/widgets/chips/radio_group_horizontal.dart';
 import 'owner_profile_screen.dart' show OwnerEditFocus;
 
 class EditOwnerProfileScreen extends StatefulWidget {
@@ -23,6 +22,7 @@ class EditOwnerProfileScreen extends StatefulWidget {
 
 class _EditOwnerProfileScreenState extends State<EditOwnerProfileScreen> {
   final UserRepository _repo = UserRepository();
+  static const String _ownerStatusLabel = 'Собственник';
   String fullName = '—';
   String phone = '—';
   String email = '';
@@ -37,7 +37,6 @@ class _EditOwnerProfileScreenState extends State<EditOwnerProfileScreen> {
   final _phoneFocus = FocusNode();
   final _addrFocus = FocusNode();
 
-  String _status = 'Собственник';
   int _navIndex = 3;
 
   @override
@@ -50,7 +49,6 @@ class _EditOwnerProfileScreenState extends State<EditOwnerProfileScreen> {
       _address.text = p.address;
       _phone.text = p.phone;
       _birth.text = DateFormat('dd.MM.yyyy').format(p.birthDate);
-      _status = p.status;
       final clubs = (p.clubs.isEmpty ? [p.clubName] : p.clubs);
       for (final c in clubs) {
         _clubCtrls.add(TextEditingController(text: c));
@@ -163,7 +161,7 @@ class _EditOwnerProfileScreenState extends State<EditOwnerProfileScreen> {
       phone: _phone.text.trim(),
       clubName: clubName,
       clubs: clubs,
-      status: _status,
+      status: _ownerStatusLabel,
       birthDate: DateFormat('dd.MM.yyyy').parse(_birth.text),
     );
     Navigator.pop(context, updated);
@@ -261,12 +259,27 @@ class _EditOwnerProfileScreenState extends State<EditOwnerProfileScreen> {
           TextField(controller: _address, focusNode: _addrFocus, decoration: _dec(hint: 'г. Воронеж, ул. Тверская, д. 45')),
           const SizedBox(height: 16),
 
-          const Text('Ваш статус:', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
-          const SizedBox(height: 8),
-          RadioGroupHorizontal(
-            options: const ['Собственник', 'Механик'],
-            groupValue: _status,
-            onChanged: (v) => setState(() => _status = v ?? _status),
+          const Text('Ваш статус', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0DADF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.lightGray),
+            ),
+            child: Row(
+              children: const [
+                Icon(Icons.badge_outlined, color: AppColors.primary),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Собственник',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
 

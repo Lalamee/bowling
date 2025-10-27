@@ -31,6 +31,8 @@ public class AuthService implements UserDetailsService {
     private final OwnerProfileRepository ownerProfileRepository;
     private final MechanicProfileRepository mechanicProfileRepository;
     private final ManagerProfileRepository managerProfileRepository;
+    private final AdministratorProfileRepository administratorProfileRepository;
+    private final ClubWarehouseService clubWarehouseService;
 
     private static final Pattern RUSSIAN_PHONE_PATTERN = Pattern.compile("^\\+7\\d{10}$");
 
@@ -162,6 +164,7 @@ public class AuthService implements UserDetailsService {
         MechanicProfile mechanicProfile = null;
         OwnerProfile ownerProfile = null;
         ManagerProfile managerProfile = null;
+        AdministratorProfile administratorProfile = null;
 
         if (isMechanicAccountType(accountTypeName)) {
             mechanicProfile = MechanicProfile.builder()
@@ -213,6 +216,17 @@ public class AuthService implements UserDetailsService {
                     .updatedAt(LocalDateTime.now())
                     .build();
             user.setManagerProfile(managerProfile);
+        } else if (isAdministratorAccountType(accountTypeName)) {
+            administratorProfile = AdministratorProfile.builder()
+                    .user(user)
+                    .fullName(ownerDto != null ? ownerDto.getContactPerson() : null)
+                    .contactPhone(normalizedPhone)
+                    .contactEmail(ownerDto != null ? ownerDto.getContactEmail() : null)
+                    .isDataVerified(false)
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+            user.setAdministratorProfile(administratorProfile);
         }
 
         userRepository.save(user);
@@ -225,15 +239,20 @@ public class AuthService implements UserDetailsService {
             managerProfileRepository.save(managerProfile);
         }
 
+        if (administratorProfile != null) {
+            administratorProfileRepository.save(administratorProfile);
+        }
+
         if (ownerProfile != null) {
             attachClubToOwner(ownerProfile, ownerDto, clubDto);
             ownerProfileRepository.save(ownerProfile);
         }
 
         if (mechanicClub != null) {
+            BowlingClub finalMechanicClub = mechanicClub;
             ClubStaff clubStaff = clubStaffRepository.findByClubAndUser(mechanicClub, user)
                     .orElseGet(() -> ClubStaff.builder()
-                            .club(mechanicClub)
+                            .club(finalMechanicClub)
                             .user(user)
                             .assignedAt(LocalDateTime.now())
                             .isActive(true)
@@ -336,7 +355,7 @@ public class AuthService implements UserDetailsService {
         response.put("id", user.getUserId());
         response.put("phone", user.getPhone());
         response.put("roleId", user.getRole() != null ? user.getRole().getRoleId() : null);
-        response.put("role", user.getRole() != null ? user.getRole().getName() : null);
+        response.put("role", mapRoleNameForResponse(user.getRole()));
         response.put("accountTypeId", user.getAccountType() != null ? user.getAccountType().getAccountTypeId() : null);
         response.put("accountType", user.getAccountType() != null ? user.getAccountType().getName() : null);
         response.put("isVerified", user.getIsVerified());
@@ -355,6 +374,10 @@ public class AuthService implements UserDetailsService {
 
         if (user.getManagerProfile() != null) {
             response.put("managerProfile", buildManagerProfile(user.getManagerProfile()));
+        }
+
+        if (user.getAdministratorProfile() != null) {
+            response.put("administratorProfile", buildAdministratorProfile(user.getAdministratorProfile()));
         }
 
         return response;
@@ -376,6 +399,9 @@ public class AuthService implements UserDetailsService {
         if (user.getManagerProfile() != null && isNotBlank(user.getManagerProfile().getFullName())) {
             return user.getManagerProfile().getFullName().trim();
         }
+        if (user.getAdministratorProfile() != null && isNotBlank(user.getAdministratorProfile().getFullName())) {
+            return user.getAdministratorProfile().getFullName().trim();
+        }
         return user.getPhone();
     }
 
@@ -385,6 +411,9 @@ public class AuthService implements UserDetailsService {
         }
         if (user.getManagerProfile() != null && isNotBlank(user.getManagerProfile().getContactEmail())) {
             return user.getManagerProfile().getContactEmail().trim();
+        }
+        if (user.getAdministratorProfile() != null && isNotBlank(user.getAdministratorProfile().getContactEmail())) {
+            return user.getAdministratorProfile().getContactEmail().trim();
         }
         return null;
     }
@@ -579,6 +608,33 @@ public class AuthService implements UserDetailsService {
         return result;
     }
 
+    private Map<String, Object> buildAdministratorProfile(AdministratorProfile profile) {
+        Map<String, Object> result = new LinkedHashMap<>();
+
+        result.put("fullName", trimOrNull(profile.getFullName()));
+        result.put("contactPhone", trimOrNull(profile.getContactPhone()));
+        result.put("contactEmail", trimOrNull(profile.getContactEmail()));
+        result.put("status", "Администратор");
+        result.put("isVerified", profile.getIsDataVerified());
+
+        BowlingClub club = profile.getClub();
+        List<String> clubs = new ArrayList<>();
+        if (club != null) {
+            String clubName = trimOrNull(club.getName());
+            if (clubName != null) {
+                clubs.add(clubName);
+                result.put("clubName", clubName);
+            }
+            String address = trimOrNull(club.getAddress());
+            if (address != null) {
+                result.put("address", address);
+            }
+        }
+        result.put("clubs", clubs);
+
+        return result;
+    }
+
     private AccountType resolveAccountType(RegisterUserDTO dto) {
         if (dto.getAccountTypeId() != null) {
             Long id = dto.getAccountTypeId().longValue();
@@ -624,7 +680,7 @@ public class AuthService implements UserDetailsService {
                 return roleByName("MECHANIC");
             }
             if (isManagerAccountType(normalized)) {
-                return roleByName("MANAGER");
+                return roleByName("HEAD_MECHANIC");
             }
         }
 
@@ -711,6 +767,18 @@ public class AuthService implements UserDetailsService {
                 || "ГЛАВНЫЙМЕХАНИК".equals(normalized);
     }
 
+    private boolean isAdministratorAccountType(String accountTypeName) {
+        String normalized = normalizeAccountTypeName(accountTypeName);
+        return "ADMINISTRATOR".equals(normalized)
+                || "ADMIN".equals(normalized)
+                || "АДМИНИСТРАТОР".equals(normalized)
+                || "INDIVIDUAL".equals(normalized)
+                || "ФИЗИЧЕСКОЕЛИЦО".equals(normalized)
+                || "ФИЗИЧЕСКОЕ ЛИЦО".equals(normalized)
+                || "ФИЗ ЛИЦО".equals(normalized)
+                || "ФИЗЛИЦО".equals(normalized);
+    }
+
     private void attachClubToOwner(OwnerProfile ownerProfile, OwnerProfileDTO ownerDto, BowlingClubDTO clubDto) {
         if (ownerProfile == null || clubDto == null) {
             return;
@@ -738,10 +806,11 @@ public class AuthService implements UserDetailsService {
 
         Integer lanesCount = clubDto.getLanesCount();
 
+        String finalClubName = clubName;
         BowlingClub club = bowlingClubRepository
                 .findByNameIgnoreCaseAndAddressIgnoreCase(clubName, clubAddress)
                 .orElseGet(() -> BowlingClub.builder()
-                        .name(clubName)
+                        .name(finalClubName)
                         .address(clubAddress)
                         .build());
 
@@ -760,6 +829,10 @@ public class AuthService implements UserDetailsService {
 
         BowlingClub savedClub = bowlingClubRepository.save(club);
 
+        if (isNewClub) {
+            clubWarehouseService.initializeWarehouseForClub(savedClub);
+        }
+
         if (ownerProfile.getClubs() == null) {
             ownerProfile.setClubs(new ArrayList<>());
         }
@@ -770,6 +843,36 @@ public class AuthService implements UserDetailsService {
         if (!alreadyLinked) {
             ownerProfile.getClubs().add(savedClub);
         }
+    }
+
+    private String mapRoleNameForResponse(Role role) {
+        if (role == null || role.getName() == null) {
+            return null;
+        }
+        return mapRoleNameForResponse(role.getName());
+    }
+
+    private String mapRoleNameForResponse(String roleName) {
+        if (roleName == null) {
+            return null;
+        }
+        String normalized = normalizeRoleName(roleName);
+        if (normalized == null) {
+            return roleName;
+        }
+        if (normalized.contains("HEADMECHANIC")
+                || normalized.contains("CHIEFMECHANIC")
+                || normalized.contains("GLAVNYIMECHANIK")) {
+            return "MANAGER";
+        }
+        return roleName;
+    }
+
+    private String normalizeRoleName(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.replaceAll("[\\s_\\-]", "").toUpperCase(Locale.ROOT);
     }
 
     private List<BowlingClub> resolveOwnerClubs(OwnerProfile profile) {

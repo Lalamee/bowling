@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/inputs/adaptive_text.dart';
-import '../../../../core/repositories/parts_repository.dart';
+import '../../../../core/repositories/inventory_repository.dart';
 import '../../../../core/utils/net_ui.dart';
-import '../../../../models/parts_catalog_response_dto.dart';
+import '../../../../models/part_dto.dart';
 
 class ClubSearchScreen extends StatefulWidget {
   final String query;
@@ -15,8 +15,8 @@ class ClubSearchScreen extends StatefulWidget {
 
 class _ClubSearchScreenState extends State<ClubSearchScreen> {
   final _ctrl = TextEditingController();
-  final _repo = PartsRepository();
-  List<PartsCatalogResponseDto> _parts = [];
+  final _repo = InventoryRepository();
+  List<PartDto> _parts = [];
   bool _isLoading = false;
 
   @override
@@ -29,7 +29,16 @@ class _ClubSearchScreenState extends State<ClubSearchScreen> {
   Future<void> _loadParts() async {
     setState(() => _isLoading = true);
     try {
-      final data = await _repo.all();
+      if (widget.query.trim().isEmpty) {
+        if (mounted) {
+          setState(() {
+            _parts = [];
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+      final data = await _repo.search(widget.query.trim());
       if (mounted) {
         setState(() {
           _parts = data;

@@ -12,7 +12,7 @@ public class CreateStaffRequestDTO {
     private String fullName;
 
     @NotBlank(message = "Phone is required")
-    @Pattern(regexp = "^\\+?[0-9\\s\-()]{10,20}$", message = "Invalid phone format")
+    @Pattern(regexp = "^\\+?[0-9\\s\\-()]{10,20}$", message = "Invalid phone format")
     private String phone;
 
     @Email(message = "Invalid email format")

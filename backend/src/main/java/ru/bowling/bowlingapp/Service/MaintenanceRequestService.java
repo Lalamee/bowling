@@ -13,16 +13,20 @@ import ru.bowling.bowlingapp.Repository.BowlingClubRepository;
 import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
 import ru.bowling.bowlingapp.Repository.MaintenanceRequestRepository;
 import ru.bowling.bowlingapp.Repository.MechanicProfileRepository;
+import ru.bowling.bowlingapp.Repository.ManagerProfileRepository;
 import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
 import ru.bowling.bowlingapp.Repository.RequestPartRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,12 +36,14 @@ public class MaintenanceRequestService {
         private final MaintenanceRequestRepository maintenanceRequestRepository;
         private final RequestPartRepository requestPartRepository;
         private final MechanicProfileRepository mechanicProfileRepository;
+        private final ManagerProfileRepository managerProfileRepository;
         private final PartsCatalogRepository partsCatalogRepository;
         private final BowlingClubRepository bowlingClubRepository;
         private final ClubStaffRepository clubStaffRepository;
         private final UserRepository userRepository;
         private final InventoryService inventoryService;
         private final SupplierService supplierService;
+        private final NotificationService notificationService;
 
         @Transactional
         public MaintenanceRequestResponseDTO createPartRequest(PartRequestDTO requestDTO) {
@@ -74,23 +80,16 @@ public class MaintenanceRequestService {
 				.verificationStatus("NOT_VERIFIED")
 				.build();
 
-		MaintenanceRequest savedRequest = maintenanceRequestRepository.save(request);
+                MaintenanceRequest savedRequest = maintenanceRequestRepository.save(request);
 
-		List<RequestPart> requestParts = requestDTO.getRequestedParts().stream()
-				.map(partDTO -> {
-					RequestPart requestPart = RequestPart.builder()
-							.request(savedRequest)
-							.catalogNumber(partDTO.getCatalogNumber())
-							.partName(partDTO.getPartName())
-							.quantity(partDTO.getQuantity())
-							.status(null)
-							.build();
-					return requestPartRepository.save(requestPart);
-				})
-				.collect(Collectors.toList());
+                List<RequestPart> requestParts = requestDTO.getRequestedParts().stream()
+                                .map(partDTO -> requestPartRepository.save(buildRequestPart(savedRequest, partDTO)))
+                                .collect(Collectors.toList());
 
-		return convertToResponseDTO(savedRequest, requestParts);
-	}
+                notifyClubTeamAboutRequest(savedRequest);
+
+                return convertToResponseDTO(savedRequest, requestParts);
+        }
 
         @Transactional(readOnly = true)
         public List<MaintenanceRequestResponseDTO> getAllRequests() {
@@ -178,7 +177,6 @@ public class MaintenanceRequestService {
 
                 if (request.getStatus() == MaintenanceRequestStatus.CLOSED
                                 || request.getStatus() == MaintenanceRequestStatus.UNREPAIRABLE
-                                || request.getStatus() == MaintenanceRequestStatus.COMPLETED
                                 || request.getStatus() == MaintenanceRequestStatus.DONE) {
                         throw new IllegalStateException("Parts cannot be added to closed or completed requests");
                 }
@@ -186,13 +184,7 @@ public class MaintenanceRequestService {
                 validateRequestedParts(partsToAdd);
 
                 for (PartRequestDTO.RequestedPartDTO partDTO : partsToAdd) {
-                        RequestPart requestPart = RequestPart.builder()
-                                        .request(request)
-                                        .catalogNumber(partDTO.getCatalogNumber())
-                                        .partName(partDTO.getPartName())
-                                        .quantity(partDTO.getQuantity())
-                                        .status(null)
-                                        .build();
+                        RequestPart requestPart = buildRequestPart(request, partDTO);
                         requestPartRepository.save(requestPart);
                 }
 
@@ -233,6 +225,12 @@ public class MaintenanceRequestService {
                 ManagerProfile managerProfile = user.getManagerProfile();
                 if (managerProfile != null && managerProfile.getClub() != null
                                 && Objects.equals(managerProfile.getClub().getClubId(), club.getClubId())) {
+                        return true;
+                }
+
+                AdministratorProfile administratorProfile = user.getAdministratorProfile();
+                if (administratorProfile != null && administratorProfile.getClub() != null
+                                && Objects.equals(administratorProfile.getClub().getClubId(), club.getClubId())) {
                         return true;
                 }
 
@@ -290,20 +288,81 @@ public class MaintenanceRequestService {
                 }
 
                 for (PartRequestDTO.RequestedPartDTO partDTO : parts) {
-                        String catalogNumber = partDTO.getCatalogNumber();
-                        if (catalogNumber == null || catalogNumber.trim().isEmpty()) {
-                                throw new IllegalArgumentException("Catalog number is required");
+                        if (partDTO == null) {
+                                throw new IllegalArgumentException("Part data is required");
                         }
 
-                        PartsCatalog catalogPart = partsCatalogRepository.findByCatalogNumber(catalogNumber)
-                                        .orElseThrow(() -> new IllegalArgumentException("Запчасть с номером '" + catalogNumber + "' не найдена в каталоге."));
-                        try {
-                                inventoryService.reservePart(new ReservationRequestDto(catalogPart.getCatalogId(), partDTO.getQuantity(), null));
-                                inventoryService.releasePart(new ReservationRequestDto(catalogPart.getCatalogId(), partDTO.getQuantity(), null));
-                        } catch (RuntimeException e) {
-                                throw new IllegalArgumentException("Ошибка проверки запчасти '" + partDTO.getPartName() + "': " + e.getMessage());
+                        String partName = normalizeValue(partDTO.getPartName());
+                        if (partName == null) {
+                                throw new IllegalArgumentException("Название запчасти обязательно для заполнения");
+                        }
+
+                        Integer quantity = partDTO.getQuantity();
+                        if (quantity == null || quantity <= 0) {
+                                throw new IllegalArgumentException("Количество для детали '" + safePartName(partDTO) + "' должно быть больше нуля");
                         }
                 }
+        }
+
+        private RequestPart buildRequestPart(MaintenanceRequest request, PartRequestDTO.RequestedPartDTO partDTO) {
+                if (request == null) {
+                        throw new IllegalArgumentException("Request is required");
+                }
+                if (partDTO == null) {
+                        throw new IllegalArgumentException("Part data is required");
+                }
+
+                String catalogNumber = normalizeValue(partDTO.getCatalogNumber());
+                String partName = normalizeValue(partDTO.getPartName());
+                String location = normalizeValue(partDTO.getLocation());
+                Long catalogId = partDTO.getCatalogId();
+                Long inventoryId = partDTO.getInventoryId();
+                Integer warehouseId = partDTO.getWarehouseId();
+
+                if (partName == null) {
+                        partName = catalogNumber != null ? catalogNumber : "Неизвестная запчасть";
+                }
+
+                return RequestPart.builder()
+                                .request(request)
+                                .catalogNumber(catalogNumber)
+                                .partName(partName)
+                                .quantity(partDTO.getQuantity())
+                                .status(null)
+                                .inventoryId(inventoryId)
+                                .catalogId(catalogId)
+                                .warehouseId(warehouseId)
+                                .inventoryLocation(location)
+                                .build();
+        }
+
+        private String normalizeValue(String value) {
+                if (value == null) {
+                        return null;
+                }
+                String trimmed = value.trim();
+                return trimmed.isEmpty() ? null : trimmed;
+        }
+
+        private String safePartName(PartRequestDTO.RequestedPartDTO partDTO) {
+                if (partDTO == null) {
+                        return "неизвестная запчасть";
+                }
+                String name = normalizeValue(partDTO.getPartName());
+                if (name != null) {
+                        return name;
+                }
+                String catalogNumber = normalizeValue(partDTO.getCatalogNumber());
+                if (catalogNumber != null) {
+                        return catalogNumber;
+                }
+                if (partDTO.getCatalogId() != null) {
+                        return partDTO.getCatalogId().toString();
+                }
+                if (partDTO.getInventoryId() != null) {
+                        return partDTO.getInventoryId().toString();
+                }
+                return "неизвестная запчасть";
         }
 
 	@Transactional
@@ -485,15 +544,85 @@ public class MaintenanceRequestService {
 	}
 
 	@Transactional
-	public MaintenanceRequestResponseDTO assignAgent(Long requestId, Long agentId) {
-		MaintenanceRequest req = maintenanceRequestRepository.findById(requestId)
-				.orElseThrow(() -> new IllegalArgumentException("Request not found"));
-		req.setAssignedAgentId(agentId);
-		req.setStatus(MaintenanceRequestStatus.IN_PROGRESS);
-		maintenanceRequestRepository.save(req);
-		java.util.List<RequestPart> parts = requestPartRepository.findByRequestRequestId(req.getRequestId());
-		return convertToResponseDTO(req, parts);
-	}
+        public MaintenanceRequestResponseDTO assignAgent(Long requestId, Long agentId) {
+                MaintenanceRequest req = maintenanceRequestRepository.findById(requestId)
+                                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+                req.setAssignedAgentId(agentId);
+                req.setStatus(MaintenanceRequestStatus.IN_PROGRESS);
+                maintenanceRequestRepository.save(req);
+                java.util.List<RequestPart> parts = requestPartRepository.findByRequestRequestId(req.getRequestId());
+                return convertToResponseDTO(req, parts);
+        }
+
+        private void notifyClubTeamAboutRequest(MaintenanceRequest request) {
+                if (request == null) {
+                        return;
+                }
+
+                List<BowlingClub> relatedClubs = new ArrayList<>();
+                Set<Long> processedClubIds = new LinkedHashSet<>();
+
+                BowlingClub requestClub = request.getClub();
+                if (requestClub != null) {
+                        Long clubId = requestClub.getClubId();
+                        if (clubId == null || processedClubIds.add(clubId)) {
+                                relatedClubs.add(requestClub);
+                        }
+                }
+
+                MechanicProfile mechanic = request.getMechanic();
+                if (mechanic != null) {
+                        List<BowlingClub> mechanicClubs = Optional.ofNullable(mechanic.getClubs()).orElse(List.of());
+                        for (BowlingClub mechanicClub : mechanicClubs) {
+                                if (mechanicClub == null) {
+                                        continue;
+                                }
+                                Long clubId = mechanicClub.getClubId();
+                                if (clubId == null || processedClubIds.add(clubId)) {
+                                        relatedClubs.add(mechanicClub);
+                                }
+                        }
+                }
+
+                List<OwnerProfile> owners = new ArrayList<>();
+                Set<Long> processedOwnerIds = new LinkedHashSet<>();
+                List<ManagerProfile> managers = new ArrayList<>();
+                Set<Long> processedManagerIds = new LinkedHashSet<>();
+
+                for (BowlingClub club : relatedClubs) {
+                        if (club == null) {
+                                continue;
+                        }
+
+                        OwnerProfile owner = club.getOwner();
+                        if (owner != null) {
+                                Long ownerKey = owner.getOwnerId() != null
+                                                ? owner.getOwnerId()
+                                                : (owner.getUser() != null ? owner.getUser().getUserId() : null);
+                                if (ownerKey == null || processedOwnerIds.add(ownerKey)) {
+                                        owners.add(owner);
+                                }
+                        }
+
+                        Long relatedClubId = club.getClubId();
+                        if (relatedClubId != null) {
+                                List<ManagerProfile> clubManagers = managerProfileRepository.findByClub_ClubId(relatedClubId);
+                                for (ManagerProfile manager : clubManagers) {
+                                        if (manager == null) {
+                                                continue;
+                                        }
+                                        Long managerKey = manager.getManagerId() != null
+                                                        ? manager.getManagerId()
+                                                        : (manager.getUser() != null ? manager.getUser().getUserId() : null);
+                                        if (managerKey == null || processedManagerIds.add(managerKey)) {
+                                                managers.add(manager);
+                                        }
+                                }
+                        }
+                }
+
+                notificationService.notifyMaintenanceRequestCreated(request, owners, managers);
+        }
 
         private MaintenanceRequestResponseDTO convertToResponseDTO(MaintenanceRequest request, List<RequestPart> parts) {
                 BowlingClub club = request.getClub();
@@ -514,6 +643,10 @@ public class MaintenanceRequestService {
                                                         .catalogNumber(part.getCatalogNumber())
                                                         .partName(part.getPartName())
                                                         .quantity(part.getQuantity())
+                                                        .inventoryId(part.getInventoryId())
+                                                        .catalogId(part.getCatalogId())
+                                                        .warehouseId(part.getWarehouseId())
+                                                        .inventoryLocation(part.getInventoryLocation())
                                                         .status(part.getStatus() != null ? part.getStatus().name() : null)
                                                         .rejectionReason(part.getRejectionReason())
                                                         .supplierId(part.getSupplierId())

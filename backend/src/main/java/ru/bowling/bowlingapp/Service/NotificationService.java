@@ -6,12 +6,77 @@ import org.springframework.stereotype.Service;
 import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Entity.enums.WorkLogStatus;
 
+import java.util.List;
+import java.util.Optional;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
+    public void notifyMaintenanceRequestCreated(
+            MaintenanceRequest request,
+            List<OwnerProfile> owners,
+            List<ManagerProfile> managers
+    ) {
+        if (request == null) {
+            return;
+        }
+
+        BowlingClub club = request.getClub();
+        String clubName = club != null ? club.getName() : "Неизвестный клуб";
+        String mechanicName = request.getMechanic() != null ? request.getMechanic().getFullName() : "Неизвестный механик";
+
+        log.info("NOTIFICATION: Новая заявка на обслуживание #{} для клуба {} (дорожка {}), механик: {}", request.getRequestId(), clubName, request.getLaneNumber(), mechanicName);
+
+        if (owners != null && !owners.isEmpty()) {
+            for (OwnerProfile owner : owners) {
+                if (owner == null) {
+                    continue;
+                }
+                String ownerName = owner.getContactPerson() != null && !owner.getContactPerson().isBlank()
+                        ? owner.getContactPerson()
+                        : Optional.ofNullable(owner.getLegalName()).filter(name -> !name.isBlank()).orElse("Владелец клуба");
+                String ownerPhone = owner.getUser() != null ? owner.getUser().getPhone() : owner.getContactPhone();
+                String ownerClub = owner.getClubs() != null && !owner.getClubs().isEmpty()
+                        ? owner.getClubs().get(0).getName()
+                        : clubName;
+                log.info("NOTIFICATION -> Owner {} ({}) уведомлен о заявке #{} (клуб: {})",
+                        ownerName,
+                        ownerPhone != null ? ownerPhone : "—",
+                        request.getRequestId(),
+                        ownerClub);
+            }
+        } else {
+            log.info("NOTIFICATION: Нет владельцев для уведомления по заявке #{}", request.getRequestId());
+        }
+
+        if (managers != null && !managers.isEmpty()) {
+            for (ManagerProfile manager : managers) {
+                if (manager == null) {
+                    continue;
+                }
+                String managerName = manager.getFullName() != null && !manager.getFullName().isBlank()
+                        ? manager.getFullName()
+                        : "Менеджер";
+                User managerUser = manager.getUser();
+                String contact = managerUser != null && managerUser.getPhone() != null
+                        ? managerUser.getPhone()
+                        : manager.getContactPhone();
+                String managerClub = manager.getClub() != null ? manager.getClub().getName() : clubName;
+                log.info("NOTIFICATION -> Manager {} ({}) уведомлен о заявке #{} (клуб: {})",
+                        managerName,
+                        contact != null ? contact : "—",
+                        request.getRequestId(),
+                        managerClub);
+            }
+        } else {
+            log.info("NOTIFICATION: Для клубов механика и заявки нет назначенных менеджеров для уведомления по заявке #{}",
+                    request.getRequestId());
+        }
+    }
+
     public void notifyWorkLogCreated(WorkLog workLog) {
-        log.info("NOTIFICATION: Создан журнал работ #{} для клуба {} (дорожка {})", 
+        log.info("NOTIFICATION: Создан журнал работ #{} для клуба {} (дорожка {})",
                 workLog.getLogId(),
                 workLog.getClub().getName(),
                 workLog.getLaneNumber());

@@ -3,6 +3,8 @@ package ru.bowling.bowlingapp.Entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import ru.bowling.bowlingapp.Entity.AdministratorProfile;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -57,4 +59,7 @@ public class User {
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
     private ManagerProfile managerProfile;
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
+    private AdministratorProfile administratorProfile;
 }
