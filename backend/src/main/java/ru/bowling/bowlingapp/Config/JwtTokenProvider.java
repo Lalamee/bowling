@@ -12,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 import ru.bowling.bowlingapp.Entity.User;
+import ru.bowling.bowlingapp.Security.UserPrincipal;
 
 import java.util.Date;
 import java.util.List;
@@ -56,9 +57,32 @@ public class JwtTokenProvider {
         DecodedJWT decoded = JWT.require(algorithm).build().verify(token);
         String phone = decoded.getSubject();
         String role = decoded.getClaim("role").asString();
-        if (role == null || role.isBlank()) role = "USER";
+        String userIdClaim = decoded.getClaim("userId").asString();
+
+        if (role == null || role.isBlank()) {
+            role = "USER";
+        }
+
+        Long userId = null;
+        if (userIdClaim != null && !userIdClaim.isBlank()) {
+            try {
+                userId = Long.parseLong(userIdClaim);
+            } catch (NumberFormatException ignored) {
+                userId = null;
+            }
+        }
+
+        UserPrincipal principal = new UserPrincipal(
+                userId,
+                phone,
+                null,
+                true
+        );
+
         return new UsernamePasswordAuthenticationToken(
-                phone, null, java.util.List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                principal,
+                null,
+                java.util.List.of(new SimpleGrantedAuthority("ROLE_" + role))
         );
     }
 
