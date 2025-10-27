@@ -65,11 +65,13 @@ public class ClubStaffController {
      */
     @DeleteMapping("/{clubId}/staff/{userId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'CLUB_OWNER')")
-    public ResponseEntity<?> removeStaff(
+    public ResponseEntity<StandardResponseDTO> removeStaff(
         @PathVariable Long clubId,
-        @PathVariable Long userId
+        @PathVariable Long userId,
+        Authentication authentication
     ) {
-        // TODO: Реализовать удаление сотрудника
+        String requestedBy = authentication != null ? authentication.getName() : null;
+        clubStaffService.removeStaff(clubId, userId, requestedBy);
         return ResponseEntity.ok(
             StandardResponseDTO.builder()
                 .message("Staff member removed successfully")
