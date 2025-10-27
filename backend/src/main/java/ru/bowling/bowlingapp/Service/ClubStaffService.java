@@ -327,34 +327,35 @@ public class ClubStaffService {
     }
 
     private String staffRoleToResponse(StaffRole staffRole, Role role) {
+        String result = null;
         if (staffRole != null) {
-            return switch (staffRole) {
-                case MANAGER -> "HEAD_MECHANIC";
+            result = switch (staffRole) {
+                case MANAGER -> "MANAGER";
                 case MECHANIC -> "MECHANIC";
                 case ADMINISTRATOR -> "ADMIN";
             };
+        } else if (role != null && role.getName() != null) {
+            result = role.getName();
         }
-        if (role != null && role.getName() != null) {
-            return role.getName();
-        }
-        return null;
+        return mapRoleNameForResponse(result);
     }
 
     private StaffRole resolveStaffRole(String role) {
         if (role == null) {
             return StaffRole.MANAGER;
         }
-        String normalized = role.trim().toUpperCase(Locale.ROOT);
-        if (normalized.contains("HEAD_MECHANIC")
-                || normalized.contains("MANAGER")
-                || normalized.contains("ГЛАВНЫЙ")
-                || normalized.contains("МЕНЕДЖ")) {
+        String upper = role.trim().toUpperCase(Locale.ROOT);
+        String normalized = normalizeRoleName(role);
+
+        if (matchesAny(normalized, "HEADMECHANIC", "CHIEFMECHANIC")
+                || matchesAny(upper, "ГЛАВНЫЙ", "МЕНЕДЖ")
+                || matchesAny(normalized, "MANAGER")) {
             return StaffRole.MANAGER;
         }
-        if (normalized.contains("MECHANIC") || normalized.contains("МЕХАН")) {
+        if (matchesAny(normalized, "MECHANIC") || matchesAny(upper, "МЕХАН")) {
             return StaffRole.MECHANIC;
         }
-        if (normalized.contains("ADMIN") || normalized.contains("АДМИН")) {
+        if (matchesAny(normalized, "ADMIN", "ADMINISTRATOR") || matchesAny(upper, "АДМИН")) {
             return StaffRole.ADMINISTRATOR;
         }
         throw new IllegalArgumentException("Unsupported role: " + role);
@@ -464,9 +465,24 @@ public class ClubStaffService {
     private Role resolveManagerRole() {
         return resolveRole(ROLE_HEAD_MECHANIC_ID,
                 "HEAD_MECHANIC",
-                "MANAGER",
-                "Менеджер",
+                "CHIEF_MECHANIC",
                 "Главный механик");
+    }
+
+    private String mapRoleNameForResponse(String roleName) {
+        if (roleName == null) {
+            return null;
+        }
+        String normalized = normalizeRoleName(roleName);
+        if (normalized == null) {
+            return roleName;
+        }
+        if (normalized.contains("HEADMECHANIC")
+                || normalized.contains("CHIEFMECHANIC")
+                || normalized.contains("GLAVNYIMECHANIK")) {
+            return "MANAGER";
+        }
+        return roleName;
     }
 
     private AccountType resolveMechanicAccountType() {
@@ -643,6 +659,21 @@ public class ClubStaffService {
             return null;
         }
         return value.replaceAll("[\\s_\\-]", "").toUpperCase(Locale.ROOT);
+    }
+
+    private boolean matchesAny(String value, String... tokens) {
+        if (value == null || tokens == null) {
+            return false;
+        }
+        for (String token : tokens) {
+            if (token == null) {
+                continue;
+            }
+            if (value.contains(token)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String normalizeAccountTypeName(String value) {
