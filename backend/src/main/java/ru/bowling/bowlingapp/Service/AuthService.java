@@ -114,15 +114,13 @@ public class AuthService implements UserDetailsService {
         String normalized = normalizeAccountTypeName(accountTypeName);
         return "INDIVIDUAL".equals(normalized)
                 || "МЕХАНИК".equals(normalized)
-                || "ГЛАВНЫЙ МЕХАНИК".equals(normalized)
-                || "ФИЗИЧЕСКОЕ ЛИЦО".equals(normalized)
-                || "ФИЗ ЛИЦО".equals(normalized)
+                || "ФИЗИЧЕСКОЕЛИЦО".equals(normalized)
                 || "ФИЗЛИЦО".equals(normalized);
     }
 
     private boolean isOwnerAccountType(String accountTypeName) {
         String normalized = normalizeAccountTypeName(accountTypeName);
-        return "CLUB_OWNER".equals(normalized)
+        return "CLUBOWNER".equals(normalized)
                 || "ВЛАДЕЛЕЦ".equals(normalized);
     }
 
@@ -130,7 +128,9 @@ public class AuthService implements UserDetailsService {
         if (accountTypeName == null) {
             return null;
         }
-        return accountTypeName.trim().toUpperCase(Locale.ROOT);
+        return accountTypeName
+                .replaceAll("[\\s_\\-]", "")
+                .toUpperCase(Locale.ROOT);
     }
 
     @Transactional
@@ -774,8 +774,6 @@ public class AuthService implements UserDetailsService {
                 || "АДМИНИСТРАТОР".equals(normalized)
                 || "INDIVIDUAL".equals(normalized)
                 || "ФИЗИЧЕСКОЕЛИЦО".equals(normalized)
-                || "ФИЗИЧЕСКОЕ ЛИЦО".equals(normalized)
-                || "ФИЗ ЛИЦО".equals(normalized)
                 || "ФИЗЛИЦО".equals(normalized);
     }
 

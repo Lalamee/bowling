@@ -344,17 +344,18 @@ public class ClubStaffService {
         if (role == null) {
             return StaffRole.MANAGER;
         }
-        String normalized = role.trim().toUpperCase(Locale.ROOT);
-        if (normalized.contains("HEAD_MECHANIC")
-                || normalized.contains("MANAGER")
-                || normalized.contains("ГЛАВНЫЙ")
-                || normalized.contains("МЕНЕДЖ")) {
+        String upper = role.trim().toUpperCase(Locale.ROOT);
+        String normalized = normalizeRoleName(role);
+
+        if (matchesAny(normalized, "HEADMECHANIC", "CHIEFMECHANIC")
+                || matchesAny(upper, "ГЛАВНЫЙ", "МЕНЕДЖ")
+                || matchesAny(normalized, "MANAGER")) {
             return StaffRole.MANAGER;
         }
-        if (normalized.contains("MECHANIC") || normalized.contains("МЕХАН")) {
+        if (matchesAny(normalized, "MECHANIC") || matchesAny(upper, "МЕХАН")) {
             return StaffRole.MECHANIC;
         }
-        if (normalized.contains("ADMIN") || normalized.contains("АДМИН")) {
+        if (matchesAny(normalized, "ADMIN", "ADMINISTRATOR") || matchesAny(upper, "АДМИН")) {
             return StaffRole.ADMINISTRATOR;
         }
         throw new IllegalArgumentException("Unsupported role: " + role);
@@ -658,6 +659,21 @@ public class ClubStaffService {
             return null;
         }
         return value.replaceAll("[\\s_\\-]", "").toUpperCase(Locale.ROOT);
+    }
+
+    private boolean matchesAny(String value, String... tokens) {
+        if (value == null || tokens == null) {
+            return false;
+        }
+        for (String token : tokens) {
+            if (token == null) {
+                continue;
+            }
+            if (value.contains(token)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String normalizeAccountTypeName(String value) {
