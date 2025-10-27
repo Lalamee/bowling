@@ -1,5 +1,7 @@
 package ru.bowling.bowlingapp.Service;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +48,9 @@ public class ClubStaffService {
     private final ClubStaffRepository clubStaffRepository;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     private enum StaffRole {
         MANAGER,
         MECHANIC,
@@ -56,6 +61,7 @@ public class ClubStaffService {
     private static final long ROLE_ADMIN_ID = 1L;
     private static final long ROLE_MECHANIC_ID = 4L;
     private static final long ROLE_HEAD_MECHANIC_ID = 6L;
+    private static final long MIN_MECHANIC_USER_ID = 55L;
 
     @Transactional(readOnly = true)
     public List<ClubStaffMemberDTO> getClubStaff(Long clubId) {
@@ -216,6 +222,8 @@ public class ClubStaffService {
 
         User user = prepareUser(normalizedPhone, rawPassword, role, accountType);
 
+        ensureMechanicUserIdFloor();
+
         LocalDate today = LocalDate.now();
 
         MechanicProfile profile = MechanicProfile.builder()
@@ -240,6 +248,33 @@ public class ClubStaffService {
         registerClubStaff(club, user, role, requestedBy);
 
         return buildResponse(user, profile.getFullName(), rawPassword, role, club, StaffRole.MECHANIC);
+    }
+
+    private void ensureMechanicUserIdFloor() {
+        if (entityManager == null) {
+            return;
+        }
+
+        Object sequenceNameResult = entityManager
+                .createNativeQuery("SELECT pg_get_serial_sequence('users', 'user_id')")
+                .getSingleResult();
+
+        if (sequenceNameResult == null) {
+            return;
+        }
+
+        String sequenceName = sequenceNameResult.toString();
+        if (sequenceName.isBlank()) {
+            return;
+        }
+
+        String sql = String.format(
+                "SELECT setval('%s', GREATEST((SELECT COALESCE(MAX(user_id), 0) FROM users), %d))",
+                sequenceName,
+                MIN_MECHANIC_USER_ID - 1
+        );
+
+        entityManager.createNativeQuery(sql).getSingleResult();
     }
 
     private CreateStaffResponseDTO createAdministratorStaff(
