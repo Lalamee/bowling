@@ -255,26 +255,98 @@ public class ClubStaffService {
             return;
         }
 
-        Object sequenceNameResult = entityManager
-                .createNativeQuery("SELECT pg_get_serial_sequence('users', 'user_id')")
-                .getSingleResult();
+        long maxUserId = getMaxColumnValue("users", "user_id");
+        long maxMechanicUserId = getMaxColumnValue("mechanic_profiles", "user_id");
 
-        if (sequenceNameResult == null) {
-            return;
+        long requiredFloor = Math.max(MIN_MECHANIC_USER_ID - 1, Math.max(maxUserId, maxMechanicUserId));
+
+        adjustSequenceFloor("users", "user_id", requiredFloor);
+    }
+
+    private long getMaxColumnValue(String tableName, String columnName) {
+        try {
+            Object result = entityManager
+                    .createNativeQuery(String.format(
+                            "SELECT COALESCE(MAX(%s), 0) FROM %s",
+                            columnName,
+                            tableName
+                    ))
+                    .getSingleResult();
+            if (result instanceof Number number) {
+                return number.longValue();
+            }
+            if (result != null) {
+                return Long.parseLong(result.toString());
+            }
+        } catch (Exception ignored) {
+            // If the table is missing or inaccessible we silently ignore and fallback to zero.
+        }
+        return 0L;
+    }
+
+    private void adjustSequenceFloor(String tableName, String columnName, long floor) {
+        if (floor < 0) {
+            floor = 0;
         }
 
-        String sequenceName = sequenceNameResult.toString();
-        if (sequenceName.isBlank()) {
-            return;
+        try {
+            Object sequenceNameResult = entityManager
+                    .createNativeQuery(String.format(
+                            "SELECT pg_get_serial_sequence('%s', '%s')",
+                            tableName,
+                            columnName
+                    ))
+                    .getSingleResult();
+
+            if (sequenceNameResult == null) {
+                return;
+            }
+
+            String sequenceName = sequenceNameResult.toString();
+            if (sequenceName == null || sequenceName.isBlank()) {
+                return;
+            }
+
+            Object[] sequenceState = (Object[]) entityManager
+                    .createNativeQuery(String.format("SELECT last_value, is_called FROM %s", sequenceName))
+                    .getSingleResult();
+
+            long lastValue = 0L;
+            boolean isCalled = true;
+            if (sequenceState != null) {
+                if (sequenceState.length > 0 && sequenceState[0] instanceof Number number) {
+                    lastValue = number.longValue();
+                } else if (sequenceState.length > 0 && sequenceState[0] != null) {
+                    lastValue = Long.parseLong(sequenceState[0].toString());
+                }
+                if (sequenceState.length > 1 && sequenceState[1] != null) {
+                    Object rawIsCalled = sequenceState[1];
+                    if (rawIsCalled instanceof Boolean bool) {
+                        isCalled = bool;
+                    } else {
+                        String textValue = rawIsCalled.toString();
+                        isCalled = "t".equalsIgnoreCase(textValue)
+                                || "true".equalsIgnoreCase(textValue)
+                                || Boolean.parseBoolean(textValue);
+                    }
+                }
+            }
+
+            long target = Math.max(floor, lastValue);
+            boolean shouldUpdate = target > lastValue || (!isCalled && target == lastValue);
+
+            if (shouldUpdate) {
+                entityManager
+                        .createNativeQuery(String.format(
+                                "SELECT setval('%s', %d, true)",
+                                sequenceName,
+                                target
+                        ))
+                        .getSingleResult();
+            }
+        } catch (Exception ignored) {
+            // If sequence metadata cannot be accessed we avoid failing the whole operation.
         }
-
-        String sql = String.format(
-                "SELECT setval('%s', GREATEST((SELECT COALESCE(MAX(user_id), 0) FROM users), %d))",
-                sequenceName,
-                MIN_MECHANIC_USER_ID - 1
-        );
-
-        entityManager.createNativeQuery(sql).getSingleResult();
     }
 
     private CreateStaffResponseDTO createAdministratorStaff(
