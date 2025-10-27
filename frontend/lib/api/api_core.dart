@@ -17,13 +17,18 @@ class ApiCore {
   static final ApiCore _i = ApiCore._internal();
   factory ApiCore() => _i;
   ApiCore._internal();
+
   final Dio dio = Dio();
   final FlutterSecureStorage storage = const FlutterSecureStorage();
-  static const String _baseUrl = 'http://158.160.205.8:8080';
+
+  static const String _defaultBaseUrl = 'http://158.160.205.8:8080';
+
+  String _baseUrl = _defaultBaseUrl;
   String get baseUrl => _baseUrl;
 
-  Future<void> init() async {
-    dio.options.baseUrl = baseUrl;
+  Future<void> init({String? baseUrl}) async {
+    _baseUrl = _resolveBaseUrl(baseUrl);
+    dio.options.baseUrl = _baseUrl;
     dio.options.connectTimeout = const Duration(seconds: 30);
     dio.options.receiveTimeout = const Duration(seconds: 30);
     dio.interceptors.add(InterceptorsWrapper(
@@ -101,6 +106,20 @@ class ApiCore {
         ));
       },
     ));
+  }
+
+  String _resolveBaseUrl(String? candidate) {
+    final raw = candidate?.trim();
+    if (raw == null || raw.isEmpty) {
+      return _defaultBaseUrl;
+    }
+
+    final normalized = raw.endsWith('/') ? raw.substring(0, raw.length - 1) : raw;
+    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+      return normalized;
+    }
+
+    return 'https://$normalized';
   }
   
   /// Преобразует DioException в понятное пользователю сообщение
