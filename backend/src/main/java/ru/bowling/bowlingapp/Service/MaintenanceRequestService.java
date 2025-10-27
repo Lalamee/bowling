@@ -60,7 +60,7 @@ public class MaintenanceRequestService {
                                 .orElseThrow(() -> new IllegalArgumentException("Club not found"));
 
                 MechanicProfile mechanicProfile = mechanic.get();
-                if (!mechanicWorksInClub(mechanicProfile, club.getClubId())) {
+                if (!mechanicWorksInClub(mechanicProfile, club)) {
                         throw new IllegalArgumentException("Mechanic is not assigned to the specified club");
                 }
 
@@ -192,16 +192,28 @@ public class MaintenanceRequestService {
                 return convertToResponseDTO(request, parts);
         }
 
-        private boolean mechanicWorksInClub(MechanicProfile mechanicProfile, Long clubId) {
-                if (clubId == null) {
+        private boolean mechanicWorksInClub(MechanicProfile mechanicProfile, BowlingClub club) {
+                if (mechanicProfile == null || club == null) {
                         return false;
                 }
-                return Optional.ofNullable(mechanicProfile.getClubs())
+                Long clubId = club.getClubId();
+                boolean assignedDirectly = Optional.ofNullable(mechanicProfile.getClubs())
                                 .orElse(List.of())
                                 .stream()
                                 .map(BowlingClub::getClubId)
                                 .filter(Objects::nonNull)
                                 .anyMatch(id -> id.equals(clubId));
+
+                if (assignedDirectly) {
+                        return true;
+                }
+
+                User mechanicUser = mechanicProfile.getUser();
+                if (mechanicUser != null && clubStaffRepository.existsByClubAndUser(club, mechanicUser)) {
+                        return true;
+                }
+
+                return false;
         }
 
         private boolean userHasAccessToClub(User user, BowlingClub club) {
@@ -235,7 +247,7 @@ public class MaintenanceRequestService {
                 }
 
                 MechanicProfile mechanicProfile = user.getMechanicProfile();
-                if (mechanicProfile != null && mechanicWorksInClub(mechanicProfile, club.getClubId())) {
+                if (mechanicProfile != null && mechanicWorksInClub(mechanicProfile, club)) {
                         return true;
                 }
 
