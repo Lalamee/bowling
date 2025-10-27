@@ -3,6 +3,7 @@ package ru.bowling.bowlingapp.Controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -58,6 +59,15 @@ public class SearchController {
         String login = authentication.getName();
         if (login == null || login.isBlank()) {
             return null;
+        }
+
+        try {
+            UserDetails details = authService.loadUserByUsername(login);
+            if (details instanceof UserPrincipal resolved && resolved.getId() != null) {
+                return resolved.getId();
+            }
+        } catch (UsernameNotFoundException ex) {
+            // fall back to direct phone lookup below
         }
 
         try {
