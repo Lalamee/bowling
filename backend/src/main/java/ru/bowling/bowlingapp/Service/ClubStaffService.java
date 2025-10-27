@@ -31,8 +31,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 @Service
 @RequiredArgsConstructor
@@ -194,16 +192,12 @@ public class ClubStaffService {
                 .updatedAt(now)
                 .build();
 
-        persistUserWithProfile(
-                user,
-                profile,
-                (persistedUser, persistedProfile) -> {
-                    persistedProfile.setUser(persistedUser);
-                    persistedProfile.setClub(club);
-                    persistedUser.setManagerProfile(persistedProfile);
-                },
-                managerProfileRepository::saveAndFlush
-        );
+        profile.setUser(user);
+        profile.setClub(club);
+        user.setManagerProfile(profile);
+
+        userRepository.save(user);
+        managerProfileRepository.save(profile);
 
         registerClubStaff(club, user, role, requestedBy);
 
@@ -237,15 +231,11 @@ public class ClubStaffService {
         clubs.add(club);
         profile.setClubs(clubs);
 
-        persistUserWithProfile(
-                user,
-                profile,
-                (persistedUser, persistedProfile) -> {
-                    persistedProfile.setUser(persistedUser);
-                    persistedUser.setMechanicProfile(persistedProfile);
-                },
-                mechanicProfileRepository::saveAndFlush
-        );
+        profile.setUser(user);
+        user.setMechanicProfile(profile);
+
+        userRepository.save(user);
+        mechanicProfileRepository.save(profile);
 
         registerClubStaff(club, user, role, requestedBy);
 
@@ -275,31 +265,16 @@ public class ClubStaffService {
                 .updatedAt(now)
                 .build();
 
-        persistUserWithProfile(
-                user,
-                profile,
-                (persistedUser, persistedProfile) -> {
-                    persistedProfile.setUser(persistedUser);
-                    persistedProfile.setClub(club);
-                    persistedUser.setAdministratorProfile(persistedProfile);
-                },
-                administratorProfileRepository::saveAndFlush
-        );
+        profile.setUser(user);
+        profile.setClub(club);
+        user.setAdministratorProfile(profile);
+
+        userRepository.save(user);
+        administratorProfileRepository.save(profile);
 
         registerClubStaff(club, user, role, requestedBy);
 
         return buildResponse(user, profile.getFullName(), rawPassword, role, club, StaffRole.ADMINISTRATOR);
-    }
-
-    private <P> void persistUserWithProfile(
-            User user,
-            P profile,
-            BiConsumer<User, P> linkUserToProfile,
-            Consumer<P> profileSaver
-    ) {
-        linkUserToProfile.accept(user, profile);
-        userRepository.saveAndFlush(user);
-        profileSaver.accept(profile);
     }
 
     private void registerClubStaff(BowlingClub club, User user, Role role, User requestedBy) {
