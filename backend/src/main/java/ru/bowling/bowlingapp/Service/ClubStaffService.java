@@ -1,5 +1,7 @@
 package ru.bowling.bowlingapp.Service;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,9 +31,8 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +48,9 @@ public class ClubStaffService {
     private final ClubStaffRepository clubStaffRepository;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     private enum StaffRole {
         MANAGER,
         MECHANIC,
@@ -57,6 +61,7 @@ public class ClubStaffService {
     private static final long ROLE_ADMIN_ID = 1L;
     private static final long ROLE_MECHANIC_ID = 4L;
     private static final long ROLE_HEAD_MECHANIC_ID = 6L;
+    private static final long MIN_MECHANIC_USER_ID = 55L;
 
     @Transactional(readOnly = true)
     public List<ClubStaffMemberDTO> getClubStaff(Long clubId) {
@@ -147,6 +152,29 @@ public class ClubStaffService {
         };
     }
 
+    @Transactional
+    public void removeStaff(Long clubId, Long userId, String requestedByLogin) {
+        BowlingClub club = bowlingClubRepository.findById(clubId)
+                .orElseThrow(() -> new IllegalArgumentException("Club not found"));
+
+        User requestedBy = findUserByLogin(requestedByLogin);
+        if (requestedBy != null) {
+            ensureClubAccess(club, requestedBy);
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (isClubOwner(club, user)) {
+            throw new IllegalArgumentException("Club owner cannot be removed from staff");
+        }
+
+        clubStaffRepository.findByClubAndUser(club, user)
+                .ifPresent(clubStaffRepository::delete);
+
+        detachProfilesFromClub(club, user);
+    }
+
     private CreateStaffResponseDTO createManagerStaff(
             BowlingClub club,
             CreateStaffRequestDTO request,
@@ -170,16 +198,12 @@ public class ClubStaffService {
                 .updatedAt(now)
                 .build();
 
-        persistUserWithProfile(
-                user,
-                profile,
-                (persistedUser, persistedProfile) -> {
-                    persistedProfile.setUser(persistedUser);
-                    persistedProfile.setClub(club);
-                    persistedUser.setManagerProfile(persistedProfile);
-                },
-                managerProfileRepository::saveAndFlush
-        );
+        profile.setUser(user);
+        profile.setClub(club);
+        user.setManagerProfile(profile);
+
+        userRepository.save(user);
+        managerProfileRepository.save(profile);
 
         registerClubStaff(club, user, role, requestedBy);
 
@@ -198,6 +222,8 @@ public class ClubStaffService {
 
         User user = prepareUser(normalizedPhone, rawPassword, role, accountType);
 
+        ensureMechanicUserIdFloor();
+
         LocalDate today = LocalDate.now();
 
         MechanicProfile profile = MechanicProfile.builder()
@@ -213,19 +239,114 @@ public class ClubStaffService {
         clubs.add(club);
         profile.setClubs(clubs);
 
-        persistUserWithProfile(
-                user,
-                profile,
-                (persistedUser, persistedProfile) -> {
-                    persistedProfile.setUser(persistedUser);
-                    persistedUser.setMechanicProfile(persistedProfile);
-                },
-                mechanicProfileRepository::saveAndFlush
-        );
+        profile.setUser(user);
+        user.setMechanicProfile(profile);
+
+        userRepository.save(user);
+        mechanicProfileRepository.save(profile);
 
         registerClubStaff(club, user, role, requestedBy);
 
         return buildResponse(user, profile.getFullName(), rawPassword, role, club, StaffRole.MECHANIC);
+    }
+
+    private void ensureMechanicUserIdFloor() {
+        if (entityManager == null) {
+            return;
+        }
+
+        long maxUserId = getMaxColumnValue("users", "user_id");
+        long maxMechanicUserId = getMaxColumnValue("mechanic_profiles", "user_id");
+
+        long requiredFloor = Math.max(MIN_MECHANIC_USER_ID - 1, Math.max(maxUserId, maxMechanicUserId));
+
+        adjustSequenceFloor("users", "user_id", requiredFloor);
+    }
+
+    private long getMaxColumnValue(String tableName, String columnName) {
+        try {
+            Object result = entityManager
+                    .createNativeQuery(String.format(
+                            "SELECT COALESCE(MAX(%s), 0) FROM %s",
+                            columnName,
+                            tableName
+                    ))
+                    .getSingleResult();
+            if (result instanceof Number number) {
+                return number.longValue();
+            }
+            if (result != null) {
+                return Long.parseLong(result.toString());
+            }
+        } catch (Exception ignored) {
+            // If the table is missing or inaccessible we silently ignore and fallback to zero.
+        }
+        return 0L;
+    }
+
+    private void adjustSequenceFloor(String tableName, String columnName, long floor) {
+        if (floor < 0) {
+            floor = 0;
+        }
+
+        try {
+            Object sequenceNameResult = entityManager
+                    .createNativeQuery(String.format(
+                            "SELECT pg_get_serial_sequence('%s', '%s')",
+                            tableName,
+                            columnName
+                    ))
+                    .getSingleResult();
+
+            if (sequenceNameResult == null) {
+                return;
+            }
+
+            String sequenceName = sequenceNameResult.toString();
+            if (sequenceName == null || sequenceName.isBlank()) {
+                return;
+            }
+
+            Object[] sequenceState = (Object[]) entityManager
+                    .createNativeQuery(String.format("SELECT last_value, is_called FROM %s", sequenceName))
+                    .getSingleResult();
+
+            long lastValue = 0L;
+            boolean isCalled = true;
+            if (sequenceState != null) {
+                if (sequenceState.length > 0 && sequenceState[0] instanceof Number number) {
+                    lastValue = number.longValue();
+                } else if (sequenceState.length > 0 && sequenceState[0] != null) {
+                    lastValue = Long.parseLong(sequenceState[0].toString());
+                }
+                if (sequenceState.length > 1 && sequenceState[1] != null) {
+                    Object rawIsCalled = sequenceState[1];
+                    if (rawIsCalled instanceof Boolean bool) {
+                        isCalled = bool;
+                    } else {
+                        String textValue = rawIsCalled.toString();
+                        isCalled = "t".equalsIgnoreCase(textValue)
+                                || "true".equalsIgnoreCase(textValue)
+                                || Boolean.parseBoolean(textValue);
+                    }
+                }
+            }
+
+            long target = Math.max(floor, lastValue);
+            boolean shouldUpdate = target > lastValue || (!isCalled && target == lastValue);
+
+            if (shouldUpdate) {
+                entityManager
+                        .createNativeQuery(String.format(
+                                "SELECT setval('%s', %d, true)",
+                                sequenceName,
+                                target
+                        ))
+                        .getSingleResult();
+            }
+        } catch (Exception ignored) {
+            // If sequence metadata cannot be accessed we avoid failing the whole operation.
+        }
     }
 
     private CreateStaffResponseDTO createAdministratorStaff(
@@ -251,31 +372,16 @@ public class ClubStaffService {
                 .updatedAt(now)
                 .build();
 
-        persistUserWithProfile(
-                user,
-                profile,
-                (persistedUser, persistedProfile) -> {
-                    persistedProfile.setUser(persistedUser);
-                    persistedProfile.setClub(club);
-                    persistedUser.setAdministratorProfile(persistedProfile);
-                },
-                administratorProfileRepository::saveAndFlush
-        );
+        profile.setUser(user);
+        profile.setClub(club);
+        user.setAdministratorProfile(profile);
+
+        userRepository.save(user);
+        administratorProfileRepository.save(profile);
 
         registerClubStaff(club, user, role, requestedBy);
 
         return buildResponse(user, profile.getFullName(), rawPassword, role, club, StaffRole.ADMINISTRATOR);
-    }
-
-    private <P> void persistUserWithProfile(
-            User user,
-            P profile,
-            BiConsumer<User, P> linkUserToProfile,
-            Consumer<P> profileSaver
-    ) {
-        linkUserToProfile.accept(user, profile);
-        userRepository.saveAndFlush(user);
-        profileSaver.accept(profile);
     }
 
     private void registerClubStaff(BowlingClub club, User user, Role role, User requestedBy) {
@@ -300,6 +406,73 @@ public class ClubStaffService {
         }
 
         clubStaffRepository.save(clubStaff);
+    }
+
+    private boolean isClubOwner(BowlingClub club, User user) {
+        if (club == null || user == null) {
+            return false;
+        }
+        OwnerProfile owner = club.getOwner();
+        return owner != null
+                && owner.getUser() != null
+                && Objects.equals(owner.getUser().getUserId(), user.getUserId());
+    }
+
+    private void detachProfilesFromClub(BowlingClub club, User user) {
+        if (club == null || user == null || user.getUserId() == null) {
+            return;
+        }
+
+        String normalizedRole = user.getRole() != null ? normalizeRoleName(user.getRole().getName()) : null;
+
+        if (normalizedRole != null) {
+            if (normalizedRole.contains("ADMIN")) {
+                detachAdministratorFromClub(club, user.getUserId());
+            }
+            if (normalizedRole.contains("HEADMECHANIC") || normalizedRole.contains("MANAGER")) {
+                detachManagerFromClub(club, user.getUserId());
+            }
+            if (normalizedRole.contains("MECHANIC")) {
+                detachMechanicFromClub(club, user.getUserId());
+            }
+            return;
+        }
+
+        detachAdministratorFromClub(club, user.getUserId());
+        detachManagerFromClub(club, user.getUserId());
+        detachMechanicFromClub(club, user.getUserId());
+    }
+
+    private void detachAdministratorFromClub(BowlingClub club, Long userId) {
+        administratorProfileRepository.findByUser_UserId(userId).ifPresent(profile -> {
+            if (profile.getClub() != null && Objects.equals(profile.getClub().getClubId(), club.getClubId())) {
+                profile.setClub(null);
+                administratorProfileRepository.save(profile);
+            }
+        });
+    }
+
+    private void detachManagerFromClub(BowlingClub club, Long userId) {
+        managerProfileRepository.findByUser_UserId(userId).ifPresent(profile -> {
+            if (profile.getClub() != null && Objects.equals(profile.getClub().getClubId(), club.getClubId())) {
+                profile.setClub(null);
+                managerProfileRepository.save(profile);
+            }
+        });
+    }
+
+    private void detachMechanicFromClub(BowlingClub club, Long userId) {
+        mechanicProfileRepository.findByUser_UserId(userId).ifPresent(profile -> {
+            List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs())
+                    .map(ArrayList::new)
+                    .orElseGet(ArrayList::new);
+            boolean removed = clubs.removeIf(existingClub -> existingClub != null
+                    && Objects.equals(existingClub.getClubId(), club.getClubId()));
+            if (removed) {
+                profile.setClubs(clubs);
+                mechanicProfileRepository.save(profile);
+            }
+        });
     }
 
     private User prepareUser(String phone, String rawPassword, Role role, AccountType accountType) {
