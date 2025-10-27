@@ -74,18 +74,8 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
                 const SizedBox(height: 16),
                 _buildTextField(
                   label: 'Каталожный номер',
-                  hint: 'Будет заполнен автоматически',
+                  hint: 'Можно оставить пустым',
                   controller: _catalogController,
-                  readOnly: true,
-                  validator: (value) {
-                    if (_pendingParts.isNotEmpty) {
-                      return null;
-                    }
-                    if (_selectedCatalogPart == null) {
-                      return 'Выберите запчасть из каталога';
-                    }
-                    return null;
-                  },
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
@@ -135,51 +125,32 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
       return;
     }
 
-    final selected = _selectedCatalogPart;
-    if (selected == null) {
-      showSnack(context, 'Выберите запчасть из каталога');
-      return;
-    }
-
     final quantity = int.tryParse(_quantityController.text.trim());
     if (quantity == null || quantity <= 0) {
       showSnack(context, 'Количество должно быть больше нуля');
       return;
     }
 
-    final available = selected.quantity;
-    final alreadyRequested = _pendingParts
-        .where((item) => item.inventoryId == selected.inventoryId)
-        .fold<int>(0, (sum, item) => sum + item.quantity);
-    final totalRequested = alreadyRequested + quantity;
-    final shortage = available != null && totalRequested > available;
+    final partName = _partNameController.text.trim();
+    if (partName.isEmpty) {
+      showSnack(context, 'Укажите название запчасти');
+      return;
+    }
+
+    final manualCatalog = _catalogController.text.trim();
+    final selected = _selectedCatalogPart;
+    final resolvedCatalogNumber = manualCatalog.isNotEmpty
+        ? manualCatalog
+        : (selected != null ? _resolveCatalogNumber(selected) : null);
 
     setState(() {
-      final existingIndex = _pendingParts.indexWhere((item) => item.inventoryId == selected.inventoryId);
-      if (existingIndex >= 0) {
-        final existing = _pendingParts[existingIndex];
-        _pendingParts[existingIndex] = RequestedPartDto(
-          inventoryId: existing.inventoryId,
-          catalogId: existing.catalogId,
-          catalogNumber: existing.catalogNumber,
-          partName: existing.partName,
-          quantity: totalRequested,
-          warehouseId: existing.warehouseId,
-          location: existing.location,
-        );
-      } else {
-        _pendingParts.add(
-          RequestedPartDto(
-            inventoryId: selected.inventoryId,
-            catalogId: selected.catalogId,
-            catalogNumber: _resolveCatalogNumber(selected),
-            partName: _resolvePartDisplayName(selected),
-            quantity: quantity,
-            warehouseId: selected.warehouseId ?? order.clubId,
-            location: selected.location,
-          ),
-        );
-      }
+      _pendingParts.add(
+        RequestedPartDto(
+          catalogNumber: resolvedCatalogNumber,
+          partName: partName,
+          quantity: quantity,
+        ),
+      );
 
       _partNameController.clear();
       _catalogController.clear();
@@ -187,11 +158,6 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
       _selectedCatalogPart = null;
       _partSuggestions = const [];
     });
-
-    if (shortage) {
-      final availableText = available ?? 0;
-      showSnack(context, 'На складе доступно только $availableText шт. Заявка отправлена на пополнение.');
-    }
   }
 
   void _removePart(int index) {
@@ -302,11 +268,8 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
             ),
           ),
           validator: (value) {
-            if (_pendingParts.isNotEmpty) {
-              return null;
-            }
-            if (_selectedCatalogPart == null) {
-              return 'Выберите запчасть из каталога';
+            if (value == null || value.trim().isEmpty) {
+              return 'Укажите название запчасти';
             }
             return null;
           },
@@ -566,9 +529,11 @@ class _PendingPartsList extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(part.partName, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textDark)),
-                      const SizedBox(height: 4),
-                      Text('Каталожный номер: ${part.catalogNumber}', style: const TextStyle(color: AppColors.darkGray)),
-                      const SizedBox(height: 4),
+                      if (part.catalogNumber != null && part.catalogNumber!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text('Каталожный номер: ${part.catalogNumber}', style: const TextStyle(color: AppColors.darkGray)),
+                        const SizedBox(height: 4),
+                      ],
                       if (part.location != null && part.location!.isNotEmpty) ...[
                         Text('Локация: ${part.location}', style: const TextStyle(color: AppColors.darkGray)),
                         const SizedBox(height: 4),
