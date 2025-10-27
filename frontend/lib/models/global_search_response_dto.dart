@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'part_dto.dart';
 
 class GlobalSearchResponseDto {
@@ -14,29 +16,63 @@ class GlobalSearchResponseDto {
   });
 
   factory GlobalSearchResponseDto.fromJson(Map<String, dynamic> json) {
-    final partsJson = json['parts'] as List<dynamic>? ?? const [];
-    final requestsJson = json['maintenanceRequests'] as List<dynamic>? ?? const [];
-    final workLogsJson = json['workLogs'] as List<dynamic>? ?? const [];
-    final clubsJson = json['clubs'] as List<dynamic>? ?? const [];
-
     return GlobalSearchResponseDto(
-      parts: partsJson
-          .whereType<Map>()
-          .map((e) => PartDto.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList(),
-      maintenanceRequests: requestsJson
-          .whereType<Map>()
-          .map((e) => SearchMaintenanceRequestDto.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList(),
-      workLogs: workLogsJson
-          .whereType<Map>()
-          .map((e) => SearchWorkLogDto.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList(),
-      clubs: clubsJson
-          .whereType<Map>()
-          .map((e) => SearchClubDto.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList(),
+      parts: _parseSection(
+        json['parts'],
+        'part',
+        (map) => PartDto.fromJson(map),
+      ),
+      maintenanceRequests: _parseSection(
+        json['maintenanceRequests'],
+        'maintenance request',
+        (map) => SearchMaintenanceRequestDto.fromJson(map),
+      ),
+      workLogs: _parseSection(
+        json['workLogs'],
+        'work log',
+        (map) => SearchWorkLogDto.fromJson(map),
+      ),
+      clubs: _parseSection(
+        json['clubs'],
+        'club',
+        (map) => SearchClubDto.fromJson(map),
+      ),
     );
+  }
+
+  static List<T> _parseSection<T>(
+    dynamic source,
+    String sectionName,
+    T? Function(Map<String, dynamic> map) parser,
+  ) {
+    if (source is! List) {
+      return const [];
+    }
+
+    final result = <T>[];
+    for (final entry in source) {
+      if (entry is! Map) {
+        continue;
+      }
+
+      try {
+        final parsed = parser(Map<String, dynamic>.from(entry as Map));
+        if (parsed != null) {
+          result.add(parsed);
+        }
+      } catch (error, stackTrace) {
+        _logParseError(sectionName, error, stackTrace);
+      }
+    }
+    return result;
+  }
+
+  static void _logParseError(String section, Object error, StackTrace stackTrace) {
+    assert(() {
+      debugPrint('Failed to parse $section entry: $error');
+      debugPrint(stackTrace.toString());
+      return true;
+    }());
   }
 }
 
@@ -58,16 +94,13 @@ class SearchMaintenanceRequestDto {
   });
 
   factory SearchMaintenanceRequestDto.fromJson(Map<String, dynamic> json) {
-    DateTime? parseDate(dynamic value) =>
-        (value is String && value.isNotEmpty) ? DateTime.tryParse(value) : null;
-
     return SearchMaintenanceRequestDto(
-      id: (json['id'] as num).toInt(),
+      id: _parseRequiredInt(json['id'], 'id'),
       status: json['status'] as String?,
       clubName: json['clubName'] as String?,
-      laneNumber: (json['laneNumber'] as num?)?.toInt(),
+      laneNumber: _parseOptionalInt(json['laneNumber']),
       mechanicName: json['mechanicName'] as String?,
-      requestedAt: parseDate(json['requestedAt']),
+      requestedAt: _parseOptionalDateTime(json['requestedAt']),
     );
   }
 }
@@ -94,18 +127,15 @@ class SearchWorkLogDto {
   });
 
   factory SearchWorkLogDto.fromJson(Map<String, dynamic> json) {
-    DateTime? parseDate(dynamic value) =>
-        (value is String && value.isNotEmpty) ? DateTime.tryParse(value) : null;
-
     return SearchWorkLogDto(
-      id: (json['id'] as num).toInt(),
+      id: _parseRequiredInt(json['id'], 'id'),
       status: json['status'] as String?,
       workType: json['workType'] as String?,
       clubName: json['clubName'] as String?,
-      laneNumber: (json['laneNumber'] as num?)?.toInt(),
+      laneNumber: _parseOptionalInt(json['laneNumber']),
       mechanicName: json['mechanicName'] as String?,
       problemDescription: json['problemDescription'] as String?,
-      createdAt: parseDate(json['createdAt']),
+      createdAt: _parseOptionalDateTime(json['createdAt']),
     );
   }
 }
@@ -127,11 +157,54 @@ class SearchClubDto {
 
   factory SearchClubDto.fromJson(Map<String, dynamic> json) {
     return SearchClubDto(
-      id: (json['id'] as num).toInt(),
+      id: _parseRequiredInt(json['id'], 'id'),
       name: json['name'] as String?,
       address: json['address'] as String?,
-      active: json['active'] as bool?,
-      verified: json['verified'] as bool?,
+      active: _parseOptionalBool(json['active']),
+      verified: _parseOptionalBool(json['verified']),
     );
   }
+}
+
+int _parseRequiredInt(dynamic value, String fieldName) {
+  final parsed = _parseOptionalInt(value);
+  if (parsed == null) {
+    throw FormatException('Missing or invalid $fieldName');
+  }
+  return parsed;
+}
+
+int? _parseOptionalInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String && value.isNotEmpty) {
+    return int.tryParse(value);
+  }
+  return null;
+}
+
+bool? _parseOptionalBool(dynamic value) {
+  if (value == null) return null;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized == 'true' || normalized == '1') {
+      return true;
+    }
+    if (normalized == 'false' || normalized == '0') {
+      return false;
+    }
+  }
+  return null;
+}
+
+DateTime? _parseOptionalDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+  if (value is String && value.isNotEmpty) {
+    return DateTime.tryParse(value);
+  }
+  return null;
 }
