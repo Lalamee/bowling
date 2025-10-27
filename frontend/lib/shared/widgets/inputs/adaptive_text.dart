@@ -7,8 +7,16 @@ class AdaptiveText extends StatelessWidget {
   final TextStyle? style;
   final TextAlign align;
   final int? maxLines;
+  final TextOverflow? overflow;
 
-  const AdaptiveText(this.text, {super.key, this.style, this.align = TextAlign.start, this.maxLines});
+  const AdaptiveText(
+    this.text, {
+    super.key,
+    this.style,
+    this.align = TextAlign.start,
+    this.maxLines,
+    this.overflow,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +26,7 @@ class AdaptiveText extends StatelessWidget {
       textAlign: align,
       softWrap: true,
       maxLines: maxLines,
-      overflow: maxLines == null ? null : TextOverflow.ellipsis,
+      overflow: overflow,
     );
   }
 }
