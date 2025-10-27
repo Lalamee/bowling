@@ -2,6 +2,7 @@ package ru.bowling.bowlingapp.Controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -10,20 +11,26 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
 import ru.bowling.bowlingapp.Config.JwtTokenProvider;
 import ru.bowling.bowlingapp.DTO.*;
+import ru.bowling.bowlingapp.Entity.RefreshToken;
 import ru.bowling.bowlingapp.Entity.User;
+import ru.bowling.bowlingapp.Exception.InvalidRefreshTokenException;
 import ru.bowling.bowlingapp.Service.AuthService;
+import ru.bowling.bowlingapp.Service.RefreshTokenService;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
 
     private final AuthService authService;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
+    private final RefreshTokenService refreshTokenService;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequestDTO request) {
@@ -47,7 +54,7 @@ public class AuthController {
         }
 
         try {
-            Authentication authentication = authenticationManager.authenticate(
+            authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(loginDto.getPhone(), loginDto.getPassword())
             );
         } catch (AuthenticationException e) {
@@ -57,12 +64,29 @@ public class AuthController {
 
         String accessToken = jwtTokenProvider.generateAccessToken(user);
         String refreshToken = jwtTokenProvider.generateRefreshToken(user);
+        try {
+            refreshTokenService.registerRefreshToken(user, refreshToken);
+        } catch (InvalidRefreshTokenException ex) {
+            log.error("Failed to register refresh token for user {}", user.getUserId(), ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(StandardResponseDTO.builder()
+                            .message("Не удалось завершить вход. Попробуйте ещё раз.")
+                            .status("error")
+                            .build());
+        } catch (RuntimeException ex) {
+            log.error("Unexpected error while registering refresh token for user {}", user.getUserId(), ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(StandardResponseDTO.builder()
+                            .message("Не удалось завершить вход. Попробуйте ещё раз.")
+                            .status("error")
+                            .build());
+        }
         LoginResponseDTO response = new LoginResponseDTO(accessToken, refreshToken);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<?> refreshToken(@RequestBody RefreshTokenRequestDTO request) {
+    public ResponseEntity<?> refreshToken(@Valid @RequestBody RefreshTokenRequestDTO request) {
         String refreshToken = request.getRefreshToken();
         if (refreshToken == null || refreshToken.isEmpty()) {
             return ResponseEntity.badRequest()
@@ -74,22 +98,37 @@ public class AuthController {
                     .body(StandardResponseDTO.builder().message("Invalid refresh token").status("error").build());
         }
 
-        String phone = jwtTokenProvider.getPhoneFromToken(refreshToken);
-        User user = authService.findUserByPhone(phone);
+        try {
+            String phone = jwtTokenProvider.getPhoneFromToken(refreshToken);
+            User user = authService.findUserByPhone(phone);
 
-        if (!user.getIsActive()) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(StandardResponseDTO.builder().message("Account is deactivated").status("error").build());
+            if (!user.getIsActive()) {
+                refreshTokenService.revokeToken(refreshToken, "USER_DISABLED");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(StandardResponseDTO.builder().message("Account is deactivated").status("error").build());
+            }
+
+            RefreshToken storedToken = refreshTokenService.getValidToken(refreshToken);
+            String newAccessToken = jwtTokenProvider.generateAccessToken(user);
+            String newRefreshToken = jwtTokenProvider.generateRefreshToken(user);
+            refreshTokenService.rotateToken(storedToken, newRefreshToken);
+
+            LoginResponseDTO response = new LoginResponseDTO(newAccessToken, newRefreshToken);
+            return ResponseEntity.ok(response);
+        } catch (InvalidRefreshTokenException | UsernameNotFoundException ex) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(StandardResponseDTO.builder().message(ex.getMessage()).status("error").build());
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(StandardResponseDTO.builder().message("Не удалось обновить токен").status("error").build());
         }
-
-        String newAccessToken = jwtTokenProvider.generateAccessToken(user);
-        String newRefreshToken = jwtTokenProvider.generateRefreshToken(user);
-        LoginResponseDTO response = new LoginResponseDTO(newAccessToken, newRefreshToken);
-        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout() {
+    public ResponseEntity<?> logout(@RequestBody(required = false) RefreshTokenRequestDTO request) {
+        if (request != null && request.getRefreshToken() != null && !request.getRefreshToken().isBlank()) {
+            refreshTokenService.revokeToken(request.getRefreshToken(), "USER_LOGOUT");
+        }
         return ResponseEntity.ok(StandardResponseDTO.builder().message("Logged out successfully").status("success").build());
     }
 

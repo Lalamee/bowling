@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import ru.bowling.bowlingapp.DTO.MaintenanceRequestResponseDTO;
+import ru.bowling.bowlingapp.DTO.MaintenanceRequestUpdateDTO;
 import ru.bowling.bowlingapp.DTO.PartRequestDTO;
 import ru.bowling.bowlingapp.Service.MaintenanceRequestService;
 
@@ -42,14 +43,21 @@ public class MaintenanceRequestController {
         return ResponseEntity.ok(maintenanceRequestService.getRequestsByMechanic(mechanicId));
     }
 
+    @PatchMapping("/{requestId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'MANAGER', 'HEAD_MECHANIC', 'CHIEF_MECHANIC')")
+    public ResponseEntity<MaintenanceRequestResponseDTO> updateRequest(@PathVariable Long requestId,
+                    @RequestBody MaintenanceRequestUpdateDTO updateDTO) {
+        return ResponseEntity.ok(maintenanceRequestService.updateRequest(requestId, updateDTO));
+    }
+
     @PatchMapping("/{requestId}/approve")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'MANAGER', 'HEAD_MECHANIC', 'CHIEF_MECHANIC', 'STAFF')")
     public ResponseEntity<MaintenanceRequestResponseDTO> approveRequest(@PathVariable Long requestId, @RequestBody(required = false) String managerNotes) {
         return ResponseEntity.ok(maintenanceRequestService.approveRequest(requestId, managerNotes));
     }
 
     @PatchMapping("/{requestId}/reject")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'MANAGER', 'HEAD_MECHANIC', 'CHIEF_MECHANIC', 'STAFF')")
     public ResponseEntity<MaintenanceRequestResponseDTO> rejectRequest(@PathVariable Long requestId, @RequestBody(required = false) String managerNotes) {
         return ResponseEntity.ok(maintenanceRequestService.rejectRequest(requestId, managerNotes));
     }

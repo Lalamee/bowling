@@ -8,13 +8,16 @@ import ru.bowling.bowlingapp.Entity.WarehouseInventory;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface WarehouseInventoryRepository extends JpaRepository<WarehouseInventory, Long> {
 
     List<WarehouseInventory> findByCatalogId(Integer catalogId);
-    
+
     List<WarehouseInventory> findByWarehouseId(Integer warehouseId);
+
+    Optional<WarehouseInventory> findByWarehouseIdAndCatalogId(Integer warehouseId, Integer catalogId);
     
     List<WarehouseInventory> findByQuantityGreaterThan(Integer quantity);
     
