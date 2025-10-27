@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 import 'package:bowling_market/api/api_core.dart';
 import 'core/routing/app_router.dart';
 import 'core/routing/routes.dart';
@@ -7,7 +9,15 @@ import 'core/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await ApiCore().init();
+
+  String? envBaseUrl;
+  try {
+    await dotenv.load(fileName: '.env');
+    envBaseUrl = dotenv.maybeGet('API_URL');
+  } catch (_) {
+    envBaseUrl = null;
+  }
+  await ApiCore().init(baseUrl: envBaseUrl);
   runApp(const App());
 }
 
