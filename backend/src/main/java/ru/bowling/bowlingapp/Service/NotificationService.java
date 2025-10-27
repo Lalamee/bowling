@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.bowling.bowlingapp.Entity.*;
+import ru.bowling.bowlingapp.Entity.enums.MaintenanceRequestStatus;
 import ru.bowling.bowlingapp.Entity.enums.WorkLogStatus;
 
 import java.util.List;
@@ -16,7 +17,8 @@ public class NotificationService {
     public void notifyMaintenanceRequestCreated(
             MaintenanceRequest request,
             List<OwnerProfile> owners,
-            List<ManagerProfile> managers
+            List<ManagerProfile> managers,
+            List<AdministratorProfile> administrators
     ) {
         if (request == null) {
             return;
@@ -72,6 +74,107 @@ public class NotificationService {
         } else {
             log.info("NOTIFICATION: Для клубов механика и заявки нет назначенных менеджеров для уведомления по заявке #{}",
                     request.getRequestId());
+        }
+
+        if (administrators != null && !administrators.isEmpty()) {
+            for (AdministratorProfile administrator : administrators) {
+                if (administrator == null) {
+                    continue;
+                }
+                String adminName = administrator.getFullName() != null && !administrator.getFullName().isBlank()
+                        ? administrator.getFullName()
+                        : "Администратор клуба";
+                User adminUser = administrator.getUser();
+                String contact = adminUser != null && adminUser.getPhone() != null
+                        ? adminUser.getPhone()
+                        : administrator.getContactPhone();
+                String adminClub = administrator.getClub() != null ? administrator.getClub().getName() : clubName;
+                log.info("NOTIFICATION -> Administrator {} ({}) уведомлен о заявке #{} (клуб: {})",
+                        adminName,
+                        contact != null ? contact : "—",
+                        request.getRequestId(),
+                        adminClub);
+            }
+        } else {
+            log.info("NOTIFICATION: Администраторы не найдены для уведомления по заявке #{}", request.getRequestId());
+        }
+    }
+
+    public void notifyMaintenanceRequestStatusChanged(
+            MaintenanceRequest request,
+            MaintenanceRequestStatus previousStatus,
+            MaintenanceRequestStatus newStatus,
+            List<OwnerProfile> owners,
+            List<ManagerProfile> managers,
+            List<AdministratorProfile> administrators
+    ) {
+        if (request == null) {
+            return;
+        }
+
+        BowlingClub club = request.getClub();
+        String clubName = club != null ? club.getName() : "Неизвестный клуб";
+        log.info("NOTIFICATION: Заявка на обслуживание #{} в клубе {} изменила статус с {} на {}",
+                request.getRequestId(),
+                clubName,
+                previousStatus != null ? previousStatus.name() : "—",
+                newStatus != null ? newStatus.name() : "—");
+
+        if (owners != null && !owners.isEmpty()) {
+            for (OwnerProfile owner : owners) {
+                if (owner == null) {
+                    continue;
+                }
+                String ownerName = owner.getContactPerson() != null && !owner.getContactPerson().isBlank()
+                        ? owner.getContactPerson()
+                        : Optional.ofNullable(owner.getLegalName()).filter(name -> !name.isBlank()).orElse("Владелец клуба");
+                String ownerPhone = owner.getUser() != null ? owner.getUser().getPhone() : owner.getContactPhone();
+                log.info("NOTIFICATION -> Owner {} ({}) получил обновление статуса заявки #{}: {}",
+                        ownerName,
+                        ownerPhone != null ? ownerPhone : "—",
+                        request.getRequestId(),
+                        newStatus != null ? newStatus.name() : "—");
+            }
+        }
+
+        if (managers != null && !managers.isEmpty()) {
+            for (ManagerProfile manager : managers) {
+                if (manager == null) {
+                    continue;
+                }
+                String managerName = manager.getFullName() != null && !manager.getFullName().isBlank()
+                        ? manager.getFullName()
+                        : "Менеджер";
+                User managerUser = manager.getUser();
+                String contact = managerUser != null && managerUser.getPhone() != null
+                        ? managerUser.getPhone()
+                        : manager.getContactPhone();
+                log.info("NOTIFICATION -> Manager {} ({}) получил обновление статуса заявки #{}: {}",
+                        managerName,
+                        contact != null ? contact : "—",
+                        request.getRequestId(),
+                        newStatus != null ? newStatus.name() : "—");
+            }
+        }
+
+        if (administrators != null && !administrators.isEmpty()) {
+            for (AdministratorProfile administrator : administrators) {
+                if (administrator == null) {
+                    continue;
+                }
+                String adminName = administrator.getFullName() != null && !administrator.getFullName().isBlank()
+                        ? administrator.getFullName()
+                        : "Администратор клуба";
+                User adminUser = administrator.getUser();
+                String contact = adminUser != null && adminUser.getPhone() != null
+                        ? adminUser.getPhone()
+                        : administrator.getContactPhone();
+                log.info("NOTIFICATION -> Administrator {} ({}) получил обновление статуса заявки #{}: {}",
+                        adminName,
+                        contact != null ? contact : "—",
+                        request.getRequestId(),
+                        newStatus != null ? newStatus.name() : "—");
+            }
         }
     }
 

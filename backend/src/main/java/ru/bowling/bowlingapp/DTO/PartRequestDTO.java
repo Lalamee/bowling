@@ -19,6 +19,8 @@ public class PartRequestDTO {
     @NotNull(message = "Club ID is required")
     private Long clubId;
 
+    @NotNull(message = "Lane number is required")
+    @Positive(message = "Lane number must be positive")
     private Integer laneNumber;
 
     @NotNull(message = "Mechanic ID is required")
