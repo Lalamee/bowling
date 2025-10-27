@@ -5,7 +5,7 @@ import '../services/local_auth_storage.dart';
 import '../../features/orders/presentation/screens/orders_screen.dart';
 import '../../features/orders/presentation/screens/admin_orders_screen.dart';
 
-import '../../features/catalog/presentation/screens/catalog_search_screen.dart';
+import '../../features/search/presentation/screens/global_search_screen.dart';
 import '../../features/clubs/presentation/screens/club_screen.dart';
 
 import '../../features/profile/mechanic/presentation/screens/mechanic_profile_screen.dart';
@@ -30,7 +30,7 @@ class BottomNavDirect {
           }
           break;
         case 1:
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const CatalogSearchScreen()));
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GlobalSearchScreen()));
           break;
         case 2:
           if (role == 'admin') {
