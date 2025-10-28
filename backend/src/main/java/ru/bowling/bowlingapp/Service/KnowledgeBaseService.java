@@ -68,11 +68,9 @@ public class KnowledgeBaseService {
                 .filter(name -> !name.isBlank())
                 .orElseGet(() -> buildDefaultFileName(document));
 
-        Long fileSize = Optional.ofNullable(document.getFileSize())
-                .filter(size -> size > 0)
-                .orElse((long) data.length);
+        long actualSize = data.length;
 
-        return new DocumentContent(data, fileName, fileSize);
+        return new DocumentContent(data, fileName, actualSize);
     }
 
     private KnowledgeBaseDocumentDTO mapToDto(KnowledgeBaseDocumentSummary summary) {
@@ -149,6 +147,6 @@ public class KnowledgeBaseService {
         return base.replaceAll("\\s+", "_") + ".pdf";
     }
 
-    public record DocumentContent(byte[] data, String fileName, Long fileSize) {
+    public record DocumentContent(byte[] data, String fileName, long fileSize) {
     }
 }
