@@ -96,7 +96,7 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
           final item = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
           final userId = (item['userId'] as num?)?.toInt();
           final tempPassword = userId != null ? _pendingPasswords.remove(userId) : null;
-          final rawRole = (item['role']?.toString() ?? 'MECHANIC').toUpperCase();
+          final rawRole = _resolveRoleKey(item);
           final roleLabel = _mapRoleToRussian(rawRole);
           final email = (item['email'] as String?)?.trim();
           final phone = (item['phone'] as String?)?.trim();
@@ -157,6 +157,81 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
       return 'CLUB_OWNER';
     }
     return role.toUpperCase();
+  }
+
+  String _resolveRoleKey(Map<String, dynamic> item) {
+    String? readString(dynamic value) {
+      if (value == null) return null;
+      if (value is String) {
+        final trimmed = value.trim();
+        return trimmed.isEmpty ? null : trimmed;
+      }
+      if (value is Map) {
+        final map = Map<String, dynamic>.from(value as Map);
+        return readString(
+          map['key'] ??
+              map['roleKey'] ??
+              map['role'] ??
+              map['name'] ??
+              map['roleName'] ??
+              map['code'],
+        );
+      }
+      return null;
+    }
+
+    String? candidate = readString(item['role']);
+    candidate ??= readString(item['roleKey']);
+    candidate ??= readString(item['roleName']);
+    candidate ??= readString(item['accountType']);
+    candidate ??= readString(item['accountTypeName']);
+
+    String? fromNumeric(dynamic value) {
+      if (value is num) {
+        switch (value.toInt()) {
+          case 1:
+            return 'ADMIN';
+          case 4:
+            return 'MECHANIC';
+          case 5:
+            return 'CLUB_OWNER';
+          case 6:
+            return 'MANAGER';
+        }
+      }
+      return null;
+    }
+
+    candidate ??= fromNumeric(item['roleId']);
+    final role = item['role'];
+    if (candidate == null && role is Map) {
+      candidate = fromNumeric(role['id']);
+    }
+
+    final normalized = (candidate ?? 'MECHANIC').trim();
+    final normalizedLower = normalized.toLowerCase();
+    switch (normalizedLower) {
+      case 'администратор':
+      case 'administrator':
+        return 'ADMIN';
+      case 'менеджер':
+      case 'manager':
+        return 'MANAGER';
+      case 'главный механик':
+      case 'head_mechanic':
+      case 'head mechanic':
+        return 'HEAD_MECHANIC';
+      case 'механик':
+      case 'mechanic':
+        return 'MECHANIC';
+      case 'владелец клуба':
+      case 'владелец':
+      case 'owner':
+      case 'club_owner':
+        return 'CLUB_OWNER';
+    }
+
+    return normalized.toUpperCase();
   }
 
   String _mapRoleToRussian(String role) {

@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 
+import '../../../../../core/models/user_club.dart';
 import '../../../../../core/repositories/user_repository.dart';
 import '../../../../../core/routing/routes.dart';
 import '../../../../../core/services/auth_service.dart';
@@ -9,6 +10,7 @@ import '../../../../../core/services/authz/acl.dart';
 import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/utils/bottom_nav.dart';
+import '../../../../../core/utils/user_club_resolver.dart';
 import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../../shared/widgets/tiles/profile_tile.dart';
 import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
@@ -115,64 +117,65 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
       return str.isEmpty ? null : str;
     }
 
-    List<String> collectClubs(List<dynamic> sources) {
-      final result = <String>[];
-      final seen = <String>{};
-
-      void addValue(dynamic value) {
-        final club = asString(value);
-        if (club != null && seen.add(club)) {
-          result.add(club);
-        }
-      }
-
-      for (final source in sources) {
-        if (source is Map) {
-          final map = Map<String, dynamic>.from(source);
-          addValue(map['clubName']);
-          final clubsValue = map['clubs'];
-          if (clubsValue is Iterable) {
-            for (final item in clubsValue) {
-              addValue(item);
-            }
-          } else if (clubsValue is String) {
-            for (final item in clubsValue.split(',')) {
-              addValue(item);
-            }
-          }
-        }
-      }
-
-      return result;
-    }
-
     final ownerProfile = me['ownerProfile'];
     final mechanicProfile = me['mechanicProfile'];
     final managerProfile = me['managerProfile'];
 
-    final resolvedClubs = collectClubs([managerProfile, ownerProfile, mechanicProfile, me]);
-    String? resolvedClubName = resolvedClubs.isNotEmpty ? resolvedClubs.first : null;
+    final List<UserClub> clubsDetailed = resolveUserClubs(me);
+    final clubNames = <String>[];
+    final seenNames = <String>{};
     String? resolvedAddress;
-    String? resolvedEmail = asString(me['email']);
+
+    void addClubName(String? value, {bool prioritize = false}) {
+      final name = asString(value);
+      if (name == null) return;
+      final wasAdded = seenNames.add(name);
+      if (!wasAdded) return;
+      if (prioritize) {
+        clubNames.insert(0, name);
+      } else {
+        clubNames.add(name);
+      }
+    }
+
+    for (final entry in clubsDetailed) {
+      addClubName(entry.name);
+      final address = asString(entry.address);
+      if (address != null && (resolvedAddress == null || address.length > resolvedAddress.length)) {
+        resolvedAddress = address;
+      }
+    }
 
     if (managerProfile is Map) {
       final map = Map<String, dynamic>.from(managerProfile);
-      final managerClub = asString(map['clubName']);
-      if (managerClub != null && managerClub.isNotEmpty) {
-        resolvedClubName = managerClub;
-        if (!resolvedClubs.contains(managerClub)) {
-          resolvedClubs.insert(0, managerClub);
+      addClubName(map['clubName'], prioritize: true);
+      if (map['club'] is Map) {
+        final club = Map<String, dynamic>.from(map['club'] as Map);
+        addClubName(club['name'], prioritize: true);
+        final clubAddress = asString(club['address']);
+        if (clubAddress != null) {
+          resolvedAddress ??= clubAddress;
         }
       }
       resolvedAddress = asString(map['address']) ?? resolvedAddress;
-      resolvedEmail = asString(map['contactEmail']) ?? resolvedEmail;
     }
 
     if (ownerProfile is Map) {
       final map = Map<String, dynamic>.from(ownerProfile);
-      resolvedEmail = asString(map['contactEmail']) ?? resolvedEmail;
       resolvedAddress = asString(map['address']) ?? resolvedAddress;
     }
+
+    final emailSources = [me, managerProfile, ownerProfile];
+    String? resolvedEmail;
+    for (final source in emailSources) {
+      if (source is Map) {
+        final map = Map<String, dynamic>.from(source);
+        resolvedEmail = asString(map['contactEmail']) ?? resolvedEmail;
+        resolvedEmail = asString(map['email']) ?? resolvedEmail;
+      }
+    }
+
+    resolvedEmail = asString(me['email']) ?? resolvedEmail;
 
     if (resolvedAddress == null) {
       resolvedAddress = _resolveAddress([managerProfile, ownerProfile, mechanicProfile, me]);
@@ -180,6 +183,7 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
 
     final resolvedPhone = asString(me['phone']) ?? phone;
     final resolvedFullName = asString(me['fullName']) ?? resolvedPhone ?? fullName;
+    final resolvedClubName = clubNames.isNotEmpty ? clubNames.first : null;
 
     return {
       'fullName': resolvedFullName,
@@ -187,7 +191,7 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
       'email': resolvedEmail,
       'clubName': resolvedClubName,
       'address': resolvedAddress,
-      'clubs': resolvedClubs,
+      'clubs': clubNames,
     };
   }
 
