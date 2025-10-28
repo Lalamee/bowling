@@ -34,7 +34,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
 
   Future<void> _loadDocument() async {
     try {
-      final bytes = await _repository.fetchDocument(widget.doc.url);
+      final bytes = await _repository.fetchDocument(widget.doc.id);
       if (!mounted) return;
       final controller = PdfControllerPinch(
         document: PdfDocument.openData(bytes),
@@ -54,9 +54,12 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final displayTitle = (widget.doc.fileName != null && widget.doc.fileName!.isNotEmpty)
+        ? widget.doc.fileName!
+        : widget.doc.title;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.doc.title),
+        title: Text(displayTitle),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
