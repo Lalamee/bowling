@@ -950,7 +950,7 @@ class _AssignEmployeeSheetState extends State<_AssignEmployeeSheet> {
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 16),
-            const Text('Ваш статус:', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
+            const Text('Роль сотрудника:', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
             const SizedBox(height: 8),
             RadioGroupHorizontal(
               options: const ['Механик', 'Менеджер', 'Администратор'],

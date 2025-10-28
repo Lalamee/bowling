@@ -87,9 +87,21 @@ class MaintenanceRepository {
   }
 
   /// Одобрить заявку
-  Future<MaintenanceRequestResponseDto?> approve(int id, String? notes) async {
+  Future<MaintenanceRequestResponseDto?> approve(
+    int id,
+    Map<int, bool> availability,
+    String? notes,
+  ) async {
     try {
-      final request = {'managerNotes': notes ?? ''};
+      final request = {
+        'managerNotes': notes ?? '',
+        'partsAvailability': availability.entries
+            .map((entry) => {
+                  'partId': entry.key,
+                  'available': entry.value,
+                })
+            .toList(),
+      };
       final res = await _dio.put(
         '/api/maintenance/requests/$id/approve',
         data: request,

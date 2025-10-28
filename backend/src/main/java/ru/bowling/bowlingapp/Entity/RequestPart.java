@@ -58,6 +58,9 @@ public class RequestPart {
     @Column(name = "supplier_id")
     private Long supplierId;
 
+    @Column(name = "is_available")
+    private Boolean isAvailable;
+
     @Column(name = "order_date")
     private LocalDateTime orderDate;
 

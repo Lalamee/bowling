@@ -13,7 +13,7 @@ class OrderSummaryScreen extends StatefulWidget {
   final String? orderNumber;
   final bool canConfirm;
   final bool? initialAvailability;
-  final Future<bool> Function({required bool partsAvailable, String? comment})? onConfirm;
+  final Future<bool> Function({required Map<int, bool> availability, String? comment})? onConfirm;
 
   const OrderSummaryScreen({
     super.key,
@@ -30,11 +30,11 @@ class OrderSummaryScreen extends StatefulWidget {
 
 class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
   final _userRepository = UserRepository();
-  bool? _partsAvailable;
   bool _isSubmitting = false;
   late final TextEditingController _commentController;
   bool _accessCheckInProgress = true;
   bool _accessDenied = false;
+  final Map<int, bool> _availabilityDecisions = {};
 
   String get _title {
     if (widget.orderNumber != null && widget.orderNumber!.isNotEmpty) return widget.orderNumber!;
@@ -46,11 +46,64 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
 
   MaintenanceRequestResponseDto? get _request => widget.order;
 
+  List<int> get _partIds {
+    final request = _request;
+    if (request == null) return const [];
+    return request.requestedParts.map((part) => part.partId).toList();
+  }
+
+  void _prefillAvailability() {
+    final request = _request;
+    if (request != null) {
+      for (final part in request.requestedParts) {
+        final decision = part.available;
+        if (decision != null) {
+          _availabilityDecisions[part.partId] = decision;
+        }
+      }
+      if (_availabilityDecisions.isEmpty && widget.initialAvailability != null) {
+        for (final part in request.requestedParts) {
+          _availabilityDecisions[part.partId] = widget.initialAvailability!;
+        }
+      }
+    }
+  }
+
+  bool? _decisionForPart(int partId) => _availabilityDecisions[partId];
+
+  bool get _allDecisionsMade {
+    if (!widget.canConfirm) return true;
+    final ids = _partIds;
+    if (ids.isEmpty) return true;
+    return ids.every(_availabilityDecisions.containsKey);
+  }
+
+  String _availabilityLabel(bool? value) {
+    if (value == null) return 'не указано';
+    return value ? 'есть в наличии' : 'нет в наличии';
+  }
+
+  void _setDecisionForPart(int partId, bool value) {
+    setState(() {
+      _availabilityDecisions[partId] = value;
+    });
+  }
+
+  void _applyBulkDecision(bool value) {
+    final ids = _partIds;
+    if (ids.isEmpty) return;
+    setState(() {
+      for (final id in ids) {
+        _availabilityDecisions[id] = value;
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
-    _partsAvailable = widget.initialAvailability;
     _commentController = TextEditingController();
+    _prefillAvailability();
     _guardAccess();
   }
 
@@ -197,6 +250,42 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                         padding: const EdgeInsets.only(top: 4),
                         child: Text('Статус: ${describeOrderStatus(part.status)}', style: t.formInput),
                       ),
+                    if (widget.canConfirm && widget.onConfirm != null) ...[
+                      const SizedBox(height: 12),
+                      Text('Наличие детали', style: t.formLabel),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 8,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Есть в наличии'),
+                            selected: _decisionForPart(part.partId) == true,
+                            selectedColor: AppColors.primary,
+                            labelStyle: TextStyle(
+                              color: _decisionForPart(part.partId) == true
+                                  ? Colors.white
+                                  : AppColors.textDark,
+                            ),
+                            onSelected: (_) => _setDecisionForPart(part.partId, true),
+                          ),
+                          ChoiceChip(
+                            label: const Text('Нет в наличии'),
+                            selected: _decisionForPart(part.partId) == false,
+                            selectedColor: AppColors.primary,
+                            labelStyle: TextStyle(
+                              color: _decisionForPart(part.partId) == false
+                                  ? Colors.white
+                                  : AppColors.textDark,
+                            ),
+                            onSelected: (_) => _setDecisionForPart(part.partId, false),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 12),
+                      Text('Наличие: ${_availabilityLabel(part.available)}', style: t.formInput),
+                    ],
                     if (part.rejectionReason != null && part.rejectionReason!.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
@@ -225,28 +314,27 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
             const SizedBox(height: 24),
             Text('Подтверждение заказа', style: t.sectionTitle),
             const SizedBox(height: 12),
-            Text('Отметьте наличие деталей', style: t.formLabel),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 12,
-              children: [
-                ChoiceChip(
-                  label: const Text('Есть в наличии'),
-                  selected: _partsAvailable == true,
-                  selectedColor: AppColors.primary,
-                  labelStyle: TextStyle(color: _partsAvailable == true ? Colors.white : AppColors.textDark),
-                  onSelected: (_) => setState(() => _partsAvailable = true),
-                ),
-                ChoiceChip(
-                  label: const Text('Нет в наличии'),
-                  selected: _partsAvailable == false,
-                  selectedColor: AppColors.primary,
-                  labelStyle: TextStyle(color: _partsAvailable == false ? Colors.white : AppColors.textDark),
-                  onSelected: (_) => setState(() => _partsAvailable = false),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
+            if (_partIds.isNotEmpty) ...[
+              Text('Отметьте наличие для каждой детали', style: t.formLabel),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _applyBulkDecision(true),
+                    icon: const Icon(Icons.check_circle_outline, color: AppColors.primary),
+                    label: const Text('Все есть в наличии'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _applyBulkDecision(false),
+                    icon: const Icon(Icons.remove_circle_outline, color: AppColors.primary),
+                    label: const Text('Ничего нет в наличии'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
             TextField(
               controller: _commentController,
               maxLines: 3,
@@ -260,7 +348,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: (_partsAvailable == null || _isSubmitting)
+                onPressed: (!_allDecisionsMade || _isSubmitting)
                     ? null
                     : () => _handleConfirm(),
                 style: ElevatedButton.styleFrom(
@@ -311,11 +399,11 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
   }
 
   Future<void> _handleConfirm() async {
-    if (widget.onConfirm == null || _partsAvailable == null) return;
+    if (widget.onConfirm == null || !_allDecisionsMade) return;
     setState(() => _isSubmitting = true);
     final comment = _commentController.text.trim();
     final success = await widget.onConfirm!(
-      partsAvailable: _partsAvailable!,
+      availability: Map<int, bool>.from(_availabilityDecisions),
       comment: comment.isEmpty ? null : comment,
     );
     if (!mounted) return;

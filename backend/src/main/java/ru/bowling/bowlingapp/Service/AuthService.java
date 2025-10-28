@@ -903,14 +903,10 @@ public class AuthService implements UserDetailsService {
 
     private boolean isAdministratorAccountType(String accountTypeName) {
         String normalized = normalizeAccountTypeName(accountTypeName);
-        return "ADMINISTRATOR".equals(normalized)
-                || "ADMIN".equals(normalized)
-                || "АДМИНИСТРАТОР".equals(normalized)
-                || "INDIVIDUAL".equals(normalized)
-                || "ФИЗИЧЕСКОЕЛИЦО".equals(normalized)
-                || "ФИЗИЧЕСКОЕ ЛИЦО".equals(normalized)
-                || "ФИЗ ЛИЦО".equals(normalized)
-                || "ФИЗЛИЦО".equals(normalized);
+        if (normalized == null) {
+            return false;
+        }
+        return normalized.contains("ADMIN") || normalized.contains("АДМИН");
     }
 
     private void attachClubToOwner(OwnerProfile ownerProfile, OwnerProfileDTO ownerDto, BowlingClubDTO clubDto) {
