@@ -45,7 +45,7 @@ public class MaintenanceRequestController {
     @PatchMapping("/{requestId}/approve")
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'STAFF')")
     public ResponseEntity<MaintenanceRequestResponseDTO> approveRequest(@PathVariable Long requestId, @RequestBody(required = false) String managerNotes) {
-        return ResponseEntity.ok(maintenanceRequestService.approveRequest(requestId, managerNotes));
+        return ResponseEntity.ok(maintenanceRequestService.approveRequest(requestId, managerNotes, null));
     }
 
     @PatchMapping("/{requestId}/reject")

@@ -347,23 +347,47 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Future<bool> _confirmRequest(
     MaintenanceRequestResponseDto request, {
-    required bool partsAvailable,
+    required Map<int, bool> availability,
     String? comment,
   }) async {
-    final noteParts = <String>[
-      partsAvailable ? 'Детали в наличии' : 'Деталей нет',
-    ];
+    final noteParts = <String>[];
+    if (availability.isNotEmpty) {
+      final partsById = {for (final part in request.requestedParts) part.partId: part};
+      final available = <String>[];
+      final unavailable = <String>[];
+      availability.forEach((partId, isAvailable) {
+        final part = partsById[partId];
+        final name = part?.partName ?? part?.catalogNumber ?? 'Деталь $partId';
+        if (isAvailable) {
+          available.add(name);
+        } else {
+          unavailable.add(name);
+        }
+      });
+      if (available.isNotEmpty && unavailable.isEmpty) {
+        noteParts.add('Все детали в наличии');
+      } else if (unavailable.isNotEmpty && available.isEmpty) {
+        noteParts.add('Деталей нет в наличии');
+      } else {
+        if (available.isNotEmpty) {
+          noteParts.add('В наличии: ${available.join(', ')}');
+        }
+        if (unavailable.isNotEmpty) {
+          noteParts.add('Нет: ${unavailable.join(', ')}');
+        }
+      }
+    }
     if (comment != null && comment.trim().isNotEmpty) {
       noteParts.add(comment.trim());
     }
-    final payload = noteParts.join('. ');
+    final payload = noteParts.isEmpty ? null : noteParts.join('. ');
 
     setState(() {
       _pendingRequestIds.add(request.requestId);
     });
 
     try {
-      final updated = await _maintenanceRepository.approve(request.requestId, payload);
+      final updated = await _maintenanceRepository.approve(request.requestId, availability, payload);
       if (!mounted) return true;
       setState(() {
         _pendingRequestIds.remove(request.requestId);
@@ -405,8 +429,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
           canConfirm: canConfirm,
           initialAvailability: initialAvailability,
           onConfirm: canConfirm
-              ? ({required bool partsAvailable, String? comment}) =>
-                  _confirmRequest(request, partsAvailable: partsAvailable, comment: comment)
+              ? ({required Map<int, bool> availability, String? comment}) =>
+                  _confirmRequest(request, availability: availability, comment: comment)
               : null,
         ),
       ),
@@ -755,6 +779,14 @@ class _OrderCard extends StatelessWidget {
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Text('Статус: ${describeOrderStatus(part.status)}',
                                     style: const TextStyle(color: AppColors.darkGray)),
+                              ),
+                            if (part.available != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  'Наличие: ${part.available! ? 'есть в наличии' : 'нет в наличии'}',
+                                  style: const TextStyle(color: AppColors.darkGray),
+                                ),
                               ),
                           ],
                         ),

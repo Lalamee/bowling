@@ -3,6 +3,7 @@ package ru.bowling.bowlingapp.Service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.bowling.bowlingapp.DTO.ApproveRejectRequestDTO;
 import ru.bowling.bowlingapp.DTO.MaintenanceRequestResponseDTO;
 import ru.bowling.bowlingapp.DTO.PartRequestDTO;
 import ru.bowling.bowlingapp.DTO.ReservationRequestDto;
@@ -20,6 +21,7 @@ import ru.bowling.bowlingapp.Repository.UserRepository;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -366,27 +368,45 @@ public class MaintenanceRequestService {
         }
 
 	@Transactional
-	public MaintenanceRequestResponseDTO approveRequest(Long requestId, String managerNotes) {
-		Optional<MaintenanceRequest> requestOpt = maintenanceRequestRepository.findById(requestId);
-		if (requestOpt.isEmpty()) {
-			throw new IllegalArgumentException("Request not found");
-		}
+        public MaintenanceRequestResponseDTO approveRequest(Long requestId,
+                                                           String managerNotes,
+                                                           List<ApproveRejectRequestDTO.PartAvailabilityDTO> availabilityUpdates) {
+                Optional<MaintenanceRequest> requestOpt = maintenanceRequestRepository.findById(requestId);
+                if (requestOpt.isEmpty()) {
+                        throw new IllegalArgumentException("Request not found");
+                }
 
-		MaintenanceRequest request = requestOpt.get();
-		request.setStatus(MaintenanceRequestStatus.APPROVED);
-		request.setManagerNotes(managerNotes);
-		request.setManagerDecisionDate(LocalDateTime.now());
+                MaintenanceRequest request = requestOpt.get();
+                request.setStatus(MaintenanceRequestStatus.APPROVED);
+                request.setManagerNotes(managerNotes);
+                request.setManagerDecisionDate(LocalDateTime.now());
 
-		MaintenanceRequest savedRequest = maintenanceRequestRepository.save(request);
+                MaintenanceRequest savedRequest = maintenanceRequestRepository.save(request);
 
-		List<RequestPart> parts = requestPartRepository.findByRequestRequestId(requestId);
-		parts.forEach(part -> {
-			part.setStatus(null);
-			requestPartRepository.save(part);
-		});
+                List<RequestPart> parts = requestPartRepository.findByRequestRequestId(requestId);
+                Map<Long, Boolean> availabilityByPart = Optional.ofNullable(availabilityUpdates)
+                                .orElse(List.of())
+                                .stream()
+                                .filter(Objects::nonNull)
+                                .collect(Collectors.toMap(
+                                                ApproveRejectRequestDTO.PartAvailabilityDTO::getPartId,
+                                                ApproveRejectRequestDTO.PartAvailabilityDTO::getAvailable,
+                                                (first, second) -> second,
+                                                LinkedHashMap::new));
 
-		return convertToResponseDTO(savedRequest, parts);
-	}
+                parts.forEach(part -> {
+                        part.setStatus(null);
+                        if (!availabilityByPart.isEmpty()) {
+                                Boolean available = availabilityByPart.get(part.getPartId());
+                                if (available != null) {
+                                        part.setIsAvailable(available);
+                                }
+                        }
+                        requestPartRepository.save(part);
+                });
+
+                return convertToResponseDTO(savedRequest, parts);
+        }
 
 	@Transactional
 	public MaintenanceRequestResponseDTO rejectRequest(Long requestId, String rejectionReason) {
@@ -654,6 +674,7 @@ public class MaintenanceRequestService {
                                                         .orderDate(part.getOrderDate())
                                                         .deliveryDate(part.getDeliveryDate())
                                                         .issueDate(part.getIssueDate())
+                                                        .available(part.getIsAvailable())
                                                         .build();
                                 })
                                 .collect(Collectors.toList());

@@ -696,6 +696,11 @@ public class AuthService implements UserDetailsService {
             return byRoleFallback;
         }
 
+        if (!Objects.equals(dto.getAccountTypeId(), ACCOUNT_TYPE_CLUB_OWNER_ID)
+                && !Objects.equals(dto.getRoleId(), ROLE_CLUB_OWNER_ID)) {
+            return resolveIndividualAccountType();
+        }
+
         throw new IllegalArgumentException("Account type not found");
     }
 
@@ -830,7 +835,9 @@ public class AuthService implements UserDetailsService {
             case 4 -> Arrays.asList(
                     "ADMINISTRATOR",
                     "ADMIN",
-                    "Администратор"
+                    "Администратор",
+                    "INDIVIDUAL",
+                    "Физическое лицо"
             );
             case 5 -> Arrays.asList(
                     "MANAGER",
@@ -857,7 +864,9 @@ public class AuthService implements UserDetailsService {
             case ROLE_ADMIN_ID -> Arrays.asList(
                     "ADMINISTRATOR",
                     "ADMIN",
-                    "Администратор"
+                    "Администратор",
+                    "INDIVIDUAL",
+                    "Физическое лицо"
             );
             case ROLE_MECHANIC_ID -> Arrays.asList(
                     "MECHANIC",
@@ -878,6 +887,14 @@ public class AuthService implements UserDetailsService {
             );
             default -> Collections.emptyList();
         };
+    }
+
+    private AccountType resolveIndividualAccountType() {
+        return accountTypeRepository.findById((long) ACCOUNT_TYPE_INDIVIDUAL_ID)
+                .or(() -> accountTypeRepository.findByNameIgnoreCase("INDIVIDUAL"))
+                .or(() -> accountTypeRepository.findByNameIgnoreCase("Физическое лицо"))
+                .orElseThrow(() -> new IllegalStateException(
+                        "Individual account type (id=" + ACCOUNT_TYPE_INDIVIDUAL_ID + ") is not configured"));
     }
 
     private String roleNameByCode(Integer code) {
@@ -903,14 +920,10 @@ public class AuthService implements UserDetailsService {
 
     private boolean isAdministratorAccountType(String accountTypeName) {
         String normalized = normalizeAccountTypeName(accountTypeName);
-        return "ADMINISTRATOR".equals(normalized)
-                || "ADMIN".equals(normalized)
-                || "АДМИНИСТРАТОР".equals(normalized)
-                || "INDIVIDUAL".equals(normalized)
-                || "ФИЗИЧЕСКОЕЛИЦО".equals(normalized)
-                || "ФИЗИЧЕСКОЕ ЛИЦО".equals(normalized)
-                || "ФИЗ ЛИЦО".equals(normalized)
-                || "ФИЗЛИЦО".equals(normalized);
+        if (normalized == null) {
+            return false;
+        }
+        return normalized.contains("ADMIN") || normalized.contains("АДМИН");
     }
 
     private void attachClubToOwner(OwnerProfile ownerProfile, OwnerProfileDTO ownerDto, BowlingClubDTO clubDto) {

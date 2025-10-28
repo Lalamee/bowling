@@ -49,5 +49,6 @@ public class MaintenanceRequestResponseDTO {
         private LocalDateTime orderDate;
         private LocalDateTime deliveryDate;
         private LocalDateTime issueDate;
+        private Boolean available;
     }
 }
