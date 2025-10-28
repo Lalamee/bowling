@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS technical_documents (
     language VARCHAR(50),
     file_name VARCHAR(255),
     file_size BIGINT,
-    file_url TEXT,
     file_data BYTEA,
     upload_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     uploaded_by BIGINT REFERENCES users(user_id),

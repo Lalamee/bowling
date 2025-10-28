@@ -10,8 +10,8 @@ import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
 import ru.bowling.bowlingapp.Repository.TechnicalDocumentRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
+import ru.bowling.bowlingapp.Repository.projection.KnowledgeBaseDocumentSummary;
 
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,20 +28,18 @@ public class KnowledgeBaseService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
+        List<KnowledgeBaseDocumentSummary> summaries;
         if (isAdmin(user)) {
-            return technicalDocumentRepository.findAll()
-                    .stream()
-                    .map(this::mapToDto)
-                    .collect(Collectors.toList());
+            summaries = technicalDocumentRepository.findAllSummaries();
+        } else {
+            Set<Long> clubIds = collectAccessibleClubIds(user);
+            if (clubIds.isEmpty()) {
+                return List.of();
+            }
+            summaries = technicalDocumentRepository.findSummariesByClubIds(clubIds);
         }
 
-        Set<Long> clubIds = collectAccessibleClubIds(user);
-        if (clubIds.isEmpty()) {
-            return List.of();
-        }
-
-        return technicalDocumentRepository.findByClubClubIdIn(clubIds)
-                .stream()
+        return summaries.stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
@@ -70,29 +68,28 @@ public class KnowledgeBaseService {
                 .filter(name -> !name.isBlank())
                 .orElseGet(() -> buildDefaultFileName(document));
 
-        return new DocumentContent(data, fileName);
+        Long fileSize = Optional.ofNullable(document.getFileSize())
+                .filter(size -> size > 0)
+                .orElse((long) data.length);
+
+        return new DocumentContent(data, fileName, fileSize);
     }
 
-    private KnowledgeBaseDocumentDTO mapToDto(TechnicalDocument document) {
-        BowlingClub club = document.getClub();
-        DocumentType documentType = document.getDocumentType();
-        Manufacturer manufacturer = document.getManufacturer();
-        LocalDateTime uploaded = document.getUploadDate();
-
+    private KnowledgeBaseDocumentDTO mapToDto(KnowledgeBaseDocumentSummary summary) {
         return KnowledgeBaseDocumentDTO.builder()
-                .documentId(document.getDocumentId())
-                .clubId(club != null ? club.getClubId() : null)
-                .clubName(club != null ? club.getName() : null)
-                .title(document.getTitle())
-                .description(document.getDescription())
-                .documentType(documentType != null ? documentType.getName() : null)
-                .manufacturer(manufacturer != null ? manufacturer.getName() : null)
-                .equipmentModel(document.getEquipmentModel())
-                .language(document.getLanguage())
-                .fileName(document.getFileName())
-                .fileSize(document.getFileSize())
-                .uploadDate(uploaded)
-                .downloadUrl(buildDownloadUrl(document.getDocumentId()))
+                .documentId(summary.getDocumentId())
+                .clubId(summary.getClubId())
+                .clubName(summary.getClubName())
+                .title(summary.getTitle())
+                .description(summary.getDescription())
+                .documentType(summary.getDocumentType())
+                .manufacturer(summary.getManufacturer())
+                .equipmentModel(summary.getEquipmentModel())
+                .language(summary.getLanguage())
+                .fileName(summary.getFileName())
+                .fileSize(summary.getFileSize())
+                .uploadDate(summary.getUploadDate())
+                .downloadUrl(buildDownloadUrl(summary.getDocumentId()))
                 .build();
     }
 
@@ -152,6 +149,6 @@ public class KnowledgeBaseService {
         return base.replaceAll("\\s+", "_") + ".pdf";
     }
 
-    public record DocumentContent(byte[] data, String fileName) {
+    public record DocumentContent(byte[] data, String fileName, Long fileSize) {
     }
 }

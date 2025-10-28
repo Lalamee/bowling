@@ -49,8 +49,10 @@ public class TechnicalDocument {
     @Column(name = "file_size")
     private Long fileSize;
 
-    @Column(name = "file_url")
-    private String fileUrl;
+    @Lob
+    @Basic(fetch = FetchType.LAZY)
+    @Column(name = "file_data", columnDefinition = "BYTEA")
+    private byte[] fileData;
 
     @Lob
     @Basic(fetch = FetchType.LAZY)

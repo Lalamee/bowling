@@ -35,8 +35,13 @@ public class KnowledgeBaseController {
         KnowledgeBaseService.DocumentContent documentContent = knowledgeBaseService
                 .getDocumentContent(documentId, userPrincipal.getId());
 
+        long contentLength = documentContent.fileSize() != null
+                ? documentContent.fileSize()
+                : documentContent.data().length;
+
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + documentContent.fileName() + "\"")
+                .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(contentLength))
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(documentContent.data());
     }
