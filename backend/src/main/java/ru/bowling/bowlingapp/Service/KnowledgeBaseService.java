@@ -10,6 +10,7 @@ import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
 import ru.bowling.bowlingapp.Repository.TechnicalDocumentRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
+import ru.bowling.bowlingapp.Repository.projection.KnowledgeBaseDocumentContent;
 import ru.bowling.bowlingapp.Repository.projection.KnowledgeBaseDocumentSummary;
 
 import java.util.*;
@@ -46,14 +47,14 @@ public class KnowledgeBaseService {
 
     @Transactional(readOnly = true)
     public DocumentContent getDocumentContent(Long documentId, Long userId) {
-        TechnicalDocument document = technicalDocumentRepository.findById(documentId)
+        KnowledgeBaseDocumentContent document = technicalDocumentRepository.findDocumentContentById(documentId)
                 .orElseThrow(() -> new EntityNotFoundException("Document not found"));
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
         if (!isAdmin(user)) {
-            Long clubId = document.getClub() != null ? document.getClub().getClubId() : null;
+            Long clubId = document.getClubId();
             if (clubId == null || !collectAccessibleClubIds(user).contains(clubId)) {
                 throw new AccessDeniedException("Access to the document is denied");
             }
@@ -140,7 +141,7 @@ public class KnowledgeBaseService {
         return "/api/knowledge-base/documents/" + documentId + "/content";
     }
 
-    private String buildDefaultFileName(TechnicalDocument document) {
+    private String buildDefaultFileName(KnowledgeBaseDocumentContent document) {
         String base = Optional.ofNullable(document.getTitle())
                 .filter(title -> !title.isBlank())
                 .orElse("document");

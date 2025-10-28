@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import ru.bowling.bowlingapp.Entity.TechnicalDocument;
+import ru.bowling.bowlingapp.Repository.projection.KnowledgeBaseDocumentContent;
 import ru.bowling.bowlingapp.Repository.projection.KnowledgeBaseDocumentSummary;
 
 import java.util.Collection;
@@ -53,4 +54,16 @@ public interface TechnicalDocumentRepository extends JpaRepository<TechnicalDocu
             order by td.uploadDate desc, td.documentId desc
             """)
     List<KnowledgeBaseDocumentSummary> findSummariesByClubIds(@Param("clubIds") Collection<Long> clubIds);
+
+    @Query("""
+            select td.documentId as documentId,
+                   club.clubId as clubId,
+                   td.title as title,
+                   td.fileName as fileName,
+                   td.fileData as fileData
+            from TechnicalDocument td
+            left join td.club club
+            where td.documentId = :documentId
+            """)
+    Optional<KnowledgeBaseDocumentContent> findDocumentContentById(@Param("documentId") Long documentId);
 }
