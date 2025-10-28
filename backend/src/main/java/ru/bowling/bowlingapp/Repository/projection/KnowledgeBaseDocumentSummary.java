@@ -24,7 +24,7 @@ public interface KnowledgeBaseDocumentSummary {
 
     String getFileName();
 
-    Long getFileSize();
+    Number getFileSize();
 
     LocalDateTime getUploadDate();
 }

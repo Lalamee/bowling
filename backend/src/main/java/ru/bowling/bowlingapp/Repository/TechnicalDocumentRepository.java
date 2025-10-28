@@ -9,61 +9,62 @@ import ru.bowling.bowlingapp.Repository.projection.KnowledgeBaseDocumentSummary;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface TechnicalDocumentRepository extends JpaRepository<TechnicalDocument, Long> {
 
-    @Query("""
-            select td.documentId as documentId,
-                   club.clubId as clubId,
-                   club.name as clubName,
-                   td.title as title,
-                   td.description as description,
-                   type.name as documentType,
-                   manufacturer.name as manufacturerName,
-                   td.equipmentModel as equipmentModel,
-                   td.language as language,
-                   td.fileName as fileName,
-                   td.fileSize as fileSize,
-                   td.uploadDate as uploadDate
-            from TechnicalDocument td
-            join td.club club
-            left join td.documentType type
-            left join td.manufacturer manufacturer
-            order by td.uploadDate desc, td.documentId desc
-            """)
+    @Query(value = """
+            SELECT td.document_id AS documentId,
+                   td.club_id AS clubId,
+                   club.name AS clubName,
+                   td.title AS title,
+                   td.description AS description,
+                   type.name AS documentType,
+                   manufacturer.name AS manufacturer,
+                   td.equipment_model AS equipmentModel,
+                   td.language AS language,
+                   td.file_name AS fileName,
+                   OCTET_LENGTH(td.file_data) AS fileSize,
+                   td.upload_date AS uploadDate
+            FROM technical_documents td
+            JOIN bowling_clubs club ON club.club_id = td.club_id
+            LEFT JOIN document_type type ON type.document_type_id = td.document_type_id
+            LEFT JOIN manufacturer manufacturer ON manufacturer.manufacturer_id = td.manufacturer_id
+            ORDER BY td.upload_date DESC, td.document_id DESC
+            """, nativeQuery = true)
     List<KnowledgeBaseDocumentSummary> findAllSummaries();
 
-    @Query("""
-            select td.documentId as documentId,
-                   club.clubId as clubId,
-                   club.name as clubName,
-                   td.title as title,
-                   td.description as description,
-                   type.name as documentType,
-                   manufacturer.name as manufacturerName,
-                   td.equipmentModel as equipmentModel,
-                   td.language as language,
-                   td.fileName as fileName,
-                   td.fileSize as fileSize,
-                   td.uploadDate as uploadDate
-            from TechnicalDocument td
-            join td.club club
-            left join td.documentType type
-            left join td.manufacturer manufacturer
-            where club.clubId in :clubIds
-            order by td.uploadDate desc, td.documentId desc
-            """)
+    @Query(value = """
+            SELECT td.document_id AS documentId,
+                   td.club_id AS clubId,
+                   club.name AS clubName,
+                   td.title AS title,
+                   td.description AS description,
+                   type.name AS documentType,
+                   manufacturer.name AS manufacturer,
+                   td.equipment_model AS equipmentModel,
+                   td.language AS language,
+                   td.file_name AS fileName,
+                   OCTET_LENGTH(td.file_data) AS fileSize,
+                   td.upload_date AS uploadDate
+            FROM technical_documents td
+            JOIN bowling_clubs club ON club.club_id = td.club_id
+            LEFT JOIN document_type type ON type.document_type_id = td.document_type_id
+            LEFT JOIN manufacturer manufacturer ON manufacturer.manufacturer_id = td.manufacturer_id
+            WHERE td.club_id IN (:clubIds)
+            ORDER BY td.upload_date DESC, td.document_id DESC
+            """, nativeQuery = true)
     List<KnowledgeBaseDocumentSummary> findSummariesByClubIds(@Param("clubIds") Collection<Long> clubIds);
 
-    @Query("""
-            select td.documentId as documentId,
-                   club.clubId as clubId,
-                   td.title as title,
-                   td.fileName as fileName,
-                   td.fileData as fileData
-            from TechnicalDocument td
-            left join td.club club
-            where td.documentId = :documentId
-            """)
+    @Query(value = """
+            SELECT td.document_id AS documentId,
+                   td.club_id AS clubId,
+                   td.title AS title,
+                   td.file_name AS fileName,
+                   td.file_data AS fileData,
+                   OCTET_LENGTH(td.file_data) AS fileSize
+            FROM technical_documents td
+            WHERE td.document_id = :documentId
+            """, nativeQuery = true)
     Optional<KnowledgeBaseDocumentContent> findDocumentContentById(@Param("documentId") Long documentId);
 }

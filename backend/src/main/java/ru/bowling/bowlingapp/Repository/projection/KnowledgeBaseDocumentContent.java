@@ -11,4 +11,6 @@ public interface KnowledgeBaseDocumentContent {
     String getFileName();
 
     byte[] getFileData();
+
+    Number getFileSize();
 }

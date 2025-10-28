@@ -69,7 +69,10 @@ public class KnowledgeBaseService {
                 .filter(name -> !name.isBlank())
                 .orElseGet(() -> buildDefaultFileName(document));
 
-        long actualSize = data.length;
+        long actualSize = Optional.ofNullable(document.getFileSize())
+                .map(Number::longValue)
+                .filter(size -> size > 0)
+                .orElse((long) data.length);
 
         return new DocumentContent(data, fileName, actualSize);
     }
@@ -86,7 +89,10 @@ public class KnowledgeBaseService {
                 .equipmentModel(summary.getEquipmentModel())
                 .language(summary.getLanguage())
                 .fileName(summary.getFileName())
-                .fileSize(summary.getFileSize())
+                .fileSize(Optional.ofNullable(summary.getFileSize())
+                        .map(Number::longValue)
+                        .filter(size -> size > 0)
+                        .orElse(null))
                 .uploadDate(summary.getUploadDate())
                 .downloadUrl(buildDownloadUrl(summary.getDocumentId()))
                 .build();
