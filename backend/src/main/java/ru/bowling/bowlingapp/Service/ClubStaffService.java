@@ -762,11 +762,16 @@ public class ClubStaffService {
         if (accountType == null) {
             return false;
         }
+
+        boolean hasNames = names != null && names.length > 0;
+        boolean namesMatch = matchesAccountTypeByName(accountType, names);
+
         Long accountTypeId = accountType.getAccountTypeId();
         if (accountTypeId != null && accountTypeId.longValue() == expectedId) {
-            return true;
+            return !hasNames || namesMatch;
         }
-        return matchesAccountTypeByName(accountType, names);
+
+        return namesMatch;
     }
 
     private boolean matchesAccountTypeByName(AccountType accountType, String... names) {

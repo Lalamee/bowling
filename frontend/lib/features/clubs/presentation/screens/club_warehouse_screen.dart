@@ -14,8 +14,16 @@ import '../../../../shared/widgets/inputs/adaptive_text.dart';
 class ClubWarehouseScreen extends StatefulWidget {
   final int clubId;
   final String? clubName;
+  final int? initialInventoryId;
+  final String? initialQuery;
 
-  const ClubWarehouseScreen({Key? key, required this.clubId, this.clubName}) : super(key: key);
+  const ClubWarehouseScreen({
+    Key? key,
+    required this.clubId,
+    this.clubName,
+    this.initialInventoryId,
+    this.initialQuery,
+  }) : super(key: key);
 
   @override
   State<ClubWarehouseScreen> createState() => _ClubWarehouseScreenState();
@@ -32,11 +40,18 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
   PartDto? _selectedPart;
   bool _isLoading = false;
   bool _hasError = false;
+  bool _initialSelectionPending = true;
 
   @override
   void initState() {
     super.initState();
-    _loadInventory();
+    final query = widget.initialQuery?.trim();
+    if (query != null && query.isNotEmpty) {
+      _searchCtrl.text = query;
+      _searchInventory(query);
+    } else {
+      _loadInventory();
+    }
   }
 
   @override
@@ -110,7 +125,19 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
   }
 
   void _applyInventory(List<PartDto> data) {
-    final selected = _resolveSelected(data);
+    PartDto? selected = _resolveSelected(data);
+    if (_initialSelectionPending) {
+      final targetId = widget.initialInventoryId;
+      if (targetId != null) {
+        for (final part in data) {
+          if (part.inventoryId == targetId) {
+            selected = part;
+            break;
+          }
+        }
+      }
+      _initialSelectionPending = false;
+    }
     setState(() {
       _inventory = data;
       _selectedPart = selected;
@@ -138,6 +165,7 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
     setState(() {
       _selectedPart = part;
       _selectedItem = _partDisplayName(part);
+      _initialSelectionPending = false;
     });
     _fillControllers(part);
   }

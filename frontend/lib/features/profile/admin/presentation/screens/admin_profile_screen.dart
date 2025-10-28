@@ -174,12 +174,6 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
             text: 'История заказов',
             onTap: () => Navigator.pushNamed(context, Routes.adminOrders),
           ),
-          const SizedBox(height: 10),
-          ProfileTile(
-            icon: Icons.notifications_active_outlined,
-            text: 'Оповещения',
-            onTap: () => Navigator.pushNamed(context, Routes.managerNotifications),
-          ),
           const SizedBox(height: 24),
           ProfileTile(
             icon: Icons.exit_to_app_rounded,

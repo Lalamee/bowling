@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import '../../../../core/models/user_club.dart';
 import '../../../../core/theme/colors.dart';
@@ -145,7 +148,7 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
       return 'ADMIN';
     }
     if (normalized.contains('manager') || normalized.contains('менедж') || normalized.contains('главн')) {
-      return 'HEAD_MECHANIC';
+      return 'MANAGER';
     }
     if (normalized.contains('mechanic') || normalized.contains('механ')) {
       return 'MECHANIC';
@@ -262,6 +265,17 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
 
     final normalizedPhone = PhoneUtils.normalize(draft.phone);
     final roleKey = _roleKeyForRequest(draft.role);
+    final payloadLog = <String, dynamic>{
+      'fullName': draft.fullName,
+      'phone': normalizedPhone,
+      'role': roleKey,
+      if (draft.email != null && draft.email!.trim().isNotEmpty) 'email': draft.email,
+    };
+    developer.log(
+      'Creating staff member for clubId=$clubId payload=${jsonEncode(payloadLog)}',
+      name: 'club_staff',
+    );
+
     final result = await handleApiCall<Map<String, dynamic>?>(
       context,
       () => _repo.createStaff(
@@ -279,6 +293,12 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
     final password = result['password']?.toString() ?? '';
     final phone = result['phone']?.toString() ?? normalizedPhone;
     final userId = (result['userId'] as num?)?.toInt();
+
+    final responseLog = Map<String, dynamic>.from(result)..remove('password');
+    developer.log(
+      'Staff response ${jsonEncode(responseLog)}',
+      name: 'club_staff',
+    );
 
     if (userId != null && password.isNotEmpty) {
       _pendingPasswords[userId] = password;

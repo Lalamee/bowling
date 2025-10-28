@@ -5,12 +5,14 @@ import 'package:flutter/material.dart';
 import '../../../../../core/repositories/user_repository.dart';
 import '../../../../../core/routing/routes.dart';
 import '../../../../../core/services/auth_service.dart';
+import '../../../../../core/services/authz/acl.dart';
 import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/utils/bottom_nav.dart';
 import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../../shared/widgets/tiles/profile_tile.dart';
 import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
+import '../../../../orders/notifications/notifications_badge_controller.dart';
 
 class ManagerProfileScreen extends StatefulWidget {
   const ManagerProfileScreen({Key? key}) : super(key: key);
@@ -21,6 +23,7 @@ class ManagerProfileScreen extends StatefulWidget {
 
 class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
   final UserRepository _repo = UserRepository();
+  final NotificationsBadgeController _notificationsController = NotificationsBadgeController();
 
   String fullName = '—';
   String phone = '—';
@@ -31,12 +34,20 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
 
   bool _isLoading = true;
   bool _hasError = false;
+  int _notificationsCount = 0;
 
   @override
   void initState() {
     super.initState();
+    _notificationsController.addListener(_handleNotificationsUpdate);
     _loadLocalProfile();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _notificationsController.removeListener(_handleNotificationsUpdate);
+    super.dispose();
   }
 
   Future<void> _loadLocalProfile() async {
@@ -68,6 +79,14 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
       await LocalAuthStorage.saveManagerProfile(normalized);
       if (!mounted) return;
       _applyProfile(normalized);
+
+      final scope = await UserAccessScope.fromProfile(me);
+      await _notificationsController.ensureInitialized(scope);
+      if (mounted) {
+        setState(() {
+          _notificationsCount = _notificationsController.badgeCount;
+        });
+      }
     } catch (e, s) {
       log('Failed to load manager profile: $e', stackTrace: s);
       if (mounted) {
@@ -76,6 +95,16 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
           _hasError = true;
         });
       }
+    }
+  }
+
+  void _handleNotificationsUpdate() {
+    if (!mounted) return;
+    final current = _notificationsController.badgeCount;
+    if (current != _notificationsCount) {
+      setState(() {
+        _notificationsCount = current;
+      });
     }
   }
 
@@ -276,7 +305,15 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
           ProfileTile(
             icon: Icons.notifications_active_outlined,
             text: 'Оповещения',
-            onTap: () => Navigator.pushNamed(context, Routes.managerNotifications),
+            badgeCount: _notificationsCount,
+            onTap: () async {
+              await Navigator.pushNamed(context, Routes.managerNotifications);
+              if (mounted) {
+                setState(() {
+                  _notificationsCount = _notificationsController.badgeCount;
+                });
+              }
+            },
           ),
           const SizedBox(height: 10),
           ProfileTile(icon: Icons.exit_to_app_rounded, text: 'Выход', danger: true, onTap: _logout),

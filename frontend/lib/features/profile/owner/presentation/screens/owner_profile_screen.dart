@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../../core/repositories/user_repository.dart';
 import '../../../../../core/routing/routes.dart';
 import '../../../../../core/services/auth_service.dart';
+import '../../../../../core/services/authz/acl.dart';
 import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
@@ -13,6 +14,7 @@ import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.da
 import '../../../../../core/utils/bottom_nav.dart';
 import '../../domain/owner_profile.dart';
 import 'edit_owner_profile_screen.dart';
+import '../../../../orders/notifications/notifications_badge_controller.dart';
 
 enum OwnerEditFocus { none, name, phone, address }
 
@@ -25,6 +27,7 @@ class OwnerProfileScreen extends StatefulWidget {
 
 class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
   final UserRepository _repo = UserRepository();
+  final NotificationsBadgeController _notificationsController = NotificationsBadgeController();
   late OwnerProfile profile;
   static const String _ownerStatusLabel = 'Собственник';
   bool _isLoading = true;
@@ -33,10 +36,12 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
   String? inn;
   String? lanes;
   String? equipment;
+  int _notificationsCount = 0;
 
   @override
   void initState() {
     super.initState();
+    _notificationsController.addListener(_handleNotificationsUpdate);
     profile = OwnerProfile(
       fullName: 'Собственник',
       phone: '—',
@@ -49,6 +54,12 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
     );
     _loadLocalProfile();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _notificationsController.removeListener(_handleNotificationsUpdate);
+    super.dispose();
   }
 
   Future<void> _loadLocalProfile() async {
@@ -71,6 +82,14 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
       await LocalAuthStorage.saveOwnerProfile(cache);
       if (!mounted) return;
       _applyProfile(cache);
+
+      final scope = await UserAccessScope.fromProfile(me);
+      await _notificationsController.ensureInitialized(scope);
+      if (mounted) {
+        setState(() {
+          _notificationsCount = _notificationsController.badgeCount;
+        });
+      }
     } catch (e, s) {
       log('Failed to load owner profile: $e', stackTrace: s);
       if (mounted) {
@@ -79,6 +98,16 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
           _hasError = true;
         });
       }
+    }
+  }
+
+  void _handleNotificationsUpdate() {
+    if (!mounted) return;
+    final current = _notificationsController.badgeCount;
+    if (current != _notificationsCount) {
+      setState(() {
+        _notificationsCount = current;
+      });
     }
   }
 
@@ -368,7 +397,19 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                     const SizedBox(height: 10),
                     ProfileTile(icon: Icons.history_rounded, text: 'История заказов', onTap: () => Navigator.pushNamed(context, Routes.ordersPersonalHistory)),
                     const SizedBox(height: 10),
-                    ProfileTile(icon: Icons.notifications_active_outlined, text: 'Оповещения', onTap: () {}),
+                    ProfileTile(
+                      icon: Icons.notifications_active_outlined,
+                      text: 'Оповещения',
+                      badgeCount: _notificationsCount,
+                      onTap: () async {
+                        await Navigator.pushNamed(context, Routes.managerNotifications);
+                        if (mounted) {
+                          setState(() {
+                            _notificationsCount = _notificationsController.badgeCount;
+                          });
+                        }
+                      },
+                    ),
                     const SizedBox(height: 10),
                     ProfileTile(icon: Icons.group_outlined, text: 'Сотрудники клуба', onTap: () => Navigator.pushNamed(context, Routes.clubStaff)),
                     const SizedBox(height: 10),

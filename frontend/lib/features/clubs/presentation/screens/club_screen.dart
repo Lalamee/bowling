@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/models/order_status.dart';
 import '../../../../core/models/user_club.dart';
+import '../../../../core/repositories/clubs_repository.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/routing/routes.dart';
 import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/authz/acl.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
@@ -18,7 +21,9 @@ import '../../../orders/presentation/screens/add_parts_to_order_screen.dart';
 import 'club_warehouse_screen.dart';
 
 class ClubScreen extends StatefulWidget {
-  const ClubScreen({Key? key}) : super(key: key);
+  final int? initialClubId;
+
+  const ClubScreen({Key? key, this.initialClubId}) : super(key: key);
 
   @override
   State<ClubScreen> createState() => _ClubScreenState();
@@ -26,11 +31,13 @@ class ClubScreen extends StatefulWidget {
 
 class _ClubScreenState extends State<ClubScreen> {
   final _userRepository = UserRepository();
+  final _clubsRepository = ClubsRepository();
 
   bool _isLoading = true;
   bool _hasError = false;
   List<UserClub> _clubs = const [];
   int? _selectedIndex;
+  UserAccessScope? _scope;
 
   @override
   void initState() {
@@ -45,11 +52,39 @@ class _ClubScreenState extends State<ClubScreen> {
     });
     try {
       final me = await _userRepository.me();
+      final scope = await UserAccessScope.fromProfile(me);
       if (!mounted) return;
-      final clubs = resolveUserClubs(me);
+
+      List<UserClub> clubs;
+      if (scope.isAdmin) {
+        final summaries = await _clubsRepository.getClubs();
+        clubs = summaries
+            .map(
+              (club) => UserClub(
+                id: club.id,
+                name: club.name,
+                address: club.address,
+                lanes: club.lanesCount?.toString(),
+                phone: club.contactPhone,
+                email: club.contactEmail,
+              ),
+            )
+            .toList();
+      } else {
+        clubs = resolveUserClubs(me);
+      }
+      int? selectedIndex;
+      if (widget.initialClubId != null) {
+        final index = clubs.indexWhere((club) => club.id == widget.initialClubId);
+        if (index >= 0) {
+          selectedIndex = index;
+        }
+      }
+
       setState(() {
         _clubs = clubs;
-        _selectedIndex = clubs.isNotEmpty ? 0 : null;
+        _selectedIndex = selectedIndex ?? (clubs.isNotEmpty ? 0 : null);
+        _scope = scope;
         _isLoading = false;
       });
     } catch (e) {
@@ -79,6 +114,11 @@ class _ClubScreenState extends State<ClubScreen> {
       showSnack(context, 'Выберите клуб');
       return;
     }
+    final scope = _scope;
+    if (scope != null && !scope.canActOnClub(selected)) {
+      showSnack(context, 'Нет доступа к выбранному клубу');
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -94,6 +134,11 @@ class _ClubScreenState extends State<ClubScreen> {
     final selected = _selectedIndex != null ? _clubs[_selectedIndex!] : null;
     if (selected == null) {
       showSnack(context, 'Выберите клуб');
+      return;
+    }
+    final scope = _scope;
+    if (scope != null && !scope.canActOnClub(selected)) {
+      showSnack(context, 'Нет доступа к выбранному клубу');
       return;
     }
     final selectedOrder = await showModalBottomSheet<MaintenanceRequestResponseDto>(
@@ -268,29 +313,6 @@ class _OrderSelectionSheetState extends State<_OrderSelectionSheet> {
     _load();
   }
 
-  String _statusName(String status) {
-    switch (status.toUpperCase()) {
-      case 'NEW':
-        return 'Новая заявка';
-      case 'APPROVED':
-        return 'Одобрено';
-      case 'IN_PROGRESS':
-        return 'В работе';
-      case 'DONE':
-        return 'Выполнено';
-      case 'COMPLETED':
-        return 'Завершено';
-      case 'CLOSED':
-        return 'Закрыто';
-      case 'UNREPAIRABLE':
-        return 'Неремонтопригодно';
-      case 'REJECTED':
-        return 'Отклонено';
-      default:
-        return status;
-    }
-  }
-
   Future<void> _load() async {
     setState(() {
       _isLoading = true;
@@ -406,7 +428,10 @@ class _OrderSelectionSheetState extends State<_OrderSelectionSheet> {
                 if (order.laneNumber != null)
                   Text('Дорожка ${order.laneNumber}', style: const TextStyle(color: AppColors.darkGray)),
                 if (order.status != null && order.status!.isNotEmpty)
-                  Text('Статус: ${_statusName(order.status!)}', style: const TextStyle(color: AppColors.darkGray)),
+                  Text(
+                    'Статус: ${describeOrderStatus(order.status!)}',
+                    style: const TextStyle(color: AppColors.darkGray),
+                  ),
               ],
             ),
             trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.darkGray),

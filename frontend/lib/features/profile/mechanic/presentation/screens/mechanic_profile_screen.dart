@@ -570,8 +570,6 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                     const SizedBox(height: 10),
                     ProfileTile(icon: Icons.history_rounded, text: 'История заказов', onTap: () => Navigator.pushNamed(context, Routes.ordersPersonalHistory)),
                     const SizedBox(height: 10),
-                    ProfileTile(icon: Icons.notifications_active_outlined, text: 'Оповещения', onTap: () {}),
-                    const SizedBox(height: 10),
                     ProfileTile(icon: Icons.star_border_rounded, text: 'Избранные заказы/детали', onTap: () {}),
                     const SizedBox(height: 10),
                     ProfileTile(icon: Icons.exit_to_app_rounded, text: 'Выход', danger: true, onTap: _logout),
