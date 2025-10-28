@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
+import '../../../../core/repositories/user_repository.dart';
+import '../../../../core/services/authz/acl.dart';
 import '../../../../models/maintenance_request_response_dto.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../shared/widgets/nav/app_bottom_nav.dart';
@@ -17,9 +19,11 @@ class MaintenanceRequestsScreen extends StatefulWidget {
 
 class _MaintenanceRequestsScreenState extends State<MaintenanceRequestsScreen> {
   final _repo = MaintenanceRepository();
+  final _userRepo = UserRepository();
   List<MaintenanceRequestResponseDto> requests = [];
   bool isLoading = true;
   String? selectedStatus;
+  UserAccessScope? _scope;
 
   final List<String> statuses = [
     'Все',
@@ -40,13 +44,15 @@ class _MaintenanceRequestsScreenState extends State<MaintenanceRequestsScreen> {
   Future<void> _loadRequests() async {
     setState(() => isLoading = true);
     try {
+      _scope ??= await UserAccessScope.fromProfile(await _userRepo.me());
+      final scope = _scope!;
       final data = selectedStatus == null || selectedStatus == 'Все'
           ? await _repo.getAllRequests()
           : await _repo.getRequestsByStatus(selectedStatus!);
-      
+
       if (mounted) {
         setState(() {
-          requests = data;
+          requests = scope.isAdmin ? data : data.where(scope.canViewOrder).toList();
           isLoading = false;
         });
       }

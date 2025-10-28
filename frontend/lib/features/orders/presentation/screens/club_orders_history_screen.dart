@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/repositories/maintenance_repository.dart';
+import '../../../../core/repositories/user_repository.dart';
+import '../../../../core/services/authz/acl.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../models/maintenance_request_response_dto.dart';
@@ -14,10 +16,12 @@ class ClubOrdersHistoryScreen extends StatefulWidget {
 
 class _ClubOrdersHistoryScreenState extends State<ClubOrdersHistoryScreen> {
   final MaintenanceRepository _repository = MaintenanceRepository();
+  final UserRepository _userRepository = UserRepository();
 
   bool _loading = true;
   bool _error = false;
   Map<String, List<MaintenanceRequestResponseDto>> _ordersByClub = const {};
+  UserAccessScope? _scope;
 
   @override
   void initState() {
@@ -31,20 +35,24 @@ class _ClubOrdersHistoryScreenState extends State<ClubOrdersHistoryScreen> {
       _error = false;
     });
     try {
+      final me = await _userRepository.me();
+      final scope = await UserAccessScope.fromProfile(me);
       final data = await _repository.getAllRequests();
       if (!mounted) return;
-      data.sort((a, b) {
+      final filtered = data.where(scope.canViewOrder).toList();
+      filtered.sort((a, b) {
         final aDate = a.requestDate ?? DateTime.fromMillisecondsSinceEpoch(0);
         final bDate = b.requestDate ?? DateTime.fromMillisecondsSinceEpoch(0);
         return bDate.compareTo(aDate);
       });
       final grouped = <String, List<MaintenanceRequestResponseDto>>{};
-      for (final order in data) {
+      for (final order in filtered) {
         final key = order.clubName ?? 'Без названия';
         grouped.putIfAbsent(key, () => []).add(order);
       }
       setState(() {
         _ordersByClub = grouped;
+        _scope = scope;
         _loading = false;
       });
     } catch (e) {

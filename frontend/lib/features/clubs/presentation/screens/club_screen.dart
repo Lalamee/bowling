@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/models/user_club.dart';
+import '../../../../core/repositories/clubs_repository.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/routing/routes.dart';
 import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/authz/acl.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
@@ -26,11 +28,13 @@ class ClubScreen extends StatefulWidget {
 
 class _ClubScreenState extends State<ClubScreen> {
   final _userRepository = UserRepository();
+  final _clubsRepository = ClubsRepository();
 
   bool _isLoading = true;
   bool _hasError = false;
   List<UserClub> _clubs = const [];
   int? _selectedIndex;
+  UserAccessScope? _scope;
 
   @override
   void initState() {
@@ -45,11 +49,31 @@ class _ClubScreenState extends State<ClubScreen> {
     });
     try {
       final me = await _userRepository.me();
+      final scope = await UserAccessScope.fromProfile(me);
       if (!mounted) return;
-      final clubs = resolveUserClubs(me);
+
+      List<UserClub> clubs;
+      if (scope.isAdmin) {
+        final summaries = await _clubsRepository.getClubs();
+        clubs = summaries
+            .map(
+              (club) => UserClub(
+                id: club.id,
+                name: club.name,
+                address: club.address,
+                lanes: club.lanesCount?.toString(),
+                phone: club.contactPhone,
+                email: club.contactEmail,
+              ),
+            )
+            .toList();
+      } else {
+        clubs = resolveUserClubs(me);
+      }
       setState(() {
         _clubs = clubs;
         _selectedIndex = clubs.isNotEmpty ? 0 : null;
+        _scope = scope;
         _isLoading = false;
       });
     } catch (e) {
@@ -79,6 +103,11 @@ class _ClubScreenState extends State<ClubScreen> {
       showSnack(context, 'Выберите клуб');
       return;
     }
+    final scope = _scope;
+    if (scope != null && !scope.canActOnClub(selected)) {
+      showSnack(context, 'Нет доступа к выбранному клубу');
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -94,6 +123,11 @@ class _ClubScreenState extends State<ClubScreen> {
     final selected = _selectedIndex != null ? _clubs[_selectedIndex!] : null;
     if (selected == null) {
       showSnack(context, 'Выберите клуб');
+      return;
+    }
+    final scope = _scope;
+    if (scope != null && !scope.canActOnClub(selected)) {
+      showSnack(context, 'Нет доступа к выбранному клубу');
       return;
     }
     final selectedOrder = await showModalBottomSheet<MaintenanceRequestResponseDto>(
