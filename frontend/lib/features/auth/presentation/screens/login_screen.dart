@@ -53,16 +53,24 @@ class _LoginScreenState extends State<LoginScreen> {
 
     String? role;
     String? normalize(String? value) => value?.toLowerCase().trim();
+    bool matchesAdmin(String? value) =>
+        value != null && (value.contains('админ') || value.contains('admin'));
+    bool matchesOwner(String? value) =>
+        value != null && (value.contains('влад') || value.contains('owner'));
+    bool matchesManager(String? value) => value != null &&
+        (value.contains('менедж') || value.contains('главн') || value.contains('manager'));
+    bool matchesMechanic(String? value) =>
+        value != null && (value.contains('механ') || value.contains('mechanic'));
 
-    final typeName = normalize(info.accountTypeName);
-    if (typeName != null && typeName.isNotEmpty) {
-      if (typeName.contains('влад') || typeName.contains('owner')) {
+    final normalizedType = normalize(info.accountTypeName);
+    if (normalizedType != null && normalizedType.isNotEmpty) {
+      if (matchesOwner(normalizedType)) {
         role = 'owner';
-      } else if (typeName.contains('менедж') || typeName.contains('главн')) {
+      } else if (matchesManager(normalizedType)) {
         role = 'manager';
-      } else if (typeName.contains('админ')) {
+      } else if (matchesAdmin(normalizedType)) {
         role = 'admin';
-      } else if (typeName.contains('механ')) {
+      } else if (matchesMechanic(normalizedType)) {
         role = 'mechanic';
       }
     }
@@ -100,12 +108,18 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (role == null && info.accountTypeId != null) {
+      final type = normalizedType ?? normalize(info.accountTypeName);
+      final fallbackType = type?.isNotEmpty == true ? type : normalize(info.accountTypeName);
       switch (info.accountTypeId) {
         case 2:
-          role = 'owner';
+          if (matchesOwner(fallbackType)) {
+            role = 'owner';
+          }
           break;
         case 1:
-          role = 'mechanic';
+          if (matchesMechanic(fallbackType)) {
+            role = 'mechanic';
+          }
           break;
       }
     }

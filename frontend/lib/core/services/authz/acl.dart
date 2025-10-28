@@ -107,10 +107,18 @@ Future<String> _resolveRole(Map<String, dynamic> me) async {
     return null;
   }
 
+  bool matchesOwnerType(String? value) =>
+      value != null && (value.contains('owner') || value.contains('влад'));
+  bool matchesMechanicType(String? value) =>
+      value != null && (value.contains('mechanic') || value.contains('механ'));
+  String? normalize(String? value) => value?.toLowerCase().trim();
+
   String? resolved;
 
   resolved ??= mapRole(me['accountTypeName']?.toString());
   resolved ??= mapRole(me['accountType']?.toString());
+  final normalizedAccountType =
+      normalize(me['accountTypeName']?.toString()) ?? normalize(me['accountType']?.toString());
 
   final role = me['role'];
   if (resolved == null && role is Map) {
@@ -145,10 +153,14 @@ Future<String> _resolveRole(Map<String, dynamic> me) async {
   if (resolved == null && accountTypeId != null) {
     switch (accountTypeId) {
       case 2:
-        resolved = 'owner';
+        if (matchesOwnerType(normalizedAccountType)) {
+          resolved = 'owner';
+        }
         break;
       case 1:
-        resolved = 'mechanic';
+        if (matchesMechanicType(normalizedAccountType)) {
+          resolved = 'mechanic';
+        }
         break;
     }
   }
