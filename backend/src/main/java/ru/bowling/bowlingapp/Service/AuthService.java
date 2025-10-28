@@ -684,17 +684,16 @@ public class AuthService implements UserDetailsService {
             if (byId.isPresent()) {
                 return byId.get();
             }
-            String fallbackName = accountTypeNameByCode(dto.getAccountTypeId());
-            if (fallbackName != null) {
-                return accountTypeRepository.findByNameIgnoreCase(fallbackName)
-                        .orElseThrow(() -> new IllegalArgumentException("Account type not found"));
+
+            AccountType byCodeFallback = findAccountTypeByNameCandidates(accountTypeNamesByCode(dto.getAccountTypeId()));
+            if (byCodeFallback != null) {
+                return byCodeFallback;
             }
         }
 
-        String fallbackFromRole = accountTypeNameForRoleCode(dto.getRoleId());
-        if (fallbackFromRole != null) {
-            return accountTypeRepository.findByNameIgnoreCase(fallbackFromRole)
-                    .orElseThrow(() -> new IllegalArgumentException("Account type not found"));
+        AccountType byRoleFallback = findAccountTypeByNameCandidates(accountTypeNamesForRoleCode(dto.getRoleId()));
+        if (byRoleFallback != null) {
+            return byRoleFallback;
         }
 
         throw new IllegalArgumentException("Account type not found");
@@ -766,25 +765,118 @@ public class AuthService implements UserDetailsService {
     private static final int ACCOUNT_TYPE_INDIVIDUAL_ID = 1;
     private static final int ACCOUNT_TYPE_CLUB_OWNER_ID = 2;
 
-    private String accountTypeNameByCode(Integer code) {
-        if (code == null) {
+    private AccountType findAccountTypeByNameCandidates(Collection<String> candidates) {
+        if (candidates == null || candidates.isEmpty()) {
             return null;
         }
+
+        List<AccountType> allAccountTypes = null;
+
+        for (String candidate : candidates) {
+            String trimmed = trimOrNull(candidate);
+            if (trimmed == null) {
+                continue;
+            }
+
+            Optional<AccountType> directMatch = accountTypeRepository.findByNameIgnoreCase(trimmed)
+                    .or(() -> accountTypeRepository.findByName(trimmed));
+            if (directMatch.isPresent()) {
+                return directMatch.get();
+            }
+
+            if (allAccountTypes == null) {
+                allAccountTypes = accountTypeRepository.findAll();
+            }
+
+            String normalizedCandidate = normalizeAccountTypeName(trimmed);
+            for (AccountType type : allAccountTypes) {
+                if (normalizedCandidate != null
+                        && normalizedCandidate.equals(normalizeAccountTypeName(type.getName()))) {
+                    return type;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private List<String> accountTypeNamesByCode(Integer code) {
+        if (code == null) {
+            return Collections.emptyList();
+        }
         return switch (code) {
-            case ACCOUNT_TYPE_INDIVIDUAL_ID -> "INDIVIDUAL";
-            case ACCOUNT_TYPE_CLUB_OWNER_ID -> "CLUB_OWNER";
-            default -> null;
+            case ACCOUNT_TYPE_INDIVIDUAL_ID -> Arrays.asList(
+                    "INDIVIDUAL",
+                    "Физическое лицо",
+                    "ФИЗ ЛИЦО",
+                    "ФИЗЛИЦО",
+                    "ФИЗ. ЛИЦО",
+                    "MECHANIC",
+                    "Механик"
+            );
+            case ACCOUNT_TYPE_CLUB_OWNER_ID -> Arrays.asList(
+                    "CLUB_OWNER",
+                    "OWNER",
+                    "Владелец"
+            );
+            case 3 -> Arrays.asList(
+                    "HEAD_MECHANIC",
+                    "HEADMECHANIC",
+                    "ГЛАВНЫЙ МЕХАНИК",
+                    "Главный механик",
+                    "MANAGER",
+                    "Менеджер"
+            );
+            case 4 -> Arrays.asList(
+                    "ADMINISTRATOR",
+                    "ADMIN",
+                    "Администратор"
+            );
+            case 5 -> Arrays.asList(
+                    "MANAGER",
+                    "Менеджер",
+                    "HEAD_MECHANIC",
+                    "HEADMECHANIC",
+                    "ГЛАВНЫЙ МЕХАНИК",
+                    "Главный механик"
+            );
+            default -> Collections.emptyList();
         };
     }
 
-    private String accountTypeNameForRoleCode(Integer code) {
+    private List<String> accountTypeNamesForRoleCode(Integer code) {
         if (code == null) {
-            return null;
+            return Collections.emptyList();
         }
         return switch (code) {
-            case ROLE_CLUB_OWNER_ID -> "CLUB_OWNER";
-            case ROLE_ADMIN_ID, ROLE_MECHANIC_ID, ROLE_HEAD_MECHANIC_ID -> "INDIVIDUAL";
-            default -> null;
+            case ROLE_CLUB_OWNER_ID -> Arrays.asList(
+                    "CLUB_OWNER",
+                    "OWNER",
+                    "Владелец"
+            );
+            case ROLE_ADMIN_ID -> Arrays.asList(
+                    "ADMINISTRATOR",
+                    "ADMIN",
+                    "Администратор"
+            );
+            case ROLE_MECHANIC_ID -> Arrays.asList(
+                    "MECHANIC",
+                    "Механик",
+                    "INDIVIDUAL",
+                    "Физическое лицо",
+                    "ФИЗ ЛИЦО",
+                    "ФИЗЛИЦО",
+                    "ФИЗ. ЛИЦО"
+            );
+            case ROLE_HEAD_MECHANIC_ID -> Arrays.asList(
+                    "HEAD_MECHANIC",
+                    "HEADMECHANIC",
+                    "ГЛАВНЫЙ МЕХАНИК",
+                    "Главный механик",
+                    "MANAGER",
+                    "Менеджер"
+            );
+            default -> Collections.emptyList();
         };
     }
 
