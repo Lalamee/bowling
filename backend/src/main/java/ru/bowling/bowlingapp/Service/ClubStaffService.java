@@ -626,13 +626,15 @@ public class ClubStaffService {
     }
 
     private AccountType resolveManagerAccountType() {
-        return resolveAccountType(ACCOUNT_TYPE_INDIVIDUAL_ID,
-                "INDIVIDUAL",
+        AccountType specific = resolveAccountTypeByNames(
                 "MANAGER",
                 "HEAD_MECHANIC",
-                "Менеджер",
                 "Главный механик",
-                "Физическое лицо");
+                "Менеджер");
+        if (specific != null) {
+            return specific;
+        }
+        return resolveIndividualAccountType();
     }
 
     private Role resolveManagerRole() {
@@ -659,11 +661,13 @@ public class ClubStaffService {
     }
 
     private AccountType resolveMechanicAccountType() {
-        return resolveAccountType(ACCOUNT_TYPE_INDIVIDUAL_ID,
-                "INDIVIDUAL",
+        AccountType specific = resolveAccountTypeByNames(
                 "MECHANIC",
-                "Механик",
-                "Физическое лицо");
+                "Механик");
+        if (specific != null) {
+            return specific;
+        }
+        return resolveIndividualAccountType();
     }
 
     private AccountType resolveAccountType(long id, String... fallbackNames) {
@@ -679,12 +683,6 @@ public class ClubStaffService {
                 Optional<AccountType> byName = accountTypeRepository.findByNameIgnoreCase(name);
                 if (byName.isPresent()) {
                     return byName.get();
-                }
-            }
-            for (String name : fallbackNames) {
-                AccountType created = createAccountTypeIfMissing(name);
-                if (created != null) {
-                    return created;
                 }
             }
         }
@@ -708,12 +706,6 @@ public class ClubStaffService {
                 return byName.get();
             }
         }
-        for (String name : names) {
-            AccountType created = createAccountTypeIfMissing(name);
-            if (created != null) {
-                return created;
-            }
-        }
         return null;
     }
 
@@ -731,9 +723,15 @@ public class ClubStaffService {
         if (specific != null) {
             return specific;
         }
-        return resolveAccountType(ACCOUNT_TYPE_INDIVIDUAL_ID,
-                "INDIVIDUAL",
-                "Физическое лицо");
+        return resolveIndividualAccountType();
+    }
+
+    private AccountType resolveIndividualAccountType() {
+        return accountTypeRepository.findById(ACCOUNT_TYPE_INDIVIDUAL_ID)
+                .or(() -> accountTypeRepository.findByNameIgnoreCase("INDIVIDUAL"))
+                .or(() -> accountTypeRepository.findByNameIgnoreCase("Физическое лицо"))
+                .orElseThrow(() -> new IllegalStateException(
+                        "Individual account type (id=" + ACCOUNT_TYPE_INDIVIDUAL_ID + ") is not configured"));
     }
 
     private Role resolveAdministratorRole() {
@@ -818,19 +816,6 @@ public class ClubStaffService {
             }
         }
         return false;
-    }
-
-    private AccountType createAccountTypeIfMissing(String candidateName) {
-        String normalized = normalizeAccountTypeName(candidateName);
-        if (normalized == null) {
-            return null;
-        }
-        String trimmed = candidateName.trim();
-        if (trimmed.isEmpty()) {
-            return null;
-        }
-        return accountTypeRepository.findByNameIgnoreCase(trimmed)
-                .orElseGet(() -> accountTypeRepository.saveAndFlush(AccountType.builder().name(trimmed).build()));
     }
 
     private boolean matchesRole(Role role, long expectedId, String... names) {
