@@ -129,10 +129,13 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
             Column(
               children: List.generate(_documents.length, (i) {
                 final doc = _documents[i];
+                final displayTitle = (doc.fileName != null && doc.fileName!.isNotEmpty)
+                    ? doc.fileName!
+                    : doc.title;
                 return Padding(
                   padding: EdgeInsets.only(bottom: i == _documents.length - 1 ? 0 : 10),
                   child: KbListTile(
-                    title: doc.title,
+                    title: displayTitle,
                     accent: i == 0,
                     onTap: () {
                       Navigator.push(
