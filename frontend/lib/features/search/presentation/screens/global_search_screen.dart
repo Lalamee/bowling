@@ -1,179 +1,179 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/repositories/search_repository.dart';
-import '../../../../core/routing/route_args.dart';
-import '../../../../core/routing/routes.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
-import '../../../../shared/widgets/nav/app_bottom_nav.dart';
-import '../../../knowledge_base/domain/kb_pdf.dart';
-import '../../../search/application/search_controller.dart';
-import '../../../search/domain/search_item.dart';
-import '../../presentation/widgets/search_item_tile.dart';
-import '../../../../shared/widgets/highlight_text.dart';
-import '../../../../core/repositories/maintenance_repository.dart';
-import '../../../../models/maintenance_request_response_dto.dart';
-import '../../../../core/repositories/inventory_repository.dart';
 import '../../../../core/utils/net_ui.dart';
+import '../../../../models/global_search_response_dto.dart';
 import '../../../../models/part_dto.dart';
-import '../../../../core/services/search_service.dart';
+import '../../../../shared/widgets/inputs/adaptive_text.dart';
+import '../../../../shared/widgets/nav/app_bottom_nav.dart';
 
 class GlobalSearchScreen extends StatefulWidget {
-  const GlobalSearchScreen({super.key, this.repository});
-
-  final SearchRepository? repository;
+  const GlobalSearchScreen({super.key});
 
   @override
   State<GlobalSearchScreen> createState() => _GlobalSearchScreenState();
 }
 
 class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
-  late final SearchController _controller;
-  late final TextEditingController _queryController;
-  late final ScrollController _scrollController;
-  late final SearchRepository _repository;
-  final MaintenanceRepository _maintenanceRepository = MaintenanceRepository();
-  final InventoryRepository _inventoryRepository = InventoryRepository();
+  static const _limitPerSection = 6;
+
+  final _repository = SearchRepository();
+  final _searchCtrl = TextEditingController();
+  final _dateFormatter = DateFormat('dd.MM.yyyy HH:mm');
+
+  Timer? _debounce;
+  bool _isLoading = true;
+  bool _hasError = false;
+  GlobalSearchResponseDto? _results;
 
   @override
   void initState() {
     super.initState();
-    _repository = widget.repository ?? SearchRepository();
-    _controller = SearchController(repository: _repository)..restore();
-    _queryController = TextEditingController(text: _controller.state.query);
-    _scrollController = ScrollController()..addListener(_handleScroll);
-    if (_controller.state.query.trim().isNotEmpty &&
-        _controller.state.items.isEmpty &&
-        !_controller.state.isLoading) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _controller.submit());
-    }
+    _load('');
   }
 
   @override
   void dispose() {
-    _scrollController.removeListener(_handleScroll);
-    _scrollController.dispose();
-    _queryController.dispose();
-    _controller.dispose();
+    _debounce?.cancel();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
-  void _handleScroll() {
-    if (!_scrollController.hasClients) return;
-    final position = _scrollController.position;
-    if (position.pixels >= position.maxScrollExtent - 200) {
-      _controller.loadMore();
+  void _onSearchChanged(String value) {
+    setState(() {});
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () => _load(value));
+  }
+
+  Future<void> _load(String query) async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+    try {
+      final res = await _repository.searchGlobal(query, limit: _limitPerSection);
+      if (!mounted) return;
+      setState(() {
+        _results = res;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
+      showApiError(context, e);
     }
+  }
+
+  Future<void> _refresh() => _load(_searchCtrl.text);
+
+  void _clearSearch() {
+    _searchCtrl.clear();
+    _onSearchChanged('');
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        final state = _controller.state;
-        return Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(
-            backgroundColor: AppColors.background,
-            elevation: 0,
-            title: _buildSearchField(state),
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        title: const Text(
+          'Поиск',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textDark),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: AppColors.primary),
+            onPressed: _refresh,
           ),
-          body: Column(
-            children: [
-              _DomainChips(
-                selected: state.domain,
-                onSelected: _controller.selectDomain,
-              ),
-              Expanded(child: _buildBody(state)),
-              if (!state.isLoading && !state.hasError && !state.isIdle)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Text(
-                    'Найдено ${state.totalCount} результатов',
-                    style: const TextStyle(color: AppColors.darkGray, fontSize: 13),
-                  ),
-                ),
-            ],
-          ),
-          bottomNavigationBar: AppBottomNav(
-            currentIndex: 1,
-            onTap: (index) => BottomNavDirect.go(context, 1, index),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildSearchField(SearchState state) {
-    final isLoading = state.isLoading && !state.isLoadingMore;
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary, width: 1.4),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _queryController,
-              onChanged: (value) => _controller.updateQuery(value),
-              onSubmitted: (_) => _controller.submit(),
-              textInputAction: TextInputAction.search,
-              decoration: const InputDecoration(
-                hintText: 'Поиск по заказам, запчастям, клубам…',
-                border: InputBorder.none,
-              ),
-            ),
-          ),
-          if (state.query.trim().isNotEmpty && !isLoading)
-            IconButton(
-              onPressed: () {
-                _queryController.clear();
-                _controller.updateQuery('', immediate: true);
-              },
-              icon: const Icon(Icons.clear_rounded, color: AppColors.darkGray, size: 20),
-            ),
-          if (isLoading)
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          else
-            IconButton(
-              onPressed: () => _controller.submit(),
-              icon: const Icon(Icons.search, color: AppColors.primary),
-            ),
         ],
       ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Container(
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.primary, width: 1.5),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchCtrl,
+                      onChanged: _onSearchChanged,
+                      onSubmitted: _load,
+                      decoration: const InputDecoration(
+                        hintText: 'Введите запрос по каталогу, заявкам или клубам',
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                  if (_searchCtrl.text.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.close, color: AppColors.darkGray, size: 20),
+                      onPressed: _clearSearch,
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.search, color: AppColors.primary),
+                    onPressed: () => _load(_searchCtrl.text),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(child: _buildBody()),
+        ],
+      ),
+      bottomNavigationBar: AppBottomNav(
+        currentIndex: 1,
+        onTap: (i) => BottomNavDirect.go(context, 1, i),
+      ),
     );
   }
 
-  Widget _buildBody(SearchState state) {
-    if (state.isIdle) {
-      return const Center(
-        child: Text(
-          'Введите запрос, чтобы начать поиск',
-          style: TextStyle(color: AppColors.darkGray),
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_hasError) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off, size: 64, color: AppColors.darkGray),
+            const SizedBox(height: 12),
+            const Text('Не удалось выполнить поиск', style: TextStyle(color: AppColors.darkGray)),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _refresh,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Повторить'),
+            ),
+          ],
         ),
       );
     }
 
-    if (state.hasError) {
-      return _ErrorState(
-        message: 'Не удалось выполнить поиск',
-        onRetry: _controller.refresh,
-      );
-    }
-
-    if (state.isLoading && state.items.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (state.isEmpty) {
+    final data = _results;
+    if (data == null || _isEmpty(data)) {
       return const Center(
         child: Text(
           'Ничего не найдено',
@@ -182,164 +182,130 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
       );
     }
 
-    final items = state.items;
     return RefreshIndicator(
-      onRefresh: _controller.refresh,
-      child: ListView.separated(
-        controller: _scrollController,
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-        itemCount: items.length + (state.isLoadingMore ? 1 : 0),
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          if (index >= items.length) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Center(child: CircularProgressIndicator()),
-            );
-          }
-          final item = items[index];
-          return SearchItemTile(
-            item: item,
-            query: state.query,
-            onTap: () => _openItem(item),
-          );
-        },
+      onRefresh: _refresh,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        children: _buildSections(data),
       ),
     );
   }
 
-  Future<void> _openItem(SearchItem item) async {
-    try {
-      switch (item.domain) {
-        case SearchDomain.orders:
-          final MaintenanceRequestResponseDto? order = await _repository.getOrderById(item.id) ??
-              await _maintenanceRepository.getById(int.tryParse(item.id) ?? 0);
-          if (!mounted) return;
-          Navigator.pushNamed(
-            context,
-            Routes.orderSummary,
-            arguments: OrderSummaryArgs(order: order, orderNumber: item.title),
-          );
-          break;
-        case SearchDomain.parts:
-          final part = await _loadPart(item.id);
-          if (!mounted || part == null) return;
-          Navigator.of(context).push(MaterialPageRoute(builder: (_) => _PartDetailsPage(part: part)));
-          break;
-        case SearchDomain.clubs:
-          final club = await _repository.getClubById(item.id);
-          if (!mounted || club == null) return;
-          Navigator.of(context).push(MaterialPageRoute(builder: (_) => _ClubPreviewPage(club: club)));
-          break;
-        case SearchDomain.knowledge:
-          final doc = await _repository.getDocumentById(item.id);
-          if (!mounted || doc == null) return;
-          Navigator.pushNamed(context, Routes.pdfReader, arguments: PdfReaderArgs(document: doc));
-          break;
-        case SearchDomain.users:
-          final user = await _repository.getUserById(item.id);
-          if (!mounted || user == null) return;
-          showModalBottomSheet(
-            context: context,
-            showDragHandle: true,
-            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-            builder: (_) => _UserPreview(user: user),
-          );
-          break;
-        case SearchDomain.all:
-          break;
-      }
-    } catch (error) {
-      if (!mounted) return;
-      showApiError(context, error);
-    }
+  bool _isEmpty(GlobalSearchResponseDto data) {
+    return data.parts.isEmpty &&
+        data.maintenanceRequests.isEmpty &&
+        data.workLogs.isEmpty &&
+        data.clubs.isEmpty;
   }
 
-  Future<PartDto?> _loadPart(String id) async {
-    final catalogPart = await _repository.getPartById(id);
-    if (catalogPart != null) {
-      return PartDto(
-        inventoryId: catalogPart.catalogId,
-        catalogId: catalogPart.catalogId,
-        catalogNumber: catalogPart.catalogNumber,
-        officialNameEn: catalogPart.officialNameEn,
-        officialNameRu: catalogPart.officialNameRu,
-        commonName: catalogPart.commonName,
-        description: catalogPart.description,
-        quantity: catalogPart.availableQuantity,
-        warehouseId: null,
-        location: null,
-        isUnique: catalogPart.isUnique,
-        lastChecked: null,
-      );
-    }
-    return _inventoryRepository.getById(id);
-  }
-}
-
-class _DomainChips extends StatelessWidget {
-  const _DomainChips({required this.selected, required this.onSelected});
-
-  final SearchDomain selected;
-  final ValueChanged<SearchDomain> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final domains = SearchDomain.values;
-    return SizedBox(
-      height: 56,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        scrollDirection: Axis.horizontal,
-        itemCount: domains.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, index) {
-          final domain = domains[index];
-          final isSelected = domain == selected;
-          return ChoiceChip(
-            label: Text(domain.label),
-            selected: isSelected,
-            onSelected: (_) => onSelected(domain),
-            selectedColor: AppColors.primary,
-            labelStyle: TextStyle(color: isSelected ? Colors.white : AppColors.textDark),
-          );
-        },
+  List<Widget> _buildSections(GlobalSearchResponseDto data) {
+    final sections = <_SearchSection<dynamic>>[
+      _SearchSection<PartDto>(
+        title: 'Запчасти',
+        icon: Icons.handyman_outlined,
+        items: data.parts,
+        itemBuilder: (part) => _PartResultTile(part: part),
       ),
-    );
+      _SearchSection<SearchMaintenanceRequestDto>(
+        title: 'Заявки на обслуживание',
+        icon: Icons.assignment_outlined,
+        items: data.maintenanceRequests,
+        itemBuilder: (req) => _MaintenanceRequestTile(
+          request: req,
+          formatter: _dateFormatter,
+        ),
+      ),
+      _SearchSection<SearchWorkLogDto>(
+        title: 'Рабочие журналы',
+        icon: Icons.work_history_outlined,
+        items: data.workLogs,
+        itemBuilder: (log) => _WorkLogResultTile(
+          log: log,
+          formatter: _dateFormatter,
+        ),
+      ),
+      _SearchSection<SearchClubDto>(
+        title: 'Клубы',
+        icon: Icons.storefront_outlined,
+        items: data.clubs,
+        itemBuilder: (club) => _ClubResultTile(club: club),
+      ),
+    ].where((section) => section.items.isNotEmpty).toList();
+
+    final children = <Widget>[];
+    for (final section in sections) {
+      children.add(_SectionHeader(title: section.title, icon: section.icon, count: section.items.length));
+      children.add(const SizedBox(height: 8));
+      children.addAll(section.items.map(section.itemBuilder));
+      children.add(const SizedBox(height: 20));
+    }
+
+    if (children.isNotEmpty) {
+      children.removeLast();
+    }
+
+    return children;
   }
 }
 
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onRetry});
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final int count;
 
-  final String message;
-  final VoidCallback onRetry;
+  const _SectionHeader({
+    required this.title,
+    required this.icon,
+    required this.count,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.cloud_off, size: 48, color: AppColors.darkGray),
-          const SizedBox(height: 12),
-          Text(message, style: const TextStyle(color: AppColors.darkGray)),
-          const SizedBox(height: 12),
-          ElevatedButton(
-            onPressed: onRetry,
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-            child: const Text('Повторить'),
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
           ),
-        ],
-      ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            '$count',
+            style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
     );
   }
 }
 
-class _PartDetailsPage extends StatelessWidget {
-  const _PartDetailsPage({required this.part});
+class _SearchSection<T> {
+  final String title;
+  final IconData icon;
+  final List<T> items;
+  final Widget Function(T item) itemBuilder;
 
+  _SearchSection({
+    required this.title,
+    required this.icon,
+    required this.items,
+    required this.itemBuilder,
+  });
+}
+
+class _PartResultTile extends StatelessWidget {
   final PartDto part;
+
+  const _PartResultTile({required this.part});
 
   String get _title {
     final candidates = [part.commonName, part.officialNameRu, part.officialNameEn];
@@ -353,95 +319,244 @@ class _PartDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(_title)),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _InfoTile(label: 'Каталожный номер', value: part.catalogNumber),
-          if (part.description?.isNotEmpty ?? false)
-            _InfoTile(label: 'Описание', value: part.description!),
-          if (part.quantity != null)
-            _InfoTile(label: 'Доступно', value: part.quantity.toString()),
-          if (part.location?.isNotEmpty ?? false)
-            _InfoTile(label: 'Локация', value: part.location!),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
         ],
+        border: Border.all(color: const Color(0xFFEDEDED), width: 1.2),
       ),
-    );
-  }
-}
-
-class _ClubPreviewPage extends StatelessWidget {
-  const _ClubPreviewPage({required this.club});
-
-  final ClubSummaryDto club;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(club.name ?? 'Клуб #${club.id}')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _InfoTile(label: 'Город', value: club.city ?? '—'),
-          _InfoTile(label: 'Адрес', value: club.address ?? '—'),
-          _InfoTile(label: 'Телефон', value: club.contactPhone ?? '—'),
-        ],
-      ),
-    );
-  }
-}
-
-class _UserPreview extends StatelessWidget {
-  const _UserPreview({required this.user});
-
-  final SearchUser user;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(user.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          Text('${user.roleLabel} · ${user.clubName}', style: const TextStyle(color: AppColors.darkGray)),
-          const SizedBox(height: 12),
-          if (user.phone != null)
-            _InfoTile(label: 'Телефон', value: user.phone!),
+          AdaptiveText(
+            _title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
+            maxLines: 2,
+          ),
+          const SizedBox(height: 6),
+          Text('Каталожный №: ${part.catalogNumber}', style: const TextStyle(color: AppColors.darkGray)),
+          if (part.quantity != null) ...[
+            const SizedBox(height: 4),
+            Text('Количество: ${part.quantity}', style: const TextStyle(color: AppColors.darkGray)),
+          ],
+          if (part.location != null && part.location!.trim().isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text('Локация: ${part.location}', style: const TextStyle(color: AppColors.darkGray)),
+          ],
         ],
       ),
     );
   }
 }
 
-class _InfoTile extends StatelessWidget {
-  const _InfoTile({required this.label, required this.value});
+class _MaintenanceRequestTile extends StatelessWidget {
+  final SearchMaintenanceRequestDto request;
+  final DateFormat formatter;
 
-  final String label;
-  final String value;
+  const _MaintenanceRequestTile({required this.request, required this.formatter});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E5E5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(color: const Color(0xFFEDEDED), width: 1.2),
       ),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13, color: AppColors.darkGray)),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Заявка №${request.id}',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
+                ),
+              ),
+              if (request.status != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    request.status!,
+                    style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (request.clubName != null)
+            _InfoRow(icon: Icons.store_mall_directory_outlined, text: request.clubName!),
+          if (request.laneNumber != null) ...[
+            const SizedBox(height: 6),
+            _InfoRow(icon: Icons.alt_route, text: 'Дорожка: ${request.laneNumber}'),
+          ],
+          if (request.mechanicName != null && request.mechanicName!.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _InfoRow(icon: Icons.engineering_outlined, text: request.mechanicName!),
+          ],
+          if (request.requestedAt != null) ...[
+            const SizedBox(height: 6),
+            _InfoRow(icon: Icons.schedule_outlined, text: formatter.format(request.requestedAt!.toLocal())),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _WorkLogResultTile extends StatelessWidget {
+  final SearchWorkLogDto log;
+  final DateFormat formatter;
+
+  const _WorkLogResultTile({required this.log, required this.formatter});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(color: const Color(0xFFEDEDED), width: 1.2),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Журнал №${log.id}',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
+                ),
+              ),
+              if (log.status != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    log.status!,
+                    style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (log.clubName != null)
+            _InfoRow(icon: Icons.store_outlined, text: log.clubName!),
+          if (log.workType != null) ...[
+            const SizedBox(height: 6),
+            _InfoRow(icon: Icons.category_outlined, text: log.workType!),
+          ],
+          if (log.laneNumber != null) ...[
+            const SizedBox(height: 6),
+            _InfoRow(icon: Icons.alt_route, text: 'Дорожка: ${log.laneNumber}'),
+          ],
+          if (log.mechanicName != null && log.mechanicName!.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _InfoRow(icon: Icons.engineering_outlined, text: log.mechanicName!),
+          ],
+          if (log.problemDescription != null && log.problemDescription!.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              log.problemDescription!,
+              style: const TextStyle(color: AppColors.darkGray),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          if (log.createdAt != null) ...[
+            const SizedBox(height: 6),
+            _InfoRow(icon: Icons.schedule_outlined, text: formatter.format(log.createdAt!.toLocal())),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ClubResultTile extends StatelessWidget {
+  final SearchClubDto club;
+
+  const _ClubResultTile({required this.club});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(color: const Color(0xFFEDEDED), width: 1.2),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            club.name ?? 'Клуб №${club.id}',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
+          ),
+          const SizedBox(height: 8),
+          if (club.address != null && club.address!.trim().isNotEmpty)
+            _InfoRow(icon: Icons.location_on_outlined, text: club.address!),
           const SizedBox(height: 6),
-          HighlightText(
-            text: value,
-            highlight: null,
-            style: const TextStyle(fontSize: 15, color: AppColors.textDark, fontWeight: FontWeight.w500),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              if (club.active != null)
+                _StatusChip(
+                  label: club.active! ? 'Активен' : 'Не активен',
+                  color: club.active! ? AppColors.primary : AppColors.darkGray,
+                ),
+              if (club.verified != null)
+                _StatusChip(
+                  label: club.verified! ? 'Верифицирован' : 'Не верифицирован',
+                  color: club.verified! ? Colors.green : AppColors.darkGray,
+                ),
+            ],
           ),
         ],
       ),
@@ -449,3 +564,48 @@ class _InfoTile extends StatelessWidget {
   }
 }
 
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _InfoRow({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: AppColors.darkGray),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(color: AppColors.darkGray),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _StatusChip({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 12),
+      ),
+    );
+  }
+}
