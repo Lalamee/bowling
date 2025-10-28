@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../../core/repositories/user_repository.dart';
+import '../../../../../core/services/authz/acl.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/theme/typography_extension.dart';
 import '../../../../../models/maintenance_request_response_dto.dart';
@@ -27,9 +29,12 @@ class OrderSummaryScreen extends StatefulWidget {
 }
 
 class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
+  final _userRepository = UserRepository();
   bool? _partsAvailable;
   bool _isSubmitting = false;
   late final TextEditingController _commentController;
+  bool _accessCheckInProgress = true;
+  bool _accessDenied = false;
 
   String get _title {
     if (widget.orderNumber != null && widget.orderNumber!.isNotEmpty) return widget.orderNumber!;
@@ -46,6 +51,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
     super.initState();
     _partsAvailable = widget.initialAvailability;
     _commentController = TextEditingController();
+    _guardAccess();
   }
 
   @override
@@ -59,6 +65,44 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
     final t = context.typo;
     final request = _request;
     final orderStatus = request != null ? mapOrderStatus(request.status) : OrderStatusCategory.pending;
+
+    if (_accessCheckInProgress) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_accessDenied) {
+      return Scaffold(
+        appBar: AppBar(title: Text(_title, style: t.sectionTitle)),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.lock_outline, size: 56, color: AppColors.darkGray),
+                const SizedBox(height: 16),
+                const Text(
+                  'У вас нет доступа к этой заявке',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.darkGray, fontSize: 16),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Вернуться'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -91,7 +135,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                   ],
                   if (request != null && request.status != null) ...[
                     const SizedBox(height: 4),
-                    Text('Текущий статус: ${_statusName(request.status!)}', style: t.formInput),
+                    Text('Текущий статус: ${describeOrderStatus(request.status)}', style: t.formInput),
                   ],
                   if (request != null && request.managerNotes != null && request.managerNotes!.isNotEmpty) ...[
                     const SizedBox(height: 12),
@@ -151,7 +195,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                     if (part.status != null && part.status!.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
-                        child: Text('Статус: ${_statusName(part.status!)}', style: t.formInput),
+                        child: Text('Статус: ${describeOrderStatus(part.status)}', style: t.formInput),
                       ),
                     if (part.rejectionReason != null && part.rejectionReason!.isNotEmpty)
                       Padding(
@@ -239,6 +283,33 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
     );
   }
 
+  Future<void> _guardAccess() async {
+    final order = widget.order;
+    if (order == null) {
+      setState(() {
+        _accessCheckInProgress = false;
+      });
+      return;
+    }
+
+    try {
+      final me = await _userRepository.me();
+      final scope = await UserAccessScope.fromProfile(me);
+      final allowed = scope.canViewOrder(order);
+      if (!mounted) return;
+      setState(() {
+        _accessDenied = !allowed;
+        _accessCheckInProgress = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _accessDenied = true;
+        _accessCheckInProgress = false;
+      });
+    }
+  }
+
   Future<void> _handleConfirm() async {
     if (widget.onConfirm == null || _partsAvailable == null) return;
     setState(() => _isSubmitting = true);
@@ -251,29 +322,6 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
     setState(() => _isSubmitting = false);
     if (success) {
       Navigator.pop(context, true);
-    }
-  }
-
-  static String _statusName(String status) {
-    switch (status.toUpperCase()) {
-      case 'NEW':
-        return 'Новая заявка';
-      case 'APPROVED':
-        return 'Одобрено';
-      case 'REJECTED':
-        return 'Отклонено';
-      case 'IN_PROGRESS':
-        return 'В работе';
-      case 'DONE':
-        return 'Выполнено';
-      case 'COMPLETED':
-        return 'Завершено';
-      case 'CLOSED':
-        return 'Закрыто';
-      case 'UNREPAIRABLE':
-        return 'Неремонтопригодно';
-      default:
-        return status;
     }
   }
 

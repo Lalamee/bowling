@@ -20,6 +20,8 @@ class EditMechanicProfileArgs {
 class ClubWarehouseArgs {
   final int clubId;
   final String? clubName;
+  final int? inventoryId;
+  final String? searchQuery;
 
-  const ClubWarehouseArgs({required this.clubId, this.clubName});
+  const ClubWarehouseArgs({required this.clubId, this.clubName, this.inventoryId, this.searchQuery});
 }

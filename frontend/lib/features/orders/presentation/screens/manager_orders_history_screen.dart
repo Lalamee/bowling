@@ -1,10 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../../core/models/order_status.dart';
+import '../../../../core/models/user_club.dart';
+import '../../../../core/routing/routes.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
+import '../../../../core/utils/user_club_resolver.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
+import '../../../../core/repositories/user_repository.dart';
+import '../../../../core/services/authz/acl.dart';
 import '../../../../models/maintenance_request_response_dto.dart';
 import 'order_summary_screen.dart';
 
@@ -17,16 +25,33 @@ class ManagerOrdersHistoryScreen extends StatefulWidget {
 
 class _ManagerOrdersHistoryScreenState extends State<ManagerOrdersHistoryScreen> {
   final MaintenanceRepository _repository = MaintenanceRepository();
+  final UserRepository _userRepository = UserRepository();
 
   bool _loading = true;
   bool _error = false;
   List<MaintenanceRequestResponseDto> _orders = const [];
   int? _expandedIndex;
+  List<UserClub> _clubs = const [];
+  int? _selectedClubId;
+  OrderStatusType? _selectedStatus;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _debounce;
+  String? _currentRole;
+
+  static const List<OrderStatusType> _statusOptions = kOrderStatusFilterOrder;
 
   @override
   void initState() {
     super.initState();
     _loadOrders();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadOrders() async {
@@ -35,15 +60,25 @@ class _ManagerOrdersHistoryScreenState extends State<ManagerOrdersHistoryScreen>
       _error = false;
     });
     try {
+      final me = await _userRepository.me();
+      final scope = await UserAccessScope.fromProfile(me);
+      final clubs = resolveUserClubs(me);
       final data = await _repository.getAllRequests();
       if (!mounted) return;
-      data.sort((a, b) {
+      final visible = data.where(scope.canViewOrder).toList();
+      visible.sort((a, b) {
         final aDate = a.requestDate ?? DateTime.fromMillisecondsSinceEpoch(0);
         final bDate = b.requestDate ?? DateTime.fromMillisecondsSinceEpoch(0);
         return bDate.compareTo(aDate);
       });
       setState(() {
-        _orders = data;
+        _orders = visible;
+        _clubs = clubs;
+        _currentRole = scope.role;
+        if (_selectedClubId != null && !_clubs.any((club) => club.id == _selectedClubId)) {
+          _selectedClubId = null;
+        }
+        _expandedIndex = null;
         _loading = false;
       });
     } catch (e) {
@@ -58,47 +93,77 @@ class _ManagerOrdersHistoryScreenState extends State<ManagerOrdersHistoryScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
+    return WillPopScope(
+      onWillPop: () async {
+        if (Navigator.of(context).canPop()) {
+          return true;
+        }
+        _handleBackFallback();
+        return false;
+      },
+      child: Scaffold(
         backgroundColor: AppColors.background,
-        elevation: 0,
-        leadingWidth: 64,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 12),
-          child: Material(
-            color: Colors.white,
-            shape: const CircleBorder(),
-            elevation: 2,
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: () => Navigator.pop(context),
-              child: const SizedBox(
-                width: 40,
-                height: 40,
-                child: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textDark),
+        appBar: AppBar(
+          backgroundColor: AppColors.background,
+          elevation: 0,
+          leadingWidth: 64,
+          leading: Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: Material(
+              color: Colors.white,
+              shape: const CircleBorder(),
+              elevation: 2,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: _handleBackPress,
+                child: const SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textDark),
+                ),
               ),
             ),
           ),
-        ),
-        title: const Text(
-          'Заказы',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textDark),
-        ),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            onPressed: _loadOrders,
-            icon: const Icon(Icons.refresh, color: AppColors.primary),
+          title: const Text(
+            'Заказы',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textDark),
           ),
-        ],
-      ),
-      body: _buildBody(),
-      bottomNavigationBar: AppBottomNav(
-        currentIndex: 0,
-        onTap: (i) => BottomNavDirect.go(context, 0, i),
+          centerTitle: false,
+          actions: [
+            IconButton(
+              onPressed: _loadOrders,
+              icon: const Icon(Icons.refresh, color: AppColors.primary),
+            ),
+          ],
+        ),
+        body: _buildBody(),
+        bottomNavigationBar: AppBottomNav(
+          currentIndex: 0,
+          onTap: (i) => BottomNavDirect.go(context, 0, i),
+        ),
       ),
     );
+  }
+
+  void _handleBackPress() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
+    _handleBackFallback();
+  }
+
+  void _handleBackFallback() {
+    final role = _currentRole;
+    if (role == 'owner') {
+      Navigator.pushReplacementNamed(context, Routes.profileOwner);
+    } else if (role == 'mechanic') {
+      Navigator.pushReplacementNamed(context, Routes.profileMechanic);
+    } else if (role == 'admin') {
+      Navigator.pushReplacementNamed(context, Routes.profileAdmin);
+    } else {
+      Navigator.pushReplacementNamed(context, Routes.profileManager);
+    }
   }
 
   Widget _buildBody() {
@@ -126,19 +191,36 @@ class _ManagerOrdersHistoryScreenState extends State<ManagerOrdersHistoryScreen>
         ),
       );
     }
-    if (_orders.isEmpty) {
-      return const Center(
-        child: Text('Заказы отсутствуют', style: TextStyle(color: AppColors.darkGray)),
+    final orders = _filteredOrders;
+    if (orders.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _loadOrders,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          children: [
+            _buildFilters(),
+            const SizedBox(height: 40),
+            const Center(
+              child: Text('Заказы отсутствуют', style: TextStyle(color: AppColors.darkGray)),
+            ),
+          ],
+        ),
       );
     }
     return RefreshIndicator(
       onRefresh: _loadOrders,
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        itemCount: _orders.length,
+        itemCount: orders.length + 1,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (_, index) {
-          final item = _orders[index];
+          if (index == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildFilters(),
+            );
+          }
+          final item = orders[index - 1];
           final isExpanded = _expandedIndex == index;
           if (!isExpanded) {
             return _CollapsedOrderCard(
@@ -162,6 +244,169 @@ class _ManagerOrdersHistoryScreenState extends State<ManagerOrdersHistoryScreen>
       ),
     );
   }
+
+  List<MaintenanceRequestResponseDto> get _filteredOrders {
+    Iterable<MaintenanceRequestResponseDto> base = _orders;
+    final clubId = _selectedClubId;
+    if (clubId != null) {
+      base = base.where((order) => order.clubId == clubId);
+    }
+    final statusFilter = _selectedStatus;
+    if (statusFilter != null) {
+      base = base.where((order) => statusFilter.matches(order.status)).toList();
+    }
+    final query = _normalize(_searchQuery);
+    if (query.isNotEmpty) {
+      base = base.where((order) => _matchesQuery(order, query));
+    }
+    return base.toList();
+  }
+
+  Widget _buildFilters() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildClubDropdown(),
+        const SizedBox(height: 12),
+        _buildSearchField(),
+        const SizedBox(height: 12),
+        _buildStatusChips(),
+      ],
+    );
+  }
+
+  Widget _buildClubDropdown() {
+    final items = <DropdownMenuItem<int?>>[
+      const DropdownMenuItem<int?>(value: null, child: Text('Все клубы')),
+      ..._clubs.map(
+        (club) => DropdownMenuItem<int?>(
+          value: club.id,
+          child: Text(club.name, overflow: TextOverflow.ellipsis),
+        ),
+      ),
+    ];
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.lightGray),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int?>(
+          value: _selectedClubId,
+          isExpanded: true,
+          items: items,
+          onChanged: (value) {
+            setState(() {
+              _selectedClubId = value;
+              _expandedIndex = null;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.lightGray),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: TextField(
+        controller: _searchController,
+        decoration: const InputDecoration(
+          hintText: 'Поиск по номеру заявки, клубу или заметкам',
+          border: InputBorder.none,
+        ),
+        onChanged: (value) {
+          _debounce?.cancel();
+          _debounce = Timer(const Duration(milliseconds: 350), () {
+            if (!mounted) return;
+            setState(() {
+              _searchQuery = value;
+              _expandedIndex = null;
+            });
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildStatusChips() {
+    TextStyle labelStyle(bool selected) => TextStyle(
+          color: selected ? Colors.white : AppColors.textDark,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+        );
+
+    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
+    const side = BorderSide(color: AppColors.lightGray);
+
+    final chips = <Widget>[
+      ChoiceChip(
+        label: const Text('Все'),
+        selected: _selectedStatus == null,
+        selectedColor: AppColors.primary,
+        backgroundColor: Colors.white,
+        shape: shape,
+        side: side,
+        labelStyle: labelStyle(_selectedStatus == null),
+        onSelected: (_) {
+          setState(() {
+            _selectedStatus = null;
+            _expandedIndex = null;
+          });
+        },
+      ),
+      ..._statusOptions.map((option) {
+        final selected = option == _selectedStatus;
+        return ChoiceChip(
+          label: Text(option.label),
+          selected: selected,
+          selectedColor: AppColors.primary,
+          backgroundColor: Colors.white,
+          shape: shape,
+          side: side,
+          labelStyle: labelStyle(selected),
+          onSelected: (_) {
+            setState(() {
+              _selectedStatus = selected ? null : option;
+              _expandedIndex = null;
+            });
+          },
+        );
+      }),
+    ];
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: chips,
+    );
+  }
+
+  bool _matchesQuery(MaintenanceRequestResponseDto order, String query) {
+    final buffer = StringBuffer()
+      ..write(order.requestId)
+      ..write(' ')
+      ..write(order.clubName ?? '')
+      ..write(' ')
+      ..write(order.status ?? '')
+      ..write(' ')
+      ..write(order.managerNotes ?? '');
+    if (order.laneNumber != null) {
+      buffer
+        ..write(' ')
+        ..write(order.laneNumber);
+    }
+    final haystack = _normalize(buffer.toString());
+    return haystack.contains(query);
+  }
+
+  String _normalize(String value) => value.toLowerCase().trim().replaceAll(RegExp(r'\s+'), ' ');
 }
 
 class _CollapsedOrderCard extends StatelessWidget {
@@ -177,7 +422,7 @@ class _CollapsedOrderCard extends StatelessWidget {
       subtitle.add(order.clubName!);
     }
     if (order.status != null && order.status!.isNotEmpty) {
-      subtitle.add(_statusName(order.status!));
+      subtitle.add(describeOrderStatus(order.status));
     }
     if (order.requestDate != null) {
       subtitle.add(_formatDate(order.requestDate!));
@@ -266,7 +511,7 @@ class _ExpandedOrderCard extends StatelessWidget {
           if (order.laneNumber != null)
             _InfoRow(label: 'Дорожка', value: order.laneNumber.toString()),
           if (order.status != null && order.status!.isNotEmpty)
-            _InfoRow(label: 'Статус', value: _statusName(order.status!)),
+            _InfoRow(label: 'Статус', value: describeOrderStatus(order.status)),
           if (order.requestDate != null)
             _InfoRow(label: 'Создано', value: _formatDate(order.requestDate!)),
           const SizedBox(height: 12),
@@ -313,7 +558,8 @@ class _ExpandedOrderCard extends StatelessWidget {
                       if (part.status != null && part.status!.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
-                          child: Text('Статус: ${_statusName(part.status!)}', style: const TextStyle(color: AppColors.darkGray)),
+                          child: Text('Статус: ${describeOrderStatus(part.status)}',
+                              style: const TextStyle(color: AppColors.darkGray)),
                         ),
                     ],
                   ),
@@ -362,21 +608,6 @@ class _InfoRow extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-String _statusName(String status) {
-  switch (status.toUpperCase()) {
-    case 'APPROVED':
-      return 'Одобрено';
-    case 'REJECTED':
-      return 'Отклонено';
-    case 'IN_PROGRESS':
-      return 'В работе';
-    case 'COMPLETED':
-      return 'Завершено';
-    default:
-      return status;
   }
 }
 

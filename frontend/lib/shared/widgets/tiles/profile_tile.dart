@@ -8,6 +8,7 @@ class ProfileTile extends StatelessWidget {
   final VoidCallback? onEdit;
   final bool danger;
   final bool showAlertBadge;
+  final int? badgeCount;
 
   const ProfileTile({
     Key? key,
@@ -17,6 +18,7 @@ class ProfileTile extends StatelessWidget {
     this.onEdit,
     this.danger = false,
     this.showAlertBadge = false,
+    this.badgeCount,
   }) : super(key: key);
 
   @override
@@ -58,7 +60,20 @@ class ProfileTile extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (showAlertBadge) ...[
+            if ((badgeCount ?? 0) > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEB003B),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${badgeCount!}',
+                  style: const TextStyle(color: AppColors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ] else if (showAlertBadge) ...[
               const SizedBox(width: 8),
               Container(
                 width: 18,

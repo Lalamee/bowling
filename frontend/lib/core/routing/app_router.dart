@@ -36,7 +36,7 @@ import '../../features/profile/owner/presentation/screens/owner_profile_screen.d
 import '../../features/profile/owner/presentation/screens/edit_owner_profile_screen.dart';
 
 import '../../features/profile/manager/presentation/screens/manager_profile_screen.dart';
-import '../../features/profile/manager/presentation/screens/manager_notifications_screen.dart';
+import '../../features/orders/notifications/notifications_page.dart';
 
 import '../../features/knowledge_base/presentation/screens/knowledge_base_screen.dart';
 import '../../features/knowledge_base/presentation/screens/pdf_reader_screen.dart';
@@ -79,7 +79,20 @@ class AppRouter {
         );
 
       case Routes.club:
-        return MaterialPageRoute(builder: (_) => const ClubScreen());
+        int? initialClubId;
+        final args = settings.arguments;
+        if (args is int) {
+          initialClubId = args;
+        } else if (args is Map) {
+          final map = Map<String, dynamic>.from(args as Map);
+          final value = map['clubId'];
+          if (value is int) {
+            initialClubId = value;
+          } else if (value is num) {
+            initialClubId = value.toInt();
+          }
+        }
+        return MaterialPageRoute(builder: (_) => ClubScreen(initialClubId: initialClubId));
       case Routes.clubSearch:
         return MaterialPageRoute(builder: (_) => const ClubSearchScreen());
       case Routes.clubWarehouse:
@@ -91,6 +104,8 @@ class AppRouter {
           builder: (_) => ClubWarehouseScreen(
             clubId: args.clubId,
             clubName: args.clubName,
+            initialInventoryId: args.inventoryId,
+            initialQuery: args.searchQuery,
           ),
         );
       case Routes.clubStaff:
@@ -132,7 +147,7 @@ class AppRouter {
       case Routes.managerOrdersHistory:
         return MaterialPageRoute(builder: (_) => const ManagerOrdersHistoryScreen());
       case Routes.managerNotifications:
-        return MaterialPageRoute(builder: (_) => const ManagerNotificationsScreen());
+        return MaterialPageRoute(builder: (_) => const NotificationsPage());
 
       case Routes.ordersPersonalHistory:
         return MaterialPageRoute(builder: (_) => const ManagerOrdersHistoryScreen());
