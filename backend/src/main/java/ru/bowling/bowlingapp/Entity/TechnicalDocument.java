@@ -1,16 +1,14 @@
 package ru.bowling.bowlingapp.Entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "technical_documents")
-@Data
+@Getter
+@Setter
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
@@ -21,6 +19,10 @@ public class TechnicalDocument {
     @Column(name = "document_id")
     private Long documentId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "club_id", nullable = false)
+    private BowlingClub club;
+
     @Column(name = "title", nullable = false)
     private String title;
 
@@ -28,7 +30,7 @@ public class TechnicalDocument {
     private String description;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "document_type_id", nullable = false)
+    @JoinColumn(name = "document_type_id")
     private DocumentType documentType;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -41,8 +43,16 @@ public class TechnicalDocument {
     @Column(name = "language")
     private String language;
 
-    @Column(name = "file_url", nullable = false)
-    private String fileUrl;
+    @Column(name = "file_name")
+    private String fileName;
+
+    @Column(name = "file_size")
+    private Long fileSize;
+
+    @Lob
+    @Basic(fetch = FetchType.LAZY)
+    @Column(name = "file_data", columnDefinition = "BYTEA")
+    private byte[] fileData;
 
     @Column(name = "upload_date", nullable = false)
     private LocalDateTime uploadDate;
