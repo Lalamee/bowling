@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/models/order_status.dart';
 import '../../../../core/models/user_club.dart';
+import '../../../../core/routing/routes.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../core/utils/bottom_nav.dart';
@@ -36,6 +37,7 @@ class _ManagerOrdersHistoryScreenState extends State<ManagerOrdersHistoryScreen>
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
+  String? _currentRole;
 
   static const List<OrderStatusType> _statusOptions = kOrderStatusFilterOrder;
 
@@ -72,6 +74,7 @@ class _ManagerOrdersHistoryScreenState extends State<ManagerOrdersHistoryScreen>
       setState(() {
         _orders = visible;
         _clubs = clubs;
+        _currentRole = scope.role;
         if (_selectedClubId != null && !_clubs.any((club) => club.id == _selectedClubId)) {
           _selectedClubId = null;
         }
@@ -90,47 +93,77 @@ class _ManagerOrdersHistoryScreenState extends State<ManagerOrdersHistoryScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
+    return WillPopScope(
+      onWillPop: () async {
+        if (Navigator.of(context).canPop()) {
+          return true;
+        }
+        _handleBackFallback();
+        return false;
+      },
+      child: Scaffold(
         backgroundColor: AppColors.background,
-        elevation: 0,
-        leadingWidth: 64,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 12),
-          child: Material(
-            color: Colors.white,
-            shape: const CircleBorder(),
-            elevation: 2,
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: () => Navigator.maybePop(context),
-              child: const SizedBox(
-                width: 40,
-                height: 40,
-                child: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textDark),
+        appBar: AppBar(
+          backgroundColor: AppColors.background,
+          elevation: 0,
+          leadingWidth: 64,
+          leading: Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: Material(
+              color: Colors.white,
+              shape: const CircleBorder(),
+              elevation: 2,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: _handleBackPress,
+                child: const SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.textDark),
+                ),
               ),
             ),
           ),
-        ),
-        title: const Text(
-          'Заказы',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textDark),
-        ),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            onPressed: _loadOrders,
-            icon: const Icon(Icons.refresh, color: AppColors.primary),
+          title: const Text(
+            'Заказы',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textDark),
           ),
-        ],
-      ),
-      body: _buildBody(),
-      bottomNavigationBar: AppBottomNav(
-        currentIndex: 0,
-        onTap: (i) => BottomNavDirect.go(context, 0, i),
+          centerTitle: false,
+          actions: [
+            IconButton(
+              onPressed: _loadOrders,
+              icon: const Icon(Icons.refresh, color: AppColors.primary),
+            ),
+          ],
+        ),
+        body: _buildBody(),
+        bottomNavigationBar: AppBottomNav(
+          currentIndex: 0,
+          onTap: (i) => BottomNavDirect.go(context, 0, i),
+        ),
       ),
     );
+  }
+
+  void _handleBackPress() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
+    _handleBackFallback();
+  }
+
+  void _handleBackFallback() {
+    final role = _currentRole;
+    if (role == 'owner') {
+      Navigator.pushReplacementNamed(context, Routes.profileOwner);
+    } else if (role == 'mechanic') {
+      Navigator.pushReplacementNamed(context, Routes.profileMechanic);
+    } else if (role == 'admin') {
+      Navigator.pushReplacementNamed(context, Routes.profileAdmin);
+    } else {
+      Navigator.pushReplacementNamed(context, Routes.profileManager);
+    }
   }
 
   Widget _buildBody() {

@@ -314,25 +314,12 @@ class _RequestCard extends StatelessWidget {
       return AppColors.darkGray;
     }
     switch (parsed) {
-      case OrderStatusType.completed:
-        return Colors.green;
-      case OrderStatusType.closed:
-      case OrderStatusType.archived:
-        return Colors.blueGrey;
-      case OrderStatusType.approved:
-      case OrderStatusType.confirmed:
-        return Colors.blue;
-      case OrderStatusType.inProgress:
-        return AppColors.primary;
-      case OrderStatusType.unrepairable:
-      case OrderStatusType.rejected:
-        return Colors.red;
-      case OrderStatusType.newRequest:
-      case OrderStatusType.draft:
       case OrderStatusType.pending:
         return AppColors.darkGray;
-      default:
-        return AppColors.darkGray;
+      case OrderStatusType.confirmed:
+        return Colors.blue;
+      case OrderStatusType.archived:
+        return Colors.blueGrey;
     }
   }
 

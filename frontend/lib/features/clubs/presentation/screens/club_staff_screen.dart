@@ -142,10 +142,10 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
   String _roleKeyForRequest(String role) {
     final normalized = role.toLowerCase();
     if (normalized.contains('admin') || normalized.contains('админ')) {
-      return 'ADMINISTRATOR';
+      return 'ADMIN';
     }
     if (normalized.contains('manager') || normalized.contains('менедж') || normalized.contains('главн')) {
-      return 'MANAGER';
+      return 'HEAD_MECHANIC';
     }
     if (normalized.contains('mechanic') || normalized.contains('механ')) {
       return 'MECHANIC';

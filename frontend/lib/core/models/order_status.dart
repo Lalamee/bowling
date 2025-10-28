@@ -1,34 +1,46 @@
 import 'dart:collection';
 
-/// Категории статусов заявок, используемые для группировки и бейджей.
+/// Категории статусов заявок, используемые для фильтров и бейджей.
 enum OrderStatusCategory { pending, confirmed, archived }
 
-/// Единый перечислимый набор статусов заявок.
+/// Фиксированный перечень пользовательских статусов, отображаемых в приложении.
 ///
-/// Каждый статус хранит читаемое название, набор исходных ключей,
-/// а также категорию для отображения агрегированных состояний.
+/// Каждый статус объединяет несколько бэкенд-значений и отображается как одна
+/// из трёх вкладок: «На проверке», «Подтверждённый», «Архив».
 enum OrderStatusType {
-  draft('Черновик', {'DRAFT'}, OrderStatusCategory.pending),
-  newRequest('Новая', {'NEW'}, OrderStatusCategory.pending),
-  pending('В ожидании', {'PENDING'}, OrderStatusCategory.pending),
-  approved('Одобрена', {'APPROVED'}, OrderStatusCategory.confirmed),
-  confirmed('Подтверждён', {'CONFIRMED'}, OrderStatusCategory.confirmed),
-  inProgress('В работе', {'IN_PROGRESS'}, OrderStatusCategory.confirmed),
-  completed('Завершена', {'COMPLETED', 'DONE'}, OrderStatusCategory.archived),
-  closed('Закрыта', {'CLOSED'}, OrderStatusCategory.archived),
-  unrepairable('Не ремонтопригодно', {'UNREPAIRABLE'}, OrderStatusCategory.archived),
-  rejected('Отклонена', {'REJECTED'}, OrderStatusCategory.archived),
-  archived('Архив', {'ARCHIVED'}, OrderStatusCategory.archived);
+  pending('На проверке', {
+    'NEW',
+    'PENDING',
+    'WAITING',
+    'REQUESTED',
+    'DRAFT',
+  }, OrderStatusCategory.pending),
+  confirmed('Подтверждённый', {
+    'APPROVED',
+    'CONFIRMED',
+    'IN_PROGRESS',
+    'ACCEPTED',
+  }, OrderStatusCategory.confirmed),
+  archived('Архив', {
+    'DONE',
+    'COMPLETED',
+    'CLOSED',
+    'UNREPAIRABLE',
+    'REJECTED',
+    'ARCHIVED',
+    'CANCELLED',
+  }, OrderStatusCategory.archived);
 
-  const OrderStatusType(this.label, this.backendKeys, this.category);
+  const OrderStatusType(this.label, Set<String> backendKeys, this.category)
+      : backendKeys = UnmodifiableSetView(backendKeys);
 
-  /// Человекочитаемое название статуса.
+  /// Отображаемое название вкладки/чипа.
   final String label;
 
-  /// Набор исходных ключей статуса из backend.
+  /// Перечень исходных статусов, попадающих в данную вкладку.
   final Set<String> backendKeys;
 
-  /// Группа статусов для агрегированных фильтров и бейджей.
+  /// Агрегированная категория (совпадает с самим перечислением).
   final OrderStatusCategory category;
 
   static final Map<String, OrderStatusType> _index = _buildIndex();
@@ -43,7 +55,7 @@ enum OrderStatusType {
     return UnmodifiableMapView(map);
   }
 
-  /// Возвращает статус по исходному ключу, если он известен приложению.
+  /// Возвращает тип статуса по исходному ключу бэкенда.
   static OrderStatusType? fromRaw(String? raw) {
     if (raw == null) return null;
     final normalized = raw.trim().toUpperCase();
@@ -51,22 +63,14 @@ enum OrderStatusType {
     return _index[normalized];
   }
 
-  /// Проверяет, относится ли исходное значение к данному статусу.
+  /// Проверяет, принадлежит ли исходное значение данной вкладке.
   bool matches(String? raw) => fromRaw(raw) == this;
 }
 
-/// Фиксированный список статусов для фильтрации и отображения чипов.
+/// Фиксированный порядок отображения фильтров статусов.
 const List<OrderStatusType> kOrderStatusFilterOrder = [
-  OrderStatusType.draft,
-  OrderStatusType.newRequest,
   OrderStatusType.pending,
-  OrderStatusType.approved,
   OrderStatusType.confirmed,
-  OrderStatusType.inProgress,
-  OrderStatusType.completed,
-  OrderStatusType.closed,
-  OrderStatusType.unrepairable,
-  OrderStatusType.rejected,
   OrderStatusType.archived,
 ];
 
@@ -76,11 +80,11 @@ OrderStatusCategory mapOrderStatusCategory(String? rawStatus) {
   return resolved?.category ?? OrderStatusCategory.pending;
 }
 
-/// Человекочитаемое название категории статуса.
+/// Человекочитаемое название категории.
 String orderStatusCategoryLabel(OrderStatusCategory category) {
   switch (category) {
     case OrderStatusCategory.archived:
-      return 'Архивный';
+      return 'Архив';
     case OrderStatusCategory.confirmed:
       return 'Подтверждённый';
     case OrderStatusCategory.pending:
@@ -101,7 +105,7 @@ bool isConfirmedStatus(String? rawStatus) =>
 bool isPendingStatus(String? rawStatus) =>
     mapOrderStatusCategory(rawStatus) == OrderStatusCategory.pending;
 
-/// Человекочитаемое название статуса по исходному значению.
+/// Возвращает пользовательское название статуса по исходному значению.
 String describeOrderStatus(String? rawStatus) {
   final resolved = OrderStatusType.fromRaw(rawStatus);
   if (resolved != null) {
