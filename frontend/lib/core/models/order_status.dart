@@ -1,5 +1,3 @@
-import 'dart:collection';
-
 /// Категории статусов заявок, используемые для фильтров и бейджей.
 enum OrderStatusCategory { pending, confirmed, archived }
 
@@ -46,18 +44,12 @@ const Set<String> _archivedBackendKeys = <String>{
   'CANCELLED',
 };
 
-final Map<OrderStatusType, UnmodifiableSetView<String>> _backendKeysByType =
-    <OrderStatusType, UnmodifiableSetView<String>>{
-  OrderStatusType.pending:
-      UnmodifiableSetView<String>(_pendingBackendKeys),
-  OrderStatusType.confirmed:
-      UnmodifiableSetView<String>(_confirmedBackendKeys),
-  OrderStatusType.archived:
-      UnmodifiableSetView<String>(_archivedBackendKeys),
+final Map<OrderStatusType, Set<String>> _backendKeysByType =
+    <OrderStatusType, Set<String>>{
+  OrderStatusType.pending: _pendingBackendKeys,
+  OrderStatusType.confirmed: _confirmedBackendKeys,
+  OrderStatusType.archived: _archivedBackendKeys,
 };
-
-final UnmodifiableSetView<String> _emptyStatusSet =
-    UnmodifiableSetView<String>(const <String>{});
 
 extension OrderStatusTypeX on OrderStatusType {
   /// Отображаемое название вкладки/чипа.
@@ -73,7 +65,7 @@ extension OrderStatusTypeX on OrderStatusType {
   }
 
   /// Перечень исходных статусов, попадающих в данную вкладку.
-  Set<String> get backendKeys => _backendKeysByType[this] ?? _emptyStatusSet;
+  Set<String> get backendKeys => _backendKeysByType[this] ?? const <String>{};
 
   /// Агрегированная категория (совпадает с самим перечислением).
   OrderStatusCategory get category {
@@ -91,8 +83,7 @@ extension OrderStatusTypeX on OrderStatusType {
   bool matches(String? raw) => OrderStatusType.fromRaw(raw) == this;
 }
 
-final Map<String, OrderStatusType> _index = UnmodifiableMapView<String,
-    OrderStatusType>(_buildIndex());
+final Map<String, OrderStatusType> _index = _buildIndex();
 
 Map<String, OrderStatusType> _buildIndex() {
   final map = <String, OrderStatusType>{};
@@ -105,7 +96,7 @@ Map<String, OrderStatusType> _buildIndex() {
 }
 
 /// Фиксированный порядок отображения фильтров статусов.
-const List<OrderStatusType> kOrderStatusFilterOrder = [
+const List<OrderStatusType> kOrderStatusFilterOrder = <OrderStatusType>[
   OrderStatusType.pending,
   OrderStatusType.confirmed,
   OrderStatusType.archived,
