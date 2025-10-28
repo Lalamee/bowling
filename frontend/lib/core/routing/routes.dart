@@ -19,6 +19,7 @@ class Routes {
 
   static const profileOwner = '/profile/owner';
   static const editOwnerProfile = '/profile/owner/edit';
+  static const notifications = '/profile/notifications';
   static const clubStaff = '/clubs/staff';
 
   static const knowledgeBase = '/kb';

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../../core/repositories/user_repository.dart';
 import '../../../../../core/routing/routes.dart';
+import '../../../../../core/services/access_guard.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/theme/colors.dart';
@@ -51,6 +52,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
       }
 
       final me = await _repo.me();
+      AccessGuardImpl().updateProfile(me, roleHint: 'admin');
       if (!mounted) return;
       if (me == null) {
         setState(() {
@@ -206,8 +208,8 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
       ),
       body: body,
       bottomNavigationBar: AppBottomNav(
-        currentIndex: 3,
-        onTap: (i) => BottomNavDirect.go(context, 3, i),
+        currentIndex: 4,
+        onTap: (i) => BottomNavDirect.go(context, 4, i),
       ),
     );
   }

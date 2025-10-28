@@ -36,7 +36,7 @@ import '../../features/profile/owner/presentation/screens/owner_profile_screen.d
 import '../../features/profile/owner/presentation/screens/edit_owner_profile_screen.dart';
 
 import '../../features/profile/manager/presentation/screens/manager_profile_screen.dart';
-import '../../features/profile/manager/presentation/screens/manager_notifications_screen.dart';
+import '../../features/profile/notifications/notifications_screen.dart';
 
 import '../../features/knowledge_base/presentation/screens/knowledge_base_screen.dart';
 import '../../features/knowledge_base/presentation/screens/pdf_reader_screen.dart';
@@ -132,7 +132,7 @@ class AppRouter {
       case Routes.managerOrdersHistory:
         return MaterialPageRoute(builder: (_) => const ManagerOrdersHistoryScreen());
       case Routes.managerNotifications:
-        return MaterialPageRoute(builder: (_) => const ManagerNotificationsScreen());
+        return MaterialPageRoute(builder: (_) => const NotificationsScreen());
 
       case Routes.ordersPersonalHistory:
         return MaterialPageRoute(builder: (_) => const ManagerOrdersHistoryScreen());

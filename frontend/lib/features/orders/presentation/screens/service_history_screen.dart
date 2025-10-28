@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/access_guard.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/repositories/service_history_repository.dart';
 import '../../../../models/service_history_dto.dart';
@@ -20,6 +21,7 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
   final _repo = ServiceHistoryRepository();
   List<dynamic> historyRecords = [];
   bool isLoading = true;
+  bool accessDenied = false;
 
   @override
   void initState() {
@@ -30,6 +32,22 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
   Future<void> _loadHistory() async {
     setState(() => isLoading = true);
     try {
+      final guard = AccessGuardImpl();
+      final snapshot = await guard.ensureLoaded();
+      if (widget.clubId != null && !snapshot.role.isAdmin) {
+        final clubKey = widget.clubId!.toString();
+        if (!snapshot.allowedClubIds.contains(clubKey)) {
+          if (mounted) {
+            setState(() {
+              historyRecords = [];
+              isLoading = false;
+              accessDenied = true;
+            });
+          }
+          debugPrint('AccessDenied(clubId=$clubKey, screen=ServiceHistoryScreen)');
+          return;
+        }
+      }
       // Если указан clubId, загружаем историю конкретного клуба
       // Иначе можно загрузить всю историю (если есть такой endpoint)
       if (widget.clubId != null) {
@@ -38,6 +56,7 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
           setState(() {
             historyRecords = data;
             isLoading = false;
+            accessDenied = false;
           });
         }
       } else {
@@ -46,6 +65,7 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
           setState(() {
             historyRecords = [];
             isLoading = false;
+            accessDenied = false;
           });
         }
       }
@@ -77,29 +97,44 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : historyRecords.isEmpty
+          : accessDenied
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: const [
-                      Icon(Icons.history, size: 64, color: AppColors.darkGray),
+                      Icon(Icons.lock, size: 64, color: AppColors.darkGray),
                       SizedBox(height: 16),
                       Text(
-                        'Нет записей об обслуживании',
+                        'У вас нет доступа к истории этого клуба',
                         style: TextStyle(fontSize: 16, color: AppColors.darkGray),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
                 )
-              : RefreshIndicator(
-                  onRefresh: _loadHistory,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: historyRecords.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) => _ServiceHistoryCard(record: historyRecords[i]),
-                  ),
-                ),
+              : historyRecords.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.history, size: 64, color: AppColors.darkGray),
+                          SizedBox(height: 16),
+                          Text(
+                            'Нет записей об обслуживании',
+                            style: TextStyle(fontSize: 16, color: AppColors.darkGray),
+                          ),
+                        ],
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadHistory,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: historyRecords.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (_, i) => _ServiceHistoryCard(record: historyRecords[i]),
+                      ),
+                    ),
       bottomNavigationBar: AppBottomNav(
         currentIndex: 0,
         onTap: (i) => BottomNavDirect.go(context, 0, i),
