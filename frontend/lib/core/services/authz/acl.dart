@@ -51,9 +51,44 @@ class UserAccessScope {
     final resolvedRole = await _resolveRole(profile);
     final clubs = resolveUserClubs(profile);
     final ids = clubs.map((e) => e.id).toSet();
+
+    void addClubIdIfPresent(dynamic source) {
+      if (source is Map) {
+        final map = Map<String, dynamic>.from(source);
+        final dynamic candidate =
+            map['clubId'] ?? map['id'] ?? map['club'] ?? map['clubProfileId'];
+        final resolved = _asInt(candidate);
+        if (resolved != null) {
+          ids.add(resolved);
+        }
+      }
+    }
+
+    if (ids.isEmpty) {
+      addClubIdIfPresent(profile['managerProfile']);
+      addClubIdIfPresent(profile['ownerProfile']);
+      addClubIdIfPresent(profile['mechanicProfile']);
+      final fallback = _asInt(profile['clubId']);
+      if (fallback != null) {
+        ids.add(fallback);
+      }
+    }
+
     final userId = (profile['id'] as num?)?.toInt() ?? (profile['userId'] as num?)?.toInt();
     return UserAccessScope(role: resolvedRole, accessibleClubIds: UnmodifiableSetView(ids), userId: userId);
   }
+}
+
+int? _asInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    return int.tryParse(trimmed);
+  }
+  return null;
 }
 
 Future<String> _resolveRole(Map<String, dynamic> me) async {
