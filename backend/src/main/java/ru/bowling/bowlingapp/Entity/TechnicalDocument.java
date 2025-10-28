@@ -54,11 +54,6 @@ public class TechnicalDocument {
     @Column(name = "file_data", columnDefinition = "BYTEA")
     private byte[] fileData;
 
-    @Lob
-    @Basic(fetch = FetchType.LAZY)
-    @Column(name = "file_data")
-    private byte[] fileData;
-
     @Column(name = "upload_date", nullable = false)
     private LocalDateTime uploadDate;
 
