@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../api/api_core.dart';
 import '../../features/knowledge_base/data/knowledge_base_repository.dart';
 import '../../features/knowledge_base/domain/kb_pdf.dart';
 import '../../features/search/domain/search_item.dart';
@@ -66,46 +65,19 @@ class SearchServiceImpl implements SearchService {
   @override
   Future<SearchResultPage> searchAll(String query, {int page = 1}) async {
     final trimmed = query.trim();
-    if (trimmed.isEmpty) {
-      return const SearchResultPage(
-        items: [],
-        page: 1,
-        hasMore: false,
-        totalCount: 0,
-      );
-    }
-
-    final collected = <SearchItem>[];
+    final items = <SearchItem>[];
     var total = 0;
-    Object? firstError;
 
     for (final domain in SearchDomain.values) {
-      if (domain == SearchDomain.all) {
-        continue;
-      }
-
-      try {
-        final result = await _dispatchDomain(domain, trimmed, page: page);
-        total += result.totalCount;
-        collected.addAll(result.items);
-      } on SearchCancelledException {
-        rethrow;
-      } catch (error, stackTrace) {
-        firstError ??= error;
-        debugPrint(
-          'SearchAll domain=${domain.name} failed for query="$trimmed" page=$page error=$error\n$stackTrace',
-        );
-      }
+      if (domain == SearchDomain.all) continue;
+      final result = await searchByDomain(domain, trimmed, page: 1);
+      total += result.totalCount;
+      items.addAll(result.items);
     }
 
-    final sorted = _sortCombined(collected, trimmed);
+    final sorted = _sortCombined(items, trimmed);
     final paged = _paginate(sorted, page);
     final hasMore = sorted.length > page * _pageSize;
-
-    if (collected.isEmpty && firstError != null) {
-      throw firstError!;
-    }
-
     return SearchResultPage(
       items: paged,
       page: page,
@@ -115,15 +87,7 @@ class SearchServiceImpl implements SearchService {
   }
 
   @override
-  Future<SearchResultPage> searchByDomain(SearchDomain domain, String query, {int page = 1}) {
-    return _dispatchDomain(domain, query.trim(), page: page);
-  }
-
-  Future<SearchResultPage> _dispatchDomain(
-    SearchDomain domain,
-    String query, {
-    required int page,
-  }) async {
+  Future<SearchResultPage> searchByDomain(SearchDomain domain, String query, {int page = 1}) async {
     switch (domain) {
       case SearchDomain.all:
         return searchAll(query, page: page);
@@ -141,7 +105,7 @@ class SearchServiceImpl implements SearchService {
   }
 
   Future<SearchResultPage> _searchOrders(String query, {required int page}) async {
-    _ordersCache ??= await _loadOrders();
+    _ordersCache ??= await _maintenanceRepository.getAllRequests();
     final orders = _ordersCache ?? const [];
     final filtered = orders
         .where((order) => _matchesQuery(query, [
@@ -236,7 +200,7 @@ class SearchServiceImpl implements SearchService {
   }
 
   Future<SearchResultPage> _searchClubs(String query, {required int page}) async {
-    _clubsCache ??= await _loadClubs();
+    _clubsCache ??= await _clubsRepository.getClubs();
     final clubs = _clubsCache ?? const [];
     final filtered = clubs
         .where((club) => _matchesQuery(query, [club.name, club.city, club.address, club.contactPhone]))
@@ -266,7 +230,7 @@ class SearchServiceImpl implements SearchService {
   }
 
   Future<SearchResultPage> _searchKnowledge(String query, {required int page}) async {
-    _knowledgeCache ??= await _loadKnowledge();
+    _knowledgeCache ??= await _knowledgeBaseRepository.load();
     final docs = _knowledgeCache ?? const [];
     final filtered = docs
         .where((doc) => _matchesQuery(query, [doc.title, doc.url, doc.serviceId?.toString()]))
@@ -417,7 +381,7 @@ class SearchServiceImpl implements SearchService {
   }
 
   Future<List<SearchUser>> _loadUsers() async {
-    final clubs = await _loadClubs();
+    final clubs = await _clubsRepository.getClubs();
     final users = <SearchUser>[];
     for (final club in clubs) {
       try {
@@ -441,87 +405,15 @@ class SearchServiceImpl implements SearchService {
           );
         }
       } catch (error, stackTrace) {
-        if (_isPermissionError(error)) {
-          debugPrint('Skip staff for club ${club.id} due to permissions: $error');
-          continue;
-        }
         debugPrint('Failed to load staff for club ${club.id}: $error\n$stackTrace');
       }
     }
     return users;
   }
 
-  Future<List<MaintenanceRequestResponseDto>> _loadOrders() async {
-    try {
-      return await _maintenanceRepository.getAllRequests();
-    } on DioException catch (error) {
-      if (_isPermissionError(error)) {
-        debugPrint('Orders search skipped due to permissions: $error');
-        return const [];
-      }
-      rethrow;
-    } on ApiException catch (error) {
-      if (_isPermissionError(error)) {
-        debugPrint('Orders search skipped due to permissions: $error');
-        return const [];
-      }
-      rethrow;
-    }
-  }
-
-  Future<List<ClubSummaryDto>> _loadClubs() async {
-    try {
-      return await _clubsRepository.getClubs();
-    } on DioException catch (error) {
-      if (_isPermissionError(error)) {
-        debugPrint('Clubs search skipped due to permissions: $error');
-        return const [];
-      }
-      rethrow;
-    } on ApiException catch (error) {
-      if (_isPermissionError(error)) {
-        debugPrint('Clubs search skipped due to permissions: $error');
-        return const [];
-      }
-      rethrow;
-    }
-  }
-
-  Future<List<KbPdf>> _loadKnowledge() async {
-    try {
-      return await _knowledgeBaseRepository.load();
-    } on DioException catch (error) {
-      if (_isPermissionError(error)) {
-        debugPrint('Knowledge search skipped due to permissions: $error');
-        return const [];
-      }
-      rethrow;
-    } on ApiException catch (error) {
-      if (_isPermissionError(error)) {
-        debugPrint('Knowledge search skipped due to permissions: $error');
-        return const [];
-      }
-      rethrow;
-    }
-  }
-
-  bool _isPermissionError(Object error) {
-    ApiException? apiException;
-    if (error is DioException && error.error is ApiException) {
-      apiException = error.error as ApiException;
-    } else if (error is ApiException) {
-      apiException = error;
-    }
-    if (apiException == null) {
-      return false;
-    }
-    final status = apiException.statusCode;
-    return status == 401 || status == 403;
-  }
-
   @override
   Future<MaintenanceRequestResponseDto?> getOrderById(String id) async {
-    _ordersCache ??= await _loadOrders();
+    _ordersCache ??= await _maintenanceRepository.getAllRequests();
     final numeric = int.tryParse(id);
     if (numeric == null) return null;
     for (final order in _ordersCache ?? const []) {
@@ -546,7 +438,7 @@ class SearchServiceImpl implements SearchService {
 
   @override
   Future<ClubSummaryDto?> getClubById(String id) async {
-    _clubsCache ??= await _loadClubs();
+    _clubsCache ??= await _clubsRepository.getClubs();
     final numeric = int.tryParse(id);
     for (final club in _clubsCache ?? const []) {
       if (numeric != null && club.id == numeric) {
@@ -561,7 +453,7 @@ class SearchServiceImpl implements SearchService {
 
   @override
   Future<KbPdf?> getDocumentById(String id) async {
-    _knowledgeCache ??= await _loadKnowledge();
+    _knowledgeCache ??= await _knowledgeBaseRepository.load();
     for (final doc in _knowledgeCache ?? const []) {
       if (doc.url == id) {
         return doc;

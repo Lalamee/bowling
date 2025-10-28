@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:bowling_market/api/api_core.dart';
 import 'package:bowling_market/core/services/search_service.dart';
 import 'package:bowling_market/core/repositories/maintenance_repository.dart';
 import 'package:bowling_market/core/repositories/parts_repository.dart';
@@ -33,26 +32,9 @@ void main() {
   });
 
   test('searchAll aggregates totals', () async {
-    final result = await service.searchAll('bowling');
-    expect(result.totalCount, 2);
-    expect(result.items.map((e) => e.domain).toSet(), containsAll({
-      SearchDomain.orders,
-      SearchDomain.clubs,
-    }));
-  });
-
-  test('searchAll continues when one domain fails', () async {
-    final failing = SearchServiceImpl(
-      maintenanceRepository: _MaintenanceStub(),
-      partsRepository: _PartsStub(),
-      clubsRepository: _ClubsStub(),
-      knowledgeBaseRepository: _FailingKnowledgeStub(),
-      clubStaffRepository: _StaffStub(),
-    );
-
-    final result = await failing.searchAll('bowling');
+    final result = await service.searchAll('');
+    expect(result.totalCount, 6); // two orders, one part, one club, one doc, one user
     expect(result.items, isNotEmpty);
-    expect(result.totalCount, greaterThan(0));
   });
 
   test('lookup helpers return cached entities', () async {
@@ -170,19 +152,6 @@ class _KnowledgeStub extends KnowledgeBaseRepository {
     return [
       KbPdf(title: 'Service Manual', url: 'https://example.com/doc.pdf', clubId: 10, serviceId: 1),
     ];
-  }
-}
-
-class _FailingKnowledgeStub extends KnowledgeBaseRepository {
-  _FailingKnowledgeStub()
-      : super(
-          maintenanceRepository: _MaintenanceStub(),
-          serviceHistoryRepository: _ServiceHistoryStub(),
-        );
-
-  @override
-  Future<List<KbPdf>> load() async {
-    throw ApiException('Доступ запрещён', statusCode: 403);
   }
 }
 
