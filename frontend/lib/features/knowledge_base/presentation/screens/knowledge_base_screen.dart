@@ -147,8 +147,8 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
         ],
       ),
       bottomNavigationBar: AppBottomNav(
-        currentIndex: 3,
-        onTap: (i) => BottomNavDirect.go(context, 3, i),
+        currentIndex: 4,
+        onTap: (i) => BottomNavDirect.go(context, 4, i),
       ),
     );
   }

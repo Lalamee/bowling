@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/services/access_guard.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../core/utils/bottom_nav.dart';
@@ -35,15 +36,28 @@ class _ManagerOrdersHistoryScreenState extends State<ManagerOrdersHistoryScreen>
       _error = false;
     });
     try {
+      final guard = AccessGuardImpl();
+      final snapshot = await guard.ensureLoaded();
       final data = await _repository.getAllRequests();
       if (!mounted) return;
-      data.sort((a, b) {
+      final filtered = <MaintenanceRequestResponseDto>[];
+      for (final order in data) {
+        if (snapshot.role.isAdmin) {
+          filtered.add(order);
+          continue;
+        }
+        final clubId = order.clubId?.toString();
+        if (clubId != null && snapshot.allowedClubIds.contains(clubId)) {
+          filtered.add(order);
+        }
+      }
+      filtered.sort((a, b) {
         final aDate = a.requestDate ?? DateTime.fromMillisecondsSinceEpoch(0);
         final bDate = b.requestDate ?? DateTime.fromMillisecondsSinceEpoch(0);
         return bDate.compareTo(aDate);
       });
       setState(() {
-        _orders = data;
+        _orders = filtered;
         _loading = false;
       });
     } catch (e) {
@@ -128,7 +142,7 @@ class _ManagerOrdersHistoryScreenState extends State<ManagerOrdersHistoryScreen>
     }
     if (_orders.isEmpty) {
       return const Center(
-        child: Text('Заказы отсутствуют', style: TextStyle(color: AppColors.darkGray)),
+        child: Text('Нет заказов для ваших клубов', style: TextStyle(color: AppColors.darkGray)),
       );
     }
     return RefreshIndicator(

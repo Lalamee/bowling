@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/repositories/maintenance_repository.dart';
+import '../../../../core/services/access_guard.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../models/maintenance_request_response_dto.dart';
@@ -31,15 +32,28 @@ class _ClubOrdersHistoryScreenState extends State<ClubOrdersHistoryScreen> {
       _error = false;
     });
     try {
+      final guard = AccessGuardImpl();
+      final snapshot = await guard.ensureLoaded();
       final data = await _repository.getAllRequests();
       if (!mounted) return;
-      data.sort((a, b) {
+      final filtered = <MaintenanceRequestResponseDto>[];
+      for (final order in data) {
+        if (snapshot.role.isAdmin) {
+          filtered.add(order);
+          continue;
+        }
+        final clubId = order.clubId?.toString();
+        if (clubId != null && snapshot.allowedClubIds.contains(clubId)) {
+          filtered.add(order);
+        }
+      }
+      filtered.sort((a, b) {
         final aDate = a.requestDate ?? DateTime.fromMillisecondsSinceEpoch(0);
         final bDate = b.requestDate ?? DateTime.fromMillisecondsSinceEpoch(0);
         return bDate.compareTo(aDate);
       });
       final grouped = <String, List<MaintenanceRequestResponseDto>>{};
-      for (final order in data) {
+      for (final order in filtered) {
         final key = order.clubName ?? 'Без названия';
         grouped.putIfAbsent(key, () => []).add(order);
       }
@@ -125,7 +139,7 @@ class _ClubOrdersHistoryScreenState extends State<ClubOrdersHistoryScreen> {
     }
     if (_ordersByClub.isEmpty) {
       return const Center(
-        child: Text('Нет заказов', style: TextStyle(color: AppColors.darkGray)),
+        child: Text('Нет заказов для ваших клубов', style: TextStyle(color: AppColors.darkGray)),
       );
     }
 

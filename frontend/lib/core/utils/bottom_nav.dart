@@ -12,6 +12,7 @@ import '../../features/profile/mechanic/presentation/screens/mechanic_profile_sc
 import '../../features/profile/owner/presentation/screens/owner_profile_screen.dart';
 import '../../features/profile/manager/presentation/screens/manager_profile_screen.dart';
 import '../../features/profile/admin/presentation/screens/admin_profile_screen.dart';
+import '../../features/profile/notifications/notifications_screen.dart';
 
 class BottomNavDirect {
   static void go(BuildContext context, int current, int tapped) {
@@ -32,9 +33,12 @@ class BottomNavDirect {
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GlobalSearchScreen()));
           break;
         case 2:
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ClubScreen()));
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
           break;
         case 3:
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ClubScreen()));
+          break;
+        case 4:
           if (role == 'owner') {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OwnerProfileScreen()));
           } else if (role == 'manager') {

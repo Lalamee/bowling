@@ -22,7 +22,7 @@ class ClubStaffScreen extends StatefulWidget {
 class _ClubStaffScreenState extends State<ClubStaffScreen> {
   final _repo = ClubStaffRepository();
   final _userRepo = UserRepository();
-  int _navIndex = 3;
+  int _navIndex = 4;
   bool _isLoading = true;
   List<UserClub> _ownerClubs = const [];
   int? _selectedClubId;
@@ -236,21 +236,8 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
 
   void _onNavTap(int i) {
     if (_navIndex == i) return;
+    BottomNavDirect.go(context, _navIndex, i);
     setState(() => _navIndex = i);
-    switch (i) {
-      case 0:
-        Navigator.pushReplacementNamed(context, Routes.orders);
-        break;
-      case 1:
-        Navigator.pushReplacementNamed(context, Routes.clubSearch);
-        break;
-      case 2:
-        Navigator.pushReplacementNamed(context, Routes.club);
-        break;
-      case 3:
-        Navigator.pushReplacementNamed(context, Routes.profileMechanic);
-        break;
-    }
   }
 
   Future<void> _createStaff(_StaffDraft draft) async {

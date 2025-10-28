@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../../core/theme/colors.dart';
+import '../../../../../core/utils/bottom_nav.dart';
+import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../domain/mechanic_profile.dart';
 import '../../../../../shared/widgets/chips/radio_group_horizontal.dart';
 import 'mechanic_profile_screen.dart' show EditFocus;
@@ -40,7 +42,7 @@ class _EditMechanicProfileScreenState extends State<EditMechanicProfileScreen> {
   final _addrFocus = FocusNode();
 
   String _status = 'Механик';
-  int _navIndex = 3;
+  int _navIndex = 4;
 
   @override
   void initState() {
@@ -306,18 +308,13 @@ class _EditMechanicProfileScreenState extends State<EditMechanicProfileScreen> {
           const SizedBox(height: 28),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
+      bottomNavigationBar: AppBottomNav(
         currentIndex: _navIndex,
-        onTap: (i) => setState(() => _navIndex = i),
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.darkGray,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: 'Заказы'),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Поиск'),
-          BottomNavigationBarItem(icon: Icon(Icons.storefront_outlined), label: 'Клуб'),
-          BottomNavigationBarItem(icon: Icon(Icons.account_circle_outlined), label: 'Профиль'),
-        ],
+        onTap: (i) {
+          if (_navIndex == i) return;
+          BottomNavDirect.go(context, _navIndex, i);
+          setState(() => _navIndex = i);
+        },
       ),
     );
   }

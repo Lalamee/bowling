@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/models/user_club.dart';
+import '../../../../core/repositories/clubs_repository.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/routing/routes.dart';
+import '../../../../core/services/access_guard.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../core/utils/user_club_resolver.dart';
 import '../../../../models/maintenance_request_response_dto.dart';
+import '../../../../models/club_summary_dto.dart';
 import '../../../../shared/widgets/buttons/custom_button.dart';
 import '../../../../shared/widgets/layout/common_ui.dart';
 import '../../../../shared/widgets/layout/section_list.dart';
@@ -26,6 +29,7 @@ class ClubScreen extends StatefulWidget {
 
 class _ClubScreenState extends State<ClubScreen> {
   final _userRepository = UserRepository();
+  final _clubsRepository = ClubsRepository();
 
   bool _isLoading = true;
   bool _hasError = false;
@@ -44,14 +48,30 @@ class _ClubScreenState extends State<ClubScreen> {
       _hasError = false;
     });
     try {
-      final me = await _userRepository.me();
-      if (!mounted) return;
-      final clubs = resolveUserClubs(me);
-      setState(() {
-        _clubs = clubs;
-        _selectedIndex = clubs.isNotEmpty ? 0 : null;
-        _isLoading = false;
-      });
+      final guard = AccessGuardImpl();
+      final snapshot = await guard.ensureLoaded();
+      if (snapshot.role.isAdmin) {
+        final clubs = await _clubsRepository.getClubs();
+        if (!mounted) return;
+        final mapped = clubs.map(_mapClubSummary).toList();
+        setState(() {
+          _clubs = mapped;
+          _selectedIndex = mapped.isNotEmpty ? 0 : null;
+          _isLoading = false;
+        });
+      } else {
+        final me = await _userRepository.me();
+        if (!mounted) return;
+        guard.updateProfile(me, roleHint: snapshot.role.code);
+        final clubs = resolveUserClubs(me);
+        final allowedIds = guard.allowedClubIdsForCurrent();
+        final filtered = clubs.where((club) => allowedIds.contains(club.id.toString())).toList();
+        setState(() {
+          _clubs = filtered;
+          _selectedIndex = filtered.isNotEmpty ? 0 : null;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -60,6 +80,17 @@ class _ClubScreenState extends State<ClubScreen> {
       });
       showApiError(context, e);
     }
+  }
+
+  UserClub _mapClubSummary(ClubSummaryDto dto) {
+    return UserClub(
+      id: dto.id,
+      name: dto.name.isNotEmpty ? dto.name : 'Клуб #${dto.id}',
+      address: dto.address,
+      lanes: dto.lanesCount?.toString(),
+      phone: dto.contactPhone,
+      email: dto.contactEmail,
+    );
   }
 
   Future<void> _logout() async {
@@ -199,8 +230,8 @@ class _ClubScreenState extends State<ClubScreen> {
       backgroundColor: AppColors.background,
       body: SafeArea(child: _buildBody()),
       bottomNavigationBar: AppBottomNav(
-        currentIndex: 2,
-        onTap: (i) => BottomNavDirect.go(context, 2, i),
+        currentIndex: 3,
+        onTap: (i) => BottomNavDirect.go(context, 3, i),
       ),
     );
   }

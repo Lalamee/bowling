@@ -324,8 +324,8 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
         ),
       ),
       bottomNavigationBar: AppBottomNav(
-        currentIndex: 2,
-        onTap: (i) => BottomNavDirect.go(context, 2, i),
+        currentIndex: 3,
+        onTap: (i) => BottomNavDirect.go(context, 3, i),
       ),
     );
   }

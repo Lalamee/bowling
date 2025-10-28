@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../../core/repositories/user_repository.dart';
 import '../../../../../core/routing/routes.dart';
+import '../../../../../core/services/access_guard.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/theme/colors.dart';
@@ -12,6 +13,7 @@ import '../../../../../shared/widgets/tiles/profile_tile.dart';
 import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
 import '../../../../../core/utils/bottom_nav.dart';
 import '../../domain/owner_profile.dart';
+import '../../notifications/notifications_screen.dart';
 import 'edit_owner_profile_screen.dart';
 
 enum OwnerEditFocus { none, name, phone, address }
@@ -66,6 +68,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
         });
       }
       final me = await _repo.me();
+      AccessGuardImpl().updateProfile(me, roleHint: 'owner');
       if (!mounted) return;
       final cache = _mapApiToCache(me);
       await LocalAuthStorage.saveOwnerProfile(cache);
@@ -368,7 +371,14 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                     const SizedBox(height: 10),
                     ProfileTile(icon: Icons.history_rounded, text: 'История заказов', onTap: () => Navigator.pushNamed(context, Routes.ordersPersonalHistory)),
                     const SizedBox(height: 10),
-                    ProfileTile(icon: Icons.notifications_active_outlined, text: 'Оповещения', onTap: () {}),
+                    ProfileTile(
+                      icon: Icons.notifications_active_outlined,
+                      text: 'Оповещения',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                      ),
+                    ),
                     const SizedBox(height: 10),
                     ProfileTile(icon: Icons.group_outlined, text: 'Сотрудники клуба', onTap: () => Navigator.pushNamed(context, Routes.clubStaff)),
                     const SizedBox(height: 10),
@@ -376,8 +386,8 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                   ],
                 ),
       bottomNavigationBar: AppBottomNav(
-        currentIndex: 3,
-        onTap: (i) => BottomNavDirect.go(context, 3, i),
+        currentIndex: 4,
+        onTap: (i) => BottomNavDirect.go(context, 4, i),
       ),
     );
   }
