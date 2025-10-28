@@ -753,7 +753,8 @@ class _OrderCard extends StatelessWidget {
                             if (part.status != null && part.status!.isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
-                                child: Text('Статус: ${_statusName(part.status!)}', style: const TextStyle(color: AppColors.darkGray)),
+                                child: Text('Статус: ${describeOrderStatus(part.status)}',
+                                    style: const TextStyle(color: AppColors.darkGray)),
                               ),
                           ],
                         ),
@@ -803,28 +804,6 @@ class _OrderCard extends StatelessWidget {
     );
   }
 
-  static String _statusName(String status) {
-    switch (status.toUpperCase()) {
-      case 'NEW':
-        return 'Новая заявка';
-      case 'APPROVED':
-        return 'Одобрено';
-      case 'REJECTED':
-        return 'Отклонено';
-      case 'IN_PROGRESS':
-        return 'В работе';
-      case 'DONE':
-        return 'Выполнено';
-      case 'COMPLETED':
-        return 'Завершено';
-      case 'CLOSED':
-        return 'Закрыто';
-      case 'UNREPAIRABLE':
-        return 'Неремонтопригодно';
-      default:
-        return 'Статус: $status';
-    }
-  }
 }
 
 enum _OrdersFilter { all, active, archive }

@@ -1,5 +1,33 @@
+import '../../../core/models/order_status.dart';
 import '../../../models/club_summary_dto.dart';
 import '../../../models/maintenance_request_response_dto.dart';
+import '../../../models/part_dto.dart';
+
+class InventorySearchEntry {
+  final PartDto part;
+  final int? clubId;
+  final String? clubName;
+
+  const InventorySearchEntry({required this.part, this.clubId, this.clubName});
+}
+
+class ProfileSearchEntry {
+  final String displayName;
+  final String? phone;
+  final String? email;
+  final String route;
+  final Object? arguments;
+  final String? roleLabel;
+
+  const ProfileSearchEntry({
+    required this.displayName,
+    required this.route,
+    this.phone,
+    this.email,
+    this.arguments,
+    this.roleLabel,
+  });
+}
 
 class LocalSearchService {
   const LocalSearchService();
@@ -30,6 +58,8 @@ class LocalSearchService {
         ..write(order.clubName ?? '')
         ..write(' ')
         ..write(order.status ?? '')
+        ..write(' ')
+        ..write(describeOrderStatus(order.status))
         ..write(' ')
         ..write(order.mechanicName ?? '')
         ..write(' ')
@@ -77,6 +107,69 @@ class LocalSearchService {
         ..write(club.contactEmail ?? '')
         ..write(' ')
         ..write(club.id);
+      final haystack = _normalize(buffer.toString());
+      return haystack.contains(normalizedQuery);
+    }).toList();
+  }
+
+  List<InventorySearchEntry> searchInventory(
+    List<InventorySearchEntry> source,
+    String query, {
+    Set<int>? allowedClubIds,
+    bool includeAll = false,
+  }) {
+    final normalizedQuery = _normalize(query);
+    final filteredByAccess = includeAll || allowedClubIds == null
+        ? List<InventorySearchEntry>.from(source)
+        : source.where((entry) {
+            final clubId = entry.clubId;
+            if (clubId == null) return includeAll;
+            return allowedClubIds.contains(clubId);
+          }).toList();
+
+    if (normalizedQuery.isEmpty) {
+      return filteredByAccess;
+    }
+
+    return filteredByAccess.where((entry) {
+      final part = entry.part;
+      final buffer = StringBuffer()
+        ..write(part.catalogNumber)
+        ..write(' ')
+        ..write(part.commonName ?? '')
+        ..write(' ')
+        ..write(part.officialNameRu ?? '')
+        ..write(' ')
+        ..write(part.officialNameEn ?? '')
+        ..write(' ')
+        ..write(part.location ?? '')
+        ..write(' ')
+        ..write(part.quantity ?? '')
+        ..write(' ')
+        ..write(entry.clubName ?? '');
+      final haystack = _normalize(buffer.toString());
+      return haystack.contains(normalizedQuery);
+    }).toList();
+  }
+
+  List<ProfileSearchEntry> searchProfiles(
+    List<ProfileSearchEntry> source,
+    String query,
+  ) {
+    final normalizedQuery = _normalize(query);
+    if (normalizedQuery.isEmpty) {
+      return List<ProfileSearchEntry>.from(source);
+    }
+
+    return source.where((profile) {
+      final buffer = StringBuffer()
+        ..write(profile.displayName)
+        ..write(' ')
+        ..write(profile.roleLabel ?? '')
+        ..write(' ')
+        ..write(profile.phone ?? '')
+        ..write(' ')
+        ..write(profile.email ?? '');
       final haystack = _normalize(buffer.toString());
       return haystack.contains(normalizedQuery);
     }).toList();

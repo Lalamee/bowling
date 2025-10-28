@@ -3,9 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/models/order_status.dart';
 import '../../../../core/repositories/clubs_repository.dart';
+import '../../../../core/repositories/inventory_repository.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
+import '../../../../core/routing/route_args.dart';
+import '../../../../core/routing/routes.dart';
 import '../../../../core/services/authz/acl.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
@@ -26,6 +30,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   final _maintenanceRepository = MaintenanceRepository();
   final _clubsRepository = ClubsRepository();
   final _userRepository = UserRepository();
+  final _inventoryRepository = InventoryRepository();
   final _localSearchService = const LocalSearchService();
 
   final _searchCtrl = TextEditingController();
@@ -36,10 +41,14 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   bool _hasError = false;
   UserAccessScope? _scope;
 
-  List<MaintenanceRequestResponseDto> _ordersCache = const [];
-  List<ClubSummaryDto> _clubsCache = const [];
-  List<MaintenanceRequestResponseDto> _ordersFiltered = const [];
-  List<ClubSummaryDto> _clubsFiltered = const [];
+  List<MaintenanceRequestResponseDto> _ordersCache = const <MaintenanceRequestResponseDto>[];
+  List<ClubSummaryDto> _clubsCache = const <ClubSummaryDto>[];
+  List<MaintenanceRequestResponseDto> _ordersFiltered = const <MaintenanceRequestResponseDto>[];
+  List<ClubSummaryDto> _clubsFiltered = const <ClubSummaryDto>[];
+  List<InventorySearchEntry> _inventoryCache = const <InventorySearchEntry>[];
+  List<ProfileSearchEntry> _profilesCache = const <ProfileSearchEntry>[];
+  List<InventorySearchEntry> _inventoryFiltered = const <InventorySearchEntry>[];
+  List<ProfileSearchEntry> _profilesFiltered = const <ProfileSearchEntry>[];
 
   @override
   void initState() {
@@ -77,8 +86,13 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
           ? rawClubs
           : rawClubs.where((club) => scope.canViewClubId(club.id)).toList();
 
+      final inventoryEntries = await _loadInventoryEntries(scope, filteredClubs);
+      final profileEntries = _buildProfileEntries(me, scope);
+
       _ordersCache = filteredOrders;
       _clubsCache = filteredClubs;
+      _inventoryCache = inventoryEntries;
+      _profilesCache = profileEntries;
       _scope = scope;
       _isLoading = false;
       _hasError = false;
@@ -110,8 +124,20 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
       allowedClubIds: allowed,
       includeAll: scope.isAdmin,
     );
+    final inventory = _localSearchService.searchInventory(
+      _inventoryCache,
+      query,
+      allowedClubIds: allowed,
+      includeAll: scope.isAdmin,
+    );
+    final profiles = _localSearchService.searchProfiles(
+      _profilesCache,
+      query,
+    );
     _ordersFiltered = orders;
     _clubsFiltered = clubs;
+    _inventoryFiltered = inventory;
+    _profilesFiltered = profiles;
     if (notify && mounted) {
       setState(() {});
     }
@@ -128,6 +154,140 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   void _clearSearch() {
     _searchCtrl.clear();
     _applySearch('');
+  }
+
+  Future<List<InventorySearchEntry>> _loadInventoryEntries(
+    UserAccessScope scope,
+    List<ClubSummaryDto> clubs,
+  ) async {
+    final entries = <InventorySearchEntry>[];
+    final seen = <String>{};
+    final clubNames = <int, String>{
+      for (final club in clubs) club.id: club.name,
+    };
+
+    final ids = scope.isAdmin
+        ? clubNames.keys.toList()
+        : scope.accessibleClubIds.where((id) => clubNames.containsKey(id)).toList();
+
+    if (ids.isEmpty) {
+      return entries;
+    }
+
+    for (final id in ids) {
+      try {
+        final parts = await _inventoryRepository.search('', clubId: id);
+        final clubName = clubNames[id];
+        for (final part in parts) {
+          final key = '$id-${part.inventoryId}';
+          if (seen.add(key)) {
+            entries.add(InventorySearchEntry(part: part, clubId: id, clubName: clubName));
+          }
+        }
+      } catch (_) {
+        // игнорируем сбои загрузки конкретного клуба
+      }
+    }
+
+    return entries;
+  }
+
+  List<ProfileSearchEntry> _buildProfileEntries(Map<String, dynamic> me, UserAccessScope scope) {
+    String? asString(dynamic value) {
+      if (value == null) return null;
+      final str = value.toString().trim();
+      return str.isEmpty ? null : str;
+    }
+
+    final displayName =
+        asString(me['fullName']) ?? asString(me['name']) ?? asString(me['phone']) ?? 'Профиль';
+    final phone = asString(me['phone']);
+    final email = asString(me['email']);
+    final route = _profileRouteForRole(scope.role);
+    if (route == null) {
+      return const [];
+    }
+
+    return [
+      ProfileSearchEntry(
+        displayName: displayName,
+        phone: phone,
+        email: email,
+        route: route,
+        roleLabel: _roleLabelForRole(scope.role),
+      ),
+    ];
+  }
+
+  String? _profileRouteForRole(String role) {
+    switch (role) {
+      case 'admin':
+        return Routes.profileAdmin;
+      case 'manager':
+        return Routes.profileManager;
+      case 'owner':
+        return Routes.profileOwner;
+      case 'mechanic':
+        return Routes.profileMechanic;
+      default:
+        return null;
+    }
+  }
+
+  String _roleLabelForRole(String role) {
+    switch (role) {
+      case 'admin':
+        return 'Администратор';
+      case 'manager':
+        return 'Менеджер';
+      case 'owner':
+        return 'Владелец';
+      case 'mechanic':
+        return 'Механик';
+      default:
+        return role;
+    }
+  }
+
+  void _openOrder(MaintenanceRequestResponseDto order) {
+    Navigator.pushNamed(
+      context,
+      Routes.orderSummary,
+      arguments: OrderSummaryArgs(order: order, orderNumber: 'Заявка №${order.requestId}'),
+    );
+  }
+
+  void _openClub(ClubSummaryDto club) {
+    Navigator.pushNamed(context, Routes.club, arguments: club.id);
+  }
+
+  void _openInventory(InventorySearchEntry entry) {
+    final clubId = entry.clubId;
+    if (clubId == null) {
+      _showMessage('Не удалось определить клуб для выбранной позиции');
+      return;
+    }
+    Navigator.pushNamed(
+      context,
+      Routes.clubWarehouse,
+      arguments: ClubWarehouseArgs(
+        clubId: clubId,
+        clubName: entry.clubName,
+        inventoryId: entry.part.inventoryId,
+        searchQuery: entry.part.commonName ?? entry.part.catalogNumber,
+      ),
+    );
+  }
+
+  void _openProfile(ProfileSearchEntry entry) {
+    Navigator.pushNamed(context, entry.route, arguments: entry.arguments);
+  }
+
+  void _showMessage(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text)));
   }
 
   @override
@@ -222,7 +382,10 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
       );
     }
 
-    if (_ordersFiltered.isEmpty && _clubsFiltered.isEmpty) {
+    if (_ordersFiltered.isEmpty &&
+        _clubsFiltered.isEmpty &&
+        _inventoryFiltered.isEmpty &&
+        _profilesFiltered.isEmpty) {
       return RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(
@@ -250,13 +413,46 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
           if (_ordersFiltered.isNotEmpty) ...[
             _SectionHeader(title: 'Заявки', icon: Icons.assignment_outlined, count: _ordersFiltered.length),
             const SizedBox(height: 8),
-            ..._ordersFiltered.map((order) => _OrderSearchTile(order: order, formatter: _dateFormatter)),
+            ..._ordersFiltered.map(
+              (order) => _OrderSearchTile(
+                order: order,
+                formatter: _dateFormatter,
+                onTap: () => _openOrder(order),
+              ),
+            ),
             const SizedBox(height: 20),
           ],
           if (_clubsFiltered.isNotEmpty) ...[
             _SectionHeader(title: 'Клубы', icon: Icons.storefront_outlined, count: _clubsFiltered.length),
             const SizedBox(height: 8),
-            ..._clubsFiltered.map((club) => _ClubSearchTile(club: club)),
+            ..._clubsFiltered.map(
+              (club) => _ClubSearchTile(
+                club: club,
+                onTap: () => _openClub(club),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+          if (_inventoryFiltered.isNotEmpty) ...[
+            _SectionHeader(title: 'Склад', icon: Icons.inventory_2_outlined, count: _inventoryFiltered.length),
+            const SizedBox(height: 8),
+            ..._inventoryFiltered.map(
+              (entry) => _InventorySearchTile(
+                entry: entry,
+                onTap: () => _openInventory(entry),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+          if (_profilesFiltered.isNotEmpty) ...[
+            _SectionHeader(title: 'Пользователи', icon: Icons.person_outline, count: _profilesFiltered.length),
+            const SizedBox(height: 8),
+            ..._profilesFiltered.map(
+              (entry) => _ProfileSearchTile(
+                entry: entry,
+                onTap: () => _openProfile(entry),
+              ),
+            ),
           ],
         ],
       ),
@@ -302,27 +498,9 @@ class _SectionHeader extends StatelessWidget {
 class _OrderSearchTile extends StatelessWidget {
   final MaintenanceRequestResponseDto order;
   final DateFormat formatter;
+  final VoidCallback onTap;
 
-  const _OrderSearchTile({required this.order, required this.formatter});
-
-  String _statusLabel(String? status) {
-    final key = status?.toUpperCase() ?? '';
-    switch (key) {
-      case 'APPROVED':
-        return 'Одобрена';
-      case 'REJECTED':
-        return 'Отклонена';
-      case 'IN_PROGRESS':
-        return 'В работе';
-      case 'COMPLETED':
-      case 'DONE':
-        return 'Завершена';
-      case 'NEW':
-        return 'Новая';
-      default:
-        return status ?? 'Неизвестно';
-    }
-  }
+  const _OrderSearchTile({required this.order, required this.formatter, required this.onTap});
 
   DateTime? get _lastUpdate {
     DateTime? latest;
@@ -350,66 +528,70 @@ class _OrderSearchTile extends StatelessWidget {
     if (order.clubName != null && order.clubName!.isNotEmpty) {
       subtitle.add(order.clubName!);
     }
-    subtitle.add(_statusLabel(order.status));
+    subtitle.add(describeOrderStatus(order.status));
     final updated = _lastUpdate;
     if (updated != null) {
       subtitle.add(formatter.format(updated));
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: const Color(0xFFEDEDED), width: 1.2),
-      ),
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Заявка №${order.requestId}',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _statusLabel(order.status),
-                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            subtitle.join(' • '),
-            style: const TextStyle(color: AppColors.darkGray, fontSize: 13),
-          ),
-          if (order.managerNotes != null && order.managerNotes!.trim().isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              order.managerNotes!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: AppColors.darkGray, fontSize: 13),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
           ],
-        ],
+          border: Border.all(color: const Color(0xFFEDEDED), width: 1.2),
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Заявка №${order.requestId}',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    describeOrderStatus(order.status),
+                    style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              subtitle.join(' • '),
+              style: const TextStyle(color: AppColors.darkGray, fontSize: 13),
+            ),
+            if (order.managerNotes != null && order.managerNotes!.trim().isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                order.managerNotes!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.darkGray, fontSize: 13),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -418,7 +600,9 @@ class _OrderSearchTile extends StatelessWidget {
 class _ClubSearchTile extends StatelessWidget {
   final ClubSummaryDto club;
 
-  const _ClubSearchTile({required this.club});
+  final VoidCallback onTap;
+
+  const _ClubSearchTile({required this.club, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -433,34 +617,169 @@ class _ClubSearchTile extends StatelessWidget {
       details.add(club.contactEmail!);
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: const Color(0xFFEDEDED), width: 1.2),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+          border: Border.all(color: const Color(0xFFEDEDED), width: 1.2),
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              club.name,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              details.isEmpty ? 'Контакты не указаны' : details.join(' • '),
+              style: const TextStyle(color: AppColors.darkGray, fontSize: 13),
+            ),
+          ],
+        ),
       ),
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            club.name,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            details.isEmpty ? 'Контакты не указаны' : details.join(' • '),
-            style: const TextStyle(color: AppColors.darkGray, fontSize: 13),
-          ),
-        ],
+    );
+  }
+}
+
+class _InventorySearchTile extends StatelessWidget {
+  final InventorySearchEntry entry;
+  final VoidCallback onTap;
+
+  const _InventorySearchTile({required this.entry, required this.onTap});
+
+  String get _displayName {
+    final part = entry.part;
+    final candidates = [
+      part.commonName,
+      part.officialNameRu,
+      part.officialNameEn,
+    ];
+    for (final candidate in candidates) {
+      if (candidate != null && candidate.trim().isNotEmpty) {
+        return candidate.trim();
+      }
+    }
+    return part.catalogNumber;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final part = entry.part;
+    final info = <String>[];
+    if (entry.clubName != null && entry.clubName!.isNotEmpty) {
+      info.add(entry.clubName!);
+    }
+    if (part.catalogNumber.isNotEmpty) {
+      info.add('Каталожный номер: ${part.catalogNumber}');
+    }
+    if (part.location != null && part.location!.trim().isNotEmpty) {
+      info.add('Локация: ${part.location!.trim()}');
+    }
+    if (part.quantity != null) {
+      info.add('Количество: ${part.quantity}');
+    }
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+          border: Border.all(color: const Color(0xFFEDEDED), width: 1.2),
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _displayName,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              info.isEmpty ? 'Детали отсутствуют' : info.join(' • '),
+              style: const TextStyle(color: AppColors.darkGray, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileSearchTile extends StatelessWidget {
+  final ProfileSearchEntry entry;
+  final VoidCallback onTap;
+
+  const _ProfileSearchTile({required this.entry, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final details = <String>[];
+    if (entry.roleLabel != null && entry.roleLabel!.isNotEmpty) {
+      details.add(entry.roleLabel!);
+    }
+    if (entry.phone != null && entry.phone!.isNotEmpty) {
+      details.add(entry.phone!);
+    }
+    if (entry.email != null && entry.email!.isNotEmpty) {
+      details.add(entry.email!);
+    }
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+          border: Border.all(color: const Color(0xFFEDEDED), width: 1.2),
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              entry.displayName,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              details.isEmpty ? 'Контакты отсутствуют' : details.join(' • '),
+              style: const TextStyle(color: AppColors.darkGray, fontSize: 13),
+            ),
+          ],
+        ),
       ),
     );
   }

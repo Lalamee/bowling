@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/models/order_status.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/services/authz/acl.dart';
@@ -81,7 +82,7 @@ class _ClubOrdersHistoryScreenState extends State<ClubOrdersHistoryScreen> {
             elevation: 2,
             child: InkWell(
               customBorder: const CircleBorder(),
-              onTap: () => Navigator.pop(context),
+              onTap: () => Navigator.maybePop(context),
               child: const SizedBox(
                 width: 40,
                 height: 40,
@@ -216,27 +217,12 @@ class _ClubSection extends StatelessWidget {
   String _buildSubtitle(MaintenanceRequestResponseDto order) {
     final pieces = <String>[];
     if (order.status != null && order.status!.isNotEmpty) {
-      pieces.add(_statusName(order.status!));
+      pieces.add(describeOrderStatus(order.status));
     }
     if (order.requestDate != null) {
       pieces.add(_formatDate(order.requestDate!));
     }
     return pieces.join(' • ');
-  }
-}
-
-String _statusName(String status) {
-  switch (status.toUpperCase()) {
-    case 'APPROVED':
-      return 'Одобрено';
-    case 'REJECTED':
-      return 'Отклонено';
-    case 'IN_PROGRESS':
-      return 'В работе';
-    case 'COMPLETED':
-      return 'Завершено';
-    default:
-      return status;
   }
 }
 

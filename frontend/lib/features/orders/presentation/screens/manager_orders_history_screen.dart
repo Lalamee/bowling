@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/models/order_status.dart';
 import '../../../../core/models/user_club.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/nav/app_bottom_nav.dart';
@@ -31,25 +32,12 @@ class _ManagerOrdersHistoryScreenState extends State<ManagerOrdersHistoryScreen>
   int? _expandedIndex;
   List<UserClub> _clubs = const [];
   int? _selectedClubId;
-  String? _selectedStatusKey;
+  OrderStatusType? _selectedStatus;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
 
-  static const List<MapEntry<String?, String>> _statusOptions = [
-    MapEntry<String?, String>(null, 'Все'),
-    MapEntry<String?, String>('DRAFT', 'Черновик'),
-    MapEntry<String?, String>('PENDING', 'В ожидании'),
-    MapEntry<String?, String>('CONFIRMED', 'Подтверждён'),
-    MapEntry<String?, String>('ARCHIVED', 'Архив'),
-    MapEntry<String?, String>('NEW', 'Новая'),
-    MapEntry<String?, String>('APPROVED', 'Одобрена'),
-    MapEntry<String?, String>('IN_PROGRESS', 'В работе'),
-    MapEntry<String?, String>('COMPLETED', 'Завершена'),
-    MapEntry<String?, String>('DONE', 'Завершена (DONE)'),
-    MapEntry<String?, String>('REJECTED', 'Отклонена'),
-    MapEntry<String?, String>('CLOSED', 'Закрыта'),
-  ];
+  static const List<OrderStatusType> _statusOptions = kOrderStatusFilterOrder;
 
   @override
   void initState() {
@@ -116,7 +104,7 @@ class _ManagerOrdersHistoryScreenState extends State<ManagerOrdersHistoryScreen>
             elevation: 2,
             child: InkWell(
               customBorder: const CircleBorder(),
-              onTap: () => Navigator.pop(context),
+              onTap: () => Navigator.maybePop(context),
               child: const SizedBox(
                 width: 40,
                 height: 40,
@@ -230,10 +218,9 @@ class _ManagerOrdersHistoryScreenState extends State<ManagerOrdersHistoryScreen>
     if (clubId != null) {
       base = base.where((order) => order.clubId == clubId);
     }
-    final statusKey = _selectedStatusKey;
-    if (statusKey != null) {
-      final normalized = statusKey.toUpperCase();
-      base = base.where((order) => (order.status ?? '').toUpperCase() == normalized);
+    final statusFilter = _selectedStatus;
+    if (statusFilter != null) {
+      base = base.where((order) => statusFilter.matches(order.status)).toList();
     }
     final query = _normalize(_searchQuery);
     if (query.isNotEmpty) {
@@ -317,22 +304,54 @@ class _ManagerOrdersHistoryScreenState extends State<ManagerOrdersHistoryScreen>
   }
 
   Widget _buildStatusChips() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: _statusOptions.map((option) {
-        final selected = option.key == _selectedStatusKey;
+    TextStyle labelStyle(bool selected) => TextStyle(
+          color: selected ? Colors.white : AppColors.textDark,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+        );
+
+    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
+    const side = BorderSide(color: AppColors.lightGray);
+
+    final chips = <Widget>[
+      ChoiceChip(
+        label: const Text('Все'),
+        selected: _selectedStatus == null,
+        selectedColor: AppColors.primary,
+        backgroundColor: Colors.white,
+        shape: shape,
+        side: side,
+        labelStyle: labelStyle(_selectedStatus == null),
+        onSelected: (_) {
+          setState(() {
+            _selectedStatus = null;
+            _expandedIndex = null;
+          });
+        },
+      ),
+      ..._statusOptions.map((option) {
+        final selected = option == _selectedStatus;
         return ChoiceChip(
-          label: Text(option.value),
+          label: Text(option.label),
           selected: selected,
+          selectedColor: AppColors.primary,
+          backgroundColor: Colors.white,
+          shape: shape,
+          side: side,
+          labelStyle: labelStyle(selected),
           onSelected: (_) {
             setState(() {
-              _selectedStatusKey = selected ? null : option.key;
+              _selectedStatus = selected ? null : option;
               _expandedIndex = null;
             });
           },
         );
-      }).toList(),
+      }),
+    ];
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: chips,
     );
   }
 
@@ -370,7 +389,7 @@ class _CollapsedOrderCard extends StatelessWidget {
       subtitle.add(order.clubName!);
     }
     if (order.status != null && order.status!.isNotEmpty) {
-      subtitle.add(_statusName(order.status!));
+      subtitle.add(describeOrderStatus(order.status));
     }
     if (order.requestDate != null) {
       subtitle.add(_formatDate(order.requestDate!));
@@ -459,7 +478,7 @@ class _ExpandedOrderCard extends StatelessWidget {
           if (order.laneNumber != null)
             _InfoRow(label: 'Дорожка', value: order.laneNumber.toString()),
           if (order.status != null && order.status!.isNotEmpty)
-            _InfoRow(label: 'Статус', value: _statusName(order.status!)),
+            _InfoRow(label: 'Статус', value: describeOrderStatus(order.status)),
           if (order.requestDate != null)
             _InfoRow(label: 'Создано', value: _formatDate(order.requestDate!)),
           const SizedBox(height: 12),
@@ -506,7 +525,8 @@ class _ExpandedOrderCard extends StatelessWidget {
                       if (part.status != null && part.status!.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
-                          child: Text('Статус: ${_statusName(part.status!)}', style: const TextStyle(color: AppColors.darkGray)),
+                          child: Text('Статус: ${describeOrderStatus(part.status)}',
+                              style: const TextStyle(color: AppColors.darkGray)),
                         ),
                     ],
                   ),
@@ -555,21 +575,6 @@ class _InfoRow extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-String _statusName(String status) {
-  switch (status.toUpperCase()) {
-    case 'APPROVED':
-      return 'Одобрено';
-    case 'REJECTED':
-      return 'Отклонено';
-    case 'IN_PROGRESS':
-      return 'В работе';
-    case 'COMPLETED':
-      return 'Завершено';
-    default:
-      return status;
   }
 }
 

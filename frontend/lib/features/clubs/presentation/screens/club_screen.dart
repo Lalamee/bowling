@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/models/order_status.dart';
 import '../../../../core/models/user_club.dart';
 import '../../../../core/repositories/clubs_repository.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
@@ -20,7 +21,9 @@ import '../../../orders/presentation/screens/add_parts_to_order_screen.dart';
 import 'club_warehouse_screen.dart';
 
 class ClubScreen extends StatefulWidget {
-  const ClubScreen({Key? key}) : super(key: key);
+  final int? initialClubId;
+
+  const ClubScreen({Key? key, this.initialClubId}) : super(key: key);
 
   @override
   State<ClubScreen> createState() => _ClubScreenState();
@@ -70,9 +73,17 @@ class _ClubScreenState extends State<ClubScreen> {
       } else {
         clubs = resolveUserClubs(me);
       }
+      int? selectedIndex;
+      if (widget.initialClubId != null) {
+        final index = clubs.indexWhere((club) => club.id == widget.initialClubId);
+        if (index >= 0) {
+          selectedIndex = index;
+        }
+      }
+
       setState(() {
         _clubs = clubs;
-        _selectedIndex = clubs.isNotEmpty ? 0 : null;
+        _selectedIndex = selectedIndex ?? (clubs.isNotEmpty ? 0 : null);
         _scope = scope;
         _isLoading = false;
       });
@@ -302,29 +313,6 @@ class _OrderSelectionSheetState extends State<_OrderSelectionSheet> {
     _load();
   }
 
-  String _statusName(String status) {
-    switch (status.toUpperCase()) {
-      case 'NEW':
-        return 'Новая заявка';
-      case 'APPROVED':
-        return 'Одобрено';
-      case 'IN_PROGRESS':
-        return 'В работе';
-      case 'DONE':
-        return 'Выполнено';
-      case 'COMPLETED':
-        return 'Завершено';
-      case 'CLOSED':
-        return 'Закрыто';
-      case 'UNREPAIRABLE':
-        return 'Неремонтопригодно';
-      case 'REJECTED':
-        return 'Отклонено';
-      default:
-        return status;
-    }
-  }
-
   Future<void> _load() async {
     setState(() {
       _isLoading = true;
@@ -440,7 +428,10 @@ class _OrderSelectionSheetState extends State<_OrderSelectionSheet> {
                 if (order.laneNumber != null)
                   Text('Дорожка ${order.laneNumber}', style: const TextStyle(color: AppColors.darkGray)),
                 if (order.status != null && order.status!.isNotEmpty)
-                  Text('Статус: ${_statusName(order.status!)}', style: const TextStyle(color: AppColors.darkGray)),
+                  Text(
+                    'Статус: ${describeOrderStatus(order.status!)}',
+                    style: const TextStyle(color: AppColors.darkGray),
+                  ),
               ],
             ),
             trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.darkGray),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/models/order_status.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
@@ -22,18 +23,9 @@ class _MaintenanceRequestsScreenState extends State<MaintenanceRequestsScreen> {
   final _userRepo = UserRepository();
   List<MaintenanceRequestResponseDto> requests = [];
   bool isLoading = true;
-  String? selectedStatus;
+  OrderStatusType? _selectedStatus;
   UserAccessScope? _scope;
-
-  final List<String> statuses = [
-    'Все',
-    'NEW',
-    'APPROVED',
-    'IN_PROGRESS',
-    'DONE',
-    'CLOSED',
-    'UNREPAIRABLE',
-  ];
+  static const List<OrderStatusType> _statusFilters = kOrderStatusFilterOrder;
 
   @override
   void initState() {
@@ -46,13 +38,23 @@ class _MaintenanceRequestsScreenState extends State<MaintenanceRequestsScreen> {
     try {
       _scope ??= await UserAccessScope.fromProfile(await _userRepo.me());
       final scope = _scope!;
-      final data = selectedStatus == null || selectedStatus == 'Все'
-          ? await _repo.getAllRequests()
-          : await _repo.getRequestsByStatus(selectedStatus!);
+      final filter = _selectedStatus;
+
+      List<MaintenanceRequestResponseDto> data;
+      if (filter == null) {
+        data = await _repo.getAllRequests();
+      } else if (filter.backendKeys.length == 1) {
+        data = await _repo.getRequestsByStatus(filter.backendKeys.first);
+      } else {
+        data = await _repo.getAllRequests();
+      }
 
       if (mounted) {
         setState(() {
-          requests = scope.isAdmin ? data : data.where(scope.canViewOrder).toList();
+          final scoped = scope.isAdmin ? data : data.where(scope.canViewOrder).toList();
+          requests = filter == null
+              ? scoped
+              : scoped.where((order) => filter.matches(order.status)).toList();
           isLoading = false;
         });
       }
@@ -73,7 +75,7 @@ class _MaintenanceRequestsScreenState extends State<MaintenanceRequestsScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textDark),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.maybePop(context),
         ),
         title: const Text(
           'Заявки на обслуживание',
@@ -103,17 +105,37 @@ class _MaintenanceRequestsScreenState extends State<MaintenanceRequestsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              itemCount: statuses.length,
+              itemCount: _statusFilters.length + 1,
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (_, i) {
-                final status = statuses[i];
-                final isSelected = selectedStatus == status || (selectedStatus == null && status == 'Все');
+                if (i == 0) {
+                  final isSelected = _selectedStatus == null;
+                  return FilterChip(
+                    label: const Text('Все'),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() {
+                        _selectedStatus = null;
+                      });
+                      _loadRequests();
+                    },
+                    backgroundColor: Colors.white,
+                    selectedColor: AppColors.primary,
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.textDark,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  );
+                }
+
+                final status = _statusFilters[i - 1];
+                final isSelected = _selectedStatus == status;
                 return FilterChip(
-                  label: Text(_getStatusLabel(status)),
+                  label: Text(status.label),
                   selected: isSelected,
                   onSelected: (selected) {
                     setState(() {
-                      selectedStatus = status == 'Все' ? null : status;
+                      _selectedStatus = selected ? status : null;
                     });
                     _loadRequests();
                   },
@@ -165,26 +187,6 @@ class _MaintenanceRequestsScreenState extends State<MaintenanceRequestsScreen> {
     );
   }
 
-  String _getStatusLabel(String status) {
-    switch (status) {
-      case 'Все':
-        return 'Все';
-      case 'NEW':
-        return 'Новая';
-      case 'APPROVED':
-        return 'Одобрена';
-      case 'IN_PROGRESS':
-        return 'В работе';
-      case 'DONE':
-        return 'Завершена';
-      case 'CLOSED':
-        return 'Закрыта';
-      case 'UNREPAIRABLE':
-        return 'Не ремонтопригодно';
-      default:
-        return status;
-    }
-  }
 }
 
 class _RequestCard extends StatelessWidget {
@@ -304,38 +306,30 @@ class _RequestCard extends StatelessWidget {
     );
   }
 
-  String _getStatusText(String status) {
-    switch (status) {
-      case 'NEW':
-        return 'Новая';
-      case 'APPROVED':
-        return 'Одобрена';
-      case 'IN_PROGRESS':
-        return 'В работе';
-      case 'DONE':
-        return 'Завершена';
-      case 'CLOSED':
-        return 'Закрыта';
-      case 'UNREPAIRABLE':
-        return 'Неремонтопригодно';
-      default:
-        return status;
-    }
-  }
+  String _getStatusText(String status) => describeOrderStatus(status);
 
   Color _getStatusColor(String status) {
-    switch (status) {
-      case 'DONE':
+    final parsed = OrderStatusType.fromRaw(status);
+    if (parsed == null) {
+      return AppColors.darkGray;
+    }
+    switch (parsed) {
+      case OrderStatusType.completed:
         return Colors.green;
-      case 'CLOSED':
+      case OrderStatusType.closed:
+      case OrderStatusType.archived:
         return Colors.blueGrey;
-      case 'APPROVED':
+      case OrderStatusType.approved:
+      case OrderStatusType.confirmed:
         return Colors.blue;
-      case 'IN_PROGRESS':
+      case OrderStatusType.inProgress:
         return AppColors.primary;
-      case 'UNREPAIRABLE':
+      case OrderStatusType.unrepairable:
+      case OrderStatusType.rejected:
         return Colors.red;
-      case 'NEW':
+      case OrderStatusType.newRequest:
+      case OrderStatusType.draft:
+      case OrderStatusType.pending:
         return AppColors.darkGray;
       default:
         return AppColors.darkGray;

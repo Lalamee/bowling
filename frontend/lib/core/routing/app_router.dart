@@ -79,7 +79,20 @@ class AppRouter {
         );
 
       case Routes.club:
-        return MaterialPageRoute(builder: (_) => const ClubScreen());
+        int? initialClubId;
+        final args = settings.arguments;
+        if (args is int) {
+          initialClubId = args;
+        } else if (args is Map) {
+          final map = Map<String, dynamic>.from(args as Map);
+          final value = map['clubId'];
+          if (value is int) {
+            initialClubId = value;
+          } else if (value is num) {
+            initialClubId = value.toInt();
+          }
+        }
+        return MaterialPageRoute(builder: (_) => ClubScreen(initialClubId: initialClubId));
       case Routes.clubSearch:
         return MaterialPageRoute(builder: (_) => const ClubSearchScreen());
       case Routes.clubWarehouse:
@@ -91,6 +104,8 @@ class AppRouter {
           builder: (_) => ClubWarehouseScreen(
             clubId: args.clubId,
             clubName: args.clubName,
+            initialInventoryId: args.inventoryId,
+            initialQuery: args.searchQuery,
           ),
         );
       case Routes.clubStaff:

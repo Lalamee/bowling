@@ -135,7 +135,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                   ],
                   if (request != null && request.status != null) ...[
                     const SizedBox(height: 4),
-                    Text('Текущий статус: ${_statusName(request.status!)}', style: t.formInput),
+                    Text('Текущий статус: ${describeOrderStatus(request.status)}', style: t.formInput),
                   ],
                   if (request != null && request.managerNotes != null && request.managerNotes!.isNotEmpty) ...[
                     const SizedBox(height: 12),
@@ -195,7 +195,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                     if (part.status != null && part.status!.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
-                        child: Text('Статус: ${_statusName(part.status!)}', style: t.formInput),
+                        child: Text('Статус: ${describeOrderStatus(part.status)}', style: t.formInput),
                       ),
                     if (part.rejectionReason != null && part.rejectionReason!.isNotEmpty)
                       Padding(
@@ -322,29 +322,6 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
     setState(() => _isSubmitting = false);
     if (success) {
       Navigator.pop(context, true);
-    }
-  }
-
-  static String _statusName(String status) {
-    switch (status.toUpperCase()) {
-      case 'NEW':
-        return 'Новая заявка';
-      case 'APPROVED':
-        return 'Одобрено';
-      case 'REJECTED':
-        return 'Отклонено';
-      case 'IN_PROGRESS':
-        return 'В работе';
-      case 'DONE':
-        return 'Выполнено';
-      case 'COMPLETED':
-        return 'Завершено';
-      case 'CLOSED':
-        return 'Закрыто';
-      case 'UNREPAIRABLE':
-        return 'Неремонтопригодно';
-      default:
-        return status;
     }
   }
 
