@@ -604,13 +604,14 @@ public class ClubStaffService {
     }
 
     private boolean isAdministratorAccountType(AccountType accountType) {
-        return matchesAccountType(accountType,
-                ACCOUNT_TYPE_INDIVIDUAL_ID,
-                "INDIVIDUAL",
-                "ADMINISTRATOR",
-                "ADMIN",
-                "Администратор",
-                "Физическое лицо");
+        if (accountType == null) {
+            return false;
+        }
+        String normalized = normalizeAccountTypeName(accountType.getName());
+        if (normalized == null) {
+            return false;
+        }
+        return normalized.contains("ADMIN") || normalized.contains("АДМИН");
     }
 
     private boolean isManagerAccountType(AccountType accountType) {
@@ -690,6 +691,32 @@ public class ClubStaffService {
         throw new IllegalStateException("Account type not configured for id=" + id);
     }
 
+    private AccountType resolveAccountTypeByNames(String... names) {
+        if (names == null || names.length == 0) {
+            return null;
+        }
+        for (String name : names) {
+            if (name == null) {
+                continue;
+            }
+            String trimmed = name.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            Optional<AccountType> byName = accountTypeRepository.findByNameIgnoreCase(trimmed);
+            if (byName.isPresent()) {
+                return byName.get();
+            }
+        }
+        for (String name : names) {
+            AccountType created = createAccountTypeIfMissing(name);
+            if (created != null) {
+                return created;
+            }
+        }
+        return null;
+    }
+
     private Role resolveMechanicRole() {
         return resolveRole(ROLE_MECHANIC_ID,
                 "MECHANIC",
@@ -697,11 +724,15 @@ public class ClubStaffService {
     }
 
     private AccountType resolveAdministratorAccountType() {
-        return resolveAccountType(ACCOUNT_TYPE_INDIVIDUAL_ID,
-                "INDIVIDUAL",
+        AccountType specific = resolveAccountTypeByNames(
                 "ADMINISTRATOR",
                 "ADMIN",
-                "Администратор",
+                "Администратор");
+        if (specific != null) {
+            return specific;
+        }
+        return resolveAccountType(ACCOUNT_TYPE_INDIVIDUAL_ID,
+                "INDIVIDUAL",
                 "Физическое лицо");
     }
 

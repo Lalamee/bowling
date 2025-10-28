@@ -84,7 +84,10 @@ public class MaintenanceController {
                         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                                         .body(StandardResponseDTO.builder().message("User not authenticated").status("error").build());
 		}
-		MaintenanceRequestResponseDTO response = maintenanceRequestService.approveRequest(requestId, request.getManagerNotes());
+                MaintenanceRequestResponseDTO response = maintenanceRequestService.approveRequest(
+                                requestId,
+                                request.getManagerNotes(),
+                                request.getPartsAvailability());
 		return ResponseEntity.ok(response);
 	}
 
