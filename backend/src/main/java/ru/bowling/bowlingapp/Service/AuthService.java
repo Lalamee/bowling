@@ -592,6 +592,7 @@ public class AuthService implements UserDetailsService {
 
         BowlingClub club = profile.getClub();
         List<String> clubs = new ArrayList<>();
+        List<Map<String, Object>> clubsDetailed = new ArrayList<>();
         if (club != null) {
             String clubName = trimOrNull(club.getName());
             if (clubName != null) {
@@ -602,8 +603,28 @@ public class AuthService implements UserDetailsService {
             if (address != null) {
                 result.put("address", address);
             }
+
+            Long clubId = club.getClubId();
+            if (clubId != null) {
+                result.put("clubId", clubId);
+            }
+
+            Map<String, Object> clubInfo = new LinkedHashMap<>();
+            clubInfo.put("id", clubId);
+            clubInfo.put("clubId", clubId);
+            clubInfo.put("name", clubName);
+            clubInfo.put("address", address);
+            clubInfo.put("contactPhone", trimOrNull(club.getContactPhone()));
+            clubInfo.put("contactEmail", trimOrNull(club.getContactEmail()));
+            clubInfo.put("lanes", club.getLanesCount());
+
+            result.put("club", clubInfo);
+            clubsDetailed.add(clubInfo);
         }
         result.put("clubs", clubs);
+        if (!clubsDetailed.isEmpty()) {
+            result.put("clubsDetailed", clubsDetailed);
+        }
 
         return result;
     }
@@ -619,6 +640,7 @@ public class AuthService implements UserDetailsService {
 
         BowlingClub club = profile.getClub();
         List<String> clubs = new ArrayList<>();
+        List<Map<String, Object>> clubsDetailed = new ArrayList<>();
         if (club != null) {
             String clubName = trimOrNull(club.getName());
             if (clubName != null) {
@@ -629,8 +651,28 @@ public class AuthService implements UserDetailsService {
             if (address != null) {
                 result.put("address", address);
             }
+
+            Long clubId = club.getClubId();
+            if (clubId != null) {
+                result.put("clubId", clubId);
+            }
+
+            Map<String, Object> clubInfo = new LinkedHashMap<>();
+            clubInfo.put("id", clubId);
+            clubInfo.put("clubId", clubId);
+            clubInfo.put("name", clubName);
+            clubInfo.put("address", address);
+            clubInfo.put("contactPhone", trimOrNull(club.getContactPhone()));
+            clubInfo.put("contactEmail", trimOrNull(club.getContactEmail()));
+            clubInfo.put("lanes", club.getLanesCount());
+
+            result.put("club", clubInfo);
+            clubsDetailed.add(clubInfo);
         }
         result.put("clubs", clubs);
+        if (!clubsDetailed.isEmpty()) {
+            result.put("clubsDetailed", clubsDetailed);
+        }
 
         return result;
     }
