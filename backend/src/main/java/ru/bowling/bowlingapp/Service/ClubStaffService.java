@@ -1,6 +1,7 @@
 package ru.bowling.bowlingapp.Service;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.NoResultException;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -62,6 +63,8 @@ public class ClubStaffService {
     private static final long ROLE_MECHANIC_ID = 4L;
     private static final long ROLE_HEAD_MECHANIC_ID = 6L;
     private static final long MIN_MECHANIC_USER_ID = 55L;
+    private static final String ADMINISTRATOR_USER_FK_NAME = "fkdo5txam8feukemar3fh6cw1ue";
+    private static final String ADMINISTRATOR_CLUB_FK_NAME = "fko1d0ydt7dsb15o2aelngsr374";
 
     @Transactional(readOnly = true)
     public List<ClubStaffMemberDTO> getClubStaff(Long clubId) {
@@ -361,6 +364,10 @@ public class ClubStaffService {
 
         User user = prepareUser(normalizedPhone, rawPassword, role, accountType);
 
+        User persistedUser = userRepository.save(user);
+
+        ensureAdministratorForeignKeysTargetActiveTables();
+
         LocalDateTime now = LocalDateTime.now();
 
         AdministratorProfile profile = AdministratorProfile.builder()
@@ -372,16 +379,107 @@ public class ClubStaffService {
                 .updatedAt(now)
                 .build();
 
-        profile.setUser(user);
+        profile.setUser(persistedUser);
         profile.setClub(club);
-        user.setAdministratorProfile(profile);
+        persistedUser.setAdministratorProfile(profile);
 
-        userRepository.save(user);
         administratorProfileRepository.save(profile);
 
-        registerClubStaff(club, user, role, requestedBy);
+        registerClubStaff(club, persistedUser, role, requestedBy);
 
-        return buildResponse(user, profile.getFullName(), rawPassword, role, club, StaffRole.ADMINISTRATOR);
+        return buildResponse(persistedUser, profile.getFullName(), rawPassword, role, club, StaffRole.ADMINISTRATOR);
+    }
+
+    private void ensureAdministratorForeignKeysTargetActiveTables() {
+        if (entityManager == null) {
+            return;
+        }
+
+        ensureForeignKeyTargetsTable(
+                "administrator_profiles",
+                ADMINISTRATOR_USER_FK_NAME,
+                "user_id",
+                "users",
+                "user_id"
+        );
+
+        ensureForeignKeyTargetsTable(
+                "administrator_profiles",
+                ADMINISTRATOR_CLUB_FK_NAME,
+                "club_id",
+                "bowling_clubs",
+                "club_id"
+        );
+    }
+
+    private void ensureForeignKeyTargetsTable(
+            String sourceTable,
+            String constraintName,
+            String sourceColumn,
+            String targetTable,
+            String targetColumn
+    ) {
+        String referencedTable = null;
+        try {
+            Object result = entityManager
+                    .createNativeQuery(
+                            "SELECT r.relname FROM pg_constraint c " +
+                                    "JOIN pg_class t ON c.conrelid = t.oid " +
+                                    "JOIN pg_namespace tn ON tn.oid = t.relnamespace " +
+                                    "JOIN pg_class r ON c.confrelid = r.oid " +
+                                    "JOIN pg_namespace rn ON rn.oid = r.relnamespace " +
+                                    "WHERE c.contype = 'f' " +
+                                    "AND tn.nspname = current_schema() " +
+                                    "AND c.conname = :constraint " +
+                                    "AND t.relname = :table")
+                    .setParameter("constraint", constraintName)
+                    .setParameter("table", sourceTable)
+                    .getSingleResult();
+            if (result != null) {
+                referencedTable = result.toString();
+            }
+        } catch (NoResultException ignored) {
+            // The constraint does not exist – we'll recreate it below.
+        } catch (Exception ex) {
+            throw new IllegalStateException(
+                    String.format("Failed to inspect foreign key %s on %s", constraintName, sourceTable),
+                    ex
+            );
+        }
+
+        if (referencedTable != null && targetTable.equalsIgnoreCase(referencedTable)) {
+            return;
+        }
+
+        try {
+            entityManager.createNativeQuery(
+                            "ALTER TABLE " + sourceTable + " DROP CONSTRAINT IF EXISTS " + constraintName)
+                    .executeUpdate();
+        } catch (Exception ex) {
+            throw new IllegalStateException(
+                    String.format("Failed to drop foreign key %s on %s", constraintName, sourceTable),
+                    ex
+            );
+        }
+
+        try {
+            entityManager.createNativeQuery(
+                            "ALTER TABLE " + sourceTable +
+                                    " ADD CONSTRAINT " + constraintName +
+                                    " FOREIGN KEY (" + sourceColumn + ") REFERENCES " + targetTable +
+                                    " (" + targetColumn + ")")
+                    .executeUpdate();
+        } catch (Exception ex) {
+            throw new IllegalStateException(
+                    String.format(
+                            "Failed to recreate foreign key %s on %s referencing %s",
+                            constraintName,
+                            sourceTable,
+                            targetTable
+                    ),
+                    ex
+            );
+        }
     }
 
     private void registerClubStaff(BowlingClub club, User user, Role role, User requestedBy) {
