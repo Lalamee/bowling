@@ -397,14 +397,9 @@ public class ClubStaffService {
                     """
                             SELECT COUNT(*)
                             FROM information_schema.table_constraints tc
-                                     JOIN information_schema.key_column_usage kcu
-                                          ON tc.constraint_name = kcu.constraint_name
-                                     JOIN information_schema.referential_constraints rc
-                                          ON tc.constraint_name = rc.constraint_name
                             WHERE tc.constraint_type = 'FOREIGN KEY'
                               AND tc.table_name = 'administrator_profiles'
-                              AND kcu.column_name = 'user_id'
-                              AND rc.unique_constraint_table_name = 'users_old'
+                              AND tc.constraint_name = 'fkdo5txam8feukemar3fh6cw1ue'
                         """
             ).getSingleResult();
 
