@@ -54,6 +54,12 @@ public class MaintenanceRequestController {
         return ResponseEntity.ok(maintenanceRequestService.rejectRequest(requestId, managerNotes));
     }
 
+    @PatchMapping("/{requestId}/complete")
+    @PreAuthorize("hasAnyRole('MECHANIC', 'CHIEF_MECHANIC', 'HEAD_MECHANIC', 'ADMIN')")
+    public ResponseEntity<MaintenanceRequestResponseDTO> completeRequest(@PathVariable Long requestId) {
+        return ResponseEntity.ok(maintenanceRequestService.completeRequest(requestId));
+    }
+
 //    @PatchMapping("/{requestId}/status")
 //    @PreAuthorize("hasAnyRole('ADMIN', 'CHIEF_MECHANIC', 'MECHANIC')")
 //    public ResponseEntity<MaintenanceRequestResponseDTO> updateStatus(@PathVariable Long requestId, @RequestParam String status) {

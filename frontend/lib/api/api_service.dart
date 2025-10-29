@@ -180,9 +180,15 @@ class ApiService {
     CloseRequestDto? request,
   ]) async {
     final response = await _dio.put(
-      '/api/maintenance/requests/$id/close', 
+      '/api/maintenance/requests/$id/close',
       data: request?.toJson() ?? {},
     );
+    return MaintenanceRequestResponseDto.fromJson(response.data);
+  }
+
+  /// PUT /api/maintenance/requests/{id}/complete - Завершение заявки механиком
+  Future<MaintenanceRequestResponseDto> completeMaintenanceRequest(int id) async {
+    final response = await _dio.put('/api/maintenance/requests/$id/complete', data: {});
     return MaintenanceRequestResponseDto.fromJson(response.data);
   }
 

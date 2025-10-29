@@ -126,10 +126,20 @@ public class MaintenanceController {
 		return ResponseEntity.ok(maintenanceRequestService.markIssued(id, payload));
 	}
 
-	@PutMapping("/requests/{id}/close")
-	public ResponseEntity<?> close(@PathVariable("id") Long id, @RequestBody(required = false) java.util.Map<String, Object> payload) {
-		return ResponseEntity.ok(maintenanceRequestService.closeRequest(id, payload));
-	}
+        @PutMapping("/requests/{id}/close")
+        public ResponseEntity<?> close(@PathVariable("id") Long id, @RequestBody(required = false) java.util.Map<String, Object> payload) {
+                return ResponseEntity.ok(maintenanceRequestService.closeRequest(id, payload));
+        }
+
+        @PutMapping("/requests/{id}/complete")
+        public ResponseEntity<?> complete(@PathVariable("id") Long id, Authentication authentication) {
+                if (authentication == null || !authentication.isAuthenticated()) {
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                        .body(StandardResponseDTO.builder().message("User not authenticated").status("error").build());
+                }
+                MaintenanceRequestResponseDTO response = maintenanceRequestService.completeRequest(id);
+                return ResponseEntity.ok(response);
+        }
 
         @PutMapping("/requests/{id}/unrepairable")
         public ResponseEntity<?> unrepairable(@PathVariable("id") Long id, @RequestBody ApproveRejectRequestDTO request) {

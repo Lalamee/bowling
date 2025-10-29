@@ -46,6 +46,21 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        leading: const BackButton(),
+        title: const Text(
+          'Заказы',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textDark),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: AppColors.primary),
+            onPressed: _load,
+          ),
+        ],
+      ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _load,
@@ -148,23 +163,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
               return ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Заказы',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textDark),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.refresh, color: AppColors.primary),
-                        onPressed: _load,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
                   _clubDropdown(),
                   if (_laneOptions.isNotEmpty) ...[
                     const SizedBox(height: 12),
@@ -178,7 +176,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     final isExpanded = _expandedIndex == index;
                     final statusCategory = mapOrderStatus(request.status);
                     final canConfirm = _canConfirmRequest(request);
-                    final confirmInProgress = _pendingRequestIds.contains(request.requestId);
+                    final canComplete = _canCompleteRequest(request);
+                    final actionInProgress = _pendingRequestIds.contains(request.requestId);
                     return Padding(
                       padding: EdgeInsets.only(bottom: index == requests.length - 1 ? 0 : 12),
                       child: _OrderCard(
@@ -186,7 +185,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         expanded: isExpanded,
                         statusCategory: statusCategory,
                         canConfirm: canConfirm,
-                        confirmInProgress: confirmInProgress,
+                        canComplete: canComplete,
+                        actionInProgress: actionInProgress,
                         onToggle: () {
                           setState(() {
                             _expandedIndex = isExpanded ? null : index;
@@ -194,6 +194,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         },
                         onOpenSummary: () => _openSummary(request),
                         onConfirm: canConfirm ? () => _openSummary(request) : null,
+                        onComplete: canComplete
+                            ? () {
+                                _completeRequest(request);
+                              }
+                            : null,
                       ),
                     );
                   }),
@@ -333,6 +338,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
     return mapOrderStatus(request.status) == OrderStatusCategory.pending;
   }
 
+  bool _canCompleteRequest(MaintenanceRequestResponseDto request) {
+    if (!_isMechanic) return false;
+    final status = request.status;
+    if (status == null) return false;
+    final resolved = OrderStatusType.fromRaw(status);
+    return resolved == OrderStatusType.confirmed;
+  }
+
   bool? _guessAvailabilityFromNotes(String? notes) {
     if (notes == null) return null;
     final normalized = notes.toLowerCase();
@@ -416,8 +429,50 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
+  Future<bool> _completeRequest(MaintenanceRequestResponseDto request) async {
+    setState(() {
+      _pendingRequestIds.add(request.requestId);
+    });
+
+    try {
+      final updated = await _maintenanceRepository.complete(request.requestId);
+      if (!mounted) {
+        return true;
+      }
+
+      setState(() {
+        _pendingRequestIds.remove(request.requestId);
+        if (updated != null) {
+          final index = _allRequests.indexWhere((e) => e.requestId == updated.requestId);
+          if (index != -1) {
+            _allRequests[index] = updated;
+          } else {
+            _allRequests = [..._allRequests, updated];
+          }
+          _sortRequests(_allRequests);
+        }
+      });
+
+      if (mounted) {
+        showSnack(context, 'Заказ завершён и перемещён в архив');
+      }
+      return true;
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _pendingRequestIds.remove(request.requestId);
+        });
+        showApiError(context, e);
+      } else {
+        _pendingRequestIds.remove(request.requestId);
+      }
+      return false;
+    }
+  }
+
   Future<void> _openSummary(MaintenanceRequestResponseDto request) async {
     final canConfirm = _canConfirmRequest(request);
+    final canComplete = _canCompleteRequest(request);
     final initialAvailability = _guessAvailabilityFromNotes(request.managerNotes);
 
     await Navigator.push<bool>(
@@ -427,11 +482,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
           orderNumber: 'Заявка №${request.requestId}',
           order: request,
           canConfirm: canConfirm,
+          canComplete: canComplete,
           initialAvailability: initialAvailability,
           onConfirm: canConfirm
               ? ({required Map<int, bool> availability, String? comment}) =>
                   _confirmRequest(request, availability: availability, comment: comment)
               : null,
+          onComplete: canComplete ? () => _completeRequest(request) : null,
         ),
       ),
     );
@@ -669,20 +726,24 @@ class _OrderCard extends StatelessWidget {
   final bool expanded;
   final OrderStatusCategory statusCategory;
   final bool canConfirm;
-  final bool confirmInProgress;
+  final bool canComplete;
+  final bool actionInProgress;
   final VoidCallback onToggle;
   final VoidCallback onOpenSummary;
   final VoidCallback? onConfirm;
+  final VoidCallback? onComplete;
 
   const _OrderCard({
     required this.request,
     required this.expanded,
     required this.statusCategory,
     required this.canConfirm,
-    required this.confirmInProgress,
+    required this.canComplete,
+    required this.actionInProgress,
     required this.onToggle,
     required this.onOpenSummary,
     this.onConfirm,
+    this.onComplete,
   });
 
   @override
@@ -793,24 +854,58 @@ class _OrderCard extends StatelessWidget {
                       ),
                     ),
                   const SizedBox(height: 12),
+                  if (request.completionDate != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Завершено: ${_formatDate(request.completionDate!)}',
+                      style: const TextStyle(color: AppColors.darkGray),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   if (canConfirm && onConfirm != null) ...[
                     SizedBox(
                       width: double.infinity,
                       height: 44,
                       child: ElevatedButton(
-                        onPressed: confirmInProgress ? null : onConfirm,
+                        onPressed: actionInProgress ? null : onConfirm,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: confirmInProgress
+                        child: actionInProgress
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                               )
                             : const Text('Подтвердить заказ'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (canComplete && onComplete != null) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: ElevatedButton(
+                        onPressed: actionInProgress
+                            ? null
+                            : () {
+                                onComplete();
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: actionInProgress
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Завершить заказ'),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -834,6 +929,10 @@ class _OrderCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
   }
 
 }

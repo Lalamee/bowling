@@ -64,6 +64,7 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
+        leading: const BackButton(),
         title: const Text(
           'История обслуживания',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textDark),

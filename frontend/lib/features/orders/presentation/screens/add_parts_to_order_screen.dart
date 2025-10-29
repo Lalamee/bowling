@@ -50,6 +50,7 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: const BackButton(),
         title: Text('Добавить детали в заявку №${order.requestId}'),
       ),
       backgroundColor: AppColors.background,
