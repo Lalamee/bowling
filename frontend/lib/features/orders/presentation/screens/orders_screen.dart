@@ -892,7 +892,7 @@ class _OrderCard extends StatelessWidget {
                         onPressed: actionInProgress
                             ? null
                             : () {
-                                onComplete();
+                                onComplete!();
                               },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
