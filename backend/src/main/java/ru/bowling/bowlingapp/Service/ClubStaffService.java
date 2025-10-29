@@ -1,6 +1,7 @@
 package ru.bowling.bowlingapp.Service;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.NoResultException;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -62,6 +63,8 @@ public class ClubStaffService {
     private static final long ROLE_MECHANIC_ID = 4L;
     private static final long ROLE_HEAD_MECHANIC_ID = 6L;
     private static final long MIN_MECHANIC_USER_ID = 55L;
+    private static final String ADMINISTRATOR_USER_FK_NAME = "fkdo5txam8feukemar3fh6cw1ue";
+    private static final String ADMINISTRATOR_CLUB_FK_NAME = "fko1d0ydt7dsb15o2aelngsr374";
 
     @Transactional(readOnly = true)
     public List<ClubStaffMemberDTO> getClubStaff(Long clubId) {
@@ -363,6 +366,8 @@ public class ClubStaffService {
 
         User persistedUser = userRepository.save(user);
 
+        ensureAdministratorForeignKeysTargetActiveTables();
+
         LocalDateTime now = LocalDateTime.now();
 
         AdministratorProfile profile = AdministratorProfile.builder()
@@ -378,8 +383,6 @@ public class ClubStaffService {
         profile.setClub(club);
         persistedUser.setAdministratorProfile(profile);
 
-        ensureAdministratorForeignKeyUsesUsersTable();
-
         administratorProfileRepository.save(profile);
 
         registerClubStaff(club, persistedUser, role, requestedBy);
@@ -387,57 +390,95 @@ public class ClubStaffService {
         return buildResponse(persistedUser, profile.getFullName(), rawPassword, role, club, StaffRole.ADMINISTRATOR);
     }
 
-    private void ensureAdministratorForeignKeyUsesUsersTable() {
+    private void ensureAdministratorForeignKeysTargetActiveTables() {
         if (entityManager == null) {
             return;
         }
 
+        ensureForeignKeyTargetsTable(
+                "administrator_profiles",
+                ADMINISTRATOR_USER_FK_NAME,
+                "user_id",
+                "users",
+                "user_id"
+        );
+
+        ensureForeignKeyTargetsTable(
+                "administrator_profiles",
+                ADMINISTRATOR_CLUB_FK_NAME,
+                "club_id",
+                "bowling_clubs",
+                "club_id"
+        );
+    }
+
+    private void ensureForeignKeyTargetsTable(
+            String sourceTable,
+            String constraintName,
+            String sourceColumn,
+            String targetTable,
+            String targetColumn
+    ) {
+        String referencedTable = null;
         try {
-            Object legacyConstraintCount = entityManager.createNativeQuery(
-                    """
-                            SELECT COUNT(*)
-                            FROM information_schema.table_constraints tc
-                            WHERE tc.constraint_type = 'FOREIGN KEY'
-                              AND tc.table_name = 'administrator_profiles'
-                              AND tc.constraint_name = 'fkdo5txam8feukemar3fh6cw1ue'
-                        """
-            ).getSingleResult();
-
-            long legacyConstraints = 0L;
-            if (legacyConstraintCount instanceof Number number) {
-                legacyConstraints = number.longValue();
-            } else if (legacyConstraintCount != null) {
-                legacyConstraints = Long.parseLong(legacyConstraintCount.toString());
+            Object result = entityManager
+                    .createNativeQuery(
+                            "SELECT r.relname FROM pg_constraint c " +
+                                    "JOIN pg_class t ON c.conrelid = t.oid " +
+                                    "JOIN pg_namespace tn ON tn.oid = t.relnamespace " +
+                                    "JOIN pg_class r ON c.confrelid = r.oid " +
+                                    "JOIN pg_namespace rn ON rn.oid = r.relnamespace " +
+                                    "WHERE c.contype = 'f' " +
+                                    "AND tn.nspname = current_schema() " +
+                                    "AND c.conname = :constraint " +
+                                    "AND t.relname = :table")
+                    .setParameter("constraint", constraintName)
+                    .setParameter("table", sourceTable)
+                    .getSingleResult();
+            if (result != null) {
+                referencedTable = result.toString();
             }
+        } catch (NoResultException ignored) {
+            // The constraint does not exist – we'll recreate it below.
+        } catch (Exception ex) {
+            throw new IllegalStateException(
+                    String.format("Failed to inspect foreign key %s on %s", constraintName, sourceTable),
+                    ex
+            );
+        }
 
-            if (legacyConstraints > 0) {
-                entityManager.createNativeQuery(
-                        "ALTER TABLE administrator_profiles DROP CONSTRAINT IF EXISTS fkdo5txam8feukemar3fh6cw1ue"
-                ).executeUpdate();
-            }
+        if (referencedTable != null && targetTable.equalsIgnoreCase(referencedTable)) {
+            return;
+        }
 
-            Object modernConstraintCount = entityManager.createNativeQuery(
-                    """
-                            SELECT COUNT(*)
-                            FROM information_schema.referential_constraints rc
-                            WHERE rc.constraint_name = 'fk_administrator_profiles_users'
-                        """
-            ).getSingleResult();
+        try {
+            entityManager.createNativeQuery(
+                            "ALTER TABLE " + sourceTable + " DROP CONSTRAINT IF EXISTS " + constraintName)
+                    .executeUpdate();
+        } catch (Exception ex) {
+            throw new IllegalStateException(
+                    String.format("Failed to drop foreign key %s on %s", constraintName, sourceTable),
+                    ex
+            );
+        }
 
-            long modernConstraints = 0L;
-            if (modernConstraintCount instanceof Number number) {
-                modernConstraints = number.longValue();
-            } else if (modernConstraintCount != null) {
-                modernConstraints = Long.parseLong(modernConstraintCount.toString());
-            }
-
-            if (modernConstraints == 0) {
-                entityManager.createNativeQuery(
-                        "ALTER TABLE administrator_profiles ADD CONSTRAINT fk_administrator_profiles_users FOREIGN KEY (user_id) REFERENCES users(user_id)"
-                ).executeUpdate();
-            }
-        } catch (Exception ignored) {
-            // If metadata update fails we avoid breaking staff creation.
+        try {
+            entityManager.createNativeQuery(
+                            "ALTER TABLE " + sourceTable +
+                                    " ADD CONSTRAINT " + constraintName +
+                                    " FOREIGN KEY (" + sourceColumn + ") REFERENCES " + targetTable +
+                                    " (" + targetColumn + ")")
+                    .executeUpdate();
+        } catch (Exception ex) {
+            throw new IllegalStateException(
+                    String.format(
+                            "Failed to recreate foreign key %s on %s referencing %s",
+                            constraintName,
+                            sourceTable,
+                            targetTable
+                    ),
+                    ex
+            );
         }
     }
 
