@@ -432,6 +432,46 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
     }
   }
 
+  Future<void> _toggleActive(_Employee employee, bool nextState) async {
+    final clubId = _selectedClubId;
+    final userId = employee.userId;
+
+    if (clubId == null) {
+      showSnack(context, 'Сначала выберите клуб');
+      return;
+    }
+
+    if (userId == null) {
+      showSnack(context, 'Не удалось определить пользователя');
+      return;
+    }
+
+    setState(() => employee.isStatusUpdating = true);
+
+    try {
+      final success = await _repo.updateStaffStatus(clubId, userId, nextState);
+      if (!mounted) return;
+      if (success) {
+        setState(() {
+          employee.isActive = nextState;
+          employee.isStatusUpdating = false;
+        });
+        showSnack(
+          context,
+          nextState ? 'Аккаунт подтверждён' : 'Аккаунт отключён',
+          success: true,
+        );
+      } else {
+        setState(() => employee.isStatusUpdating = false);
+        showSnack(context, 'Не удалось обновить статус сотрудника');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => employee.isStatusUpdating = false);
+      showApiError(context, e);
+    }
+  }
+
   Future<void> _showCredentialsDialog(String phone, String password) async {
     if (!mounted) return;
     await showDialog<void>(
@@ -464,7 +504,7 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
         elevation: 0,
         backgroundColor: AppColors.background,
         leading: IconButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.of(context).maybePop(),
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textDark),
         ),
         title: const Text('Сотрудники клуба', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textDark)),
@@ -537,6 +577,7 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
               e.roleLabel = v;
               e.roleKey = _roleKeyForRequest(v);
             }),
+            onToggleActive: (value) => _toggleActive(e, value),
           )),
         ],
       ),
@@ -556,6 +597,7 @@ class _Employee {
   bool isActive;
   bool isOwner;
   String? tempPassword;
+  bool isStatusUpdating;
 
   bool get canModify => !isOwner;
 
@@ -571,6 +613,7 @@ class _Employee {
     this.isActive = true,
     this.isOwner = false,
     this.tempPassword,
+    this.isStatusUpdating = false,
   });
 }
 
@@ -598,6 +641,7 @@ class _EmployeeCard extends StatefulWidget {
   final Widget Function(VoidCallback? onPressed) suffixEdit;
   final VoidCallback onDelete;
   final ValueChanged<String> onChangeRole;
+  final ValueChanged<bool> onToggleActive;
 
   const _EmployeeCard({
     Key? key,
@@ -606,6 +650,7 @@ class _EmployeeCard extends StatefulWidget {
     required this.suffixEdit,
     required this.onDelete,
     required this.onChangeRole,
+    required this.onToggleActive,
   }) : super(key: key);
 
   @override
@@ -754,25 +799,52 @@ class _EmployeeCardState extends State<_EmployeeCard> {
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(
-                  widget.employee.isActive ? Icons.check_circle_outline : Icons.remove_circle_outline,
-                  color: widget.employee.isActive ? const Color(0xFF2E7D32) : const Color(0xFFB00020),
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  widget.employee.isActive ? 'Аккаунт активен' : 'Аккаунт отключен',
-                  style: const TextStyle(fontSize: 13, color: AppColors.darkGray),
-                ),
-              ],
+        Row(
+          children: [
+            Icon(
+              widget.employee.isActive ? Icons.check_circle_outline : Icons.remove_circle_outline,
+              color: widget.employee.isActive ? const Color(0xFF2E7D32) : const Color(0xFFB00020),
+              size: 18,
             ),
-            if (widget.employee.tempPassword != null && widget.employee.tempPassword!.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
+            const SizedBox(width: 8),
+            Text(
+              widget.employee.isActive ? 'Аккаунт активен' : 'Аккаунт отключен',
+              style: const TextStyle(fontSize: 13, color: AppColors.darkGray),
+            ),
+          ],
+        ),
+        if (widget.employee.canModify) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 44,
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: widget.employee.isStatusUpdating
+                  ? null
+                  : () => widget.onToggleActive(!widget.employee.isActive),
+              style: OutlinedButton.styleFrom(
+                foregroundColor:
+                    widget.employee.isActive ? AppColors.primary : const Color(0xFF2E7D32),
+                side: BorderSide(
+                  color: widget.employee.isActive ? AppColors.primary : const Color(0xFF2E7D32),
+                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: widget.employee.isStatusUpdating
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(widget.employee.isActive ? 'Отключить аккаунт' : 'Подтвердить аккаунт'),
+            ),
+          ),
+        ],
+        if (widget.employee.tempPassword != null && widget.employee.tempPassword!.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF5F5F5),
                   borderRadius: BorderRadius.circular(12),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../../api/api_core.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/theme/text_styles.dart';
 import '../../../../../shared/widgets/inputs/labeled_text_field.dart';
@@ -31,6 +32,9 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
   final _birth = TextEditingController();
   final _phone = TextEditingController();
   DateTime? birthDate;
+
+  final _password = TextEditingController();
+  final _passwordConfirm = TextEditingController();
 
   final _educationName = TextEditingController();
   final _extraEducation = TextEditingController();
@@ -77,6 +81,9 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
   @override
   void initState() {
     super.initState();
+    if (_phone.text.isEmpty) {
+      _phone.text = '+7 ';
+    }
     _loadClubs();
   }
 
@@ -84,6 +91,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
   void dispose() {
     [
       _fio, _birth, _phone,
+      _password, _passwordConfirm,
       _educationName, _extraEducation,
       _workYears, _bowlingYears,
       _bowlingHistory, _skills
@@ -152,7 +160,10 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
   }
 
   void _nextStepGuarded() {
-    if (!(formKey.currentState?.validate() ?? false)) return;
+    if (!(formKey.currentState?.validate() ?? false)) {
+      _showBar('Заполните обязательные поля');
+      return;
+    }
     if (step == 1 && (educationLevelId == null || educationLevelId!.isEmpty)) {
       _showBar('Выберите уровень образования');
       return;
@@ -168,6 +179,9 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     if (!formKey.currentState!.validate() || educationLevelId == null || status == null) {
       if (educationLevelId == null) _showBar('Выберите уровень образования');
       if (status == null) _showBar('Выберите статус');
+      if (educationLevelId != null && status != null) {
+        _showBar('Заполните обязательные поля');
+      }
       return;
     }
 
@@ -177,6 +191,23 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     }
 
     final selectedClub = _selectedClub!;
+
+    final passwordValue = _password.text.trim();
+    final confirmPasswordValue = _passwordConfirm.text.trim();
+
+    final passwordError = Validators.password(passwordValue);
+    final confirmError = confirmPasswordValue.isEmpty
+        ? 'Повторите пароль'
+        : (passwordValue != confirmPasswordValue ? 'Пароли не совпадают' : null);
+
+    if (passwordError != null) {
+      _showBar(passwordError);
+      return;
+    }
+    if (confirmError != null) {
+      _showBar(confirmError);
+      return;
+    }
 
     final entries = Validators.parseEmploymentHistory(_bowlingHistory.text.trim());
     final places = <String>[];
@@ -205,7 +236,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'fio': _fio.text.trim(),
       'birth': DateFormat('yyyy-MM-dd').format(birthDate!),
       'phone': normalizedPhone,
-      'password': 'password123',
+      'password': passwordValue,
       'educationLevelId': educationLevelId!,
       'educationName': _educationName.text.trim(),
       'specializationId': '1',
@@ -255,19 +286,30 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'clubs': clubsCache,
       'workplaceVerified': false,
     };
-    final password = data['password']?.toString() ?? 'password123';
-    final loginResult = await AuthService.login(phone: normalizedPhone, password: password);
-    if (loginResult == null) {
+    try {
+      final loginResult = await AuthService.login(phone: normalizedPhone, password: passwordValue);
+      if (loginResult == null) {
+        throw ApiException('Не удалось войти с новыми данными, попробуйте позже');
+      }
+
+      await LocalAuthStorage.saveMechanicProfile(profileData);
+      await LocalAuthStorage.setMechanicRegistered(true);
+      await LocalAuthStorage.setRegisteredRole('mechanic');
+
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil(Routes.profileMechanic, (route) => false);
+    } on ApiException catch (e) {
+      if (e.statusCode == 403) {
+        if (mounted) {
+          _showBar('Данные отправлены владельцу клуба. Дождитесь подтверждения аккаунта.');
+          Navigator.of(context).pushNamedAndRemoveUntil(Routes.authLogin, (route) => false);
+        }
+      } else {
+        _showBar(e.message);
+      }
+    } catch (e) {
       _showBar('Не удалось войти с новыми данными, попробуйте позже');
-      return;
     }
-
-    await LocalAuthStorage.saveMechanicProfile(profileData);
-    await LocalAuthStorage.setMechanicRegistered(true);
-    await LocalAuthStorage.setRegisteredRole('mechanic');
-
-    if (!mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil(Routes.profileMechanic, (route) => false);
   }
 
   @override
@@ -305,12 +347,46 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.arrow_back, color: AppColors.primary)),
+        TextButton.icon(
+          onPressed: () {
+            final navigator = Navigator.of(ctx);
+            if (navigator.canPop()) {
+              navigator.pop();
+            }
+          },
+          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+          label: const Text('Шаг назад', style: TextStyle(color: AppColors.primary)),
+          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+        ),
         formStepTitle('Добро пожаловать!'),
         formDescription('Пожалуйста, заполните форму — это нужно, чтобы мы знали, где вы работаете и могли подключить Вас к системе.'),
-        LabeledTextField(label: 'ФИО', controller: _fio, validator: Validators.notEmpty, icon: Icons.person),
-        LabeledTextField(label: 'Дата рождения', controller: _birth, validator: Validators.birth(birthDate), readOnly: true, onTap: _pickBirthDate, icon: Icons.calendar_today),
-        LabeledTextField(label: 'Номер телефона', controller: _phone, validator: Validators.phone, keyboardType: TextInputType.phone, icon: Icons.phone),
+        LabeledTextField(label: 'ФИО', controller: _fio, validator: Validators.notEmpty, icon: Icons.person, isRequired: true),
+        LabeledTextField(label: 'Дата рождения', controller: _birth, validator: Validators.birth(birthDate), readOnly: true, onTap: _pickBirthDate, icon: Icons.calendar_today, isRequired: true),
+        LabeledTextField(label: 'Номер телефона', controller: _phone, validator: Validators.phone, keyboardType: TextInputType.phone, icon: Icons.phone, isRequired: true),
+        LabeledTextField(
+          label: 'Пароль',
+          controller: _password,
+          validator: Validators.password,
+          keyboardType: TextInputType.visiblePassword,
+          obscureText: true,
+          icon: Icons.lock,
+          isRequired: true,
+        ),
+        LabeledTextField(
+          label: 'Повторите пароль',
+          controller: _passwordConfirm,
+          validator: (value) {
+            final text = value?.trim() ?? '';
+            if (text.isEmpty) return 'Повторите пароль';
+            if (text.length < 8) return 'Пароль должен содержать не менее 8 символов';
+            if (_password.text.trim() != text) return 'Пароли не совпадают';
+            return null;
+          },
+          keyboardType: TextInputType.visiblePassword,
+          obscureText: true,
+          icon: Icons.lock_outline,
+          isRequired: true,
+        ),
       ],
     );
   }
@@ -320,7 +396,12 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        IconButton(onPressed: prevStep, icon: const Icon(Icons.arrow_back, color: AppColors.primary)),
+        TextButton.icon(
+          onPressed: prevStep,
+          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+          label: const Text('Шаг назад', style: TextStyle(color: AppColors.primary)),
+          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+        ),
         sectionTitle('Какое у Вас образование?'),
         const SizedBox(height: 16),
         // показываем пользователю текст, а сохраняем id
@@ -342,11 +423,13 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
           label: 'Наименование образовательного учреждения',
           controller: _educationName,
           validator: Validators.notEmpty,
+          isRequired: true,
         ),
         LabeledTextField(
           label: 'Дополнительное образование (курсы и т.д.)',
           controller: _extraEducation,
           validator: Validators.notEmpty,
+          isRequired: true,
         ),
       ],
     );
@@ -356,10 +439,15 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        IconButton(onPressed: prevStep, icon: const Icon(Icons.arrow_back, color: AppColors.primary)),
+        TextButton.icon(
+          onPressed: prevStep,
+          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+          label: const Text('Шаг назад', style: TextStyle(color: AppColors.primary)),
+          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+        ),
         sectionTitle('Стаж работы'),
         const SizedBox(height: 8),
-        LabeledTextField(label: 'Общий стаж работы', controller: _workYears, validator: Validators.integer, keyboardType: TextInputType.number),
+        LabeledTextField(label: 'Общий стаж работы', controller: _workYears, validator: Validators.integer, keyboardType: TextInputType.number, isRequired: true),
         LabeledTextField(
           label: 'Стаж в боулинге',
           controller: _bowlingYears,
@@ -369,6 +457,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
             return Validators.validateExperience(_workYears.text, v);
           },
           keyboardType: TextInputType.number,
+          isRequired: true,
         ),
         const SizedBox(height: 16),
         formDescription('Выберите клуб, в котором вы работаете:'),
@@ -402,7 +491,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
                 )
                 .toList(),
             onChanged: _handleClubChange,
-            decoration: const InputDecoration(labelText: 'Клуб'),
+            decoration: const InputDecoration(labelText: 'Клуб *'),
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             validator: (value) {
               if (value == null) {
                 return 'Выберите клуб';
@@ -419,7 +509,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
             style: AppTextStyles.formHint,
           ),
         ],
-        LabeledTextField(label: 'Где и когда работали в боулинге', controller: _bowlingHistory, validator: Validators.bowlingHistorySoft),
+        LabeledTextField(label: 'Где и когда работали в боулинге', controller: _bowlingHistory, validator: Validators.bowlingHistorySoft, isRequired: true),
         Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: Text(
@@ -427,7 +517,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
             style: AppTextStyles.formHint,
           ),
         ),
-        LabeledTextField(label: 'Навыки и преимущества', controller: _skills, validator: Validators.notEmpty),
+        LabeledTextField(label: 'Навыки и преимущества', controller: _skills, validator: Validators.notEmpty, isRequired: true),
         const SizedBox(height: 16),
         formDescription('Ваш статус:'),
         RadioGroupHorizontal(

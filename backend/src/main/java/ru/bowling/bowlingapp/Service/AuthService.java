@@ -159,6 +159,10 @@ public class AuthService implements UserDetailsService {
                 .build();
 
         String accountTypeName = accountType.getName();
+        boolean mechanicAccount = isMechanicAccountType(accountTypeName);
+        if (mechanicAccount) {
+            user.setIsActive(false);
+        }
 
         BowlingClub mechanicClub = null;
         MechanicProfile mechanicProfile = null;
@@ -166,7 +170,7 @@ public class AuthService implements UserDetailsService {
         ManagerProfile managerProfile = null;
         AdministratorProfile administratorProfile = null;
 
-        if (isMechanicAccountType(accountTypeName)) {
+        if (mechanicAccount) {
             mechanicProfile = MechanicProfile.builder()
                     .user(user)
                     .fullName(mechanicDto.getFullName())

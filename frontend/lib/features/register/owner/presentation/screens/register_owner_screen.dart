@@ -30,6 +30,8 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
   final _lanes = TextEditingController();
   final _email = TextEditingController();
   final _customEquipment = TextEditingController();
+  final _password = TextEditingController();
+  final _passwordConfirm = TextEditingController();
 
   int _step = 0;
   String? status;
@@ -55,6 +57,15 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
   }
 
   @override
+  @override
+  void initState() {
+    super.initState();
+    if (_phone.text.isEmpty) {
+      _phone.text = '+7 ';
+    }
+  }
+
+  @override
   void dispose() {
     [
       _fio,
@@ -65,6 +76,8 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
       _lanes,
       _email,
       _customEquipment,
+      _password,
+      _passwordConfirm,
     ].forEach((c) => c.dispose());
     super.dispose();
   }
@@ -74,7 +87,10 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
   }
 
   void _nextStepGuarded() {
-    if (!(formKey.currentState?.validate() ?? false)) return;
+    if (!(formKey.currentState?.validate() ?? false)) {
+      _showBar('Заполните обязательные поля');
+      return;
+    }
     if (step == 0 && (status == null || status!.isEmpty)) {
       _showBar('Выберите статус');
       return;
@@ -85,6 +101,7 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
   Future<void> _submit() async {
     if (!formKey.currentState!.validate() || status == null) {
       if (status == null) _showBar('Выберите статус');
+      else _showBar('Заполните обязательные поля');
       return;
     }
     final equipment = selectedEquipment == null
@@ -105,7 +122,22 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
     final trimmedLanes = _lanes.text.trim();
     final trimmedStatus = status?.trim();
     final normalizedPhone = PhoneUtils.normalize(_phone.text);
-    const password = 'password123';
+    final password = _password.text.trim();
+    final confirmPassword = _passwordConfirm.text.trim();
+
+    final passwordError = Validators.password(password);
+    final confirmError = confirmPassword.isEmpty
+        ? 'Повторите пароль'
+        : (password != confirmPassword ? 'Пароли не совпадают' : null);
+
+    if (passwordError != null) {
+      _showBar(passwordError);
+      return;
+    }
+    if (confirmError != null) {
+      _showBar(confirmError);
+      return;
+    }
 
     final lanesCount = int.tryParse(trimmedLanes);
     if (lanesCount == null || lanesCount <= 0) {
@@ -204,14 +236,48 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.arrow_back, color: AppColors.primary)),
+        TextButton.icon(
+          onPressed: () {
+            final navigator = Navigator.of(ctx);
+            if (navigator.canPop()) {
+              navigator.pop();
+            }
+          },
+          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+          label: const Text('Шаг назад', style: TextStyle(color: AppColors.primary)),
+          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+        ),
         formStepTitle('Добро пожаловать!'),
         formDescription('Это нужно, чтобы мы знали, каким клубом вы управляете, и могли предоставить вам доступ к инструментам управления.'),
-        LabeledTextField(label: 'ФИО', controller: _fio, validator: Validators.notEmpty, icon: Icons.person),
-        LabeledTextField(label: 'Номер телефона', controller: _phone, validator: Validators.phone, keyboardType: TextInputType.phone, icon: Icons.phone),
-        LabeledTextField(label: 'Email', controller: _email, validator: Validators.email, keyboardType: TextInputType.emailAddress, icon: Icons.email),
-        LabeledTextField(label: 'ИНН организации', controller: _inn, validator: Validators.notEmpty, keyboardType: TextInputType.number, icon: Icons.badge),
-        LabeledTextField(label: 'Адрес клуба', controller: _addr, validator: Validators.notEmpty, icon: Icons.location_on),
+        LabeledTextField(label: 'ФИО', controller: _fio, validator: Validators.notEmpty, icon: Icons.person, isRequired: true),
+        LabeledTextField(label: 'Номер телефона', controller: _phone, validator: Validators.phone, keyboardType: TextInputType.phone, icon: Icons.phone, isRequired: true),
+        LabeledTextField(label: 'Email', controller: _email, validator: Validators.email, keyboardType: TextInputType.emailAddress, icon: Icons.email, isRequired: true),
+        LabeledTextField(label: 'ИНН организации', controller: _inn, validator: Validators.notEmpty, keyboardType: TextInputType.number, icon: Icons.badge, isRequired: true),
+        LabeledTextField(label: 'Адрес клуба', controller: _addr, validator: Validators.notEmpty, icon: Icons.location_on, isRequired: true),
+        LabeledTextField(
+          label: 'Пароль',
+          controller: _password,
+          validator: Validators.password,
+          keyboardType: TextInputType.visiblePassword,
+          obscureText: true,
+          icon: Icons.lock,
+          isRequired: true,
+        ),
+        LabeledTextField(
+          label: 'Повторите пароль',
+          controller: _passwordConfirm,
+          validator: (value) {
+            final text = value?.trim() ?? '';
+            if (text.isEmpty) return 'Повторите пароль';
+            if (text.length < 8) return 'Пароль должен содержать не менее 8 символов';
+            if (_password.text.trim() != text) return 'Пароли не совпадают';
+            return null;
+          },
+          keyboardType: TextInputType.visiblePassword,
+          obscureText: true,
+          icon: Icons.lock_outline,
+          isRequired: true,
+        ),
         formDescription('Ваш статус:'),
         RadioGroupHorizontal(
           options: _statusOptions,
@@ -226,11 +292,16 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        IconButton(onPressed: prevStep, icon: const Icon(Icons.arrow_back, color: AppColors.primary)),
+        TextButton.icon(
+          onPressed: prevStep,
+          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+          label: const Text('Шаг назад', style: TextStyle(color: AppColors.primary)),
+          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+        ),
         sectionTitle('Расскажите о Вашем клубе:'),
         formDescription('Укажите количество дорожек и установленное оборудование.'),
-        LabeledTextField(label: 'Название клуба', controller: _club, validator: Validators.notEmpty, icon: Icons.sports),
-        LabeledTextField(label: 'Количество дорожек', controller: _lanes, validator: Validators.integer, keyboardType: TextInputType.number, icon: Icons.format_list_numbered),
+        LabeledTextField(label: 'Название клуба', controller: _club, validator: Validators.notEmpty, icon: Icons.sports, isRequired: true),
+        LabeledTextField(label: 'Количество дорожек', controller: _lanes, validator: Validators.integer, keyboardType: TextInputType.number, icon: Icons.format_list_numbered, isRequired: true),
         formDescription('Какое оборудование стоит в клубе:'),
         RadioGroupVertical(
           options: _equipmentOptions,
@@ -244,6 +315,7 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
               label: 'Уточните',
               controller: _customEquipment,
               validator: Validators.notEmpty,
+              isRequired: true,
             ),
           ),
       ],

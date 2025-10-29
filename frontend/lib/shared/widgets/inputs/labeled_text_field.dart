@@ -13,6 +13,9 @@ class LabeledTextField extends StatefulWidget {
   final VoidCallback? onTap;
   final IconData? icon;
   final EdgeInsetsGeometry padding;
+  final bool obscureText;
+  final TextInputAction? textInputAction;
+  final bool isRequired;
 
   const LabeledTextField({
     Key? key,
@@ -24,6 +27,9 @@ class LabeledTextField extends StatefulWidget {
     this.onTap,
     this.icon,
     this.padding = const EdgeInsets.only(bottom: 16),
+    this.obscureText = false,
+    this.textInputAction,
+    this.isRequired = false,
   }) : super(key: key);
 
   @override
@@ -91,19 +97,35 @@ class _LabeledTextFieldState extends State<LabeledTextField> {
     return null;
   }
 
-  void _onChanged(String val) {
+  String? _runValidators(String? value, {bool fromValidator = false}) {
     String? newError;
     if (isPhone) {
-      newError = _validatePhone(val);
+      newError = _validatePhone(value);
     } else if (isINN) {
-      newError = _validateINN(val);
+      newError = _validateINN(value);
     } else if (widget.validator != null) {
-      newError = widget.validator!(val);
+      newError = widget.validator!(value);
     }
 
-    setState(() {
-      errorText = newError;
-    });
+    void updateError() {
+      if (errorText != newError) {
+        setState(() => errorText = newError);
+      }
+    }
+
+    if (fromValidator) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) updateError();
+      });
+    } else {
+      updateError();
+    }
+
+    return newError;
+  }
+
+  void _onChanged(String val) {
+    _runValidators(val);
   }
 
   @override
@@ -122,6 +144,25 @@ class _LabeledTextFieldState extends State<LabeledTextField> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6, left: 4),
+            child: RichText(
+              text: TextSpan(
+                text: widget.label,
+                style: AppTextStyles.formLabel.copyWith(color: AppColors.textDark),
+                children: [
+                  if (widget.isRequired)
+                    const TextSpan(
+                      text: ' *',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
           Container(
             decoration: BoxDecoration(
               color: AppColors.white,
@@ -143,8 +184,10 @@ class _LabeledTextFieldState extends State<LabeledTextField> {
                   controller: widget.controller,
                   keyboardType: widget.keyboardType,
                   readOnly: widget.readOnly,
+                  obscureText: widget.obscureText,
                   onTap: widget.onTap,
                   inputFormatters: inputFormatters,
+                  textInputAction: widget.textInputAction,
                   decoration: InputDecoration(
                     hintText: isPhone ? '+7 (980) 001 01 01' : widget.label,
                     hintStyle: AppTextStyles.formLabel,
@@ -158,11 +201,14 @@ class _LabeledTextFieldState extends State<LabeledTextField> {
                     contentPadding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                     errorText: null,
+                    errorStyle: const TextStyle(height: 0, fontSize: 0),
                     fillColor: AppColors.white,
                     filled: true,
                   ),
                   style: AppTextStyles.formInput,
                   onChanged: _onChanged,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  validator: (value) => _runValidators(value, fromValidator: true),
                 ),
               ),
             ),

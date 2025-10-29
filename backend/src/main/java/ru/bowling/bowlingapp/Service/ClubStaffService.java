@@ -156,6 +156,33 @@ public class ClubStaffService {
     }
 
     @Transactional
+    public void updateStaffStatus(Long clubId, Long userId, boolean active, String requestedByLogin) {
+        BowlingClub club = bowlingClubRepository.findById(clubId)
+                .orElseThrow(() -> new IllegalArgumentException("Club not found"));
+
+        User requestedBy = findUserByLogin(requestedByLogin);
+        if (requestedBy != null) {
+            ensureClubAccess(club, requestedBy);
+        }
+
+        User targetUser = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (isClubOwner(club, targetUser)) {
+            throw new IllegalArgumentException("Club owner cannot change activation status");
+        }
+
+        ClubStaff clubStaff = clubStaffRepository.findByClubAndUser(club, targetUser)
+                .orElseThrow(() -> new IllegalArgumentException("Staff member is not assigned to this club"));
+
+        targetUser.setIsActive(active);
+        userRepository.save(targetUser);
+
+        clubStaff.setIsActive(active);
+        clubStaffRepository.save(clubStaff);
+    }
+
+    @Transactional
     public void removeStaff(Long clubId, Long userId, String requestedByLogin) {
         BowlingClub club = bowlingClubRepository.findById(clubId)
                 .orElseThrow(() -> new IllegalArgumentException("Club not found"));
@@ -495,7 +522,7 @@ public class ClubStaffService {
                         .build());
 
         clubStaff.setRole(role);
-        clubStaff.setIsActive(Boolean.TRUE);
+        clubStaff.setIsActive(Boolean.TRUE.equals(user.getIsActive()));
         if (clubStaff.getAssignedAt() == null) {
             clubStaff.setAssignedAt(LocalDateTime.now());
         }
