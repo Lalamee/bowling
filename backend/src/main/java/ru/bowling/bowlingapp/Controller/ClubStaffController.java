@@ -80,6 +80,36 @@ public class ClubStaffController {
         );
     }
 
+    @PatchMapping("/{clubId}/staff/{userId}/status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CLUB_OWNER')")
+    public ResponseEntity<StandardResponseDTO> updateStaffStatus(
+            @PathVariable Long clubId,
+            @PathVariable Long userId,
+            @RequestBody Map<String, Object> body,
+            Authentication authentication
+    ) {
+        Object rawActive = body != null ? (body.containsKey("isActive") ? body.get("isActive") : body.get("active")) : null;
+        if (rawActive == null) {
+            throw new IllegalArgumentException("isActive flag is required");
+        }
+        boolean active;
+        if (rawActive instanceof Boolean bool) {
+            active = bool;
+        } else {
+            active = Boolean.parseBoolean(rawActive.toString());
+        }
+
+        String requestedBy = authentication != null ? authentication.getName() : null;
+        clubStaffService.updateStaffStatus(clubId, userId, active, requestedBy);
+
+        return ResponseEntity.ok(
+                StandardResponseDTO.builder()
+                        .message(active ? "Staff member activated" : "Staff member deactivated")
+                        .status("success")
+                        .build()
+        );
+    }
+
     /**
      * Обновить роль сотрудника в клубе
      * PUT /api/clubs/{clubId}/staff/{userId}/role

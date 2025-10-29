@@ -25,6 +25,15 @@ class Validators {
     return null;
   }
 
+  static String? password(String? value, {int minLength = 8}) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) return 'Введите пароль';
+    if (trimmed.length < minLength) {
+      return 'Пароль должен содержать не менее $minLength символов';
+    }
+    return null;
+  }
+
   static String? validateExperience(String? total, String? bowling) {
     if (total == null || bowling == null) return null;
     final totalYears = int.tryParse(total.trim());

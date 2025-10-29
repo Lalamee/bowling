@@ -12,17 +12,13 @@ class AuthService {
   static final _api = ApiService();
 
   static Future<Map<String, dynamic>?> login({required String phone, required String password}) async {
-    try {
-      final loginDto = UserLoginDto(phone: phone, password: password);
-      final response = await _api.login(loginDto);
-      await _api.saveTokens(response);
-      return {
-        'accessToken': response.accessToken,
-        'refreshToken': response.refreshToken,
-      };
-    } catch (e) {
-      return null;
-    }
+    final loginDto = UserLoginDto(phone: phone, password: password);
+    final response = await _api.login(loginDto);
+    await _api.saveTokens(response);
+    return {
+      'accessToken': response.accessToken,
+      'refreshToken': response.refreshToken,
+    };
   }
 
   static Future<bool> registerOwner(Map<String, dynamic> data) async {
@@ -33,10 +29,15 @@ class AuthService {
         return str.isEmpty ? null : str;
       }
 
+      final password = (data['password'] as String?)?.trim();
+      if (password == null || password.isEmpty) {
+        throw ApiException('Введите пароль');
+      }
+
       final request = RegisterRequestDto(
         user: RegisterUserDto(
           phone: data['phone'],
-          password: data['password'] ?? 'password123',
+          password: password,
           roleId: 5,
           accountTypeId: 2,
         ),
@@ -96,10 +97,15 @@ class AuthService {
           ? rawClubId
           : int.tryParse(rawClubId?.toString() ?? '');
 
+      final password = (data['password'] as String?)?.trim();
+      if (password == null || password.isEmpty) {
+        throw ApiException('Введите пароль');
+      }
+
       final request = RegisterRequestDto(
         user: RegisterUserDto(
           phone: data['phone'],
-          password: data['password'] ?? 'password123',
+          password: password,
           roleId: 4,
           accountTypeId: 1,
         ),

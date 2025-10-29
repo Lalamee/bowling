@@ -51,6 +51,18 @@ class ClubStaffRepository {
     }
   }
 
+  Future<bool> updateStaffStatus(int clubId, int userId, bool isActive) async {
+    try {
+      final res = await _dio.patch(
+        '/api/clubs/$clubId/staff/$userId/status',
+        data: {'isActive': isActive},
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<Map<String, dynamic>?> createStaff(
     int clubId, {
     required String fullName,

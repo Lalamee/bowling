@@ -1,3 +1,6 @@
+import 'package:dio/dio.dart';
+
+import '../../../../api/api_core.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/local_auth_storage.dart';
@@ -20,9 +23,27 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _login = TextEditingController();
   final _password = TextEditingController();
+  late final FocusNode _loginFocus;
+
+  @override
+  void initState() {
+    super.initState();
+    _loginFocus = FocusNode();
+    if (_login.text.isEmpty) {
+      _login.text = '+7 ';
+      _login.selection = TextSelection.fromPosition(TextPosition(offset: _login.text.length));
+    }
+    _loginFocus.addListener(() {
+      if (_loginFocus.hasFocus && (_login.text.isEmpty || _login.text == '+7')) {
+        _login.text = '+7 ';
+        _login.selection = TextSelection.fromPosition(TextPosition(offset: _login.text.length));
+      }
+    });
+  }
 
   @override
   void dispose() {
+    _loginFocus.dispose();
     _login.dispose();
     _password.dispose();
     super.dispose();
@@ -30,20 +51,74 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _onLogin() async {
     final phone = _login.text.trim();
+    if (phone.isEmpty || phone == '+7') {
+      showSnack(context, 'Введите телефон и пароль');
+      return;
+    }
     final normalizedPhone = PhoneUtils.normalize(phone);
     final password = _password.text;
     if (phone.isEmpty || password.isEmpty) {
       showSnack(context, 'Введите телефон и пароль');
       return;
     }
-    final res = await withLoader(context, () => AuthService.login(phone: normalizedPhone, password: password));
-    if (res != null && mounted) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    bool loaderClosed = false;
+    void closeLoader() {
+      if (!mounted || loaderClosed) return;
+      final navigator = Navigator.of(context, rootNavigator: true);
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+      loaderClosed = true;
+    }
+
+    try {
+      final res = await AuthService.login(phone: normalizedPhone, password: password);
+      closeLoader();
+      if (res == null || !mounted) {
+        return;
+      }
       final role = await _cacheRole();
       if (!mounted) return;
       final destination = _routeForRole(role);
       Navigator.of(context).pushReplacementNamed(destination);
-    } else if (mounted) {
-      showSnack(context, 'Неверный телефон или пароль');
+    } on DioException catch (e) {
+      final api = e.error is ApiException ? e.error as ApiException : null;
+      closeLoader();
+      if (!mounted) return;
+      if (api != null) {
+        if (api.statusCode == 403) {
+          showSnack(context, 'Аккаунт не активирован. Обратитесь к владельцу клуба.');
+          return;
+        }
+        if (api.statusCode == 401) {
+          showSnack(context, 'Неверный телефон или пароль');
+          return;
+        }
+      }
+      showApiError(context, api ?? e);
+    } on ApiException catch (e) {
+      closeLoader();
+      if (!mounted) return;
+      if (e.statusCode == 403) {
+        showSnack(context, 'Аккаунт не активирован. Обратитесь к владельцу клуба.');
+        return;
+      }
+      if (e.statusCode == 401) {
+        showSnack(context, 'Неверный телефон или пароль');
+        return;
+      }
+      showSnack(context, e.message);
+    } catch (e) {
+      closeLoader();
+      if (!mounted) return;
+      showApiError(context, e);
     }
   }
 
@@ -147,6 +222,19 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
+                onPressed: () {
+                  final navigator = Navigator.of(context);
+                  if (navigator.canPop()) {
+                    navigator.pop();
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
             const Spacer(),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -156,7 +244,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     controller: _login,
                     hint: 'Логин/телефон',
                     prefixIcon: Icons.person_outline,
-                    keyboardType: TextInputType.emailAddress,
+                    keyboardType: TextInputType.phone,
+                    focusNode: _loginFocus,
                   ),
                   const SizedBox(height: 12),
                   PasswordField(controller: _password, hint: 'Пароль'),

@@ -6,12 +6,21 @@ class AppTextField extends StatelessWidget {
   final String hint;
   final IconData prefixIcon;
   final TextInputType? keyboardType;
+  final FocusNode? focusNode;
 
-  const AppTextField({super.key, required this.controller, required this.hint, required this.prefixIcon, this.keyboardType});
+  const AppTextField({
+    super.key,
+    required this.controller,
+    required this.hint,
+    required this.prefixIcon,
+    this.keyboardType,
+    this.focusNode,
+  });
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      focusNode: focusNode,
       controller: controller,
       keyboardType: keyboardType,
       style: const TextStyle(color: AppColors.textDark),
