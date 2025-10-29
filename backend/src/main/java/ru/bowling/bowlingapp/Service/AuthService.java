@@ -160,7 +160,11 @@ public class AuthService implements UserDetailsService {
 
         String accountTypeName = accountType.getName();
         boolean mechanicAccount = isMechanicAccountType(accountTypeName);
-        if (mechanicAccount) {
+        boolean autoActivateMechanic = mechanicAccount
+                && mechanicDto != null
+                && mechanicDto.isEntrepreneur();
+
+        if (mechanicAccount && !autoActivateMechanic) {
             user.setIsActive(false);
         }
 
@@ -185,7 +189,7 @@ public class AuthService implements UserDetailsService {
                     .advantages(mechanicDto.getAdvantages())
                     .workPlaces(mechanicDto.getWorkPlaces())
                     .workPeriods(mechanicDto.getWorkPeriods())
-                    .isDataVerified(false)
+                    .isDataVerified(autoActivateMechanic)
                     .createdAt(LocalDate.now())
                     .updatedAt(LocalDate.now())
                     .build();
