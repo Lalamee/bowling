@@ -361,6 +361,8 @@ public class ClubStaffService {
 
         User user = prepareUser(normalizedPhone, rawPassword, role, accountType);
 
+        User persistedUser = userRepository.save(user);
+
         LocalDateTime now = LocalDateTime.now();
 
         AdministratorProfile profile = AdministratorProfile.builder()
@@ -372,16 +374,76 @@ public class ClubStaffService {
                 .updatedAt(now)
                 .build();
 
-        profile.setUser(user);
+        profile.setUser(persistedUser);
         profile.setClub(club);
-        user.setAdministratorProfile(profile);
+        persistedUser.setAdministratorProfile(profile);
 
-        userRepository.save(user);
+        ensureAdministratorForeignKeyUsesUsersTable();
+
         administratorProfileRepository.save(profile);
 
-        registerClubStaff(club, user, role, requestedBy);
+        registerClubStaff(club, persistedUser, role, requestedBy);
 
-        return buildResponse(user, profile.getFullName(), rawPassword, role, club, StaffRole.ADMINISTRATOR);
+        return buildResponse(persistedUser, profile.getFullName(), rawPassword, role, club, StaffRole.ADMINISTRATOR);
+    }
+
+    private void ensureAdministratorForeignKeyUsesUsersTable() {
+        if (entityManager == null) {
+            return;
+        }
+
+        try {
+            Object legacyConstraintCount = entityManager.createNativeQuery(
+                    """
+                            SELECT COUNT(*)
+                            FROM information_schema.table_constraints tc
+                                     JOIN information_schema.key_column_usage kcu
+                                          ON tc.constraint_name = kcu.constraint_name
+                                     JOIN information_schema.referential_constraints rc
+                                          ON tc.constraint_name = rc.constraint_name
+                            WHERE tc.constraint_type = 'FOREIGN KEY'
+                              AND tc.table_name = 'administrator_profiles'
+                              AND kcu.column_name = 'user_id'
+                              AND rc.unique_constraint_table_name = 'users_old'
+                        """
+            ).getSingleResult();
+
+            long legacyConstraints = 0L;
+            if (legacyConstraintCount instanceof Number number) {
+                legacyConstraints = number.longValue();
+            } else if (legacyConstraintCount != null) {
+                legacyConstraints = Long.parseLong(legacyConstraintCount.toString());
+            }
+
+            if (legacyConstraints > 0) {
+                entityManager.createNativeQuery(
+                        "ALTER TABLE administrator_profiles DROP CONSTRAINT IF EXISTS fkdo5txam8feukemar3fh6cw1ue"
+                ).executeUpdate();
+            }
+
+            Object modernConstraintCount = entityManager.createNativeQuery(
+                    """
+                            SELECT COUNT(*)
+                            FROM information_schema.referential_constraints rc
+                            WHERE rc.constraint_name = 'fk_administrator_profiles_users'
+                        """
+            ).getSingleResult();
+
+            long modernConstraints = 0L;
+            if (modernConstraintCount instanceof Number number) {
+                modernConstraints = number.longValue();
+            } else if (modernConstraintCount != null) {
+                modernConstraints = Long.parseLong(modernConstraintCount.toString());
+            }
+
+            if (modernConstraints == 0) {
+                entityManager.createNativeQuery(
+                        "ALTER TABLE administrator_profiles ADD CONSTRAINT fk_administrator_profiles_users FOREIGN KEY (user_id) REFERENCES users(user_id)"
+                ).executeUpdate();
+            }
+        } catch (Exception ignored) {
+            // If metadata update fails we avoid breaking staff creation.
+        }
     }
 
     private void registerClubStaff(BowlingClub club, User user, Role role, User requestedBy) {
