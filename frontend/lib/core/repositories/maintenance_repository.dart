@@ -69,6 +69,15 @@ class MaintenanceRepository {
     }
   }
 
+  /// Завершить заявку
+  Future<MaintenanceRequestResponseDto?> complete(int id) async {
+    try {
+      return await _api.completeMaintenanceRequest(id);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   /// Отметить как неремонтопригодное
   Future<MaintenanceRequestResponseDto?> markUnrepairable(int id, String reason) async {
     try {

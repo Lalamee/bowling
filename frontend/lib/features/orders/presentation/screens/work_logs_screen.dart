@@ -51,6 +51,7 @@ class _WorkLogsScreenState extends State<WorkLogsScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
+        leading: const BackButton(),
         title: const Text(
           'Рабочие журналы',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textDark),

@@ -232,6 +232,9 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
 
     final trimmedStatus = status?.trim();
     final normalizedPhone = PhoneUtils.normalize(_phone.text);
+    final extraEducation = _extraEducation.text.trim();
+    final skills = _skills.text.trim();
+
     final data = {
       'fio': _fio.text.trim(),
       'birth': DateFormat('yyyy-MM-dd').format(birthDate!),
@@ -240,12 +243,12 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'educationLevelId': educationLevelId!,
       'educationName': _educationName.text.trim(),
       'specializationId': '1',
-      'advantages': _extraEducation.text.trim(),
+      'advantages': extraEducation.isEmpty ? null : extraEducation,
       'workYears': _workYears.text.trim(),
       'bowlingYears': _bowlingYears.text.trim(),
       'currentClub': selectedClub.name,
       'bowlingHistory': _bowlingHistory.text.trim(),
-      'skills': _skills.text.trim(),
+      'skills': skills.isEmpty ? null : skills,
       'status': trimmedStatus ?? status,
       'workPlaces': places.join(', '),
       'workPeriods': periods.join(', '),
@@ -428,8 +431,6 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
         LabeledTextField(
           label: 'Дополнительное образование (курсы и т.д.)',
           controller: _extraEducation,
-          validator: Validators.notEmpty,
-          isRequired: true,
         ),
       ],
     );
@@ -517,7 +518,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
             style: AppTextStyles.formHint,
           ),
         ),
-        LabeledTextField(label: 'Навыки и преимущества', controller: _skills, validator: Validators.notEmpty, isRequired: true),
+        LabeledTextField(label: 'Навыки и преимущества', controller: _skills),
         const SizedBox(height: 16),
         formDescription('Ваш статус:'),
         RadioGroupHorizontal(

@@ -526,19 +526,48 @@ public class MaintenanceRequestService {
 		return convertToResponseDTO(req, parts);
 	}
 
-	@Transactional
-	public MaintenanceRequestResponseDTO closeRequest(Long requestId, java.util.Map<String, Object> payload) {
-		MaintenanceRequest req = maintenanceRequestRepository.findById(requestId)
-				.orElseThrow(() -> new IllegalArgumentException("Request not found"));
-		req.setStatus(MaintenanceRequestStatus.CLOSED);
-		req.setCompletionDate(java.time.LocalDateTime.now());
-		maintenanceRequestRepository.save(req);
-		java.util.List<RequestPart> parts = requestPartRepository.findByRequestRequestId(req.getRequestId());
-		return convertToResponseDTO(req, parts);
-	}
+        @Transactional
+        public MaintenanceRequestResponseDTO closeRequest(Long requestId, java.util.Map<String, Object> payload) {
+                MaintenanceRequest req = maintenanceRequestRepository.findById(requestId)
+                                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+                req.setStatus(MaintenanceRequestStatus.CLOSED);
+                req.setCompletionDate(java.time.LocalDateTime.now());
+                maintenanceRequestRepository.save(req);
+                java.util.List<RequestPart> parts = requestPartRepository.findByRequestRequestId(req.getRequestId());
+                return convertToResponseDTO(req, parts);
+        }
 
-	@Transactional
-	public MaintenanceRequestResponseDTO markAsUnrepairable(Long requestId, String reason) {
+        @Transactional
+        public MaintenanceRequestResponseDTO completeRequest(Long requestId) {
+                MaintenanceRequest req = maintenanceRequestRepository.findById(requestId)
+                                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+
+                MaintenanceRequestStatus currentStatus = req.getStatus();
+                if (currentStatus == null) {
+                        throw new IllegalStateException("Request status is not specified");
+                }
+
+                if (currentStatus == MaintenanceRequestStatus.DONE
+                                || currentStatus == MaintenanceRequestStatus.CLOSED
+                                || currentStatus == MaintenanceRequestStatus.UNREPAIRABLE) {
+                        throw new IllegalStateException("Request is already completed or closed");
+                }
+
+                if (currentStatus != MaintenanceRequestStatus.APPROVED
+                                && currentStatus != MaintenanceRequestStatus.IN_PROGRESS) {
+                        throw new IllegalStateException("Only approved or in-progress requests can be completed");
+                }
+
+                req.setStatus(MaintenanceRequestStatus.DONE);
+                req.setCompletionDate(LocalDateTime.now());
+                maintenanceRequestRepository.save(req);
+
+                java.util.List<RequestPart> parts = requestPartRepository.findByRequestRequestId(req.getRequestId());
+                return convertToResponseDTO(req, parts);
+        }
+
+        @Transactional
+        public MaintenanceRequestResponseDTO markAsUnrepairable(Long requestId, String reason) {
 		MaintenanceRequest req = maintenanceRequestRepository.findById(requestId)
 				.orElseThrow(() -> new IllegalArgumentException("Request not found"));
 		req.setStatus(MaintenanceRequestStatus.UNREPAIRABLE);

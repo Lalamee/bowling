@@ -12,16 +12,20 @@ class OrderSummaryScreen extends StatefulWidget {
   final MaintenanceRequestResponseDto? order;
   final String? orderNumber;
   final bool canConfirm;
+  final bool canComplete;
   final bool? initialAvailability;
   final Future<bool> Function({required Map<int, bool> availability, String? comment})? onConfirm;
+  final Future<bool> Function()? onComplete;
 
   const OrderSummaryScreen({
     super.key,
     this.order,
     this.orderNumber,
     this.canConfirm = false,
+    this.canComplete = false,
     this.initialAvailability,
     this.onConfirm,
+    this.onComplete,
   });
 
   @override
@@ -31,6 +35,7 @@ class OrderSummaryScreen extends StatefulWidget {
 class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
   final _userRepository = UserRepository();
   bool _isSubmitting = false;
+  bool _isCompleting = false;
   late final TextEditingController _commentController;
   bool _accessCheckInProgress = true;
   bool _accessDenied = false;
@@ -127,7 +132,10 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
 
     if (_accessDenied) {
       return Scaffold(
-        appBar: AppBar(title: Text(_title, style: t.sectionTitle)),
+        appBar: AppBar(
+          leading: const BackButton(),
+          title: Text(_title, style: t.sectionTitle),
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -159,6 +167,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: const BackButton(),
         title: Text(_title, style: t.sectionTitle),
       ),
       body: ListView(
@@ -348,7 +357,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: (!_allDecisionsMade || _isSubmitting)
+                onPressed: (!_allDecisionsMade || _isSubmitting || _isCompleting)
                     ? null
                     : () => _handleConfirm(),
                 style: ElevatedButton.styleFrom(
@@ -363,6 +372,32 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
                     : const Text('Подтвердить заказ'),
+              ),
+            ),
+          ],
+          if (widget.canComplete && widget.onComplete != null) ...[
+            const SizedBox(height: 24),
+            Text('Завершение заказа', style: t.sectionTitle),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: (_isSubmitting || _isCompleting)
+                    ? null
+                    : () => _handleComplete(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _isCompleting
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Завершить заказ'),
               ),
             ),
           ],
@@ -395,6 +430,17 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
         _accessDenied = true;
         _accessCheckInProgress = false;
       });
+    }
+  }
+
+  Future<void> _handleComplete() async {
+    if (widget.onComplete == null) return;
+    setState(() => _isCompleting = true);
+    final success = await widget.onComplete!.call();
+    if (!mounted) return;
+    setState(() => _isCompleting = false);
+    if (success) {
+      Navigator.pop(context, true);
     }
   }
 
