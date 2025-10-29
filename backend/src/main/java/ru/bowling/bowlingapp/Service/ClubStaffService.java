@@ -361,6 +361,8 @@ public class ClubStaffService {
 
         User user = prepareUser(normalizedPhone, rawPassword, role, accountType);
 
+        User persistedUser = userRepository.save(user);
+
         LocalDateTime now = LocalDateTime.now();
 
         AdministratorProfile profile = AdministratorProfile.builder()
@@ -372,16 +374,15 @@ public class ClubStaffService {
                 .updatedAt(now)
                 .build();
 
-        profile.setUser(user);
+        profile.setUser(persistedUser);
         profile.setClub(club);
-        user.setAdministratorProfile(profile);
+        persistedUser.setAdministratorProfile(profile);
 
-        userRepository.save(user);
         administratorProfileRepository.save(profile);
 
-        registerClubStaff(club, user, role, requestedBy);
+        registerClubStaff(club, persistedUser, role, requestedBy);
 
-        return buildResponse(user, profile.getFullName(), rawPassword, role, club, StaffRole.ADMINISTRATOR);
+        return buildResponse(persistedUser, profile.getFullName(), rawPassword, role, club, StaffRole.ADMINISTRATOR);
     }
 
     private void registerClubStaff(BowlingClub club, User user, Role role, User requestedBy) {
