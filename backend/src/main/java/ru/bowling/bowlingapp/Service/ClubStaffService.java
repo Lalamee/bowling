@@ -176,7 +176,23 @@ public class ClubStaffService {
                 .orElseThrow(() -> new IllegalArgumentException("Staff member is not assigned to this club"));
 
         targetUser.setIsActive(active);
+        targetUser.setIsVerified(active);
         userRepository.save(targetUser);
+
+        MechanicProfile mechanicProfile = targetUser.getMechanicProfile();
+        if (mechanicProfile != null) {
+            mechanicProfile.setIsDataVerified(active);
+            if (active) {
+                mechanicProfile.setVerificationDate(LocalDate.now());
+            }
+            mechanicProfileRepository.save(mechanicProfile);
+        }
+
+        ManagerProfile managerProfile = targetUser.getManagerProfile();
+        if (managerProfile != null) {
+            managerProfile.setIsDataVerified(active);
+            managerProfileRepository.save(managerProfile);
+        }
 
         clubStaff.setIsActive(active);
         clubStaffRepository.save(clubStaff);
@@ -712,13 +728,22 @@ public class ClubStaffService {
         if (hasRole(user, "ADMIN")) {
             return;
         }
+
         OwnerProfile owner = club.getOwner();
-        if (owner == null || owner.getUser() == null) {
-            throw new IllegalArgumentException("Club has no owner assigned");
+        if (owner != null && owner.getUser() != null
+                && Objects.equals(owner.getUser().getUserId(), user.getUserId())) {
+            return;
         }
-        if (!owner.getUser().getUserId().equals(user.getUserId())) {
-            throw new IllegalArgumentException("You do not have access to manage this club");
+
+        if (hasRole(user, "MANAGER") || hasRole(user, "HEAD_MECHANIC")) {
+            ManagerProfile managerProfile = user.getManagerProfile();
+            if (managerProfile != null && managerProfile.getClub() != null
+                    && Objects.equals(managerProfile.getClub().getClubId(), club.getClubId())) {
+                return;
+            }
         }
+
+        throw new IllegalArgumentException("You do not have access to manage this club");
     }
 
     private boolean hasRole(User user, String roleName) {

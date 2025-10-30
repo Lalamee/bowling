@@ -22,7 +22,7 @@ public class ClubStaffController {
     private final ClubStaffService clubStaffService;
 
     @GetMapping("/{clubId}/staff")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CLUB_OWNER', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CLUB_OWNER', 'HEAD_MECHANIC')")
     public ResponseEntity<?> getClubStaff(@PathVariable Long clubId) {
         return ResponseEntity.ok(clubStaffService.getClubStaff(clubId));
     }
@@ -81,7 +81,7 @@ public class ClubStaffController {
     }
 
     @PatchMapping("/{clubId}/staff/{userId}/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CLUB_OWNER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CLUB_OWNER', 'HEAD_MECHANIC')")
     public ResponseEntity<StandardResponseDTO> updateStaffStatus(
             @PathVariable Long clubId,
             @PathVariable Long userId,

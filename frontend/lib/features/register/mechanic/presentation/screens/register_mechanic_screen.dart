@@ -83,6 +83,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     if (_phone.text.isEmpty) {
       _phone.text = '+7 ';
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadClubs());
   }
 
   @override
@@ -227,13 +228,20 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     }
 
     final selectedClub = _selectedClub;
-    if (selectedClub == null) {
-      _showBar('Выберите клуб из списка');
-      return;
+    final hasSelectedClub = selectedClub != null;
+
+    if (hasSelectedClub && !places.contains(selectedClub!.name)) {
+      places.insert(0, selectedClub!.name);
     }
 
-    if (!places.contains(selectedClub.name)) {
-      places.insert(0, selectedClub.name);
+    final profileClubs = <String>[];
+    if (hasSelectedClub) {
+      profileClubs.add(selectedClub!.name);
+    }
+    for (final place in places) {
+      if (!profileClubs.contains(place)) {
+        profileClubs.add(place);
+      }
     }
 
     final trimmedStatus = _status?.trim();
@@ -259,9 +267,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'status': trimmedStatus ?? _status,
       'workPlaces': workPlaces.isEmpty ? null : workPlaces,
       'workPeriods': workPeriods.isEmpty ? null : workPeriods,
-      'clubId': selectedClub.id,
-      'clubName': selectedClub.name,
-      'clubAddress': selectedClub.address,
+      'clubId': hasSelectedClub ? selectedClub!.id : null,
     };
 
     setState(() => _isSubmitting = true);
@@ -296,14 +302,17 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     final profileData = {
       'fullName': _fio.text.trim(),
       'phone': normalizedPhone,
-      'clubName': clubsCache.isNotEmpty ? clubsCache.first : '',
-      'address': '',
+      'clubName': hasSelectedClub
+          ? selectedClub!.name
+          : (profileClubs.isNotEmpty ? profileClubs.first : ''),
+      'address': hasSelectedClub ? (selectedClub!.address ?? '') : '',
       'status': normalizedStatus,
       'birthDate': birthDate?.toIso8601String(),
-      'clubs': <String>[],
+      'clubs': profileClubs,
       'workplaceVerified': false,
-      'clubId': selectedClub.id,
-      'clubAddress': selectedClub.address,
+      'clubId': hasSelectedClub ? selectedClub!.id : null,
+      'clubAddress': hasSelectedClub ? selectedClub!.address : null,
+      'freeAgent': !hasSelectedClub,
     };
     try {
       final loginResult = await AuthService.login(phone: normalizedPhone, password: passwordValue);
@@ -486,7 +495,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
           isRequired: true,
         ),
         const SizedBox(height: 16),
-        formDescription('Выберите клуб, в котором вы работаете:'),
+        formDescription(
+            'Если вы уже работаете в клубе, выберите его из списка. Без выбора вы зарегистрируетесь как свободный агент.'),
         const SizedBox(height: 8),
         if (_isLoadingClubs)
           const Center(child: CircularProgressIndicator())
@@ -517,15 +527,17 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
                 )
                 .toList(),
             onChanged: _handleClubChange,
-            decoration: const InputDecoration(labelText: 'Клуб *'),
+            decoration:
+                const InputDecoration(labelText: 'Клуб (по желанию)'),
             autovalidateMode: AutovalidateMode.onUserInteraction,
-            validator: (value) {
-              if (value == null) {
-                return 'Выберите клуб';
-              }
-              return null;
-            },
           ),
+        if (_selectedClub == null) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Без выбранного клуба вас сможет подключить к системе только администратор.',
+            style: AppTextStyles.formHint,
+          ),
+        ],
         if (_selectedClub != null) ...[
           const SizedBox(height: 8),
           Text(
