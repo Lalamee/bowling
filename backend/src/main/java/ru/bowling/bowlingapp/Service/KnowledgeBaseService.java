@@ -116,14 +116,6 @@ public class KnowledgeBaseService {
                     .forEach(clubIds::add);
         }
 
-        MechanicProfile mechanicProfile = user.getMechanicProfile();
-        if (mechanicProfile != null && mechanicProfile.getClubs() != null) {
-            mechanicProfile.getClubs().stream()
-                    .map(BowlingClub::getClubId)
-                    .filter(Objects::nonNull)
-                    .forEach(clubIds::add);
-        }
-
         ManagerProfile managerProfile = user.getManagerProfile();
         if (managerProfile != null && managerProfile.getClub() != null) {
             Long clubId = managerProfile.getClub().getClubId();

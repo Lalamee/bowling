@@ -160,9 +160,6 @@ public class AuthService implements UserDetailsService {
 
         String accountTypeName = accountType.getName();
         boolean mechanicAccount = isMechanicAccountType(accountTypeName);
-        if (mechanicAccount) {
-            user.setIsActive(false);
-        }
 
         BowlingClub mechanicClub = null;
         MechanicProfile mechanicProfile = null;
@@ -259,9 +256,12 @@ public class AuthService implements UserDetailsService {
                             .club(finalMechanicClub)
                             .user(user)
                             .assignedAt(LocalDateTime.now())
-                            .isActive(true)
+                            .isActive(!mechanicAccount)
                             .build());
             clubStaff.setRole(user.getRole());
+            if (mechanicAccount) {
+                clubStaff.setIsActive(false);
+            }
             if (clubStaff.getAssignedAt() == null) {
                 clubStaff.setAssignedAt(LocalDateTime.now());
             }
