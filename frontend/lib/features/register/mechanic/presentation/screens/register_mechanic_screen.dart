@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../../api/api_core.dart';
+import '../../../../../core/repositories/clubs_repository.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/theme/text_styles.dart';
+import '../../../../../models/club_summary_dto.dart';
 import '../../../../../shared/widgets/inputs/labeled_text_field.dart';
 import '../../../../../shared/widgets/buttons/custom_button.dart';
 import '../../../../../shared/widgets/chips/radio_group_wrap.dart';
@@ -88,13 +90,22 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
 
   @override
   void dispose() {
-    [
-      _fio, _birth, _phone,
-      _password, _passwordConfirm,
-      _educationName, _extraEducation,
-      _workYears, _bowlingYears,
-      _bowlingHistory, _skills
-    ].forEach((c) => c.dispose());
+    final controllers = [
+      _fio,
+      _birth,
+      _phone,
+      _password,
+      _passwordConfirm,
+      _educationName,
+      _extraEducation,
+      _workYears,
+      _bowlingYears,
+      _bowlingHistory,
+      _skills,
+    ];
+    for (final controller in controllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -228,15 +239,16 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     }
 
     final selectedClub = _selectedClub;
-    final hasSelectedClub = selectedClub != null;
+    final selectedClubName = selectedClub?.name;
+    final hasSelectedClub = selectedClubName != null && selectedClubName.isNotEmpty;
 
-    if (hasSelectedClub && !places.contains(selectedClub!.name)) {
-      places.insert(0, selectedClub!.name);
+    if (selectedClubName != null && !places.contains(selectedClubName)) {
+      places.insert(0, selectedClubName);
     }
 
     final profileClubs = <String>[];
-    if (hasSelectedClub) {
-      profileClubs.add(selectedClub!.name);
+    if (selectedClubName != null && selectedClubName.isNotEmpty) {
+      profileClubs.add(selectedClubName);
     }
     for (final place in places) {
       if (!profileClubs.contains(place)) {
@@ -267,7 +279,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'status': trimmedStatus ?? _status,
       'workPlaces': workPlaces.isEmpty ? null : workPlaces,
       'workPeriods': workPeriods.isEmpty ? null : workPeriods,
-      'clubId': hasSelectedClub ? selectedClub!.id : null,
+      'clubId': selectedClub?.id,
     };
 
     setState(() => _isSubmitting = true);
@@ -302,16 +314,14 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     final profileData = {
       'fullName': _fio.text.trim(),
       'phone': normalizedPhone,
-      'clubName': hasSelectedClub
-          ? selectedClub!.name
-          : (profileClubs.isNotEmpty ? profileClubs.first : ''),
-      'address': hasSelectedClub ? (selectedClub!.address ?? '') : '',
+      'clubName': selectedClubName ?? (profileClubs.isNotEmpty ? profileClubs.first : ''),
+      'address': selectedClub?.address ?? '',
       'status': normalizedStatus,
       'birthDate': birthDate?.toIso8601String(),
       'clubs': profileClubs,
       'workplaceVerified': false,
-      'clubId': hasSelectedClub ? selectedClub!.id : null,
-      'clubAddress': hasSelectedClub ? selectedClub!.address : null,
+      'clubId': selectedClub?.id,
+      'clubAddress': selectedClub?.address,
       'freeAgent': !hasSelectedClub,
     };
     try {
@@ -471,6 +481,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
   }
 
   Widget _buildStepThree(BuildContext ctx) {
+    final selectedClub = _selectedClub;
+    final selectedClubAddress = selectedClub?.address?.trim();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -513,17 +525,18 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
           )
         else
           DropdownButtonFormField<int>(
-            value: _selectedClub?.id,
+            value: selectedClub?.id,
             items: _clubs
                 .map(
-                  (club) => DropdownMenuItem<int>(
-                    value: club.id,
-                    child: Text(
-                      club.address != null && club.address!.trim().isNotEmpty
-                          ? '${club.name} — ${club.address}'
-                          : club.name,
-                    ),
-                  ),
+                  (club) {
+                    final address = club.address?.trim();
+                    final hasAddress = address != null && address.isNotEmpty;
+                    final title = hasAddress ? '${club.name} — $address' : club.name;
+                    return DropdownMenuItem<int>(
+                      value: club.id,
+                      child: Text(title),
+                    );
+                  },
                 )
                 .toList(),
             onChanged: _handleClubChange,
@@ -531,18 +544,18 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
                 const InputDecoration(labelText: 'Клуб (по желанию)'),
             autovalidateMode: AutovalidateMode.onUserInteraction,
           ),
-        if (_selectedClub == null) ...[
+        if (selectedClub == null) ...[
           const SizedBox(height: 8),
           Text(
             'Без выбранного клуба вас сможет подключить к системе только администратор.',
             style: AppTextStyles.formHint,
           ),
         ],
-        if (_selectedClub != null) ...[
+        if (selectedClub != null) ...[
           const SizedBox(height: 8),
           Text(
-            _selectedClub!.address != null && _selectedClub!.address!.trim().isNotEmpty
-                ? 'Адрес: ${_selectedClub!.address}'
+            selectedClubAddress != null && selectedClubAddress.isNotEmpty
+                ? 'Адрес: $selectedClubAddress'
                 : 'Адрес не указан',
             style: AppTextStyles.formHint,
           ),
