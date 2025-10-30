@@ -14,8 +14,6 @@ import '../../../../../core/utils/phone_utils.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/routing/routes.dart';
-import '../../../../../core/repositories/clubs_repository.dart';
-import '../../../../../models/club_summary_dto.dart';
 
 class RegisterMechanicScreen extends StatefulWidget {
   const RegisterMechanicScreen({Key? key}) : super(key: key);
@@ -48,12 +46,6 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
   String? educationLevelId;
   String? status;
 
-  final _clubsRepository = ClubsRepository();
-  List<ClubSummaryDto> _clubs = [];
-  bool _isLoadingClubs = true;
-  String? _clubsError;
-  ClubSummaryDto? _selectedClub;
-
   /// маппинг названия уровня образования в id
   static const _eduMap = <String, String>{
     'высшее': '1',
@@ -84,7 +76,6 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     if (_phone.text.isEmpty) {
       _phone.text = '+7 ';
     }
-    _loadClubs();
   }
 
   @override
@@ -244,7 +235,6 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'advantages': extraEducation.isEmpty ? null : extraEducation,
       'workYears': _workYears.text.trim(),
       'bowlingYears': _bowlingYears.text.trim(),
-      'currentClub': selectedClub.name,
       'bowlingHistory': _bowlingHistory.text.trim(),
       'skills': skills.isEmpty ? null : skills,
       'status': trimmedStatus ?? status,
@@ -280,8 +270,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     final profileData = {
       'fullName': _fio.text.trim(),
       'phone': normalizedPhone,
-      'clubName': selectedClub.name,
-      'address': selectedClub.address ?? '',
+      'clubName': clubsCache.isNotEmpty ? clubsCache.first : '',
+      'address': '',
       'status': normalizedStatus,
       'birthDate': birthDate?.toIso8601String(),
       'clubs': clubsCache,
