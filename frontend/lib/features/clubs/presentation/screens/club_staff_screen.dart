@@ -196,7 +196,7 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
           case 5:
             return 'CLUB_OWNER';
           case 6:
-            return 'MANAGER';
+            return 'HEAD_MECHANIC';
         }
       }
       return null;
@@ -216,7 +216,7 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
         return 'ADMIN';
       case 'менеджер':
       case 'manager':
-        return 'MANAGER';
+        return 'HEAD_MECHANIC';
       case 'главный механик':
       case 'head_mechanic':
       case 'head mechanic':
