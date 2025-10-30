@@ -14,8 +14,6 @@ import '../../../../../core/utils/phone_utils.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/routing/routes.dart';
-import '../../../../../core/repositories/clubs_repository.dart';
-import '../../../../../models/club_summary_dto.dart';
 
 class RegisterMechanicScreen extends StatefulWidget {
   const RegisterMechanicScreen({Key? key}) : super(key: key);
@@ -48,12 +46,6 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
   String? educationLevelId;
   String? status;
 
-  final _clubsRepository = ClubsRepository();
-  List<ClubSummaryDto> _clubs = [];
-  bool _isLoadingClubs = true;
-  String? _clubsError;
-  ClubSummaryDto? _selectedClub;
-
   /// маппинг названия уровня образования в id
   static const _eduMap = <String, String>{
     'высшее': '1',
@@ -84,7 +76,6 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     if (_phone.text.isEmpty) {
       _phone.text = '+7 ';
     }
-    _loadClubs();
   }
 
   @override
@@ -97,43 +88,6 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       _bowlingHistory, _skills
     ].forEach((c) => c.dispose());
     super.dispose();
-  }
-
-  Future<void> _loadClubs() async {
-    setState(() {
-      _isLoadingClubs = true;
-      _clubsError = null;
-    });
-    try {
-      final clubs = await _clubsRepository.getClubs();
-      setState(() {
-        _clubs = clubs;
-        _isLoadingClubs = false;
-        if (clubs.isEmpty) {
-          _clubsError = 'Список клубов пуст. Обратитесь к администратору.';
-        }
-      });
-    } catch (_) {
-      setState(() {
-        _isLoadingClubs = false;
-        _clubsError = 'Не удалось загрузить список клубов';
-      });
-    }
-  }
-
-  void _handleClubChange(int? clubId) {
-    if (clubId == null) {
-      setState(() => _selectedClub = null);
-      return;
-    }
-    ClubSummaryDto? selected;
-    for (final club in _clubs) {
-      if (club.id == clubId) {
-        selected = club;
-        break;
-      }
-    }
-    setState(() => _selectedClub = selected);
   }
 
   Future<void> _pickBirthDate() async {
@@ -168,29 +122,17 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       _showBar('Выберите уровень образования');
       return;
     }
-    if (step == 2 && (status == null || status!.isEmpty)) {
-      _showBar('Выберите статус');
-      return;
-    }
     nextStep();
   }
 
   Future<void> _submit() async {
-    if (!formKey.currentState!.validate() || educationLevelId == null || status == null) {
+    if (!formKey.currentState!.validate() || educationLevelId == null) {
       if (educationLevelId == null) _showBar('Выберите уровень образования');
-      if (status == null) _showBar('Выберите статус');
-      if (educationLevelId != null && status != null) {
+      if (educationLevelId != null) {
         _showBar('Заполните обязательные поля');
       }
       return;
     }
-
-    if (_selectedClub == null) {
-      _showBar('Выберите клуб из списка');
-      return;
-    }
-
-    final selectedClub = _selectedClub!;
 
     final passwordValue = _password.text.trim();
     final confirmPasswordValue = _passwordConfirm.text.trim();
@@ -226,14 +168,12 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       }
     }
 
-    if (!places.contains(selectedClub.name)) {
-      places.insert(0, selectedClub.name);
-    }
-
     final trimmedStatus = status?.trim();
     final normalizedPhone = PhoneUtils.normalize(_phone.text);
     final extraEducation = _extraEducation.text.trim();
     final skills = _skills.text.trim();
+    final workPlaces = places.join(', ');
+    final workPeriods = periods.join(', ');
 
     final data = {
       'fio': _fio.text.trim(),
@@ -246,15 +186,11 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'advantages': extraEducation.isEmpty ? null : extraEducation,
       'workYears': _workYears.text.trim(),
       'bowlingYears': _bowlingYears.text.trim(),
-      'currentClub': selectedClub.name,
       'bowlingHistory': _bowlingHistory.text.trim(),
       'skills': skills.isEmpty ? null : skills,
       'status': trimmedStatus ?? status,
-      'workPlaces': places.join(', '),
-      'workPeriods': periods.join(', '),
-      'clubId': selectedClub.id,
-      'clubName': selectedClub.name,
-      'clubAddress': selectedClub.address,
+      'workPlaces': workPlaces.isEmpty ? null : workPlaces,
+      'workPeriods': workPeriods.isEmpty ? null : workPeriods,
     };
 
     final success = await AuthService.registerMechanic(data);
@@ -264,9 +200,6 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     }
 
     final clubsCache = List<String>.from(places);
-    if (clubsCache.isEmpty) {
-      clubsCache.add(selectedClub.name);
-    }
 
     final normalizedStatus = () {
       final trimmed = trimmedStatus?.trim();
@@ -276,14 +209,14 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       if (status != null && status!.trim().isNotEmpty) {
         return status!.trim();
       }
-      return 'Самозанятый';
+      return 'Не указан';
     }();
 
     final profileData = {
       'fullName': _fio.text.trim(),
       'phone': normalizedPhone,
-      'clubName': selectedClub.name,
-      'address': selectedClub.address ?? '',
+      'clubName': clubsCache.isNotEmpty ? clubsCache.first : '',
+      'address': '',
       'status': normalizedStatus,
       'birthDate': birthDate?.toIso8601String(),
       'clubs': clubsCache,
@@ -297,6 +230,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
 
       await LocalAuthStorage.saveMechanicProfile(profileData);
       await LocalAuthStorage.setMechanicRegistered(true);
+      await LocalAuthStorage.clearOwnerState();
+      await LocalAuthStorage.clearManagerState();
       await LocalAuthStorage.setRegisteredRole('mechanic');
 
       if (!mounted) return;
@@ -461,56 +396,11 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
           isRequired: true,
         ),
         const SizedBox(height: 16),
-        formDescription('Выберите клуб, в котором вы работаете:'),
-        const SizedBox(height: 8),
-        if (_isLoadingClubs)
-          const Center(child: CircularProgressIndicator())
-        else if (_clubsError != null)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _clubsError!,
-                style: AppTextStyles.formHint.copyWith(color: Colors.red),
-              ),
-              TextButton(onPressed: _loadClubs, child: const Text('Повторить попытку')),
-            ],
-          )
-        else
-          DropdownButtonFormField<int>(
-            value: _selectedClub?.id,
-            items: _clubs
-                .map(
-                  (club) => DropdownMenuItem<int>(
-                    value: club.id,
-                    child: Text(
-                      club.address != null && club.address!.trim().isNotEmpty
-                          ? '${club.name} — ${club.address}'
-                          : club.name,
-                    ),
-                  ),
-                )
-                .toList(),
-            onChanged: _handleClubChange,
-            decoration: const InputDecoration(labelText: 'Клуб *'),
-            autovalidateMode: AutovalidateMode.onUserInteraction,
-            validator: (value) {
-              if (value == null) {
-                return 'Выберите клуб';
-              }
-              return null;
-            },
-          ),
-        if (_selectedClub != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            _selectedClub!.address != null && _selectedClub!.address!.trim().isNotEmpty
-                ? 'Адрес: ${_selectedClub!.address}'
-                : 'Адрес не указан',
-            style: AppTextStyles.formHint,
-          ),
-        ],
-        LabeledTextField(label: 'Где и когда работали в боулинге', controller: _bowlingHistory, validator: Validators.bowlingHistorySoft, isRequired: true),
+        LabeledTextField(
+          label: 'Где и когда работали в боулинге',
+          controller: _bowlingHistory,
+          validator: Validators.bowlingHistorySoft,
+        ),
         Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: Text(
@@ -520,11 +410,17 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
         ),
         LabeledTextField(label: 'Навыки и преимущества', controller: _skills),
         const SizedBox(height: 16),
-        formDescription('Ваш статус:'),
+        formDescription('Ваш статус (при наличии):'),
         RadioGroupHorizontal(
           options: const ['ИП', 'Самозанятый'],
           groupValue: status,
-          onChanged: (v) => setState(() => status = v),
+          onChanged: (v) => setState(() {
+            if (status == v) {
+              status = null;
+            } else {
+              status = v;
+            }
+          }),
         ),
       ],
     );

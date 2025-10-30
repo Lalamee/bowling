@@ -20,6 +20,9 @@ public class RegisterRequestDTO {
     private MechanicProfileDTO mechanicProfile;
 
     @Valid
+    private ManagerProfileDTO managerProfile;
+
+    @Valid
     private OwnerProfileDTO ownerProfile;
 
     @Valid

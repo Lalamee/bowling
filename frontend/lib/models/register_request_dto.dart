@@ -1,18 +1,21 @@
 import 'register_user_dto.dart';
 import 'mechanic_profile_dto.dart';
 import 'owner_profile_dto.dart';
+import 'manager_profile_dto.dart';
 import 'bowling_club_dto.dart';
 
 class RegisterRequestDto {
   final RegisterUserDto user;
   final MechanicProfileDto? mechanicProfile;
   final OwnerProfileDto? ownerProfile;
+  final ManagerProfileDto? managerProfile;
   final BowlingClubDto? club;
 
   RegisterRequestDto({
     required this.user,
     this.mechanicProfile,
     this.ownerProfile,
+    this.managerProfile,
     this.club,
   });
 
@@ -20,6 +23,7 @@ class RegisterRequestDto {
         'user': user.toJson(),
         'mechanicProfile': mechanicProfile?.toJson(),
         'ownerProfile': ownerProfile?.toJson(),
+        'managerProfile': managerProfile?.toJson(),
         'club': club?.toJson(),
       };
 
@@ -31,6 +35,9 @@ class RegisterRequestDto {
           : null,
       ownerProfile: json['ownerProfile'] != null
           ? OwnerProfileDto.fromJson(json['ownerProfile'] as Map<String, dynamic>)
+          : null,
+      managerProfile: json['managerProfile'] != null
+          ? ManagerProfileDto.fromJson(json['managerProfile'] as Map<String, dynamic>)
           : null,
       club: json['club'] != null
           ? BowlingClubDto.fromJson(json['club'] as Map<String, dynamic>)
