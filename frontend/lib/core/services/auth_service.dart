@@ -25,7 +25,7 @@ class AuthService {
 
   static Future<bool> registerOwner(Map<String, dynamic> data) async {
     try {
-      String? _nullable(dynamic value) {
+      String? nullableString(dynamic value) {
         if (value == null) return null;
         final str = value.toString().trim();
         return str.isEmpty ? null : str;
@@ -44,15 +44,17 @@ class AuthService {
           accountTypeId: 2,
         ),
         ownerProfile: OwnerProfileDto(
-          inn: _nullable(data['inn']) ?? '',
-          legalName: _nullable(data['legalName']),
-          contactPerson: _nullable(data['contactPerson']),
-          contactPhone: _nullable(data['contactPhone']),
-          contactEmail: _nullable(data['contactEmail']),
+          inn: nullableString(data['inn']) ?? '',
+          legalName: nullableString(data['legalName']),
+          contactPerson: nullableString(data['contactPerson']),
+          contactPhone: nullableString(data['contactPhone']),
+          contactEmail: nullableString(data['contactEmail']),
         ),
         club: () {
-          final String? clubName = _nullable(data['clubName']) ?? _nullable(data['legalName']);
-          final String? clubAddress = _nullable(data['clubAddress']) ?? _nullable(data['address']);
+          final String? clubName =
+              nullableString(data['clubName']) ?? nullableString(data['legalName']);
+          final String? clubAddress =
+              nullableString(data['clubAddress']) ?? nullableString(data['address']);
           final dynamic rawLanes = data['lanesCount'] ?? data['lanes'];
           final int? lanesCount = rawLanes is int
               ? rawLanes
@@ -72,8 +74,9 @@ class AuthService {
             name: clubName,
             address: clubAddress,
             lanesCount: lanesCount,
-            contactPhone: _nullable(data['clubPhone']) ?? _nullable(data['contactPhone']),
-            contactEmail: _nullable(data['contactEmail']),
+            contactPhone:
+                nullableString(data['clubPhone']) ?? nullableString(data['contactPhone']),
+            contactEmail: nullableString(data['contactEmail']),
           );
         }(),
       );
@@ -158,69 +161,7 @@ class AuthService {
     }
   }
 
-  static Future<bool> registerManager(Map<String, dynamic> data) async {
-    try {
-      final password = (data['password'] as String?)?.trim();
-      if (password == null || password.isEmpty) {
-        throw ApiException('Введите пароль');
-      }
-
-      String? nullableString(dynamic value) {
-        if (value == null) return null;
-        final str = value.toString().trim();
-        return str.isEmpty ? null : str;
-      }
-
-      final normalizedPhone = nullableString(data['phone']) ?? data['phone'];
-
-      final request = RegisterRequestDto(
-        user: RegisterUserDto(
-          phone: normalizedPhone,
-          password: password,
-          roleId: 6,
-          accountTypeId: 3,
-        ),
-        managerProfile: ManagerProfileDto(
-          fullName: data['fio'],
-          contactEmail: nullableString(data['email']),
-          contactPhone: normalizedPhone,
-        ),
-      );
-
-      final response = await _api.register(request);
-      if (!response.isSuccess) {
-        throw ApiException(response.message);
-      }
-
-      final loginResult = await AuthService.login(phone: normalizedPhone, password: password);
-      if (loginResult == null) {
-        throw ApiException('Не удалось войти с новыми данными, попробуйте позже');
-      }
-
-      await LocalAuthStorage.clearMechanicState();
-      await LocalAuthStorage.clearOwnerState();
-      final profileData = {
-        'fullName': data['fio'],
-        'phone': normalizedPhone,
-        'email': nullableString(data['email']),
-        'clubName': '',
-        'address': '',
-        'clubs': <String>[],
-        'workplaceVerified': false,
-      };
-
-      await LocalAuthStorage.saveManagerProfile(profileData);
-      await LocalAuthStorage.setRegisteredRole('manager');
-
-      return true;
-    } on ApiException {
-      rethrow;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  static Future<bool> registerManager(Map<String, dynamic> data) async {
+  static Future<bool> registerHeadMechanic(Map<String, dynamic> data) async {
     try {
       final password = (data['password'] as String?)?.trim();
       if (password == null || password.isEmpty) {

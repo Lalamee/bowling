@@ -80,7 +80,7 @@ class _RegisterManagerScreenState extends State<RegisterManagerScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      final success = await AuthService.registerManager({
+      final success = await AuthService.registerHeadMechanic({
         'fio': _fio.text.trim(),
         'phone': normalizedPhone,
         'email': email.isEmpty ? null : email,
