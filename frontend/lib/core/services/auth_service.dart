@@ -161,7 +161,7 @@ class AuthService {
     }
   }
 
-  static Future<bool> registerManager(Map<String, dynamic> data) async {
+  static Future<bool> registerHeadMechanic(Map<String, dynamic> data) async {
     try {
       final password = (data['password'] as String?)?.trim();
       if (password == null || password.isEmpty) {
