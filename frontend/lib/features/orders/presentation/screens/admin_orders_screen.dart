@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/models/user_club.dart';
+import '../../../../core/repositories/clubs_repository.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
-import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/routing/routes.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/net_ui.dart';
-import '../../../../core/utils/user_club_resolver.dart';
+import '../../../../models/club_summary_dto.dart';
 import '../../../../models/maintenance_request_response_dto.dart';
-import '../../domain/order_status.dart';
 import '../widgets/order_status_badge.dart';
 import 'order_summary_screen.dart';
 
@@ -21,13 +19,11 @@ class AdminOrdersScreen extends StatefulWidget {
 
 class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   final MaintenanceRepository _maintenanceRepository = MaintenanceRepository();
-  final UserRepository _userRepository = UserRepository();
+  final ClubsRepository _clubsRepository = ClubsRepository();
 
   bool _isLoading = true;
   bool _hasError = false;
-  List<MaintenanceRequestResponseDto> _allRequests = [];
-  List<UserClub> _clubs = const [];
-  int? _selectedClubId;
+  List<_ClubOrdersSection> _sections = [];
 
   @override
   void initState() {
@@ -42,15 +38,15 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     });
 
     try {
-      final me = await _userRepository.me();
-      final clubs = resolveUserClubs(me);
-      final selectedClub = _resolveSelectedClubId(clubs, _selectedClubId);
-      final requests = await _fetchRequestsForClubs(clubs);
+      final requestsFuture = _maintenanceRepository.getAllRequests();
+      final clubsFuture = _clubsRepository.getClubs();
+      final requests = await requestsFuture;
+      final clubs = await clubsFuture;
+
       if (!mounted) return;
+
       setState(() {
-        _clubs = clubs;
-        _selectedClubId = selectedClub;
-        _allRequests = requests;
+        _sections = _buildSections(clubs, requests);
         _isLoading = false;
       });
     } catch (e) {
@@ -61,6 +57,40 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       });
       showApiError(context, e);
     }
+  }
+
+  List<_ClubOrdersSection> _buildSections(
+    List<ClubSummaryDto> clubs,
+    List<MaintenanceRequestResponseDto> requests,
+  ) {
+    final sections = <int?, _ClubOrdersSection>{};
+
+    for (final club in clubs) {
+      final id = club.id;
+      final name = _resolveClubName(id, club.name);
+      sections[id] = _ClubOrdersSection(clubId: id, clubName: name, orders: []);
+    }
+
+    for (final request in requests) {
+      final key = request.clubId;
+      final resolvedName = _resolveClubName(key, request.clubName);
+      final section = sections.putIfAbsent(
+        key,
+        () => _ClubOrdersSection(clubId: key, clubName: resolvedName, orders: []),
+      );
+      if (section.clubName.trim().isEmpty || section.clubName.startsWith('Клуб #')) {
+        section.clubName = resolvedName;
+      }
+      section.orders.add(request);
+    }
+
+    final list = sections.values.toList();
+    for (final section in list) {
+      _sortRequests(section.orders);
+      section.isOpen = section.orders.isNotEmpty;
+    }
+    list.sort((a, b) => a.clubName.toLowerCase().compareTo(b.clubName.toLowerCase()));
+    return list;
   }
 
   @override
@@ -102,24 +132,17 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     if (_hasError) {
       return _buildErrorState();
     }
-    if (_clubs.isEmpty) {
-      return _buildEmptyClubsState();
+    if (_sections.isEmpty) {
+      return _buildEmptyRequestsState();
     }
-
-    final requests = _filteredRequests;
 
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(
+      child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        children: [
-          _buildClubSelector(),
-          const SizedBox(height: 14),
-          if (requests.isEmpty)
-            _buildEmptyRequestsState()
-          else
-            ...requests.map(_buildRequestTile),
-        ],
+        itemCount: _sections.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (_, index) => _buildSectionCard(_sections[index], index),
       ),
     );
   }
@@ -134,7 +157,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
             const Icon(Icons.cloud_off, size: 56, color: AppColors.darkGray),
             const SizedBox(height: 12),
             const Text(
-              'Не удалось загрузить историю заказов',
+              'Не удалось загузить историю заказов',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 16, color: AppColors.darkGray),
             ),
@@ -153,7 +176,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 
-  Widget _buildEmptyClubsState() {
+  Widget _buildEmptyRequestsState() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -163,7 +186,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
             Icon(Icons.info_outline, size: 48, color: AppColors.darkGray),
             SizedBox(height: 12),
             Text(
-              'У вас нет привязанных клубов для просмотра истории заказов.',
+              'Заказы отсутствуют',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.darkGray),
             ),
@@ -173,48 +196,70 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 
-  Widget _buildEmptyRequestsState() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 48),
-      alignment: Alignment.center,
-      child: const Text(
-        'Заказы отсутствуют',
-        style: TextStyle(color: AppColors.darkGray, fontSize: 16),
-      ),
-    );
-  }
-
-  Widget _buildClubSelector() {
-    final items = <DropdownMenuItem<int?>>[];
-    if (_clubs.length > 1) {
-      items.add(const DropdownMenuItem<int?>(value: null, child: Text('Все клубы')));
-    }
-    items.addAll(
-      _clubs.map(
-        (club) => DropdownMenuItem<int?>(
-          value: club.id,
-          child: Text(club.name, overflow: TextOverflow.ellipsis),
-        ),
-      ),
-    );
+  Widget _buildSectionCard(_ClubOrdersSection section, int index) {
+    final borderColor = section.isOpen ? AppColors.primary : AppColors.lightGray;
+    final orderCount = section.orders.length;
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.primary),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 3))],
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 4))],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<int?>(
-          value: _selectedClubId,
-          isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.darkGray),
-          items: items,
-          onChanged: (value) => setState(() => _selectedClubId = value),
-        ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => _toggleSection(index),
+            borderRadius: BorderRadius.circular(18),
+            child: Container(
+              height: 56,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          section.clubName,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Всего заказов: $orderCount',
+                          style: const TextStyle(fontSize: 13, color: AppColors.darkGray),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    section.isOpen ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                    color: AppColors.darkGray,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (section.isOpen) const Divider(height: 1),
+          if (section.isOpen)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: _buildSectionContent(section),
+            ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildSectionContent(_ClubOrdersSection section) {
+    if (section.orders.isEmpty) {
+      return const Text('Заказы отсутствуют', style: TextStyle(color: AppColors.darkGray));
+    }
+
+    return Column(
+      children: section.orders.map(_buildRequestTile).toList(),
     );
   }
 
@@ -260,36 +305,10 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 
-  List<MaintenanceRequestResponseDto> get _filteredRequests {
-    final clubId = _selectedClubId;
-    if (clubId == null) {
-      return _allRequests;
-    }
-    return _allRequests.where((element) => element.clubId == clubId).toList();
-  }
-
-  Future<List<MaintenanceRequestResponseDto>> _fetchRequestsForClubs(List<UserClub> clubs) async {
-    if (clubs.isEmpty) {
-      return const [];
-    }
-
-    final responses = await Future.wait(
-      clubs.map((club) => _maintenanceRepository.getRequestsByClub(club.id)),
-    );
-
-    final combined = <MaintenanceRequestResponseDto>[];
-    final seen = <int>{};
-
-    for (final list in responses) {
-      for (final request in list) {
-        if (seen.add(request.requestId)) {
-          combined.add(request);
-        }
-      }
-    }
-
-    _sortRequests(combined);
-    return combined;
+  void _toggleSection(int index) {
+    setState(() {
+      _sections[index].isOpen = !_sections[index].isOpen;
+    });
   }
 
   void _sortRequests(List<MaintenanceRequestResponseDto> list) {
@@ -305,17 +324,15 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     });
   }
 
-  int? _resolveSelectedClubId(List<UserClub> clubs, int? current) {
-    if (clubs.isEmpty) {
-      return null;
+  String _resolveClubName(int? clubId, String? provided) {
+    final name = provided?.trim();
+    if (name != null && name.isNotEmpty) {
+      return name;
     }
-    if (current != null && clubs.any((club) => club.id == current)) {
-      return current;
+    if (clubId == null) {
+      return 'Без привязки к клубу';
     }
-    if (clubs.length == 1) {
-      return clubs.first.id;
-    }
-    return null;
+    return 'Клуб #$clubId';
   }
 
   String _formatDate(DateTime date) {
@@ -323,4 +340,18 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     final month = date.month.toString().padLeft(2, '0');
     return '$day.$month.${date.year}';
   }
+}
+
+class _ClubOrdersSection {
+  final int? clubId;
+  String clubName;
+  final List<MaintenanceRequestResponseDto> orders;
+  bool isOpen;
+
+  _ClubOrdersSection({
+    required this.clubId,
+    required this.clubName,
+    required this.orders,
+    this.isOpen = false,
+  });
 }

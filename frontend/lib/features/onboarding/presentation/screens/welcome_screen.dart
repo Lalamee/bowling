@@ -42,7 +42,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   void _enter() {
     if (TestOverrides.useLoginScreen) {
-      Navigator.pushReplacementNamed(context, Routes.authLogin);
+      Navigator.pushNamed(context, Routes.authLogin);
       return;
     }
     var role = _registeredRole?.trim().toLowerCase();
@@ -50,7 +50,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       role = TestOverrides.userRole.toLowerCase();
     }
     if (role == null || role.isEmpty) {
-      Navigator.pushReplacementNamed(context, Routes.authLogin);
+      Navigator.pushNamed(context, Routes.authLogin);
       return;
     }
     if (role == 'owner') {
