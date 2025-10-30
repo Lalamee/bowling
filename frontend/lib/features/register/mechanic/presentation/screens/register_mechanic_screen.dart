@@ -341,7 +341,10 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     } on ApiException catch (e) {
       if (e.statusCode == 403) {
         if (mounted) {
-          _showBar('Данные отправлены владельцу клуба. Дождитесь подтверждения аккаунта.');
+          final approvalMessage = hasSelectedClub
+              ? 'Данные отправлены владельцу клуба. Дождитесь подтверждения аккаунта.'
+              : 'Данные отправлены администрации приложения. Дождитесь подтверждения аккаунта.';
+          _showBar(approvalMessage);
           Navigator.of(context).pushNamedAndRemoveUntil(Routes.authLogin, (route) => false);
         }
       } else {
