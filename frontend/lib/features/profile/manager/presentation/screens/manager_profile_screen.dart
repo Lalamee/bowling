@@ -146,6 +146,8 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
       }
     }
 
+    bool workplaceVerified = false;
+
     if (managerProfile is Map) {
       final map = Map<String, dynamic>.from(managerProfile);
       addClubName(map['clubName'], prioritize: true);
@@ -158,6 +160,10 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
         }
       }
       resolvedAddress = asString(map['address']) ?? resolvedAddress;
+      final rawVerified = map['workplaceVerified'] ?? map['isVerified'];
+      if (rawVerified is bool) {
+        workplaceVerified = workplaceVerified || rawVerified;
+      }
     }
 
     if (ownerProfile is Map) {
@@ -185,6 +191,11 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
     final resolvedFullName = asString(me['fullName']) ?? resolvedPhone ?? fullName;
     final resolvedClubName = clubNames.isNotEmpty ? clubNames.first : null;
 
+    final rawVerified = me['workplaceVerified'] ?? me['isVerified'];
+    if (rawVerified is bool) {
+      workplaceVerified = workplaceVerified || rawVerified;
+    }
+
     return {
       'fullName': resolvedFullName,
       'phone': resolvedPhone,
@@ -192,6 +203,7 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
       'clubName': resolvedClubName,
       'address': resolvedAddress,
       'clubs': clubNames,
+      'workplaceVerified': workplaceVerified,
     };
   }
 
