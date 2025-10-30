@@ -31,6 +31,7 @@ public class AuthController {
                 request.getUser(),
                 request.getMechanicProfile(),
                 request.getOwnerProfile(),
+                request.getManagerProfile(),
                 request.getClub()
         );
         return ResponseEntity.status(HttpStatus.CREATED)

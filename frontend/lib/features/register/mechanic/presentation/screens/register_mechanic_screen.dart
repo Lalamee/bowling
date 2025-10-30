@@ -106,6 +106,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     });
     try {
       final clubs = await _clubsRepository.getClubs();
+      if (!mounted) return;
       setState(() {
         _clubs = clubs;
         _isLoadingClubs = false;
@@ -114,6 +115,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
         }
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _isLoadingClubs = false;
         _clubsError = 'Не удалось загрузить список клубов';
@@ -168,29 +170,17 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       _showBar('Выберите уровень образования');
       return;
     }
-    if (step == 2 && (status == null || status!.isEmpty)) {
-      _showBar('Выберите статус');
-      return;
-    }
     nextStep();
   }
 
   Future<void> _submit() async {
-    if (!formKey.currentState!.validate() || educationLevelId == null || status == null) {
+    if (!formKey.currentState!.validate() || educationLevelId == null) {
       if (educationLevelId == null) _showBar('Выберите уровень образования');
-      if (status == null) _showBar('Выберите статус');
-      if (educationLevelId != null && status != null) {
+      if (educationLevelId != null) {
         _showBar('Заполните обязательные поля');
       }
       return;
     }
-
-    if (_selectedClub == null) {
-      _showBar('Выберите клуб из списка');
-      return;
-    }
-
-    final selectedClub = _selectedClub!;
 
     final passwordValue = _password.text.trim();
     final confirmPasswordValue = _passwordConfirm.text.trim();
@@ -226,6 +216,12 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       }
     }
 
+    final selectedClub = _selectedClub;
+    if (selectedClub == null) {
+      _showBar('Выберите клуб из списка');
+      return;
+    }
+
     if (!places.contains(selectedClub.name)) {
       places.insert(0, selectedClub.name);
     }
@@ -234,6 +230,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     final normalizedPhone = PhoneUtils.normalize(_phone.text);
     final extraEducation = _extraEducation.text.trim();
     final skills = _skills.text.trim();
+    final workPlaces = places.join(', ');
+    final workPeriods = periods.join(', ');
 
     final data = {
       'fio': _fio.text.trim(),
@@ -250,8 +248,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'bowlingHistory': _bowlingHistory.text.trim(),
       'skills': skills.isEmpty ? null : skills,
       'status': trimmedStatus ?? status,
-      'workPlaces': places.join(', '),
-      'workPeriods': periods.join(', '),
+      'workPlaces': workPlaces.isEmpty ? null : workPlaces,
+      'workPeriods': workPeriods.isEmpty ? null : workPeriods,
       'clubId': selectedClub.id,
       'clubName': selectedClub.name,
       'clubAddress': selectedClub.address,
@@ -264,8 +262,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     }
 
     final clubsCache = List<String>.from(places);
-    if (clubsCache.isEmpty) {
-      clubsCache.add(selectedClub.name);
+    if (!clubsCache.contains(selectedClub.name)) {
+      clubsCache.insert(0, selectedClub.name);
     }
 
     final normalizedStatus = () {
@@ -276,7 +274,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       if (status != null && status!.trim().isNotEmpty) {
         return status!.trim();
       }
-      return 'Самозанятый';
+      return 'Не указан';
     }();
 
     final profileData = {
@@ -297,6 +295,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
 
       await LocalAuthStorage.saveMechanicProfile(profileData);
       await LocalAuthStorage.setMechanicRegistered(true);
+      await LocalAuthStorage.clearOwnerState();
+      await LocalAuthStorage.clearManagerState();
       await LocalAuthStorage.setRegisteredRole('mechanic');
 
       if (!mounted) return;
@@ -510,7 +510,12 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
             style: AppTextStyles.formHint,
           ),
         ],
-        LabeledTextField(label: 'Где и когда работали в боулинге', controller: _bowlingHistory, validator: Validators.bowlingHistorySoft, isRequired: true),
+        const SizedBox(height: 16),
+        LabeledTextField(
+          label: 'Где и когда работали в боулинге',
+          controller: _bowlingHistory,
+          validator: Validators.bowlingHistorySoft,
+        ),
         Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: Text(
@@ -520,11 +525,17 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
         ),
         LabeledTextField(label: 'Навыки и преимущества', controller: _skills),
         const SizedBox(height: 16),
-        formDescription('Ваш статус:'),
+        formDescription('Ваш статус (при наличии):'),
         RadioGroupHorizontal(
           options: const ['ИП', 'Самозанятый'],
           groupValue: status,
-          onChanged: (v) => setState(() => status = v),
+          onChanged: (v) => setState(() {
+            if (status == v) {
+              status = null;
+            } else {
+              status = v;
+            }
+          }),
         ),
       ],
     );

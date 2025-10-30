@@ -5,7 +5,7 @@ class MechanicProfileDto {
   final String? educationalInstitution;
   final int totalExperienceYears;
   final int bowlingExperienceYears;
-  final bool isEntrepreneur;
+  final bool? isEntrepreneur;
   final int? specializationId;
   final String? skills;
   final String? advantages;
@@ -20,7 +20,7 @@ class MechanicProfileDto {
     this.educationalInstitution,
     required this.totalExperienceYears,
     required this.bowlingExperienceYears,
-    this.isEntrepreneur = false,
+    this.isEntrepreneur,
     this.specializationId,
     this.skills,
     this.advantages,
@@ -53,7 +53,7 @@ class MechanicProfileDto {
       educationalInstitution: json['educationalInstitution'] as String?,
       totalExperienceYears: (json['totalExperienceYears'] as num).toInt(),
       bowlingExperienceYears: (json['bowlingExperienceYears'] as num).toInt(),
-      isEntrepreneur: json['isEntrepreneur'] as bool? ?? false,
+      isEntrepreneur: json['isEntrepreneur'] as bool?,
       specializationId: (json['specializationId'] as num?)?.toInt(),
       skills: json['skills'] as String?,
       advantages: json['advantages'] as String?,
