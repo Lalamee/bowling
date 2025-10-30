@@ -189,13 +189,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (role == 'mechanic') {
       await LocalAuthStorage.clearOwnerState();
+      await LocalAuthStorage.clearManagerState();
       await LocalAuthStorage.setMechanicRegistered(true);
     } else if (role == 'owner') {
       await LocalAuthStorage.clearMechanicState();
+      await LocalAuthStorage.clearManagerState();
       await LocalAuthStorage.setOwnerRegistered(true);
+    } else if (role == 'manager') {
+      await LocalAuthStorage.clearMechanicState();
+      await LocalAuthStorage.clearOwnerState();
     } else {
       await LocalAuthStorage.clearMechanicState();
       await LocalAuthStorage.clearOwnerState();
+      await LocalAuthStorage.clearManagerState();
     }
 
     await LocalAuthStorage.setRegisteredRole(role);

@@ -5,8 +5,10 @@ import '../../models/register_request_dto.dart';
 import '../../models/register_user_dto.dart';
 import '../../models/mechanic_profile_dto.dart';
 import '../../models/owner_profile_dto.dart';
+import '../../models/manager_profile_dto.dart';
 import '../../models/bowling_club_dto.dart';
 import '../../models/user_info_dto.dart';
+import 'local_auth_storage.dart';
 
 class AuthService {
   static final _api = ApiService();
@@ -102,6 +104,25 @@ class AuthService {
         throw ApiException('Введите пароль');
       }
 
+      bool? resolveEntrepreneurStatus() {
+        final raw = data['status']?.toString().toLowerCase().trim();
+        if (raw == null || raw.isEmpty) return null;
+        if (raw.contains('ип')) return true;
+        if (raw.contains('самозан')) return false;
+        return null;
+      }
+
+      String? nullableString(dynamic value) {
+        if (value == null) return null;
+        final str = value.toString().trim();
+        return str.isEmpty ? null : str;
+      }
+
+      final workPlaces = nullableString(data['workPlaces']);
+      final workPeriods = nullableString(data['workPeriods']);
+      final skills = nullableString(data['skills']);
+      final advantages = nullableString(data['advantages']);
+
       final request = RegisterRequestDto(
         user: RegisterUserDto(
           phone: data['phone'],
@@ -115,20 +136,86 @@ class AuthService {
           educationLevelId: int.tryParse(data['educationLevelId']?.toString() ?? '') ?? 1,
           educationalInstitution: data['educationName'],
           specializationId: int.tryParse(data['specializationId']?.toString() ?? '') ?? 1,
-          advantages: data['advantages'],
+          advantages: advantages,
           totalExperienceYears: int.tryParse(data['workYears']?.toString() ?? '0') ?? 0,
           bowlingExperienceYears: int.tryParse(data['bowlingYears']?.toString() ?? '0') ?? 0,
-          isEntrepreneur: (data['status']?.toString().toLowerCase() == 'самозанятый' ||
-                          data['status']?.toString().toLowerCase() == 'ип'),
-          skills: data['skills'],
-          workPlaces: data['workPlaces'],
-          workPeriods: data['workPeriods'],
+          isEntrepreneur: resolveEntrepreneurStatus(),
+          skills: skills,
+          workPlaces: workPlaces,
+          workPeriods: workPeriods,
           clubId: clubId,
         ),
       );
       final response = await _api.register(request);
-      return response.isSuccess;
-    } catch (e) {
+      if (!response.isSuccess) {
+        throw ApiException(response.message);
+      }
+      return true;
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException('Не удалось зарегистрировать механика');
+    }
+  }
+
+  static Future<bool> registerManager(Map<String, dynamic> data) async {
+    try {
+      final password = (data['password'] as String?)?.trim();
+      if (password == null || password.isEmpty) {
+        throw ApiException('Введите пароль');
+      }
+
+      String? nullableString(dynamic value) {
+        if (value == null) return null;
+        final str = value.toString().trim();
+        return str.isEmpty ? null : str;
+      }
+
+      final normalizedPhone = nullableString(data['phone']) ?? data['phone'];
+
+      final request = RegisterRequestDto(
+        user: RegisterUserDto(
+          phone: normalizedPhone,
+          password: password,
+          roleId: 6,
+          accountTypeId: 3,
+        ),
+        managerProfile: ManagerProfileDto(
+          fullName: data['fio'],
+          contactEmail: nullableString(data['email']),
+          contactPhone: normalizedPhone,
+        ),
+      );
+
+      final response = await _api.register(request);
+      if (!response.isSuccess) {
+        throw ApiException(response.message);
+      }
+
+      final loginResult = await AuthService.login(phone: normalizedPhone, password: password);
+      if (loginResult == null) {
+        throw ApiException('Не удалось войти с новыми данными, попробуйте позже');
+      }
+
+      await LocalAuthStorage.clearMechanicState();
+      await LocalAuthStorage.clearOwnerState();
+      final profileData = {
+        'fullName': data['fio'],
+        'phone': normalizedPhone,
+        'email': nullableString(data['email']),
+        'clubName': '',
+        'address': '',
+        'clubs': <String>[],
+        'workplaceVerified': false,
+      };
+
+      await LocalAuthStorage.saveManagerProfile(profileData);
+      await LocalAuthStorage.setRegisteredRole('manager');
+
+      return true;
+    } on ApiException {
+      rethrow;
+    } catch (_) {
       return false;
     }
   }

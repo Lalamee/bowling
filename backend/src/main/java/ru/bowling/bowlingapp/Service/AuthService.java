@@ -134,8 +134,12 @@ public class AuthService implements UserDetailsService {
     }
 
     @Transactional
-    public void registerUser(RegisterUserDTO dto, MechanicProfileDTO mechanicDto, OwnerProfileDTO ownerDto, BowlingClubDTO clubDto) {
-        AccountType accountType = validateRegistrationData(dto, mechanicDto, ownerDto, clubDto);
+    public void registerUser(RegisterUserDTO dto,
+                             MechanicProfileDTO mechanicDto,
+                             OwnerProfileDTO ownerDto,
+                             ManagerProfileDTO managerDto,
+                             BowlingClubDTO clubDto) {
+        AccountType accountType = validateRegistrationData(dto, mechanicDto, ownerDto, managerDto, clubDto);
 
         String normalizedPhone = normalizePhone(dto.getPhone());
         if (normalizedPhone == null) {
@@ -176,7 +180,7 @@ public class AuthService implements UserDetailsService {
                     .educationalInstitution(mechanicDto.getEducationalInstitution())
                     .totalExperienceYears(mechanicDto.getTotalExperienceYears())
                     .bowlingExperienceYears(mechanicDto.getBowlingExperienceYears())
-                    .isEntrepreneur(mechanicDto.isEntrepreneur())
+                    .isEntrepreneur(mechanicDto.getIsEntrepreneur())
                     .specializationId(mechanicDto.getSpecializationId())
                     .skills(mechanicDto.getSkills())
                     .advantages(mechanicDto.getAdvantages())
@@ -207,11 +211,21 @@ public class AuthService implements UserDetailsService {
             ownerProfile.setClubs(new ArrayList<>());
             user.setOwnerProfile(ownerProfile);
         } else if (isManagerAccountType(accountTypeName)) {
+            String managerFullName = managerDto != null && managerDto.getFullName() != null
+                    ? managerDto.getFullName().trim()
+                    : (ownerDto != null ? trimOrNull(ownerDto.getContactPerson()) : null);
+            if (managerFullName == null || managerFullName.isEmpty()) {
+                managerFullName = normalizedPhone;
+            }
+            String managerEmail = managerDto != null ? trimOrNull(managerDto.getContactEmail()) : null;
+            String managerPhone = managerDto != null && managerDto.getContactPhone() != null
+                    ? trimOrNull(managerDto.getContactPhone())
+                    : normalizedPhone;
             managerProfile = ManagerProfile.builder()
                     .user(user)
-                    .fullName(ownerDto != null ? ownerDto.getContactPerson() : null)
-                    .contactPhone(normalizedPhone)
-                    .contactEmail(ownerDto != null ? ownerDto.getContactEmail() : null)
+                    .fullName(managerFullName)
+                    .contactPhone(managerPhone != null ? managerPhone : normalizedPhone)
+                    .contactEmail(managerEmail)
                     .isDataVerified(false)
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
@@ -291,7 +305,11 @@ public class AuthService implements UserDetailsService {
         userRepository.save(user);
     }
     
-    private AccountType validateRegistrationData(RegisterUserDTO dto, MechanicProfileDTO mechanicDto, OwnerProfileDTO ownerDto, BowlingClubDTO clubDto) {
+    private AccountType validateRegistrationData(RegisterUserDTO dto,
+                                                 MechanicProfileDTO mechanicDto,
+                                                 OwnerProfileDTO ownerDto,
+                                                 ManagerProfileDTO managerDto,
+                                                 BowlingClubDTO clubDto) {
         if (dto == null) {
             throw new IllegalArgumentException("User registration data is required");
         }
@@ -326,8 +344,12 @@ public class AuthService implements UserDetailsService {
             if (mechanicDto.getBowlingExperienceYears() == null || mechanicDto.getBowlingExperienceYears() < 0) {
                 throw new IllegalArgumentException("Bowling experience years must be non-negative");
             }
-            if (mechanicDto.getClubId() == null) {
-                throw new IllegalArgumentException("Club selection is required for mechanic profile");
+        } else if (isManagerAccountType(accountType.getName())) {
+            if (managerDto == null) {
+                throw new IllegalArgumentException("Manager profile data is required for manager account type");
+            }
+            if (managerDto.getFullName() == null || managerDto.getFullName().trim().isEmpty()) {
+                throw new IllegalArgumentException("Full name is required for manager profile");
             }
         } else if (isOwnerAccountType(accountType.getName())) {
             if (ownerDto == null) {

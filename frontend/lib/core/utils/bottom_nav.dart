@@ -19,6 +19,17 @@ class BottomNavDirect {
 
     () async {
       final role = await _resolveRole();
+      final hasAccess = await _hasFullAccess(role);
+
+      if (tapped != 3 && !hasAccess) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Доступ к разделу откроется после подтверждения владельцем клуба'),
+          ),
+        );
+        return;
+      }
 
       switch (tapped) {
         case 0:
@@ -65,5 +76,37 @@ class BottomNavDirect {
 
     final fallback = TestOverrides.userRole.trim().toLowerCase();
     return fallback.isNotEmpty ? fallback : 'mechanic';
+  }
+
+  static Future<bool> _hasFullAccess(String role) async {
+    Map<String, dynamic>? profile;
+
+    if (role == 'mechanic') {
+      profile = await LocalAuthStorage.loadMechanicProfile();
+    } else if (role == 'manager') {
+      profile = await LocalAuthStorage.loadManagerProfile();
+    } else {
+      return true;
+    }
+
+    if (profile == null) {
+      return false;
+    }
+
+    bool _boolFrom(dynamic value) {
+      if (value is bool) return value;
+      if (value is String) {
+        final normalized = value.trim().toLowerCase();
+        if (normalized == 'true' || normalized == '1') return true;
+        if (normalized == 'false' || normalized == '0') return false;
+      }
+      return false;
+    }
+
+    final verified = _boolFrom(profile['workplaceVerified']) ||
+        _boolFrom(profile['isVerified']) ||
+        _boolFrom(profile['verified']);
+
+    return verified;
   }
 }

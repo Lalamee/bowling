@@ -14,6 +14,7 @@ import '../../features/onboarding/presentation/screens/register_role_selection.d
 
 import '../../features/register/mechanic/presentation/screens/register_mechanic_screen.dart';
 import '../../features/register/owner/presentation/screens/register_owner_screen.dart';
+import '../../features/register/manager/presentation/screens/register_manager_screen.dart';
 
 import '../../features/orders/presentation/screens/orders_screen.dart';
 import '../../features/orders/presentation/screens/order_summary_screen.dart';
@@ -63,6 +64,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const RegisterMechanicScreen());
       case Routes.registerOwner:
         return MaterialPageRoute(builder: (_) => const RegisterOwnerScreen());
+      case Routes.registerManager:
+        return MaterialPageRoute(builder: (_) => const RegisterManagerScreen());
 
       case Routes.orders:
         return MaterialPageRoute(builder: (_) => const OrdersScreen());

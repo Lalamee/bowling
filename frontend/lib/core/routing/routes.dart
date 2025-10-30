@@ -6,6 +6,7 @@ class Routes {
   static const registerRole = '/register/role';
   static const registerMechanic = '/register/mechanic';
   static const registerOwner = '/register/owner';
+  static const registerManager = '/register/manager';
 
   static const orders = '/orders';
   static const orderSummary = '/orders/summary';

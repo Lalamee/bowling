@@ -25,7 +25,7 @@ public class MechanicProfileDTO {
     @NotNull
     private Integer bowlingExperienceYears;
 
-    private boolean isEntrepreneur;
+    private Boolean isEntrepreneur;
 
     private Integer specializationId;
     private String skills;
