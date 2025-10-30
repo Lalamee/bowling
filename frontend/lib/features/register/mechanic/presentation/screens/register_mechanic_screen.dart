@@ -90,6 +90,45 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     super.dispose();
   }
 
+  Future<void> _loadClubs() async {
+    setState(() {
+      _isLoadingClubs = true;
+      _clubsError = null;
+    });
+    try {
+      final clubs = await _clubsRepository.getClubs();
+      if (!mounted) return;
+      setState(() {
+        _clubs = clubs;
+        _isLoadingClubs = false;
+        if (clubs.isEmpty) {
+          _clubsError = 'Список клубов пуст. Обратитесь к администратору.';
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingClubs = false;
+        _clubsError = 'Не удалось загрузить список клубов';
+      });
+    }
+  }
+
+  void _handleClubChange(int? clubId) {
+    if (clubId == null) {
+      setState(() => _selectedClub = null);
+      return;
+    }
+    ClubSummaryDto? selected;
+    for (final club in _clubs) {
+      if (club.id == clubId) {
+        selected = club;
+        break;
+      }
+    }
+    setState(() => _selectedClub = selected);
+  }
+
   Future<void> _pickBirthDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -168,6 +207,16 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       }
     }
 
+    final selectedClub = _selectedClub;
+    if (selectedClub == null) {
+      _showBar('Выберите клуб из списка');
+      return;
+    }
+
+    if (!places.contains(selectedClub.name)) {
+      places.insert(0, selectedClub.name);
+    }
+
     final trimmedStatus = status?.trim();
     final normalizedPhone = PhoneUtils.normalize(_phone.text);
     final extraEducation = _extraEducation.text.trim();
@@ -191,6 +240,9 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'status': trimmedStatus ?? status,
       'workPlaces': workPlaces.isEmpty ? null : workPlaces,
       'workPeriods': workPeriods.isEmpty ? null : workPeriods,
+      'clubId': selectedClub.id,
+      'clubName': selectedClub.name,
+      'clubAddress': selectedClub.address,
     };
 
     final success = await AuthService.registerMechanic(data);
@@ -200,6 +252,9 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     }
 
     final clubsCache = List<String>.from(places);
+    if (!clubsCache.contains(selectedClub.name)) {
+      clubsCache.insert(0, selectedClub.name);
+    }
 
     final normalizedStatus = () {
       final trimmed = trimmedStatus?.trim();
@@ -395,6 +450,56 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
           keyboardType: TextInputType.number,
           isRequired: true,
         ),
+        const SizedBox(height: 16),
+        formDescription('Выберите клуб, в котором вы работаете:'),
+        const SizedBox(height: 8),
+        if (_isLoadingClubs)
+          const Center(child: CircularProgressIndicator())
+        else if (_clubsError != null)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _clubsError!,
+                style: AppTextStyles.formHint.copyWith(color: Colors.red),
+              ),
+              TextButton(onPressed: _loadClubs, child: const Text('Повторить попытку')),
+            ],
+          )
+        else
+          DropdownButtonFormField<int>(
+            value: _selectedClub?.id,
+            items: _clubs
+                .map(
+                  (club) => DropdownMenuItem<int>(
+                    value: club.id,
+                    child: Text(
+                      club.address != null && club.address!.trim().isNotEmpty
+                          ? '${club.name} — ${club.address}'
+                          : club.name,
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: _handleClubChange,
+            decoration: const InputDecoration(labelText: 'Клуб *'),
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            validator: (value) {
+              if (value == null) {
+                return 'Выберите клуб';
+              }
+              return null;
+            },
+          ),
+        if (_selectedClub != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _selectedClub!.address != null && _selectedClub!.address!.trim().isNotEmpty
+                ? 'Адрес: ${_selectedClub!.address}'
+                : 'Адрес не указан',
+            style: AppTextStyles.formHint,
+          ),
+        ],
         const SizedBox(height: 16),
         LabeledTextField(
           label: 'Где и когда работали в боулинге',
