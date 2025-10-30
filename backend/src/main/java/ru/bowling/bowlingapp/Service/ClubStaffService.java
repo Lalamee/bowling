@@ -96,7 +96,7 @@ public class ClubStaffService {
                     .phone(manager.getContactPhone() != null ? manager.getContactPhone() : (managerUser != null ? managerUser.getPhone() : null))
                     .email(manager.getContactEmail())
                     .role(staffRoleToResponse(managerRole, managerUser != null ? managerUser.getRole() : null))
-                    .isActive(managerUser != null ? managerUser.getIsActive() : Boolean.TRUE)
+                    .isActive(resolveStaffActiveStatus(club, managerUser, managerUser != null ? managerUser.getIsActive() : Boolean.TRUE))
                     .build());
         }
 
@@ -109,7 +109,7 @@ public class ClubStaffService {
                     .phone(administrator.getContactPhone() != null ? administrator.getContactPhone() : (administratorUser != null ? administratorUser.getPhone() : null))
                     .email(administrator.getContactEmail())
                     .role(staffRoleToResponse(StaffRole.ADMINISTRATOR, administratorUser != null ? administratorUser.getRole() : null))
-                    .isActive(administratorUser != null ? administratorUser.getIsActive() : Boolean.TRUE)
+                    .isActive(resolveStaffActiveStatus(club, administratorUser, administratorUser != null ? administratorUser.getIsActive() : Boolean.TRUE))
                     .build());
         }
 
@@ -121,7 +121,7 @@ public class ClubStaffService {
                     .fullName(trim(mechanic.getFullName(), mechanicUser != null ? mechanicUser.getPhone() : null))
                     .phone(mechanicUser != null ? mechanicUser.getPhone() : null)
                     .role(staffRoleToResponse(StaffRole.MECHANIC, mechanicUser != null ? mechanicUser.getRole() : null))
-                    .isActive(mechanicUser != null ? mechanicUser.getIsActive() : Boolean.TRUE)
+                    .isActive(resolveStaffActiveStatus(club, mechanicUser, mechanicUser != null ? mechanicUser.getIsActive() : Boolean.TRUE))
                     .build());
         }
 
@@ -547,6 +547,23 @@ public class ClubStaffService {
         }
 
         clubStaffRepository.save(clubStaff);
+    }
+
+    private Boolean resolveStaffActiveStatus(BowlingClub club, User user, Boolean defaultValue) {
+        if (user == null) {
+            return defaultValue != null ? defaultValue : Boolean.TRUE;
+        }
+
+        return clubStaffRepository.findByClubAndUser(club, user)
+                .map(ClubStaff::getIsActive)
+                .filter(Objects::nonNull)
+                .orElseGet(() -> {
+                    Boolean userActive = user.getIsActive();
+                    if (userActive != null) {
+                        return userActive;
+                    }
+                    return defaultValue != null ? defaultValue : Boolean.TRUE;
+                });
     }
 
     private boolean isClubOwner(BowlingClub club, User user) {
