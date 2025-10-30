@@ -44,8 +44,14 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
 
   /// здесь храним именно **id** в виде строки, например "1"
   String? educationLevelId;
-  String? status;
+  String? _status;
   bool _isSubmitting = false;
+
+  late final ClubsRepository _clubsRepository = ClubsRepository();
+  List<ClubSummaryDto> _clubs = const <ClubSummaryDto>[];
+  bool _isLoadingClubs = true;
+  String? _clubsError;
+  ClubSummaryDto? _selectedClub;
 
   /// маппинг названия уровня образования в id
   static const _eduMap = <String, String>{
@@ -102,6 +108,12 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       setState(() {
         _clubs = clubs;
         _isLoadingClubs = false;
+        if (_selectedClub != null && !_clubs.any((club) => club.id == _selectedClub!.id)) {
+          _selectedClub = null;
+        }
+        if (_selectedClub == null && _clubs.length == 1) {
+          _selectedClub = _clubs.first;
+        }
         if (clubs.isEmpty) {
           _clubsError = 'Список клубов пуст. Обратитесь к администратору.';
         }
@@ -121,11 +133,10 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       return;
     }
     ClubSummaryDto? selected;
-    for (final club in _clubs) {
-      if (club.id == clubId) {
-        selected = club;
-        break;
-      }
+    try {
+      selected = _clubs.firstWhere((club) => club.id == clubId);
+    } catch (_) {
+      selected = null;
     }
     setState(() => _selectedClub = selected);
   }
@@ -225,7 +236,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       places.insert(0, selectedClub.name);
     }
 
-    final trimmedStatus = status?.trim();
+    final trimmedStatus = _status?.trim();
     final normalizedPhone = PhoneUtils.normalize(_phone.text);
     final extraEducation = _extraEducation.text.trim();
     final skills = _skills.text.trim();
@@ -245,7 +256,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'bowlingYears': _bowlingYears.text.trim(),
       'bowlingHistory': _bowlingHistory.text.trim(),
       'skills': skills.isEmpty ? null : skills,
-      'status': trimmedStatus ?? status,
+      'status': trimmedStatus ?? _status,
       'workPlaces': workPlaces.isEmpty ? null : workPlaces,
       'workPeriods': workPeriods.isEmpty ? null : workPeriods,
       'clubId': selectedClub.id,
@@ -255,10 +266,19 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
 
     setState(() => _isSubmitting = true);
 
-    final success = await AuthService.registerMechanic(data);
-    if (!success) {
+    try {
+      await AuthService.registerMechanic(data);
+    } on ApiException catch (e) {
+      _showBar(e.message);
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+      return;
+    } catch (_) {
       _showBar('Ошибка при отправке данных');
-      if (mounted) setState(() => _isSubmitting = false);
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
       return;
     }
 
@@ -267,8 +287,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       if (trimmed != null && trimmed.isNotEmpty) {
         return trimmed;
       }
-      if (status != null && status!.trim().isNotEmpty) {
-        return status!.trim();
+      if (_status != null && _status!.trim().isNotEmpty) {
+        return _status!.trim();
       }
       return 'Не указан';
     }();
@@ -533,12 +553,12 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
         formDescription('Ваш статус (при наличии):'),
         RadioGroupHorizontal(
           options: const ['ИП', 'Самозанятый'],
-          groupValue: status,
+          groupValue: _status,
           onChanged: (v) => setState(() {
-            if (status == v) {
-              status = null;
+            if (_status == v) {
+              _status = null;
             } else {
-              status = v;
+              _status = v;
             }
           }),
         ),
