@@ -45,6 +45,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
   /// здесь храним именно **id** в виде строки, например "1"
   String? educationLevelId;
   String? status;
+  bool _isSubmitting = false;
 
   /// маппинг названия уровня образования в id
   static const _eduMap = <String, String>{
@@ -165,11 +166,18 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
+
     if (!formKey.currentState!.validate() || educationLevelId == null) {
       if (educationLevelId == null) _showBar('Выберите уровень образования');
       if (educationLevelId != null) {
         _showBar('Заполните обязательные поля');
       }
+      return;
+    }
+
+    if (birthDate == null) {
+      _showBar('Выберите дату рождения');
       return;
     }
 
@@ -245,15 +253,13 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'clubAddress': selectedClub.address,
     };
 
+    setState(() => _isSubmitting = true);
+
     final success = await AuthService.registerMechanic(data);
     if (!success) {
       _showBar('Ошибка при отправке данных');
+      if (mounted) setState(() => _isSubmitting = false);
       return;
-    }
-
-    final clubsCache = List<String>.from(places);
-    if (!clubsCache.contains(selectedClub.name)) {
-      clubsCache.insert(0, selectedClub.name);
     }
 
     final normalizedStatus = () {
@@ -274,8 +280,10 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'address': '',
       'status': normalizedStatus,
       'birthDate': birthDate?.toIso8601String(),
-      'clubs': clubsCache,
+      'clubs': <String>[],
       'workplaceVerified': false,
+      'clubId': selectedClub.id,
+      'clubAddress': selectedClub.address,
     };
     try {
       final loginResult = await AuthService.login(phone: normalizedPhone, password: passwordValue);
@@ -302,6 +310,10 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       }
     } catch (e) {
       _showBar('Не удалось войти с новыми данными, попробуйте позже');
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
@@ -327,7 +339,10 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
             Padding(
               padding: const EdgeInsets.all(24),
               child: isLast
-                  ? CustomButton(text: 'Зарегистрироваться', onPressed: _submit)
+                  ? CustomButton(
+                      text: _isSubmitting ? 'Отправка…' : 'Зарегистрироваться',
+                      onPressed: _isSubmitting ? null : _submit,
+                    )
                   : CustomButton(text: 'Далее', onPressed: _nextStepGuarded),
             ),
           ],

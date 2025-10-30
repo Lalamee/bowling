@@ -93,11 +93,20 @@ class BottomNavDirect {
       return false;
     }
 
-    final verified = profile['workplaceVerified'] == true;
-    final clubs = profile['clubs'];
-    final hasClub = clubs is List &&
-        clubs.any((club) => club != null && club.toString().trim().isNotEmpty);
+    bool _boolFrom(dynamic value) {
+      if (value is bool) return value;
+      if (value is String) {
+        final normalized = value.trim().toLowerCase();
+        if (normalized == 'true' || normalized == '1') return true;
+        if (normalized == 'false' || normalized == '0') return false;
+      }
+      return false;
+    }
 
-    return verified || hasClub;
+    final verified = _boolFrom(profile['workplaceVerified']) ||
+        _boolFrom(profile['isVerified']) ||
+        _boolFrom(profile['verified']);
+
+    return verified;
   }
 }
