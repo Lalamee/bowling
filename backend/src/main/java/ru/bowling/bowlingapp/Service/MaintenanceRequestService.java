@@ -195,9 +195,16 @@ public class MaintenanceRequestService {
         }
 
         private boolean mechanicWorksInClub(MechanicProfile mechanicProfile, Long clubId) {
-                if (clubId == null) {
+                if (mechanicProfile == null || clubId == null) {
                         return false;
                 }
+
+                User mechanicUser = mechanicProfile.getUser();
+                if (mechanicUser != null && mechanicUser.getUserId() != null
+                                && clubStaffRepository.existsByClubClubIdAndUserUserIdAndIsActiveTrue(clubId, mechanicUser.getUserId())) {
+                        return true;
+                }
+
                 return Optional.ofNullable(mechanicProfile.getClubs())
                                 .orElse(List.of())
                                 .stream()
@@ -220,7 +227,7 @@ public class MaintenanceRequestService {
                         return true;
                 }
 
-                if (clubStaffRepository.existsByClubAndUser(club, user)) {
+                if (clubStaffRepository.existsByClubAndUserAndIsActiveTrue(club, user)) {
                         return true;
                 }
 

@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.DTO.GlobalSearchResponseDTO;
 import ru.bowling.bowlingapp.DTO.PartDto;
 import ru.bowling.bowlingapp.Entity.BowlingClub;
+import ru.bowling.bowlingapp.Entity.ClubStaff;
 import ru.bowling.bowlingapp.Entity.MaintenanceRequest;
 import ru.bowling.bowlingapp.Entity.MechanicProfile;
 import ru.bowling.bowlingapp.Entity.OwnerProfile;
@@ -15,6 +16,7 @@ import ru.bowling.bowlingapp.Entity.User;
 import ru.bowling.bowlingapp.Entity.WorkLog;
 import ru.bowling.bowlingapp.Entity.enums.MaintenanceRequestStatus;
 import ru.bowling.bowlingapp.Repository.BowlingClubRepository;
+import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
 import ru.bowling.bowlingapp.Repository.MaintenanceRequestRepository;
 import ru.bowling.bowlingapp.Repository.MechanicProfileRepository;
 import ru.bowling.bowlingapp.Repository.OwnerProfileRepository;
@@ -49,6 +51,7 @@ public class GlobalSearchService {
     private final MaintenanceRequestRepository maintenanceRequestRepository;
     private final WorkLogRepository workLogRepository;
     private final BowlingClubRepository bowlingClubRepository;
+    private final ClubStaffRepository clubStaffRepository;
 
     @Transactional(readOnly = true)
     public GlobalSearchResponseDTO search(String rawQuery, int limit, Long userId) {
@@ -336,11 +339,19 @@ public class GlobalSearchService {
 
     private List<Long> resolveAccessibleClubIds(String roleName, MechanicProfile mechanicProfile, ManagerProfile managerProfile, OwnerProfile ownerProfile) {
         Set<Long> ids = new LinkedHashSet<>();
-        if (("MECHANIC".equals(roleName) || mechanicProfile != null) && mechanicProfile != null && mechanicProfile.getClubs() != null) {
-            mechanicProfile.getClubs().stream()
-                    .map(BowlingClub::getClubId)
-                    .filter(Objects::nonNull)
-                    .forEach(ids::add);
+        if (("MECHANIC".equals(roleName) || mechanicProfile != null) && mechanicProfile != null) {
+            Long mechanicUserId = Optional.ofNullable(mechanicProfile.getUser())
+                    .map(User::getUserId)
+                    .orElse(null);
+            if (mechanicUserId != null) {
+                clubStaffRepository.findByUserUserIdAndIsActiveTrue(mechanicUserId)
+                        .stream()
+                        .map(ClubStaff::getClub)
+                        .filter(Objects::nonNull)
+                        .map(BowlingClub::getClubId)
+                        .filter(Objects::nonNull)
+                        .forEach(ids::add);
+            }
         }
         if (("HEAD_MECHANIC".equals(roleName) || managerProfile != null) && managerProfile != null && managerProfile.getClub() != null) {
             if (managerProfile.getClub().getClubId() != null) {

@@ -11,6 +11,8 @@ import java.util.Optional;
 public interface ClubStaffRepository extends JpaRepository<ClubStaff, Long> {
     Optional<ClubStaff> findByClubAndUser(BowlingClub club, User user);
     boolean existsByClubAndUser(BowlingClub club, User user);
+    boolean existsByClubAndUserAndIsActiveTrue(BowlingClub club, User user);
+    boolean existsByClubClubIdAndUserUserIdAndIsActiveTrue(Long clubId, Long userId);
 
     List<ClubStaff> findByUserUserIdAndIsActiveTrue(Long userId);
 }
