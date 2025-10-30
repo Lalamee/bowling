@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import '../../../../core/models/user_club.dart';
+import '../../../../core/services/local_auth_storage.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/chips/radio_group_horizontal.dart';
 import '../../../../shared/widgets/nav/app_bottom_nav.dart';
@@ -31,6 +32,9 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
   int? _selectedClubId;
   List<_Employee> _employees = [];
   final Map<int, String> _pendingPasswords = {};
+  String _currentRole = 'mechanic';
+
+  bool get _canApproveMechanics => _currentRole == 'owner' || _currentRole == 'manager';
 
   @override
   void initState() {
@@ -48,6 +52,7 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
       final data = await _userRepo.me();
       if (!mounted || data == null) return;
 
+      final role = await _resolveCurrentUserRole(data);
       final clubs = resolveUserClubs(data);
       int? desiredClubId = widget.clubId;
       if (desiredClubId != null && clubs.every((club) => club.id != desiredClubId)) {
@@ -61,12 +66,95 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
       setState(() {
         _ownerClubs = clubs;
         _selectedClubId = desiredClubId;
+        _currentRole = role;
       });
     } catch (e) {
       if (mounted) {
         showApiError(context, e);
       }
     }
+  }
+
+  Future<String> _resolveCurrentUserRole(Map<String, dynamic>? source) async {
+    String? mapRole(String? value) {
+      final normalized = value?.toLowerCase().trim();
+      if (normalized == null || normalized.isEmpty) return null;
+      if (normalized.contains('admin') || normalized.contains('админ')) return 'admin';
+      if (normalized.contains('owner') || normalized.contains('влад')) return 'owner';
+      if (normalized.contains('manager') ||
+          normalized.contains('менедж') ||
+          normalized.contains('chief') ||
+          normalized.contains('head')) {
+        return 'manager';
+      }
+      if (normalized.contains('mechanic') || normalized.contains('механ')) return 'mechanic';
+      return null;
+    }
+
+    Map<String, dynamic>? me;
+    if (source != null) {
+      if (source is Map<String, dynamic>) {
+        me = source;
+      } else if (source is Map) {
+        me = Map<String, dynamic>.from(source as Map);
+      }
+    }
+
+    String? resolved;
+
+    if (me != null) {
+      resolved ??= mapRole(me['accountTypeName']?.toString());
+      resolved ??= mapRole(me['accountType']?.toString());
+
+      final role = me['role'];
+      if (resolved == null && role is Map) {
+        resolved = mapRole(role['name']?.toString()) ??
+            mapRole(role['roleName']?.toString()) ??
+            mapRole(role['key']?.toString());
+      } else if (resolved == null && role is String) {
+        resolved = mapRole(role);
+      }
+
+      resolved ??= mapRole(me['roleName']?.toString());
+      resolved ??= mapRole(me['roleKey']?.toString());
+
+      final roleId = (me['roleId'] as num?)?.toInt();
+      if (resolved == null && roleId != null) {
+        switch (roleId) {
+          case 1:
+            resolved = 'admin';
+            break;
+          case 4:
+            resolved = 'mechanic';
+            break;
+          case 5:
+            resolved = 'owner';
+            break;
+          case 6:
+            resolved = 'manager';
+            break;
+        }
+      }
+
+      final accountTypeId = (me['accountTypeId'] as num?)?.toInt();
+      if (resolved == null && accountTypeId != null) {
+        switch (accountTypeId) {
+          case 2:
+            resolved = 'owner';
+            break;
+          case 1:
+            resolved = 'mechanic';
+            break;
+        }
+      }
+    }
+
+    if (resolved == null) {
+      final stored = await LocalAuthStorage.getRegisteredRole();
+      resolved = stored?.toLowerCase();
+    }
+
+    return resolved ?? 'mechanic';
   }
 
   Future<void> _loadStaff({int? clubId}) async {
@@ -102,6 +190,7 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
           final phone = (item['phone'] as String?)?.trim();
           final fio = (item['fullName'] as String?)?.trim();
           final isActive = item['isActive'] is bool ? item['isActive'] as bool : true;
+          final canToggleActive = _canApproveMechanics && rawRole == 'MECHANIC';
 
           return _Employee(
             userId: userId,
@@ -115,6 +204,7 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
             isActive: isActive,
             isOwner: rawRole == 'OWNER',
             tempPassword: tempPassword,
+            canToggleActive: canToggleActive,
           );
         }).toList();
         _isLoading = false;
@@ -598,6 +688,7 @@ class _Employee {
   bool isOwner;
   String? tempPassword;
   bool isStatusUpdating;
+  bool canToggleActive;
 
   bool get canModify => !isOwner;
 
@@ -614,6 +705,7 @@ class _Employee {
     this.isOwner = false,
     this.tempPassword,
     this.isStatusUpdating = false,
+    this.canToggleActive = false,
   });
 }
 
@@ -683,6 +775,17 @@ class _EmployeeCardState extends State<_EmployeeCard> {
 
   @override
   Widget build(BuildContext context) {
+    final awaitingApproval = !widget.employee.isActive && widget.employee.roleKey == 'MECHANIC';
+    final statusIcon = awaitingApproval
+        ? Icons.watch_later_outlined
+        : (widget.employee.isActive ? Icons.check_circle_outline : Icons.remove_circle_outline);
+    final statusColor = awaitingApproval
+        ? const Color(0xFFFB8C00)
+        : (widget.employee.isActive ? const Color(0xFF2E7D32) : const Color(0xFFB00020));
+    final statusText = awaitingApproval
+        ? 'Аккаунт ожидает подтверждения'
+        : (widget.employee.isActive ? 'Аккаунт активен' : 'Аккаунт отключён');
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       color: AppColors.white,
@@ -799,52 +902,45 @@ class _EmployeeCardState extends State<_EmployeeCard> {
               ),
             ),
             const SizedBox(height: 12),
-        Row(
-          children: [
-            Icon(
-              widget.employee.isActive ? Icons.check_circle_outline : Icons.remove_circle_outline,
-              color: widget.employee.isActive ? const Color(0xFF2E7D32) : const Color(0xFFB00020),
-              size: 18,
+            Row(
+              children: [
+                Icon(statusIcon, color: statusColor, size: 18),
+                const SizedBox(width: 8),
+                Text(statusText, style: const TextStyle(fontSize: 13, color: AppColors.darkGray)),
+              ],
             ),
-            const SizedBox(width: 8),
-            Text(
-              widget.employee.isActive ? 'Аккаунт активен' : 'Аккаунт отключен',
-              style: const TextStyle(fontSize: 13, color: AppColors.darkGray),
-            ),
-          ],
-        ),
-        if (widget.employee.canModify) ...[
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 44,
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: widget.employee.isStatusUpdating
-                  ? null
-                  : () => widget.onToggleActive(!widget.employee.isActive),
-              style: OutlinedButton.styleFrom(
-                foregroundColor:
-                    widget.employee.isActive ? AppColors.primary : const Color(0xFF2E7D32),
-                side: BorderSide(
-                  color: widget.employee.isActive ? AppColors.primary : const Color(0xFF2E7D32),
+            if (widget.employee.canToggleActive) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 44,
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: widget.employee.isStatusUpdating
+                      ? null
+                      : () => widget.onToggleActive(!widget.employee.isActive),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor:
+                        widget.employee.isActive ? AppColors.primary : const Color(0xFF2E7D32),
+                    side: BorderSide(
+                      color: widget.employee.isActive ? AppColors.primary : const Color(0xFF2E7D32),
+                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: widget.employee.isStatusUpdating
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(widget.employee.isActive ? 'Отключить механика' : 'Подтвердить механика'),
                 ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              child: widget.employee.isStatusUpdating
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(widget.employee.isActive ? 'Отключить аккаунт' : 'Подтвердить аккаунт'),
-            ),
-          ),
-        ],
-        if (widget.employee.tempPassword != null && widget.employee.tempPassword!.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
+            ],
+            if (widget.employee.tempPassword != null && widget.employee.tempPassword!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF5F5F5),
                   borderRadius: BorderRadius.circular(12),
