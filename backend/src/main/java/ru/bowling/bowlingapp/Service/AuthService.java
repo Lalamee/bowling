@@ -194,6 +194,8 @@ public class AuthService implements UserDetailsService {
                 mechanicClub = bowlingClubRepository.findById(mechanicDto.getClubId())
                         .orElseThrow(() -> new IllegalArgumentException("Selected club not found"));
                 mechanicProfile.setClubs(new ArrayList<>(Collections.singletonList(mechanicClub)));
+            } else {
+                mechanicProfile.setClubs(new ArrayList<>());
             }
             user.setMechanicProfile(mechanicProfile);
         } else if (isOwnerAccountType(accountTypeName)) {
