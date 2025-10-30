@@ -220,6 +220,68 @@ class AuthService {
     }
   }
 
+  static Future<bool> registerManager(Map<String, dynamic> data) async {
+    try {
+      final password = (data['password'] as String?)?.trim();
+      if (password == null || password.isEmpty) {
+        throw ApiException('Введите пароль');
+      }
+
+      String? nullableString(dynamic value) {
+        if (value == null) return null;
+        final str = value.toString().trim();
+        return str.isEmpty ? null : str;
+      }
+
+      final normalizedPhone = nullableString(data['phone']) ?? data['phone'];
+
+      final request = RegisterRequestDto(
+        user: RegisterUserDto(
+          phone: normalizedPhone,
+          password: password,
+          roleId: 6,
+          accountTypeId: 3,
+        ),
+        managerProfile: ManagerProfileDto(
+          fullName: data['fio'],
+          contactEmail: nullableString(data['email']),
+          contactPhone: normalizedPhone,
+        ),
+      );
+
+      final response = await _api.register(request);
+      if (!response.isSuccess) {
+        throw ApiException(response.message);
+      }
+
+      final loginResult = await AuthService.login(phone: normalizedPhone, password: password);
+      if (loginResult == null) {
+        throw ApiException('Не удалось войти с новыми данными, попробуйте позже');
+      }
+
+      await LocalAuthStorage.clearMechanicState();
+      await LocalAuthStorage.clearOwnerState();
+      final profileData = {
+        'fullName': data['fio'],
+        'phone': normalizedPhone,
+        'email': nullableString(data['email']),
+        'clubName': '',
+        'address': '',
+        'clubs': <String>[],
+        'workplaceVerified': false,
+      };
+
+      await LocalAuthStorage.saveManagerProfile(profileData);
+      await LocalAuthStorage.setRegisteredRole('manager');
+
+      return true;
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<void> logout() async {
     try {
       await _api.logout();
