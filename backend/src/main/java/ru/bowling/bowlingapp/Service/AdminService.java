@@ -7,11 +7,12 @@ import ru.bowling.bowlingapp.DTO.AdminMechanicClubDTO;
 import ru.bowling.bowlingapp.DTO.AdminMechanicListResponseDTO;
 import ru.bowling.bowlingapp.DTO.AdminMechanicSummaryDTO;
 import ru.bowling.bowlingapp.DTO.AdminPendingMechanicDTO;
-import ru.bowling.bowlingapp.Entity.BowlingClub;
 import ru.bowling.bowlingapp.Entity.MechanicProfile;
 import ru.bowling.bowlingapp.Entity.User;
+import ru.bowling.bowlingapp.Entity.BowlingClub;
 import ru.bowling.bowlingapp.Repository.MechanicProfileRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
+import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -26,14 +27,33 @@ public class AdminService {
 
     private final UserRepository userRepository;
     private final MechanicProfileRepository mechanicProfileRepository;
+    private final ClubStaffRepository clubStaffRepository;
 
     @Transactional
     public void verifyUser(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         user.setIsVerified(true);
+        user.setIsActive(true);
         if (user.getMechanicProfile() != null) {
-            user.getMechanicProfile().setIsDataVerified(true);
+            MechanicProfile mechanicProfile = user.getMechanicProfile();
+            mechanicProfile.setIsDataVerified(true);
+            mechanicProfileRepository.save(mechanicProfile);
+
+            if (mechanicProfile.getClubs() != null) {
+                for (BowlingClub club : mechanicProfile.getClubs()) {
+                    if (club == null) {
+                        continue;
+                    }
+                    clubStaffRepository.findByClubAndUser(club, user)
+                            .ifPresent(staff -> {
+                                if (!Boolean.TRUE.equals(staff.getIsActive())) {
+                                    staff.setIsActive(true);
+                                    clubStaffRepository.save(staff);
+                                }
+                            });
+                }
+            }
         }
         if (user.getOwnerProfile() != null) {
             user.getOwnerProfile().setIsDataVerified(true);
