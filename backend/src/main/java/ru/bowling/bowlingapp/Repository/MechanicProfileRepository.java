@@ -1,7 +1,7 @@
 package ru.bowling.bowlingapp.Repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Query;
 import ru.bowling.bowlingapp.Entity.MechanicProfile;
 
 import java.util.List;
@@ -11,8 +11,12 @@ public interface MechanicProfileRepository extends JpaRepository<MechanicProfile
     Optional<MechanicProfile> findByUser_UserId(Long userId);
     List<MechanicProfile> findByClubs_ClubId(Long clubId);
 
-    @Override
-    @EntityGraph(attributePaths = {"user", "clubs"})
-    List<MechanicProfile> findAll();
+    @Query("""
+            SELECT DISTINCT mp
+            FROM MechanicProfile mp
+            LEFT JOIN FETCH mp.user u
+            LEFT JOIN FETCH mp.clubs c
+            """)
+    List<MechanicProfile> findAllWithUserAndClubs();
 }
 
