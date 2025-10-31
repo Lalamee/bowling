@@ -2,8 +2,8 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 
-import '../../../../../core/repositories/club_staff_repository.dart';
-import '../../../../../core/repositories/clubs_repository.dart';
+import '../../../../../core/repositories/admin_mechanics_repository.dart';
+import '../../../../../core/repositories/admin_users_repository.dart';
 import '../../../../../core/routing/routes.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/utils/net_ui.dart';
@@ -16,106 +16,170 @@ class AdminMechanicsScreen extends StatefulWidget {
 }
 
 class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
-  final ClubsRepository _clubsRepository = ClubsRepository();
-  final ClubStaffRepository _staffRepository = ClubStaffRepository();
+  final AdminMechanicsRepository _mechanicsRepository = AdminMechanicsRepository();
+  final AdminUsersRepository _usersRepository = AdminUsersRepository();
 
   bool _isLoading = true;
   bool _hasError = false;
-  List<_ClubStaffSection> _sections = [];
+  List<_PendingMechanic> _pending = [];
+  List<_ClubMechanicsSection> _sections = [];
 
   @override
   void initState() {
     super.initState();
-    _loadSections();
+    _loadData();
   }
 
-  Future<void> _loadSections() async {
+  Future<void> _loadData() async {
     try {
-      setState(() {
-        _isLoading = true;
-        _hasError = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = true;
+          _hasError = false;
+        });
+      }
 
-      final clubs = await _clubsRepository.getClubs();
+      final overview = await _mechanicsRepository.getOverview();
       if (!mounted) return;
 
+      final pending = overview.pending.map(_mapPending).where((m) => m.userId != null).toList();
+      final sections = overview.clubs.map(_mapClub).toList();
+      sections.sort((a, b) => (a.clubName ?? '').toLowerCase().compareTo((b.clubName ?? '').toLowerCase()));
+
       setState(() {
-        _sections = clubs
-            .map(
-              (club) => _ClubStaffSection(
-                clubId: club.id,
-                clubName: club.name,
-                address: club.address,
-                contactPhone: club.contactPhone,
-                contactEmail: club.contactEmail,
-              ),
-            )
-            .toList();
+        _pending = pending;
+        _sections = sections;
         _isLoading = false;
+        _hasError = false;
       });
     } catch (e, s) {
-      log('Failed to load admin clubs: $e', stackTrace: s);
+      log('Failed to load admin mechanics: $e', stackTrace: s);
       if (!mounted) return;
       setState(() {
         _isLoading = false;
         _hasError = true;
+        _pending = [];
         _sections = [];
       });
       showApiError(context, e);
     }
   }
 
-  Future<void> _toggleSection(int index) async {
-    final section = _sections[index];
+  _PendingMechanic _mapPending(dynamic raw) {
+    final map = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
+    return _PendingMechanic(
+      userId: _asInt(map['userId']),
+      profileId: _asInt(map['profileId']),
+      name: _asString(map['fullName']) ?? 'Без имени',
+      phone: _asString(map['phone']),
+      clubId: _asInt(map['requestedClubId']),
+      clubName: _asString(map['requestedClubName']),
+      clubAddress: _asString(map['requestedClubAddress']),
+      createdAt: _asString(map['createdAt']),
+      isActive: _asBool(map['isActive']),
+      isVerified: _asBool(map['isVerified']),
+      isDataVerified: _asBool(map['isDataVerified']),
+    );
+  }
+
+  _ClubMechanicsSection _mapClub(dynamic raw) {
+    final map = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
+    final mechanicsRaw = map['mechanics'];
+    final mechanics = mechanicsRaw is List ? mechanicsRaw.map(_mapMechanic).toList() : <_MechanicInfo>[];
+    return _ClubMechanicsSection(
+      clubId: _asInt(map['clubId']),
+      clubName: _asString(map['clubName']) ?? 'Клуб',
+      address: _asString(map['address']),
+      contactPhone: _asString(map['contactPhone']),
+      contactEmail: _asString(map['contactEmail']),
+      mechanics: mechanics,
+    );
+  }
+
+  _MechanicInfo _mapMechanic(dynamic raw) {
+    final map = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
+    return _MechanicInfo(
+      userId: _asInt(map['userId']),
+      profileId: _asInt(map['profileId']),
+      name: _asString(map['fullName']) ?? 'Без имени',
+      phone: _asString(map['phone']),
+      isActive: _asBool(map['isActive']),
+      isVerified: _asBool(map['isVerified']),
+      isDataVerified: _asBool(map['isDataVerified']),
+    );
+  }
+
+  int? _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  bool? _asBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is String) {
+      final lower = value.toLowerCase();
+      if (lower == 'true') return true;
+      if (lower == 'false') return false;
+    }
+    if (value is num) return value != 0;
+    return null;
+  }
+
+  String? _asString(dynamic value) {
+    if (value == null) return null;
+    final str = value.toString().trim();
+    return str.isEmpty ? null : str;
+  }
+
+  void _toggleSection(int index) {
     setState(() {
-      section.isOpen = !section.isOpen;
-      if (section.isOpen && !section.staffLoaded) {
-        section.isLoading = true;
-        section.hasError = false;
-      }
+      _sections[index].isOpen = !_sections[index].isOpen;
+    });
+  }
+
+  Future<void> _approvePending(int index) async {
+    final mechanic = _pending[index];
+    if (mechanic.userId == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Подтверждение механика'),
+        content: Text('Подтвердить регистрацию механика "${mechanic.name}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Подтвердить')),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      mechanic.isProcessing = true;
     });
 
-    if (!section.isOpen || section.staffLoaded) {
-      return;
-    }
-
     try {
-      final staff = await _staffRepository.getClubStaff(section.clubId);
+      final success = await _usersRepository.verify('${mechanic.userId}');
       if (!mounted) return;
-
-      setState(() {
-        section.staff = staff.map(_mapStaffMember).toList();
-        section.isLoading = false;
-        section.staffLoaded = true;
-      });
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Механик подтверждён')),
+        );
+        await _loadData();
+      } else {
+        throw Exception('Не удалось подтвердить механика');
+      }
     } catch (e, s) {
-      log('Failed to load staff for club ${section.clubId}: $e', stackTrace: s);
+      log('Failed to verify mechanic ${mechanic.userId}: $e', stackTrace: s);
       if (!mounted) return;
       setState(() {
-        section.isLoading = false;
-        section.hasError = true;
+        mechanic.isProcessing = false;
       });
       showApiError(context, e);
     }
-  }
-
-  _StaffMember _mapStaffMember(dynamic raw) {
-    final map = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
-    final originalRole = (map['role'] ?? map['roleKey'] ?? '').toString().toUpperCase();
-    final normalizedRole = _normalizeRole(originalRole);
-    final name = (map['fullName'] as String?)?.trim();
-    final phone = (map['phone'] as String?)?.trim();
-    final email = (map['email'] as String?)?.trim();
-    final isActive = map['isActive'] is bool ? map['isActive'] as bool : true;
-
-    return _StaffMember(
-      roleKey: normalizedRole,
-      displayRole: _mapRoleToLabel(normalizedRole),
-      name: (name != null && name.isNotEmpty) ? name : 'Без имени',
-      phone: (phone != null && phone.isNotEmpty) ? phone : null,
-      email: (email != null && email.isNotEmpty) ? email : null,
-      isActive: isActive,
-    );
   }
 
   @override
@@ -130,12 +194,12 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Сотрудники клубов',
+          'Механики',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textDark),
         ),
         actions: [
           IconButton(
-            onPressed: _loadSections,
+            onPressed: _loadData,
             icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
           ),
         ],
@@ -155,10 +219,10 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('Не удалось загрузить список сотрудников', textAlign: TextAlign.center),
+              const Text('Не удалось загрузить список механиков', textAlign: TextAlign.center),
               const SizedBox(height: 12),
               ElevatedButton.icon(
-                onPressed: _loadSections,
+                onPressed: _loadData,
                 icon: const Icon(Icons.refresh_rounded),
                 label: const Text('Повторить'),
               ),
@@ -167,22 +231,121 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
         ),
       );
     }
-    if (_sections.isEmpty) {
-      return const Center(child: Text('Клубы не найдены'));
+
+    if (_pending.isEmpty && _sections.isEmpty) {
+      return const Center(child: Text('Механики не найдены'));
     }
 
     return RefreshIndicator(
-      onRefresh: _loadSections,
-      child: ListView.separated(
+      onRefresh: _loadData,
+      child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        itemCount: _sections.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, index) => _buildSectionCard(_sections[index], index),
+        children: [
+          if (_pending.isNotEmpty) ...[
+            _buildPendingSection(),
+            const SizedBox(height: 16),
+          ],
+          if (_sections.isEmpty)
+            const Center(child: Text('Клубы с механиками не найдены'))
+          else
+            for (var i = 0; i < _sections.length; i++) ...[
+              _buildSectionCard(_sections[i], i),
+              if (i < _sections.length - 1) const SizedBox(height: 12),
+            ],
+        ],
       ),
     );
   }
 
-  Widget _buildSectionCard(_ClubStaffSection section, int index) {
+  Widget _buildPendingSection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.primary.withOpacity(0.4)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 3))],
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Ожидают подтверждения',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
+          ),
+          const SizedBox(height: 12),
+          for (var i = 0; i < _pending.length; i++) ...[
+            if (i > 0) const SizedBox(height: 12),
+            _buildPendingTile(_pending[i], i),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPendingTile(_PendingMechanic mechanic, int index) {
+    final info = <String>[];
+    if (mechanic.phone != null) {
+      info.add(mechanic.phone!);
+    }
+    if (mechanic.clubName != null) {
+      info.add('Клуб: ${mechanic.clubName}');
+    }
+    if (mechanic.createdAt != null) {
+      info.add('Заявка от ${mechanic.createdAt}');
+    }
+
+    final status = <String>[];
+    if (mechanic.isActive == false) {
+      status.add('Аккаунт отключён');
+    }
+    if (mechanic.isVerified != true || mechanic.isDataVerified != true) {
+      status.add('Требует подтверждения');
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.lightGray),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            mechanic.name,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textDark),
+          ),
+          if (info.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(info.join(' • '), style: const TextStyle(fontSize: 13, color: AppColors.darkGray)),
+          ],
+          if (status.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(status.join(' • '), style: const TextStyle(fontSize: 12, color: AppColors.primary)),
+          ],
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
+              onPressed: (mechanic.userId == null || mechanic.isProcessing) ? null : () => _approvePending(index),
+              icon: mechanic.isProcessing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.check_circle_outline),
+              label: Text(mechanic.isProcessing ? 'Обработка…' : 'Подтвердить'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionCard(_ClubMechanicsSection section, int index) {
     final borderColor = section.isOpen ? AppColors.primary : AppColors.lightGray;
 
     return Container(
@@ -204,7 +367,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      section.clubName,
+                      section.clubName ?? 'Клуб',
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
                     ),
                   ),
@@ -227,7 +390,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     );
   }
 
-  Widget _buildSectionContent(_ClubStaffSection section) {
+  Widget _buildSectionContent(_ClubMechanicsSection section) {
     final children = <Widget>[
       _sectionTitle('Контактная информация'),
       _infoTile(Icons.place_outlined, section.address ?? '—'),
@@ -243,25 +406,15 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     }
 
     children.add(const SizedBox(height: 16));
-    children.add(_sectionTitle('Сотрудники клуба'));
+    children.add(_sectionTitle('Механики клуба'));
 
-    if (section.isLoading) {
+    if (section.mechanics.isEmpty) {
       children.add(const Padding(
         padding: EdgeInsets.symmetric(vertical: 16),
-        child: Center(child: CircularProgressIndicator()),
-      ));
-    } else if (section.hasError) {
-      children.add(const Padding(
-        padding: EdgeInsets.symmetric(vertical: 16),
-        child: Center(child: Text('Не удалось загрузить сотрудников')), 
-      ));
-    } else if (section.staff.isEmpty) {
-      children.add(const Padding(
-        padding: EdgeInsets.symmetric(vertical: 16),
-        child: Center(child: Text('Сотрудники не назначены')), 
+        child: Center(child: Text('Механики не назначены')),
       ));
     } else {
-      children.addAll(_buildGroupedStaff(section.staff));
+      children.addAll(_buildMechanicTiles(section.mechanics));
     }
 
     children.add(const SizedBox(height: 16));
@@ -288,59 +441,31 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     );
   }
 
-  List<Widget> _buildGroupedStaff(List<_StaffMember> staff) {
-    final groups = <String, List<_StaffMember>>{};
-    for (final member in staff) {
-      groups.putIfAbsent(member.roleKey, () => []).add(member);
-    }
-
-    final order = ['OWNER', 'ADMIN', 'MANAGER', 'HEAD_MECHANIC', 'MECHANIC', 'STAFF'];
-    final widgets = <Widget>[];
-    var firstGroup = true;
-
-    for (final role in order) {
-      final members = groups.remove(role);
-      if (members == null || members.isEmpty) continue;
-      if (!firstGroup) {
-        widgets.add(const SizedBox(height: 12));
-      }
-      firstGroup = false;
-      widgets.add(_groupHeader(_mapRoleToPlural(role)));
-      widgets.addAll(_buildStaffTiles(members));
-    }
-
-    if (groups.isNotEmpty) {
-      if (!firstGroup) {
-        widgets.add(const SizedBox(height: 12));
-      }
-      widgets.add(_groupHeader('Другие сотрудники'));
-      widgets.addAll(groups.values.expand(_buildStaffTiles));
-    }
-
-    return widgets;
-  }
-
-  List<Widget> _buildStaffTiles(List<_StaffMember> members) {
+  List<Widget> _buildMechanicTiles(List<_MechanicInfo> mechanics) {
     final tiles = <Widget>[];
-    for (var i = 0; i < members.length; i++) {
+    for (var i = 0; i < mechanics.length; i++) {
       if (i > 0) {
         tiles.add(const SizedBox(height: 8));
       }
-      tiles.add(_staffTile(members[i]));
+      tiles.add(_mechanicTile(mechanics[i]));
     }
     return tiles;
   }
 
-  Widget _staffTile(_StaffMember member) {
+  Widget _mechanicTile(_MechanicInfo mechanic) {
     final details = <String>[];
-    if (member.phone != null) {
-      details.add(member.phone!);
+    if (mechanic.phone != null) {
+      details.add(mechanic.phone!);
     }
-    if (member.email != null) {
-      details.add(member.email!);
+
+    final statuses = <String>[];
+    if (mechanic.isActive == false) {
+      statuses.add('Аккаунт отключён');
     }
-    if (!member.isActive) {
-      details.add('Аккаунт отключён');
+    if (mechanic.isVerified != true) {
+      statuses.add('Не подтверждён');
+    } else if (mechanic.isDataVerified != true) {
+      statuses.add('Данные не подтверждены');
     }
 
     return Container(
@@ -354,19 +479,21 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            member.name,
+            mechanic.name,
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textDark),
           ),
-          const SizedBox(height: 4),
-          Text(
-            member.displayRole,
-            style: const TextStyle(fontSize: 13, color: AppColors.darkGray),
-          ),
           if (details.isNotEmpty) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               details.join(' • '),
               style: const TextStyle(fontSize: 13, color: AppColors.darkGray),
+            ),
+          ],
+          if (statuses.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              statuses.join(' • '),
+              style: const TextStyle(fontSize: 12, color: AppColors.primary),
             ),
           ],
         ],
@@ -408,103 +535,72 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       ),
     );
   }
-
-  Widget _groupHeader(String text) {
-    return Text(
-      text,
-      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.darkGray),
-    );
-  }
-
-  String _normalizeRole(String role) {
-    switch (role) {
-      case 'ADMINISTRATOR':
-        return 'ADMIN';
-      case 'HEAD_MANAGER':
-      case 'CHIEF':
-        return 'MANAGER';
-      case 'HEAD_MECHANIC':
-      case 'LEAD_MECHANIC':
-        return 'HEAD_MECHANIC';
-      case 'MECHANICS':
-        return 'MECHANIC';
-      case 'OWNERS':
-        return 'OWNER';
-      default:
-        return role.isEmpty ? 'STAFF' : role;
-    }
-  }
-
-  String _mapRoleToLabel(String role) {
-    switch (role) {
-      case 'OWNER':
-        return 'Владелец клуба';
-      case 'ADMIN':
-        return 'Администратор клуба';
-      case 'MANAGER':
-        return 'Менеджер клуба';
-      case 'HEAD_MECHANIC':
-        return 'Старший механик';
-      case 'MECHANIC':
-        return 'Механик';
-      default:
-        return 'Сотрудник клуба';
-    }
-  }
-
-  String _mapRoleToPlural(String role) {
-    switch (role) {
-      case 'OWNER':
-        return 'Владельцы';
-      case 'ADMIN':
-        return 'Администраторы';
-      case 'MANAGER':
-        return 'Менеджеры';
-      case 'HEAD_MECHANIC':
-        return 'Старшие механики';
-      case 'MECHANIC':
-        return 'Механики';
-      default:
-        return 'Сотрудники';
-    }
-  }
 }
 
-class _ClubStaffSection {
-  final int clubId;
-  final String clubName;
-  final String? address;
-  final String? contactPhone;
-  final String? contactEmail;
-  bool isOpen = false;
-  bool isLoading = false;
-  bool staffLoaded = false;
-  bool hasError = false;
-  List<_StaffMember> staff = [];
+class _PendingMechanic {
+  final int? userId;
+  final int? profileId;
+  final String name;
+  final String? phone;
+  final int? clubId;
+  final String? clubName;
+  final String? clubAddress;
+  final String? createdAt;
+  final bool? isActive;
+  final bool? isVerified;
+  final bool? isDataVerified;
+  bool isProcessing = false;
 
-  _ClubStaffSection({
-    required this.clubId,
-    required this.clubName,
-    this.address,
-    this.contactPhone,
-    this.contactEmail,
+  _PendingMechanic({
+    required this.userId,
+    required this.profileId,
+    required this.name,
+    this.phone,
+    this.clubId,
+    this.clubName,
+    this.clubAddress,
+    this.createdAt,
+    this.isActive,
+    this.isVerified,
+    this.isDataVerified,
   });
 }
 
-class _StaffMember {
-  final String roleKey;
-  final String displayRole;
+class _ClubMechanicsSection {
+  final int? clubId;
+  final String? clubName;
+  final String? address;
+  final String? contactPhone;
+  final String? contactEmail;
+  final List<_MechanicInfo> mechanics;
+  bool isOpen = false;
+
+  _ClubMechanicsSection({
+    required this.clubId,
+    required this.clubName,
+    required this.address,
+    required this.contactPhone,
+    required this.contactEmail,
+    required this.mechanics,
+  });
+}
+
+class _MechanicInfo {
+  final int? userId;
+  final int? profileId;
   final String name;
   final String? phone;
-  final String? email;
-  final bool isActive;
+  final bool? isActive;
+  final bool? isVerified;
+  final bool? isDataVerified;
 
-  _StaffMember({
-    required this.roleKey,
-    required this.displayRole,
+  _MechanicInfo({
+    required this.userId,
+    required this.profileId,
     required this.name,
     this.phone,
-    this.email,
-    required this.isActive,
+    this.isActive,
+    this.isVerified,
+    this.isDataVerified,
   });
 }
