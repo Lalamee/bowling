@@ -87,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final role = await _cacheRole();
       if (!mounted) return;
       final destination = _routeForRole(role);
-      Navigator.of(context).pushReplacementNamed(destination);
+      Navigator.of(context).pushNamedAndRemoveUntil(destination, (route) => false);
     } on DioException catch (e) {
       final api = e.error is ApiException ? e.error as ApiException : null;
       closeLoader();
