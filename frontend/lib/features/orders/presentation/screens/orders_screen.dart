@@ -44,180 +44,189 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
+    return WillPopScope(
+      onWillPop: () async {
+        if (Navigator.of(context).canPop()) {
+          return true;
+        }
+        _handleBackFallback();
+        return false;
+      },
+      child: Scaffold(
         backgroundColor: AppColors.background,
-        elevation: 0,
-        leading: const BackButton(),
-        title: const Text(
-          'Заказы',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textDark),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: AppColors.primary),
-            onPressed: _load,
+        appBar: AppBar(
+          backgroundColor: AppColors.background,
+          elevation: 0,
+          leading: BackButton(onPressed: _handleBackPress),
+          title: const Text(
+            'Заказы',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textDark),
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _load,
-          child: Builder(
-            builder: (context) {
-              if (_isLoading) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (_hasError) {
-                return ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    const SizedBox(height: 160),
-                    Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.cloud_off, size: 56, color: AppColors.darkGray),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Не удалось загрузить заказы',
-                            style: TextStyle(color: AppColors.darkGray, fontSize: 16),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _load,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh, color: AppColors.primary),
+              onPressed: _load,
+            ),
+          ],
+        ),
+        body: SafeArea(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: Builder(
+              builder: (context) {
+                if (_isLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (_hasError) {
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      const SizedBox(height: 160),
+                      Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.cloud_off, size: 56, color: AppColors.darkGray),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Не удалось загрузить заказы',
+                              style: TextStyle(color: AppColors.darkGray, fontSize: 16),
+                              textAlign: TextAlign.center,
                             ),
-                            child: const Text('Повторить попытку'),
-                          ),
-                          TextButton(
-                            onPressed: _logout,
-                            child: const Text('Выйти из аккаунта'),
-                          ),
-                        ],
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _load,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              ),
+                              child: const Text('Повторить попытку'),
+                            ),
+                            TextButton(
+                              onPressed: _logout,
+                              child: const Text('Выйти из аккаунта'),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                );
-              }
-              if (_clubs.isEmpty) {
-                return ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    const SizedBox(height: 200),
-                    Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'Вы не привязаны ни к одному клубу',
-                            style: TextStyle(color: AppColors.darkGray, fontSize: 16),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 16),
-                          TextButton(
-                            onPressed: _logout,
-                            child: const Text('Выйти из аккаунта'),
-                          ),
-                        ],
+                    ],
+                  );
+                }
+                if (_clubs.isEmpty) {
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      const SizedBox(height: 200),
+                      Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'Вы не привязаны ни к одному клубу',
+                              style: TextStyle(color: AppColors.darkGray, fontSize: 16),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            TextButton(
+                              onPressed: _logout,
+                              child: const Text('Выйти из аккаунта'),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                );
-              }
+                    ],
+                  );
+                }
 
-              final requests = _filteredRequests;
-              if (requests.isEmpty) {
-                String emptyText;
-                switch (_filter) {
-                  case _OrdersFilter.archive:
-                    emptyText = 'Архивных заказов нет';
-                    break;
-                  case _OrdersFilter.active:
-                    emptyText = 'Нет текущих заказов';
-                    break;
-                  default:
-                    emptyText = 'Заказы отсутствуют';
-                    break;
+                final requests = _filteredRequests;
+                if (requests.isEmpty) {
+                  String emptyText;
+                  switch (_filter) {
+                    case _OrdersFilter.archive:
+                      emptyText = 'Архивных заказов нет';
+                      break;
+                    case _OrdersFilter.active:
+                      emptyText = 'Нет текущих заказов';
+                      break;
+                    default:
+                      emptyText = 'Заказы отсутствуют';
+                      break;
+                  }
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      const SizedBox(height: 200),
+                      Center(
+                        child: Text(
+                          emptyText,
+                          style: const TextStyle(color: AppColors.darkGray, fontSize: 16),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  );
                 }
                 return ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   children: [
-                    const SizedBox(height: 200),
-                    Center(
-                      child: Text(
-                        emptyText,
-                        style: const TextStyle(color: AppColors.darkGray, fontSize: 16),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
+                    _clubDropdown(),
+                    if (_laneOptions.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _laneDropdown(),
+                    ],
+                    const SizedBox(height: 12),
+                    _statusFilterChips(),
+                    const SizedBox(height: 12),
+                    ...List.generate(requests.length, (index) {
+                      final request = requests[index];
+                      final isExpanded = _expandedIndex == index;
+                      final statusCategory = mapOrderStatus(request.status);
+                      final canConfirm = _canConfirmRequest(request);
+                      final canComplete = _canCompleteRequest(request);
+                      final actionInProgress = _pendingRequestIds.contains(request.requestId);
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: index == requests.length - 1 ? 0 : 12),
+                        child: _OrderCard(
+                          request: request,
+                          expanded: isExpanded,
+                          statusCategory: statusCategory,
+                          canConfirm: canConfirm,
+                          canComplete: canComplete,
+                          actionInProgress: actionInProgress,
+                          onToggle: () {
+                            setState(() {
+                              _expandedIndex = isExpanded ? null : index;
+                            });
+                          },
+                          onOpenSummary: () => _openSummary(request),
+                          onConfirm: canConfirm ? () => _openSummary(request) : null,
+                          onComplete: canComplete
+                              ? () {
+                                  _completeRequest(request);
+                                }
+                              : null,
+                        ),
+                      );
+                    }),
                   ],
                 );
-              }
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                children: [
-                  _clubDropdown(),
-                  if (_laneOptions.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    _laneDropdown(),
-                  ],
-                  const SizedBox(height: 12),
-                  _statusFilterChips(),
-                  const SizedBox(height: 12),
-                  ...List.generate(requests.length, (index) {
-                    final request = requests[index];
-                    final isExpanded = _expandedIndex == index;
-                    final statusCategory = mapOrderStatus(request.status);
-                    final canConfirm = _canConfirmRequest(request);
-                    final canComplete = _canCompleteRequest(request);
-                    final actionInProgress = _pendingRequestIds.contains(request.requestId);
-                    return Padding(
-                      padding: EdgeInsets.only(bottom: index == requests.length - 1 ? 0 : 12),
-                      child: _OrderCard(
-                        request: request,
-                        expanded: isExpanded,
-                        statusCategory: statusCategory,
-                        canConfirm: canConfirm,
-                        canComplete: canComplete,
-                        actionInProgress: actionInProgress,
-                        onToggle: () {
-                          setState(() {
-                            _expandedIndex = isExpanded ? null : index;
-                          });
-                        },
-                        onOpenSummary: () => _openSummary(request),
-                        onConfirm: canConfirm ? () => _openSummary(request) : null,
-                        onComplete: canComplete
-                            ? () {
-                                _completeRequest(request);
-                              }
-                            : null,
-                      ),
-                    );
-                  }),
-                ],
-              );
-            },
+              },
+            ),
           ),
         ),
-      ),
-      floatingActionButton: (!_isMechanic || _clubs.isEmpty)
-          ? null
-          : FloatingActionButton(
-              onPressed: _openCreateRequest,
-              backgroundColor: AppColors.primary,
-              child: const Icon(Icons.add, color: Colors.white),
-            ),
-      bottomNavigationBar: AppBottomNav(
-        currentIndex: 0,
-        onTap: (i) => BottomNavDirect.go(context, 0, i),
+        floatingActionButton: (!_isMechanic || _clubs.isEmpty)
+            ? null
+            : FloatingActionButton(
+                onPressed: _openCreateRequest,
+                backgroundColor: AppColors.primary,
+                child: const Icon(Icons.add, color: Colors.white),
+              ),
+        bottomNavigationBar: AppBottomNav(
+          currentIndex: 0,
+          onTap: (i) => BottomNavDirect.go(context, 0, i),
+        ),
       ),
     );
   }
@@ -260,6 +269,30 @@ class _OrdersScreenState extends State<OrdersScreen> {
         _hasError = true;
       });
       showApiError(context, e);
+    }
+  }
+
+  void _handleBackPress() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
+    _handleBackFallback();
+  }
+
+  void _handleBackFallback() {
+    if (!mounted) {
+      return;
+    }
+    final role = _role ?? 'mechanic';
+    if (role == 'owner') {
+      Navigator.pushReplacementNamed(context, Routes.profileOwner);
+    } else if (role == 'manager') {
+      Navigator.pushReplacementNamed(context, Routes.profileManager);
+    } else if (role == 'admin') {
+      Navigator.pushReplacementNamed(context, Routes.profileAdmin);
+    } else {
+      Navigator.pushReplacementNamed(context, Routes.profileMechanic);
     }
   }
 
