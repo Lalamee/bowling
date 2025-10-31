@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import ru.bowling.bowlingapp.DTO.AdminMechanicListResponseDTO;
 import ru.bowling.bowlingapp.Service.AdminService;
 
 @RestController
@@ -13,6 +14,11 @@ import ru.bowling.bowlingapp.Service.AdminService;
 public class AdminController {
 
     private final AdminService adminService;
+
+    @GetMapping("/mechanics")
+    public ResponseEntity<AdminMechanicListResponseDTO> getMechanicsOverview() {
+        return ResponseEntity.ok(adminService.getMechanicsOverview());
+    }
 
     @PutMapping("/users/{userId}/verify")
     public ResponseEntity<?> verifyUser(@PathVariable Long userId) {
