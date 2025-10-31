@@ -216,7 +216,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
             ),
           ),
         ),
-      ),
         floatingActionButton: (!_isMechanic || _clubs.isEmpty)
             ? null
             : FloatingActionButton(
