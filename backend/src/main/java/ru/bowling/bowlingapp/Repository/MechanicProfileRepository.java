@@ -11,7 +11,8 @@ public interface MechanicProfileRepository extends JpaRepository<MechanicProfile
     Optional<MechanicProfile> findByUser_UserId(Long userId);
     List<MechanicProfile> findByClubs_ClubId(Long clubId);
 
+    @Override
     @EntityGraph(attributePaths = {"user", "clubs"})
-    List<MechanicProfile> findAllWithUserAndClubs();
+    List<MechanicProfile> findAll();
 }
 

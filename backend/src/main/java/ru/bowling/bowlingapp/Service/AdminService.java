@@ -60,7 +60,7 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public AdminMechanicListResponseDTO getMechanicsOverview() {
-        List<MechanicProfile> profiles = mechanicProfileRepository.findAllWithUserAndClubs();
+        List<MechanicProfile> profiles = mechanicProfileRepository.findAll();
 
         List<AdminPendingMechanicDTO> pending = new ArrayList<>();
         Map<Long, ClubMechanicsAggregate> clubAggregates = new LinkedHashMap<>();
