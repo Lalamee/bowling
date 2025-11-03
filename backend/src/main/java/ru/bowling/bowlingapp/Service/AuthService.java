@@ -164,8 +164,10 @@ public class AuthService implements UserDetailsService {
 
         String accountTypeName = accountType.getName();
         boolean mechanicAccount = isMechanicAccountType(accountTypeName);
+        boolean managerAccount = isManagerAccountType(accountTypeName);
 
         BowlingClub mechanicClub = null;
+        BowlingClub managerClub = null;
         MechanicProfile mechanicProfile = null;
         OwnerProfile ownerProfile = null;
         ManagerProfile managerProfile = null;
@@ -212,7 +214,7 @@ public class AuthService implements UserDetailsService {
                     .build();
             ownerProfile.setClubs(new ArrayList<>());
             user.setOwnerProfile(ownerProfile);
-        } else if (isManagerAccountType(accountTypeName)) {
+        } else if (managerAccount) {
             String managerFullName = managerDto != null && managerDto.getFullName() != null
                     ? managerDto.getFullName().trim()
                     : (ownerDto != null ? trimOrNull(ownerDto.getContactPerson()) : null);
@@ -232,6 +234,11 @@ public class AuthService implements UserDetailsService {
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
                     .build();
+            if (managerDto != null && managerDto.getClubId() != null) {
+                managerClub = bowlingClubRepository.findById(managerDto.getClubId())
+                        .orElseThrow(() -> new IllegalArgumentException("Selected club not found"));
+                managerProfile.setClub(managerClub);
+            }
             user.setManagerProfile(managerProfile);
         } else if (isAdministratorAccountType(accountTypeName)) {
             administratorProfile = AdministratorProfile.builder()
@@ -276,6 +283,25 @@ public class AuthService implements UserDetailsService {
                             .build());
             clubStaff.setRole(user.getRole());
             if (mechanicAccount) {
+                clubStaff.setIsActive(false);
+            }
+            if (clubStaff.getAssignedAt() == null) {
+                clubStaff.setAssignedAt(LocalDateTime.now());
+            }
+            clubStaffRepository.save(clubStaff);
+        }
+
+        if (managerClub != null) {
+            BowlingClub finalManagerClub = managerClub;
+            ClubStaff clubStaff = clubStaffRepository.findByClubAndUser(managerClub, user)
+                    .orElseGet(() -> ClubStaff.builder()
+                            .club(finalManagerClub)
+                            .user(user)
+                            .assignedAt(LocalDateTime.now())
+                            .isActive(!managerAccount)
+                            .build());
+            clubStaff.setRole(user.getRole());
+            if (managerAccount) {
                 clubStaff.setIsActive(false);
             }
             if (clubStaff.getAssignedAt() == null) {

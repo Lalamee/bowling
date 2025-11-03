@@ -34,7 +34,9 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
   final Map<int, String> _pendingPasswords = {};
   String _currentRole = 'mechanic';
 
-  bool get _canApproveMechanics => _currentRole == 'owner' || _currentRole == 'manager';
+  bool get _isOwner => _currentRole == 'owner';
+  bool get _canApproveMechanics => _isOwner || _currentRole == 'manager';
+  bool get _canApproveManagers => _isOwner;
 
   @override
   void initState() {
@@ -190,7 +192,13 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
           final phone = (item['phone'] as String?)?.trim();
           final fio = (item['fullName'] as String?)?.trim();
           final isActive = item['isActive'] is bool ? item['isActive'] as bool : true;
-          final canToggleActive = _canApproveMechanics && rawRole == 'MECHANIC';
+          final normalizedRole = rawRole.toUpperCase();
+          bool canToggleActive = false;
+          if (normalizedRole == 'MECHANIC') {
+            canToggleActive = _canApproveMechanics;
+          } else if (normalizedRole == 'HEAD_MECHANIC' || normalizedRole == 'MANAGER') {
+            canToggleActive = _canApproveManagers;
+          }
 
           return _Employee(
             userId: userId,
@@ -691,6 +699,8 @@ class _Employee {
   bool canToggleActive;
 
   bool get canModify => !isOwner;
+  bool get isMechanicRole => roleKey == 'MECHANIC';
+  bool get isManagerRole => roleKey == 'HEAD_MECHANIC' || roleKey == 'MANAGER';
 
   _Employee({
     this.userId,
@@ -775,7 +785,7 @@ class _EmployeeCardState extends State<_EmployeeCard> {
 
   @override
   Widget build(BuildContext context) {
-    final awaitingApproval = !widget.employee.isActive && widget.employee.roleKey == 'MECHANIC';
+    final awaitingApproval = widget.employee.canToggleActive && !widget.employee.isActive;
     final statusIcon = awaitingApproval
         ? Icons.watch_later_outlined
         : (widget.employee.isActive ? Icons.check_circle_outline : Icons.remove_circle_outline);
@@ -785,6 +795,11 @@ class _EmployeeCardState extends State<_EmployeeCard> {
     final statusText = awaitingApproval
         ? 'Аккаунт ожидает подтверждения'
         : (widget.employee.isActive ? 'Аккаунт активен' : 'Аккаунт отключён');
+    final toggleNoun = widget.employee.isMechanicRole
+        ? 'механика'
+        : (widget.employee.isManagerRole ? 'менеджера' : 'сотрудника');
+    final confirmLabel = 'Подтвердить $toggleNoun';
+    final disableLabel = 'Отключить $toggleNoun';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -932,7 +947,7 @@ class _EmployeeCardState extends State<_EmployeeCard> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(widget.employee.isActive ? 'Отключить механика' : 'Подтвердить механика'),
+                      : Text(widget.employee.isActive ? disableLabel : confirmLabel),
                 ),
               ),
             ],
