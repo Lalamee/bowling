@@ -117,7 +117,10 @@ public class KnowledgeBaseService {
         }
 
         ManagerProfile managerProfile = user.getManagerProfile();
-        if (managerProfile != null && managerProfile.getClub() != null) {
+        if (managerProfile != null && managerProfile.getClub() != null
+                && Boolean.TRUE.equals(user.getIsVerified())
+                && Boolean.TRUE.equals(managerProfile.getIsDataVerified())
+                && clubStaffRepository.existsByClubAndUserAndIsActiveTrue(managerProfile.getClub(), user)) {
             Long clubId = managerProfile.getClub().getClubId();
             if (clubId != null) {
                 clubIds.add(clubId);
