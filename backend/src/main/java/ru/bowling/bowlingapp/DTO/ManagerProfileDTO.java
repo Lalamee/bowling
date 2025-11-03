@@ -19,4 +19,6 @@ public class ManagerProfileDTO {
     private String contactEmail;
 
     private String contactPhone;
+
+    private Long clubId;
 }

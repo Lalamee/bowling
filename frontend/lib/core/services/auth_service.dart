@@ -175,6 +175,12 @@ class AuthService {
       }
 
       final normalizedPhone = nullableString(data['phone']) ?? data['phone'];
+      final dynamic rawClubId = data['clubId'];
+      final int? clubId = rawClubId is int
+          ? rawClubId
+          : int.tryParse(rawClubId?.toString() ?? '');
+      final clubName = nullableString(data['clubName']);
+      final clubAddress = nullableString(data['clubAddress']);
 
       final request = RegisterRequestDto(
         user: RegisterUserDto(
@@ -187,6 +193,7 @@ class AuthService {
           fullName: data['fio'],
           contactEmail: nullableString(data['email']),
           contactPhone: normalizedPhone,
+          clubId: clubId,
         ),
       );
 
@@ -206,9 +213,10 @@ class AuthService {
         'fullName': data['fio'],
         'phone': normalizedPhone,
         'email': nullableString(data['email']),
-        'clubName': '',
-        'address': '',
-        'clubs': <String>[],
+        'clubId': clubId,
+        'clubName': clubName ?? '',
+        'address': clubAddress ?? '',
+        'clubs': clubName != null && clubName.isNotEmpty ? [clubName] : <String>[],
         'workplaceVerified': false,
       };
 

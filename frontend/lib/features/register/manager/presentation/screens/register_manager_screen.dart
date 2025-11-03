@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../api/api_core.dart' show ApiException;
+import '../../../../../core/repositories/clubs_repository.dart';
 import '../../../../../core/routing/routes.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/utils/phone_utils.dart';
 import '../../../../../core/utils/validators.dart';
+import '../../../../../models/club_summary_dto.dart';
 import '../../../../../shared/widgets/buttons/custom_button.dart';
 import '../../../../../shared/widgets/inputs/labeled_text_field.dart';
 import '../../../../../shared/widgets/layout/common_ui.dart';
@@ -26,6 +28,11 @@ class _RegisterManagerScreenState extends State<RegisterManagerScreen> {
   final _passwordConfirm = TextEditingController();
 
   bool _isSubmitting = false;
+  late final ClubsRepository _clubsRepository = ClubsRepository();
+  List<ClubSummaryDto> _clubs = const <ClubSummaryDto>[];
+  bool _isLoadingClubs = true;
+  String? _clubsError;
+  ClubSummaryDto? _selectedClub;
 
   @override
   void initState() {
@@ -33,6 +40,7 @@ class _RegisterManagerScreenState extends State<RegisterManagerScreen> {
     if (_phone.text.isEmpty) {
       _phone.text = '+7 ';
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadClubs());
   }
 
   @override
@@ -49,6 +57,50 @@ class _RegisterManagerScreenState extends State<RegisterManagerScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: AppColors.primary),
     );
+  }
+
+  Future<void> _loadClubs() async {
+    setState(() {
+      _isLoadingClubs = true;
+      _clubsError = null;
+    });
+    try {
+      final clubs = await _clubsRepository.getClubs();
+      if (!mounted) return;
+      setState(() {
+        _clubs = clubs;
+        _isLoadingClubs = false;
+        if (_selectedClub != null && !_clubs.any((club) => club.id == _selectedClub!.id)) {
+          _selectedClub = null;
+        }
+        if (_selectedClub == null && _clubs.length == 1) {
+          _selectedClub = _clubs.first;
+        }
+        if (clubs.isEmpty) {
+          _clubsError = 'Список клубов пуст. Обратитесь к администратору.';
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingClubs = false;
+        _clubsError = 'Не удалось загрузить список клубов';
+      });
+    }
+  }
+
+  void _handleClubChange(int? clubId) {
+    if (clubId == null) {
+      setState(() => _selectedClub = null);
+      return;
+    }
+    ClubSummaryDto? selected;
+    try {
+      selected = _clubs.firstWhere((club) => club.id == clubId);
+    } catch (_) {
+      selected = null;
+    }
+    setState(() => _selectedClub = selected);
   }
 
   Future<void> _submit() async {
@@ -77,6 +129,7 @@ class _RegisterManagerScreenState extends State<RegisterManagerScreen> {
 
     final normalizedPhone = PhoneUtils.normalize(_phone.text);
     final email = _email.text.trim();
+    final selectedClub = _selectedClub;
 
     setState(() => _isSubmitting = true);
     try {
@@ -85,6 +138,9 @@ class _RegisterManagerScreenState extends State<RegisterManagerScreen> {
         'phone': normalizedPhone,
         'email': email.isEmpty ? null : email,
         'password': password,
+        'clubId': selectedClub?.id,
+        'clubName': selectedClub?.name,
+        'clubAddress': selectedClub?.address,
       });
 
       if (!success) {
@@ -114,6 +170,8 @@ class _RegisterManagerScreenState extends State<RegisterManagerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final selectedClub = _selectedClub;
+    final selectedClubAddress = selectedClub?.address?.trim();
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -173,6 +231,61 @@ class _RegisterManagerScreenState extends State<RegisterManagerScreen> {
                   },
                   isRequired: true,
                 ),
+                const SizedBox(height: 16),
+                sectionTitle('Рабочее место'),
+                formDescription(
+                    'Если вы уже работаете в клубе, выберите его из списка. Без выбора вы зарегистрируетесь как свободный менеджер.'),
+                const SizedBox(height: 8),
+                if (_isLoadingClubs)
+                  const Center(child: CircularProgressIndicator())
+                else if (_clubsError != null)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _clubsError!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                      TextButton(onPressed: _loadClubs, child: const Text('Повторить попытку')),
+                    ],
+                  )
+                else
+                  DropdownButtonFormField<int>(
+                    value: selectedClub?.id,
+                    items: _clubs
+                        .map(
+                          (club) {
+                            final address = club.address?.trim();
+                            final hasAddress = address != null && address.isNotEmpty;
+                            final title = hasAddress ? '${club.name} — $address' : club.name;
+                            return DropdownMenuItem<int>(
+                              value: club.id,
+                              child: Text(title),
+                            );
+                          },
+                        )
+                        .toList(),
+                    onChanged: _handleClubChange,
+                    decoration: const InputDecoration(labelText: 'Клуб (по желанию)'),
+                  ),
+                if (selectedClub == null) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Без выбранного клуба вас сможет подключить к системе только администратор.',
+                    style: TextStyle(color: Colors.black54),
+                  ),
+                ] else ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Вы выбрали: ${selectedClub.name}',
+                    style: const TextStyle(color: Colors.black87),
+                  ),
+                  if (selectedClubAddress != null && selectedClubAddress.isNotEmpty)
+                    Text(
+                      selectedClubAddress,
+                      style: const TextStyle(color: Colors.black54),
+                    ),
+                ],
                 const SizedBox(height: 24),
                 CustomButton(
                   text: _isSubmitting ? 'Отправка...' : 'Зарегистрироваться',
