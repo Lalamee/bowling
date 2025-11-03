@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+
 import '../../api/api_core.dart';
 import '../../api/api_service.dart';
 import '../../models/user_login_dto.dart';
@@ -182,6 +184,10 @@ class AuthService {
       final clubName = nullableString(data['clubName']);
       final clubAddress = nullableString(data['clubAddress']);
 
+      if (clubId == null) {
+        throw ApiException('Выберите клуб, в котором вы работаете');
+      }
+
       final request = RegisterRequestDto(
         user: RegisterUserDto(
           phone: normalizedPhone,
@@ -226,8 +232,14 @@ class AuthService {
       return true;
     } on ApiException {
       rethrow;
+    } on DioException catch (e) {
+      final error = e.error;
+      if (error is ApiException) {
+        throw error;
+      }
+      throw ApiException('Не удалось зарегистрироваться. Попробуйте позже.');
     } catch (_) {
-      return false;
+      throw ApiException('Не удалось зарегистрироваться. Попробуйте позже.');
     }
   }
 

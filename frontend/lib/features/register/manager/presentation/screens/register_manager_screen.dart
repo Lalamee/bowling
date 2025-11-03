@@ -90,17 +90,16 @@ class _RegisterManagerScreenState extends State<RegisterManagerScreen> {
   }
 
   void _handleClubChange(int? clubId) {
-    if (clubId == null) {
-      setState(() => _selectedClub = null);
-      return;
-    }
     ClubSummaryDto? selected;
-    try {
-      selected = _clubs.firstWhere((club) => club.id == clubId);
-    } catch (_) {
-      selected = null;
+    if (clubId != null) {
+      try {
+        selected = _clubs.firstWhere((club) => club.id == clubId);
+      } catch (_) {
+        selected = null;
+      }
     }
     setState(() => _selectedClub = selected);
+    _formKey.currentState?.validate();
   }
 
   Future<void> _submit() async {
@@ -131,6 +130,11 @@ class _RegisterManagerScreenState extends State<RegisterManagerScreen> {
     final email = _email.text.trim();
     final selectedClub = _selectedClub;
 
+    if (selectedClub == null) {
+      _showMessage('Выберите клуб, в котором вы работаете');
+      return;
+    }
+
     setState(() => _isSubmitting = true);
     try {
       final success = await AuthService.registerHeadMechanic({
@@ -138,9 +142,9 @@ class _RegisterManagerScreenState extends State<RegisterManagerScreen> {
         'phone': normalizedPhone,
         'email': email.isEmpty ? null : email,
         'password': password,
-        'clubId': selectedClub?.id,
-        'clubName': selectedClub?.name,
-        'clubAddress': selectedClub?.address,
+        'clubId': selectedClub.id,
+        'clubName': selectedClub.name,
+        'clubAddress': selectedClub.address,
       });
 
       if (!success) {
@@ -234,7 +238,7 @@ class _RegisterManagerScreenState extends State<RegisterManagerScreen> {
                 const SizedBox(height: 16),
                 sectionTitle('Рабочее место'),
                 formDescription(
-                    'Если вы уже работаете в клубе, выберите его из списка. Без выбора вы зарегистрируетесь как свободный менеджер.'),
+                    'Выберите клуб, в котором вы работаете. Без выбора регистрация невозможна.'),
                 const SizedBox(height: 8),
                 if (_isLoadingClubs)
                   const Center(child: CircularProgressIndicator())
@@ -252,6 +256,8 @@ class _RegisterManagerScreenState extends State<RegisterManagerScreen> {
                 else
                   DropdownButtonFormField<int>(
                     value: selectedClub?.id,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    validator: (value) => value == null ? 'Выберите клуб' : null,
                     items: _clubs
                         .map(
                           (club) {
@@ -266,15 +272,9 @@ class _RegisterManagerScreenState extends State<RegisterManagerScreen> {
                         )
                         .toList(),
                     onChanged: _handleClubChange,
-                    decoration: const InputDecoration(labelText: 'Клуб (по желанию)'),
+                    decoration: const InputDecoration(labelText: 'Клуб *'),
                   ),
-                if (selectedClub == null) ...[
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Без выбранного клуба вас сможет подключить к системе только администратор.',
-                    style: TextStyle(color: Colors.black54),
-                  ),
-                ] else ...[
+                if (selectedClub != null) ...[
                   const SizedBox(height: 8),
                   Text(
                     'Вы выбрали: ${selectedClub.name}',
