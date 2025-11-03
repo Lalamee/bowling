@@ -70,12 +70,12 @@ public class GlobalSearchService {
         ManagerProfile managerProfile = managerProfileRepository.findByUser_UserId(userId).orElse(null);
         OwnerProfile ownerProfile = ownerProfileRepository.findByUser_UserId(userId).orElse(null);
 
-        List<Long> accessibleClubIds = resolveAccessibleClubIds(roleName, mechanicProfile, managerProfile, ownerProfile);
+        List<Long> accessibleClubIds = resolveAccessibleClubIds(user, roleName, mechanicProfile, managerProfile, ownerProfile);
 
         List<PartDto> parts = searchParts(normalizedQuery, limit, accessibleClubIds, roleName);
-        List<GlobalSearchResponseDTO.MaintenanceRequestResult> requests = searchMaintenanceRequests(loweredQuery, hasQuery, limit, roleName, mechanicProfile, managerProfile, ownerProfile);
-        List<GlobalSearchResponseDTO.WorkLogResult> workLogs = searchWorkLogs(loweredQuery, hasQuery, limit, roleName, mechanicProfile, managerProfile, ownerProfile);
-        List<GlobalSearchResponseDTO.ClubResult> clubs = searchClubs(loweredQuery, hasQuery, limit, roleName, accessibleClubIds, ownerProfile, managerProfile);
+        List<GlobalSearchResponseDTO.MaintenanceRequestResult> requests = searchMaintenanceRequests(loweredQuery, hasQuery, limit, user, roleName, mechanicProfile, managerProfile, ownerProfile);
+        List<GlobalSearchResponseDTO.WorkLogResult> workLogs = searchWorkLogs(loweredQuery, hasQuery, limit, user, roleName, mechanicProfile, managerProfile, ownerProfile);
+        List<GlobalSearchResponseDTO.ClubResult> clubs = searchClubs(loweredQuery, hasQuery, limit, user, roleName, accessibleClubIds, ownerProfile, managerProfile);
 
         return GlobalSearchResponseDTO.builder()
                 .parts(parts)
@@ -128,6 +128,7 @@ public class GlobalSearchService {
             String loweredQuery,
             boolean hasQuery,
             int limit,
+            User user,
             String roleName,
             MechanicProfile mechanicProfile,
             ManagerProfile managerProfile,
@@ -139,7 +140,7 @@ public class GlobalSearchService {
             pool.addAll(maintenanceRequestRepository.findAllByOrderByRequestDateDesc());
         } else if ("MECHANIC".equals(roleName) && mechanicProfile != null) {
             pool.addAll(maintenanceRequestRepository.findByMechanic_ProfileId(mechanicProfile.getProfileId()));
-        } else if ("HEAD_MECHANIC".equals(roleName) && managerProfile != null && managerProfile.getClub() != null) {
+        } else if ("HEAD_MECHANIC".equals(roleName) && hasVerifiedManagerAccess(user, managerProfile)) {
             pool.addAll(maintenanceRequestRepository.findByClubClubIdOrderByRequestDateDesc(managerProfile.getClub().getClubId()));
         } else if ("CLUB_OWNER".equals(roleName) && ownerProfile != null && ownerProfile.getClubs() != null) {
             for (BowlingClub club : ownerProfile.getClubs()) {
@@ -201,6 +202,7 @@ public class GlobalSearchService {
             String loweredQuery,
             boolean hasQuery,
             int limit,
+            User user,
             String roleName,
             MechanicProfile mechanicProfile,
             ManagerProfile managerProfile,
@@ -213,7 +215,7 @@ public class GlobalSearchService {
             collected.addAll(workLogRepository.findAllByOrderByCreatedDateDesc(PageRequest.of(0, pageSize)).getContent());
         } else if ("MECHANIC".equals(roleName) && mechanicProfile != null) {
             collected.addAll(workLogRepository.findByMechanicProfileId(mechanicProfile.getProfileId(), PageRequest.of(0, pageSize)).getContent());
-        } else if ("HEAD_MECHANIC".equals(roleName) && managerProfile != null && managerProfile.getClub() != null) {
+        } else if ("HEAD_MECHANIC".equals(roleName) && hasVerifiedManagerAccess(user, managerProfile)) {
             collected.addAll(workLogRepository.findByClubClubId(managerProfile.getClub().getClubId(), PageRequest.of(0, pageSize)).getContent());
         } else if ("CLUB_OWNER".equals(roleName) && ownerProfile != null && ownerProfile.getClubs() != null) {
             for (BowlingClub club : ownerProfile.getClubs()) {
@@ -276,6 +278,7 @@ public class GlobalSearchService {
             String loweredQuery,
             boolean hasQuery,
             int limit,
+            User user,
             String roleName,
             List<Long> accessibleClubIds,
             OwnerProfile ownerProfile,
@@ -287,7 +290,7 @@ public class GlobalSearchService {
             clubs.addAll(bowlingClubRepository.findAll());
         } else if ("CLUB_OWNER".equals(roleName) && ownerProfile != null && ownerProfile.getClubs() != null) {
             clubs.addAll(ownerProfile.getClubs());
-        } else if ("HEAD_MECHANIC".equals(roleName) && managerProfile != null && managerProfile.getClub() != null) {
+        } else if ("HEAD_MECHANIC".equals(roleName) && hasVerifiedManagerAccess(user, managerProfile)) {
             clubs.add(managerProfile.getClub());
         } else if (!accessibleClubIds.isEmpty()) {
             for (Long id : accessibleClubIds) {
@@ -337,7 +340,7 @@ public class GlobalSearchService {
         return false;
     }
 
-    private List<Long> resolveAccessibleClubIds(String roleName, MechanicProfile mechanicProfile, ManagerProfile managerProfile, OwnerProfile ownerProfile) {
+    private List<Long> resolveAccessibleClubIds(User user, String roleName, MechanicProfile mechanicProfile, ManagerProfile managerProfile, OwnerProfile ownerProfile) {
         Set<Long> ids = new LinkedHashSet<>();
         if (("MECHANIC".equals(roleName) || mechanicProfile != null) && mechanicProfile != null) {
             Long mechanicUserId = Optional.ofNullable(mechanicProfile.getUser())
@@ -353,10 +356,12 @@ public class GlobalSearchService {
                         .forEach(ids::add);
             }
         }
-        if (("HEAD_MECHANIC".equals(roleName) || managerProfile != null) && managerProfile != null && managerProfile.getClub() != null) {
-            if (managerProfile.getClub().getClubId() != null) {
-                ids.add(managerProfile.getClub().getClubId());
-            }
+        if (("HEAD_MECHANIC".equals(roleName) || managerProfile != null)
+                && hasVerifiedManagerAccess(user, managerProfile)
+                && managerProfile != null
+                && managerProfile.getClub() != null
+                && managerProfile.getClub().getClubId() != null) {
+            ids.add(managerProfile.getClub().getClubId());
         }
         if (("CLUB_OWNER".equals(roleName) || ownerProfile != null) && ownerProfile != null && ownerProfile.getClubs() != null) {
             ownerProfile.getClubs().stream()
@@ -365,5 +370,18 @@ public class GlobalSearchService {
                     .forEach(ids::add);
         }
         return new ArrayList<>(ids);
+    }
+
+    private boolean hasVerifiedManagerAccess(User user, ManagerProfile managerProfile) {
+        if (user == null || managerProfile == null || managerProfile.getClub() == null) {
+            return false;
+        }
+        if (!Boolean.TRUE.equals(user.getIsVerified())) {
+            return false;
+        }
+        if (!Boolean.TRUE.equals(managerProfile.getIsDataVerified())) {
+            return false;
+        }
+        return clubStaffRepository.existsByClubAndUserAndIsActiveTrue(managerProfile.getClub(), user);
     }
 }

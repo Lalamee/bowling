@@ -231,9 +231,7 @@ public class MaintenanceRequestService {
                         return true;
                 }
 
-                ManagerProfile managerProfile = user.getManagerProfile();
-                if (managerProfile != null && managerProfile.getClub() != null
-                                && Objects.equals(managerProfile.getClub().getClubId(), club.getClubId())) {
+                if (hasActiveManagerAccess(user, club)) {
                         return true;
                 }
 
@@ -257,6 +255,31 @@ public class MaintenanceRequestService {
                 }
                 String roleName = user.getRole().getName().toUpperCase(Locale.ROOT);
                 return roleName.contains("ADMIN");
+        }
+
+        private boolean hasActiveManagerAccess(User user, BowlingClub club) {
+                if (user == null || club == null) {
+                        return false;
+                }
+
+                ManagerProfile managerProfile = user.getManagerProfile();
+                if (managerProfile == null || managerProfile.getClub() == null) {
+                        return false;
+                }
+
+                if (!Boolean.TRUE.equals(user.getIsVerified())) {
+                        return false;
+                }
+
+                if (!Boolean.TRUE.equals(managerProfile.getIsDataVerified())) {
+                        return false;
+                }
+
+                if (!Objects.equals(managerProfile.getClub().getClubId(), club.getClubId())) {
+                        return false;
+                }
+
+                return clubStaffRepository.existsByClubAndUserAndIsActiveTrue(club, user);
         }
 
         private User findUserByLogin(String login) {

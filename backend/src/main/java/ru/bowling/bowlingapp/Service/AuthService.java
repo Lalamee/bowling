@@ -379,6 +379,9 @@ public class AuthService implements UserDetailsService {
             if (managerDto.getFullName() == null || managerDto.getFullName().trim().isEmpty()) {
                 throw new IllegalArgumentException("Full name is required for manager profile");
             }
+            if (managerDto.getClubId() == null) {
+                throw new IllegalArgumentException("Club selection is required for manager profile");
+            }
         } else if (isOwnerAccountType(accountType.getName())) {
             if (ownerDto == null) {
                 throw new IllegalArgumentException("Owner profile data is required for club owner account type");
