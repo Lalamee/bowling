@@ -170,8 +170,9 @@ public class AuthService implements UserDetailsService {
                 .build();
 
         String accountTypeName = accountType.getName();
-        boolean mechanicAccount = isMechanicAccountType(accountTypeName);
-        boolean managerAccount = isManagerAccountType(accountTypeName);
+        boolean managerAccount = isManagerAccountType(accountTypeName) || isManagerRole(role);
+        boolean mechanicAccount = !managerAccount
+                && (isMechanicAccountType(accountTypeName) || isMechanicRole(role));
 
         BowlingClub mechanicClub = null;
         BowlingClub managerClub = null;
@@ -363,7 +364,13 @@ public class AuthService implements UserDetailsService {
 
         AccountType accountType = resolveAccountType(dto);
 
-        if (isMechanicAccountType(accountType.getName())) {
+        boolean managerRegistration = isManagerAccountType(accountType.getName())
+                || isManagerRoleCode(dto.getRoleId());
+        boolean mechanicRegistration = !managerRegistration
+                && (isMechanicAccountType(accountType.getName())
+                || isMechanicRoleCode(dto.getRoleId()));
+
+        if (mechanicRegistration) {
             if (mechanicDto == null) {
                 throw new IllegalArgumentException("Mechanic profile data is required for mechanic account type");
             }
@@ -379,7 +386,7 @@ public class AuthService implements UserDetailsService {
             if (mechanicDto.getBowlingExperienceYears() == null || mechanicDto.getBowlingExperienceYears() < 0) {
                 throw new IllegalArgumentException("Bowling experience years must be non-negative");
             }
-        } else if (isManagerAccountType(accountType.getName())) {
+        } else if (managerRegistration) {
             if (managerDto == null) {
                 throw new IllegalArgumentException("Manager profile data is required for manager account type");
             }
@@ -997,6 +1004,30 @@ public class AuthService implements UserDetailsService {
             return null;
         }
         return accountTypeName.replaceAll("[\\s_\\-]", "").toUpperCase(Locale.ROOT);
+    }
+
+    private boolean isManagerRole(Role role) {
+        if (role == null || role.getName() == null) {
+            return false;
+        }
+        String normalized = role.getName().trim().toUpperCase(Locale.ROOT);
+        return "HEAD_MECHANIC".equals(normalized) || "MANAGER".equals(normalized);
+    }
+
+    private boolean isMechanicRole(Role role) {
+        if (role == null || role.getName() == null) {
+            return false;
+        }
+        String normalized = role.getName().trim().toUpperCase(Locale.ROOT);
+        return "MECHANIC".equals(normalized);
+    }
+
+    private boolean isManagerRoleCode(Integer roleId) {
+        return roleId != null && roleId == ROLE_HEAD_MECHANIC_ID;
+    }
+
+    private boolean isMechanicRoleCode(Integer roleId) {
+        return roleId != null && roleId == ROLE_MECHANIC_ID;
     }
 
     private boolean isAdministratorAccountType(String accountTypeName) {
