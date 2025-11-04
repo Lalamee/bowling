@@ -112,9 +112,16 @@ public class AuthService implements UserDetailsService {
 
     private boolean isMechanicAccountType(String accountTypeName) {
         String normalized = normalizeAccountTypeName(accountTypeName);
+        if (normalized == null) {
+            return false;
+        }
+
+        if (isManagerAccountType(accountTypeName)) {
+            return false;
+        }
+
         return "INDIVIDUAL".equals(normalized)
                 || "МЕХАНИК".equals(normalized)
-                || "ГЛАВНЫЙ МЕХАНИК".equals(normalized)
                 || "ФИЗИЧЕСКОЕ ЛИЦО".equals(normalized)
                 || "ФИЗ ЛИЦО".equals(normalized)
                 || "ФИЗЛИЦО".equals(normalized);
@@ -969,10 +976,27 @@ public class AuthService implements UserDetailsService {
 
     private boolean isManagerAccountType(String accountTypeName) {
         String normalized = normalizeAccountTypeName(accountTypeName);
+        if (normalized == null) {
+            return false;
+        }
+
+        String compact = normalizeAccountTypeKey(accountTypeName);
+
         return "MANAGER".equals(normalized)
+                || "MANAGER".equals(compact)
                 || "HEADMECHANIC".equals(normalized)
+                || "HEADMECHANIC".equals(compact)
                 || "МЕНЕДЖЕР".equals(normalized)
-                || "ГЛАВНЫЙМЕХАНИК".equals(normalized);
+                || "МЕНЕДЖЕР".equals(compact)
+                || "ГЛАВНЫЙМЕХАНИК".equals(normalized)
+                || "ГЛАВНЫЙМЕХАНИК".equals(compact);
+    }
+
+    private String normalizeAccountTypeKey(String accountTypeName) {
+        if (accountTypeName == null) {
+            return null;
+        }
+        return accountTypeName.replaceAll("[\\s_\\-]", "").toUpperCase(Locale.ROOT);
     }
 
     private boolean isAdministratorAccountType(String accountTypeName) {
