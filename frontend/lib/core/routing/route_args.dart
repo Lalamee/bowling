@@ -25,3 +25,11 @@ class ClubWarehouseArgs {
 
   const ClubWarehouseArgs({required this.clubId, this.clubName, this.inventoryId, this.searchQuery});
 }
+
+class ClubLanesArgs {
+  final int clubId;
+  final String? clubName;
+  final int? lanesCount;
+
+  const ClubLanesArgs({required this.clubId, this.clubName, this.lanesCount});
+}

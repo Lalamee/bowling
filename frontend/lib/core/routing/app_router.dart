@@ -28,6 +28,7 @@ import '../../features/orders/presentation/screens/service_history_screen.dart';
 import '../../features/clubs/presentation/screens/club_screen.dart';
 import '../../features/clubs/presentation/screens/club_search_screen.dart';
 import '../../features/clubs/presentation/screens/club_warehouse_screen.dart';
+import '../../features/clubs/presentation/screens/club_lanes_screen.dart';
 import '../../features/clubs/presentation/screens/club_staff_screen.dart';
 
 import '../../features/profile/mechanic/presentation/screens/mechanic_profile_screen.dart';
@@ -109,6 +110,18 @@ class AppRouter {
             clubName: args.clubName,
             initialInventoryId: args.inventoryId,
             initialQuery: args.searchQuery,
+          ),
+        );
+      case Routes.clubLanes:
+        final args = settings.arguments as ClubLanesArgs?;
+        if (args == null) {
+          return MaterialPageRoute(builder: (_) => const ClubScreen());
+        }
+        return MaterialPageRoute(
+          builder: (_) => ClubLanesScreen(
+            clubId: args.clubId,
+            clubName: args.clubName,
+            lanesCount: args.lanesCount,
           ),
         );
       case Routes.clubStaff:
