@@ -5,6 +5,7 @@ import '../../../../core/models/user_club.dart';
 import '../../../../core/repositories/clubs_repository.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
+import '../../../../core/routing/route_args.dart';
 import '../../../../core/routing/routes.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/authz/acl.dart';
@@ -130,6 +131,29 @@ class _ClubScreenState extends State<ClubScreen> {
     );
   }
 
+  void _openLanesOverview() {
+    final selected = _selectedIndex != null ? _clubs[_selectedIndex!] : null;
+    if (selected == null) {
+      showSnack(context, 'Выберите клуб');
+      return;
+    }
+    final scope = _scope;
+    if (scope != null && !scope.canActOnClub(selected)) {
+      showSnack(context, 'Нет доступа к выбранному клубу');
+      return;
+    }
+    final laneCount = _parseLaneCount(selected.lanes);
+    Navigator.pushNamed(
+      context,
+      Routes.clubLanes,
+      arguments: ClubLanesArgs(
+        clubId: selected.id,
+        clubName: selected.name,
+        lanesCount: laneCount,
+      ),
+    );
+  }
+
   Future<void> _openAddPartFlow() async {
     final selected = _selectedIndex != null ? _clubs[_selectedIndex!] : null;
     if (selected == null) {
@@ -157,6 +181,16 @@ class _ClubScreenState extends State<ClubScreen> {
     if (result != null && mounted) {
       showSnack(context, 'Детали добавлены в заявку №${result.requestId}');
     }
+  }
+
+  int? _parseLaneCount(String? raw) {
+    if (raw == null) return null;
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    final direct = int.tryParse(trimmed);
+    if (direct != null) return direct;
+    final digits = RegExp(r'\d+').firstMatch(trimmed);
+    return digits != null ? int.tryParse(digits.group(0)!) : null;
   }
 
   Widget _buildBody() {
@@ -231,6 +265,8 @@ class _ClubScreenState extends State<ClubScreen> {
         const SizedBox(height: 16),
         if (selectedClub != null) _ClubDetailsCard(club: selectedClub),
         const SizedBox(height: 20),
+        CustomButton(text: 'Дорожки и ТО', onPressed: _openLanesOverview),
+        const SizedBox(height: 12),
         CustomButton(text: 'Добавить деталь в заказ', onPressed: _openAddPartFlow),
         const SizedBox(height: 12),
         CustomButton(text: 'Открыть склад', isOutlined: true, onPressed: _openWarehouse),
