@@ -62,4 +62,32 @@ public class User {
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
     private AdministratorProfile administratorProfile;
+
+    public String getFullName() {
+        if (mechanicProfile != null && isNotBlank(mechanicProfile.getFullName())) {
+            return mechanicProfile.getFullName().trim();
+        }
+        if (managerProfile != null && isNotBlank(managerProfile.getFullName())) {
+            return managerProfile.getFullName().trim();
+        }
+        if (administratorProfile != null && isNotBlank(administratorProfile.getFullName())) {
+            return administratorProfile.getFullName().trim();
+        }
+        if (ownerProfile != null) {
+            if (isNotBlank(ownerProfile.getContactPerson())) {
+                return ownerProfile.getContactPerson().trim();
+            }
+            if (isNotBlank(ownerProfile.getLegalName())) {
+                return ownerProfile.getLegalName().trim();
+            }
+        }
+        if (phone != null && !phone.isBlank()) {
+            return phone.trim();
+        }
+        return null;
+    }
+
+    private boolean isNotBlank(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
 }
