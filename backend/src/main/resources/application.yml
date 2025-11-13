@@ -27,7 +27,7 @@ spring:
       max-age: 3600
 
 server:
-  port: 8080
+  port: 8081
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/xml,text/plain,text/css,application/javascript,application/octet-stream
