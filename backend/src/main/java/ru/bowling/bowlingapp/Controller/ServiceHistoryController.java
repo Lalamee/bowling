@@ -6,6 +6,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import ru.bowling.bowlingapp.DTO.ServiceHistoryDTO;
+import ru.bowling.bowlingapp.DTO.ServiceHistoryPartDTO;
 import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Security.UserPrincipal;
 import ru.bowling.bowlingapp.Service.ServiceHistoryService;
@@ -64,7 +65,8 @@ public class ServiceHistoryController {
             builder.clubId(entity.getClub().getClubId()).clubName(entity.getClub().getName());
         }
         if (entity.getEquipment() != null) {
-            builder.equipmentId(entity.getEquipment().getEquipmentId());
+            builder.equipmentId(entity.getEquipment().getEquipmentId())
+                   .equipmentName(entity.getEquipment().getModel());
         }
         if (entity.getServiceType() != null) {
             builder.serviceType(entity.getServiceType().name());
@@ -74,10 +76,47 @@ public class ServiceHistoryController {
                    .performedByMechanicName(entity.getPerformedBy().getFullName());
         }
         if (entity.getSupervisedBy() != null) {
-            builder.supervisedByUserId(entity.getSupervisedBy().getUserId());
+            builder.supervisedByUserId(entity.getSupervisedBy().getUserId())
+                   .supervisedByUserName(entity.getSupervisedBy().getFullName());
+        }
+
+        if (entity.getServiceId() != null) {
+            List<ServiceHistoryPart> parts = serviceHistoryService.getPartsUsedInService(entity.getServiceId());
+            if (!parts.isEmpty()) {
+                builder.partsUsed(parts.stream()
+                        .map(part -> convertPartToDto(part, entity.getServiceId()))
+                        .collect(Collectors.toList()));
+            }
         }
 
         return builder.build();
+    }
+
+    private ServiceHistoryPartDTO convertPartToDto(ServiceHistoryPart part, Long serviceId) {
+        if (part == null) {
+            return null;
+        }
+
+        String partName = part.getPartName() != null && !part.getPartName().isBlank()
+                ? part.getPartName()
+                : "Компонент";
+        String catalogNumber = part.getCatalogNumber() != null && !part.getCatalogNumber().isBlank()
+                ? part.getCatalogNumber()
+                : "N/A";
+
+        return ServiceHistoryPartDTO.builder()
+                .id(part.getId())
+                .serviceHistoryId(serviceId)
+                .partName(partName)
+                .catalogNumber(catalogNumber)
+                .quantity(part.getQuantity() != null ? part.getQuantity() : 0)
+                .unitCost(part.getUnitCost() != null ? part.getUnitCost() : 0.0)
+                .totalCost(part.getTotalCost())
+                .warrantyMonths(part.getWarrantyMonths())
+                .supplierId(part.getSupplierId())
+                .installationNotes(part.getInstallationNotes())
+                .createdDate(part.getCreatedDate())
+                .build();
     }
 
     private ServiceHistory convertToEntity(ServiceHistoryDTO dto) {
