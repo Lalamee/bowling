@@ -21,7 +21,7 @@ class ApiCore {
   final Dio dio = Dio();
   final FlutterSecureStorage storage = const FlutterSecureStorage();
 
-  static const String _defaultBaseUrl = 'http://158.160.205.8:8080';
+  static const String _defaultBaseUrl = 'http://92.242.61.128:8081';
 
   String _baseUrl = _defaultBaseUrl;
   String get baseUrl => _baseUrl;
@@ -40,7 +40,6 @@ class ApiCore {
         return handler.next(options);
       },
       onError: (e, handler) async {
-        // Попытка обновить токен при 401
         final isUnauthorized = e.response?.statusCode == 401;
         final reqOptions = e.requestOptions;
         final retried = reqOptions.headers['x-retried'] == true;

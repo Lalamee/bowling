@@ -136,11 +136,6 @@ public class ServiceHistoryController {
                 .performanceMetrics(dto.getPerformanceMetrics())
                 .createdDate(dto.getCreatedDate())
                 .createdBy(dto.getCreatedBy());
-
-        // Note: Setting related entities by ID requires fetching them from repositories.
-        // This should be handled in the service layer, not the controller.
-        // This conversion is simplified for demonstration.
-
         return builder.build();
     }
 }
