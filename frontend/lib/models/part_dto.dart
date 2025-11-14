@@ -7,8 +7,13 @@ class PartDto {
   final String? commonName;
   final String? description;
   final int? quantity;
+  final int? reservedQuantity; // TODO: reservedQuantity придёт из API склада
   final int? warehouseId;
   final String? location;
+  final String? cellCode; // TODO: код ячейки хранения
+  final String? shelfCode; // TODO: код стеллажа/зоны
+  final int? laneNumber; // TODO: привязка к дорожке
+  final String? placementStatus; // TODO: текстовый статус расположения
   final bool? isUnique;
   final DateTime? lastChecked;
 
@@ -21,8 +26,13 @@ class PartDto {
     this.commonName,
     this.description,
     this.quantity,
+    this.reservedQuantity,
     this.warehouseId,
     this.location,
+    this.cellCode,
+    this.shelfCode,
+    this.laneNumber,
+    this.placementStatus,
     this.isUnique,
     this.lastChecked,
   });
@@ -46,8 +56,13 @@ class PartDto {
       commonName: json['commonName'] as String?,
       description: json['description'] as String?,
       quantity: _parseOptionalInt(json['quantity']),
+      reservedQuantity: _parseOptionalInt(json['reservedQuantity'] ?? json['reserved_quantity']),
       warehouseId: _parseOptionalInt(json['warehouseId']),
       location: json['location']?.toString(),
+      cellCode: json['cellCode']?.toString(),
+      shelfCode: json['shelfCode']?.toString(),
+      laneNumber: _parseOptionalInt(json['laneNumber']),
+      placementStatus: json['placementStatus']?.toString(),
       isUnique: _parseOptionalBool(json['unique'] ?? json['isUnique']),
       lastChecked: _parseOptionalDate(json['lastChecked'] ?? json['last_checked']),
     );
@@ -62,8 +77,13 @@ class PartDto {
         'commonName': commonName,
         'description': description,
         'quantity': quantity,
+        'reservedQuantity': reservedQuantity,
         'warehouseId': warehouseId,
         'location': location,
+        'cellCode': cellCode,
+        'shelfCode': shelfCode,
+        'laneNumber': laneNumber,
+        'placementStatus': placementStatus,
         'unique': isUnique,
         'lastChecked': lastChecked?.toIso8601String(),
       };

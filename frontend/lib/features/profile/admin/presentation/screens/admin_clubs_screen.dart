@@ -341,7 +341,11 @@ class _AdminClubsScreenState extends State<AdminClubsScreen> {
                 Navigator.pushNamed(
                   context,
                   Routes.clubWarehouse,
-                  arguments: ClubWarehouseArgs(clubId: entry.clubId, clubName: entry.clubName),
+                  arguments: ClubWarehouseArgs(
+                    warehouseId: entry.clubId,
+                    clubId: entry.clubId,
+                    clubName: entry.clubName,
+                  ),
                 );
               },
               style: OutlinedButton.styleFrom(

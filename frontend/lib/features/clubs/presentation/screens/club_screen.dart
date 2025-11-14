@@ -19,7 +19,6 @@ import '../../../../shared/widgets/layout/common_ui.dart';
 import '../../../../shared/widgets/layout/section_list.dart';
 import '../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../orders/presentation/screens/add_parts_to_order_screen.dart';
-import 'club_warehouse_screen.dart';
 
 class ClubScreen extends StatefulWidget {
   final int? initialClubId;
@@ -120,14 +119,10 @@ class _ClubScreenState extends State<ClubScreen> {
       showSnack(context, 'Нет доступа к выбранному клубу');
       return;
     }
-    Navigator.push(
+    Navigator.pushNamed(
       context,
-      MaterialPageRoute(
-        builder: (_) => ClubWarehouseScreen(
-          clubId: selected.id,
-          clubName: selected.name,
-        ),
-      ),
+      Routes.warehouseSelector,
+      arguments: WarehouseSelectorArgs(preferredClubId: selected.id),
     );
   }
 

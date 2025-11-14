@@ -12,15 +12,19 @@ import 'club_search_screen.dart';
 import '../../../../shared/widgets/inputs/adaptive_text.dart';
 
 class ClubWarehouseScreen extends StatefulWidget {
-  final int clubId;
+  final int warehouseId;
+  final int? clubId;
   final String? clubName;
+  final String? warehouseType;
   final int? initialInventoryId;
   final String? initialQuery;
 
   const ClubWarehouseScreen({
     Key? key,
-    required this.clubId,
+    required this.warehouseId,
+    this.clubId,
     this.clubName,
+    this.warehouseType,
     this.initialInventoryId,
     this.initialQuery,
   }) : super(key: key);
@@ -41,6 +45,7 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
   bool _isLoading = false;
   bool _hasError = false;
   bool _initialSelectionPending = true;
+  String? _availabilityFilter;
 
   @override
   void initState() {
@@ -64,36 +69,29 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
   }
 
   Future<void> _loadInventory() async {
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-    });
-    try {
-      final data = await _repo.search('', clubId: widget.clubId);
-      if (!mounted) return;
-      _applyInventory(data);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _hasError = true;
-      });
-      showApiError(context, e);
-    }
+    await _fetchInventory(query: '');
   }
 
   Future<void> _searchInventory(String query) async {
     if (query.isEmpty) {
-      _loadInventory();
+      await _loadInventory();
       return;
     }
+    await _fetchInventory(query: query);
+  }
 
+  Future<void> _fetchInventory({required String query}) async {
     setState(() {
       _isLoading = true;
       _hasError = false;
     });
     try {
-      final data = await _repo.search(query, clubId: widget.clubId);
+      final data = await _repo.search(
+        query: query,
+        warehouseId: widget.warehouseId,
+        clubId: widget.clubId,
+        availability: _availabilityFilter,
+      );
       if (!mounted) return;
       _applyInventory(data);
     } catch (e) {
@@ -202,15 +200,22 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
       return;
     }
     final location = part.location?.trim();
-    _cellCtrl.text = location != null && location.isNotEmpty ? location : '';
-    _shelfCtrl.text = part.catalogNumber;
-    _markCtrl.text = part.quantity?.toString() ?? '';
+    _cellCtrl.text = (part.cellCode ?? location ?? '').trim();
+    _shelfCtrl.text = (part.shelfCode ?? part.catalogNumber).trim();
+    _markCtrl.text = part.placementStatus ?? (part.laneNumber != null ? 'Дорожка №${part.laneNumber}' : '');
+  }
+
+  void _setAvailability(String? value) {
+    if (_availabilityFilter == value) return;
+    setState(() => _availabilityFilter = value);
+    _fetchInventory(query: _searchCtrl.text);
   }
 
   Map<String, List<PartDto>> _groupInventory() {
     final map = <String, List<PartDto>>{};
     for (final part in _inventory) {
-      final location = part.location?.trim() ?? '';
+      final cell = part.cellCode?.trim();
+      final location = cell != null && cell.isNotEmpty ? cell : part.location?.trim() ?? '';
       final key = location.isEmpty ? 'Без указания локации' : location;
       map.putIfAbsent(key, () => []).add(part);
     }
@@ -247,11 +252,33 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
     });
   }
 
+  Widget _buildFilters() {
+    final chips = <Widget>[
+      ChoiceChip(
+        label: const Text('Все'),
+        selected: _availabilityFilter == null,
+        onSelected: (_) => _setAvailability(null),
+      ),
+      ChoiceChip(
+        label: const Text('В наличии'),
+        selected: _availabilityFilter == 'IN_STOCK',
+        onSelected: (_) => _setAvailability('IN_STOCK'),
+      ),
+      ChoiceChip(
+        label: const Text('Низкий остаток'),
+        selected: _availabilityFilter == 'LOW_STOCK',
+        onSelected: (_) => _setAvailability('LOW_STOCK'),
+      ),
+    ];
+    return Wrap(spacing: 8, runSpacing: 4, children: chips);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final typeLabel = widget.warehouseType == 'PERSONAL' ? 'Личный склад' : 'Клубный склад';
     final title = widget.clubName != null && widget.clubName!.trim().isNotEmpty
-        ? 'Склад: ${widget.clubName}'
-        : 'Склад';
+        ? '$typeLabel: ${widget.clubName}'
+        : typeLabel;
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -290,6 +317,8 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 12),
+            _buildFilters(),
             const SizedBox(height: 12),
             CommonUI.card(
               padding: const EdgeInsets.all(12),
@@ -345,6 +374,11 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
                                   const SizedBox(height: 12),
                                 ],
                                 ..._buildInventoryCards(),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'TODO: требуется API истории движения склада (дата, тип операции, количество, инициатор)',
+                                  style: TextStyle(fontSize: 12, color: AppColors.darkGray),
+                                ),
                               ],
                             ),
             ),
@@ -404,9 +438,33 @@ class _InventoryItemTile extends StatelessWidget {
               const SizedBox(height: 4),
               Text('Количество: ${part.quantity}', style: subtitleStyle),
             ],
+            if (part.reservedQuantity != null) ...[
+              const SizedBox(height: 4),
+              Text('В резерве: ${part.reservedQuantity}', style: subtitleStyle),
+            ],
             if (part.location != null && part.location!.trim().isNotEmpty) ...[
               const SizedBox(height: 4),
               Text('Локация: ${part.location}', style: subtitleStyle),
+            ],
+            if (part.cellCode != null || part.shelfCode != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Ячейка: ${part.cellCode ?? '-'} / Стеллаж: ${part.shelfCode ?? '-'}',
+                style: subtitleStyle,
+              ),
+            ],
+            if (part.laneNumber != null || (part.placementStatus != null && part.placementStatus!.isNotEmpty)) ...[
+              const SizedBox(height: 4),
+              Text(
+                part.laneNumber != null
+                    ? 'На дорожке №${part.laneNumber}'
+                    : 'Статус: ${part.placementStatus}',
+                style: subtitleStyle,
+              ),
+            ]
+            else ...[
+              const SizedBox(height: 4),
+              const Text('TODO: требуется placementStatus из API', style: subtitleStyle),
             ],
           ],
         ),
