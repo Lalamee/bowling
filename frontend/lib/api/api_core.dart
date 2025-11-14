@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Централизованный обработчик ошибок API
@@ -33,7 +35,7 @@ class ApiCore {
     dio.options.receiveTimeout = const Duration(seconds: 30);
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final token = await storage.read(key: 'jwt_token');
+        final token = await getAccessToken();
         if (token != null && token.isNotEmpty) {
           options.headers['Authorization'] = 'Bearer $token';
         }
@@ -45,7 +47,7 @@ class ApiCore {
         final retried = reqOptions.headers['x-retried'] == true;
         
         if (isUnauthorized && !retried) {
-          final refresh = await storage.read(key: 'refresh_token');
+          final refresh = await getRefreshToken();
           if (refresh != null && refresh.isNotEmpty) {
             try {
               final r = await dio.post('/api/auth/refresh', data: {'refreshToken': refresh});
@@ -63,9 +65,9 @@ class ApiCore {
                 headers['x-retried'] = true;
                 headers['Authorization'] = 'Bearer $newAccessToken';
 
-                await storage.write(key: 'jwt_token', value: newAccessToken);
+                await setToken(newAccessToken);
                 if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
-                  await storage.write(key: 'refresh_token', value: newRefreshToken);
+                  await setRefreshToken(newRefreshToken);
                 }
 
                 final opts = Options(
@@ -191,12 +193,76 @@ class ApiCore {
     }
   }
 
-  Future<void> setToken(String token) async {
-    await storage.write(key: 'jwt_token', value: token);
-  }
+  Future<String?> getAccessToken() => _safeStorageRead('jwt_token');
+
+  Future<String?> getRefreshToken() => _safeStorageRead('refresh_token');
+
+  Future<void> setToken(String token) => _safeStorageWrite('jwt_token', token);
+
+  Future<void> setRefreshToken(String token) => _safeStorageWrite('refresh_token', token);
 
   Future<void> clearToken() async {
-    await storage.delete(key: 'jwt_token');
-    await storage.delete(key: 'refresh_token');
+    await _safeStorageDelete('jwt_token');
+    await _safeStorageDelete('refresh_token');
+  }
+
+  Future<String?> _safeStorageRead(String key) async {
+    try {
+      return await storage.read(key: key);
+    } on PlatformException catch (e, s) {
+      _handleStorageException('read', key, e, s);
+      if (_isBadDecrypt(e)) {
+        await _safeStorageDelete(key);
+      }
+      return null;
+    } catch (e, s) {
+      _logStorageFailure('read', key, e, s);
+      return null;
+    }
+  }
+
+  Future<void> _safeStorageWrite(String key, String value) async {
+    try {
+      await storage.write(key: key, value: value);
+    } on PlatformException catch (e, s) {
+      _handleStorageException('write', key, e, s);
+      if (_isBadDecrypt(e)) {
+        await _safeStorageDelete(key);
+      }
+    } catch (e, s) {
+      _logStorageFailure('write', key, e, s);
+    }
+  }
+
+  Future<void> _safeStorageDelete(String key) async {
+    try {
+      await storage.delete(key: key);
+    } on PlatformException catch (e, s) {
+      _handleStorageException('delete', key, e, s);
+    } catch (e, s) {
+      _logStorageFailure('delete', key, e, s);
+    }
+  }
+
+  void _handleStorageException(
+    String operation,
+    String key,
+    PlatformException exception,
+    StackTrace stackTrace,
+  ) {
+    _logStorageFailure(operation, key, exception, stackTrace);
+  }
+
+  void _logStorageFailure(String operation, String key, Object error, StackTrace stackTrace) {
+    if (kDebugMode) {
+      debugPrint('Secure storage $operation failed for "$key": $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
+  bool _isBadDecrypt(PlatformException e) {
+    final details = e.details?.toString().toLowerCase() ?? '';
+    final message = e.message?.toLowerCase() ?? '';
+    return details.contains('bad_decrypt') || message.contains('bad_decrypt');
   }
 }
