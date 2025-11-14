@@ -366,8 +366,8 @@ class ApiService {
 
   /// Сохранение токенов после успешной авторизации
   Future<void> saveTokens(LoginResponseDto loginResponse) async {
-    await _core.storage.write(key: 'jwt_token', value: loginResponse.accessToken);
-    await _core.storage.write(key: 'refresh_token', value: loginResponse.refreshToken);
+    await _core.setToken(loginResponse.accessToken);
+    await _core.setRefreshToken(loginResponse.refreshToken);
   }
 
   /// Очистка токенов при выходе

@@ -8,7 +8,7 @@ class UserRepository {
 
   Future<Map<String, dynamic>> me() async {
     try {
-      final token = await ApiCore().storage.read(key: 'jwt_token');
+      final token = await ApiCore().getAccessToken();
       if (token == null || token.isEmpty) {
         throw ApiException('Требуется авторизация', statusCode: 401);
       }

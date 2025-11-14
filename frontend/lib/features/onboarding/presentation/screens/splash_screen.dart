@@ -51,7 +51,7 @@ class _SplashScreenState extends State<SplashScreen> {
       final storedRole = await _safeAsync(() => LocalAuthStorage.getRegisteredRole(),
           timeout: const Duration(seconds: 2));
       final token = await _safeAsync(
-          () => ApiCore().storage.read(key: 'jwt_token'),
+          () => ApiCore().getAccessToken(),
           timeout: const Duration(seconds: 2));
 
       if (!mounted) return;
