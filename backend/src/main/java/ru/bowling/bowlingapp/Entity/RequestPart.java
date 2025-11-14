@@ -61,6 +61,15 @@ public class RequestPart {
     @Column(name = "is_available")
     private Boolean isAvailable;
 
+    @Column(name = "accepted_quantity")
+    private Integer acceptedQuantity;
+
+    @Column(name = "acceptance_comment")
+    private String acceptanceComment;
+
+    @Column(name = "acceptance_date")
+    private LocalDateTime acceptanceDate;
+
     @Column(name = "order_date")
     private LocalDateTime orderDate;
 

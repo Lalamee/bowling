@@ -50,5 +50,8 @@ public class MaintenanceRequestResponseDTO {
         private LocalDateTime deliveryDate;
         private LocalDateTime issueDate;
         private Boolean available;
+        private Integer acceptedQuantity;
+        private String acceptanceComment;
+        private LocalDateTime acceptanceDate;
     }
 }

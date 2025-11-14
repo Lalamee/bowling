@@ -13,9 +13,11 @@ import java.util.List;
 public interface WarehouseInventoryRepository extends JpaRepository<WarehouseInventory, Long> {
 
     List<WarehouseInventory> findByCatalogId(Integer catalogId);
-    
+
     List<WarehouseInventory> findByWarehouseId(Integer warehouseId);
-    
+
+    WarehouseInventory findFirstByWarehouseIdAndCatalogId(Integer warehouseId, Integer catalogId);
+
     List<WarehouseInventory> findByQuantityGreaterThan(Integer quantity);
     
     List<WarehouseInventory> findByCatalogIdAndQuantityGreaterThan(Integer catalogId, Integer quantity);

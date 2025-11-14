@@ -319,6 +319,18 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
           ),
           const SizedBox(height: 10),
           ProfileTile(
+            icon: Icons.inventory_2_outlined,
+            text: 'Приёмка поставок',
+            onTap: () => Navigator.pushNamed(context, Routes.supplyAcceptance),
+          ),
+          const SizedBox(height: 10),
+          ProfileTile(
+            icon: Icons.archive_outlined,
+            text: 'Архив поставок и претензии',
+            onTap: () => Navigator.pushNamed(context, Routes.supplyArchive),
+          ),
+          const SizedBox(height: 10),
+          ProfileTile(
             icon: Icons.notifications_active_outlined,
             text: 'Оповещения',
             badgeCount: _notificationsCount,
