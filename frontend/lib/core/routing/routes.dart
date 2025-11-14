@@ -43,7 +43,11 @@ class Routes {
 
   static const ordersPersonalHistory = '/orders/history-personal';
   static const clubOrdersHistory = '/orders/history-club';
-  
+
+  static const supplyAcceptance = '/supply/acceptance';
+  static const supplyArchive = '/supply/archive';
+  static const supplyOrderDetails = '/supply/orders/details';
+
   static const maintenanceRequests = '/maintenance/requests';
   static const createMaintenanceRequest = '/maintenance/create';
   static const workLogs = '/worklogs';

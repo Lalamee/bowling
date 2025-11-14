@@ -734,6 +734,9 @@ public class MaintenanceRequestService {
                                                         .deliveryDate(part.getDeliveryDate())
                                                         .issueDate(part.getIssueDate())
                                                         .available(part.getIsAvailable())
+                                                        .acceptedQuantity(part.getAcceptedQuantity())
+                                                        .acceptanceComment(part.getAcceptanceComment())
+                                                        .acceptanceDate(part.getAcceptanceDate())
                                                         .build();
                                 })
                                 .collect(Collectors.toList());

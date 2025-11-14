@@ -1,10 +1,11 @@
 package ru.bowling.bowlingapp.Entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import ru.bowling.bowlingapp.Entity.enums.SupplierComplaintStatus;
 
 import java.time.LocalDateTime;
 
@@ -30,6 +31,10 @@ public class SupplierReview {
     @Column(name = "user_id")
     private Long userId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id")
+    private PurchaseOrder purchaseOrder;
+
     @Column(name = "rating")
     private Integer rating;
 
@@ -44,5 +49,15 @@ public class SupplierReview {
 
     @Column(name = "complaint_resolved")
     private Boolean complaintResolved;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "complaint_status")
+    private SupplierComplaintStatus complaintStatus;
+
+    @Column(name = "complaint_title")
+    private String complaintTitle;
+
+    @Column(name = "resolution_notes")
+    private String resolutionNotes;
 }
 

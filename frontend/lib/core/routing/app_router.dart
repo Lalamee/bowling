@@ -3,6 +3,9 @@ import 'package:bowling_market/features/orders/presentation/screens/admin_orders
 import 'package:bowling_market/features/profile/admin/presentation/screens/admin_clubs_screen.dart';
 import 'package:bowling_market/features/profile/admin/presentation/screens/admin_mechanics_screen.dart';
 import 'package:bowling_market/features/profile/admin/presentation/screens/admin_profile_screen.dart';
+import 'package:bowling_market/features/orders/presentation/screens/supply_acceptance_screen.dart';
+import 'package:bowling_market/features/orders/presentation/screens/supply_archive_screen.dart';
+import 'package:bowling_market/features/orders/presentation/screens/supply_order_details_screen.dart';
 import 'routes.dart';
 import 'route_args.dart';
 
@@ -169,6 +172,18 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const ManagerOrdersHistoryScreen());
       case Routes.clubOrdersHistory:
         return MaterialPageRoute(builder: (_) => const ClubOrdersHistoryScreen());
+      case Routes.supplyAcceptance:
+        return MaterialPageRoute(builder: (_) => const SupplyAcceptanceScreen());
+      case Routes.supplyArchive:
+        return MaterialPageRoute(builder: (_) => const SupplyArchiveScreen());
+      case Routes.supplyOrderDetails:
+        final args = settings.arguments as SupplyOrderDetailsArgs?;
+        if (args == null) {
+          return MaterialPageRoute(builder: (_) => const SupplyAcceptanceScreen());
+        }
+        return MaterialPageRoute(
+          builder: (_) => SupplyOrderDetailsScreen(orderId: args.orderId, initialSummary: args.summary),
+        );
 
       case Routes.profileAdmin:
         return MaterialPageRoute(builder: (_) => const AdminProfileScreen());

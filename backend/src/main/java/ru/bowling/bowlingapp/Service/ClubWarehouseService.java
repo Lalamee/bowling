@@ -114,6 +114,41 @@ public class ClubWarehouseService {
         initializeWarehousesForClubs(clubs);
     }
 
+    @Transactional
+    public void registerDelivery(BowlingClub club, Map<Integer, Integer> deliveredQuantities) {
+        if (club == null || deliveredQuantities == null || deliveredQuantities.isEmpty()) {
+            return;
+        }
+
+        Integer warehouseId = resolveWarehouseId(club.getClubId());
+        if (warehouseId == null) {
+            return;
+        }
+
+        deliveredQuantities.forEach((catalogId, quantity) -> {
+            if (catalogId == null || quantity == null || quantity <= 0) {
+                return;
+            }
+
+            WarehouseInventory inventory = warehouseInventoryRepository.findFirstByWarehouseIdAndCatalogId(warehouseId, catalogId);
+            if (inventory == null) {
+                inventory = WarehouseInventory.builder()
+                        .warehouseId(warehouseId)
+                        .catalogId(catalogId)
+                        .quantity(quantity)
+                        .lastChecked(LocalDate.now())
+                        .build();
+            } else {
+                int current = inventory.getQuantity() != null ? inventory.getQuantity() : 0;
+                inventory.setQuantity(current + quantity);
+                if (inventory.getLastChecked() == null) {
+                    inventory.setLastChecked(LocalDate.now());
+                }
+            }
+            warehouseInventoryRepository.save(inventory);
+        });
+    }
+
     private Map<Long, PartsCatalog> loadCatalogById() {
         return partsCatalogRepository.findAll().stream()
                 .filter(part -> part.getCatalogId() != null)

@@ -84,6 +84,9 @@ class RequestPartResponseDto {
   final DateTime? deliveryDate;
   final DateTime? issueDate;
   final bool? available;
+  final int? acceptedQuantity;
+  final String? acceptanceComment;
+  final DateTime? acceptanceDate;
 
   RequestPartResponseDto({
     required this.partId,
@@ -102,6 +105,9 @@ class RequestPartResponseDto {
     this.deliveryDate,
     this.issueDate,
     this.available,
+    this.acceptedQuantity,
+    this.acceptanceComment,
+    this.acceptanceDate,
   });
 
   factory RequestPartResponseDto.fromJson(Map<String, dynamic> json) {
@@ -124,6 +130,9 @@ class RequestPartResponseDto {
       issueDate: _d(json['issueDate']),
       available: json['available'] is bool ? json['available'] as bool :
           (json['available'] is num ? (json['available'] as num) != 0 : null),
+      acceptedQuantity: (json['acceptedQuantity'] as num?)?.toInt(),
+      acceptanceComment: json['acceptanceComment'] as String?,
+      acceptanceDate: _d(json['acceptanceDate']),
     );
   }
 
@@ -144,5 +153,8 @@ class RequestPartResponseDto {
         'deliveryDate': deliveryDate?.toIso8601String(),
         'issueDate': issueDate?.toIso8601String(),
         'available': available,
+        'acceptedQuantity': acceptedQuantity,
+        'acceptanceComment': acceptanceComment,
+        'acceptanceDate': acceptanceDate?.toIso8601String(),
       };
 }

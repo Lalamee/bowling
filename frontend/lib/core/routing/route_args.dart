@@ -1,5 +1,6 @@
 import '../../models/maintenance_request_response_dto.dart';
 import '../../features/knowledge_base/domain/kb_pdf.dart';
+import '../../models/purchase_order_summary_dto.dart';
 
 class PdfReaderArgs {
   final KbPdf document;
@@ -32,4 +33,11 @@ class ClubLanesArgs {
   final int? lanesCount;
 
   const ClubLanesArgs({required this.clubId, this.clubName, this.lanesCount});
+}
+
+class SupplyOrderDetailsArgs {
+  final int orderId;
+  final PurchaseOrderSummaryDto? summary;
+
+  const SupplyOrderDetailsArgs({required this.orderId, this.summary});
 }

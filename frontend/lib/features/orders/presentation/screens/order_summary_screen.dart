@@ -259,6 +259,11 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                         padding: const EdgeInsets.only(top: 4),
                         child: Text('Статус: ${describeOrderStatus(part.status)}', style: t.formInput),
                       ),
+                    if (part.acceptedQuantity != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text('Принято: ${part.acceptedQuantity}', style: t.formInput),
+                      ),
                     if (widget.canConfirm && widget.onConfirm != null) ...[
                       const SizedBox(height: 12),
                       Text('Наличие детали', style: t.formLabel),
@@ -299,6 +304,11 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Text('Причина отказа: ${part.rejectionReason}', style: t.formInput),
+                      ),
+                    if (part.acceptanceComment != null && part.acceptanceComment!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text('Комментарий приемки: ${part.acceptanceComment}', style: t.formInput),
                       ),
                     if (part.orderDate != null)
                       Padding(

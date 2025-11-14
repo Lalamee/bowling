@@ -21,6 +21,11 @@ import '../models/delivery_request_dto.dart';
 import '../models/issue_request_dto.dart';
 import '../models/close_request_dto.dart';
 import '../models/club_summary_dto.dart';
+import '../models/purchase_order_summary_dto.dart';
+import '../models/purchase_order_detail_dto.dart';
+import '../models/purchase_order_acceptance_request_dto.dart';
+import '../models/supplier_review_request_dto.dart';
+import '../models/supplier_complaint_request_dto.dart';
 
 /// Типизированный API сервис для взаимодействия с backend
 class ApiService {
@@ -202,6 +207,70 @@ class ApiService {
       data: request.toJson(),
     );
     return MaintenanceRequestResponseDto.fromJson(response.data);
+  }
+
+  // ============================================
+  // PURCHASE ORDERS
+  // ============================================
+
+  Future<List<PurchaseOrderSummaryDto>> getPurchaseOrders({
+    int? clubId,
+    bool archived = false,
+    String? status,
+    bool? hasComplaint,
+    bool? hasReview,
+  }) async {
+    final response = await _dio.get(
+      '/api/purchase-orders',
+      queryParameters: {
+        if (clubId != null) 'clubId': clubId,
+        'archived': archived,
+        if (status != null) 'status': status,
+        if (hasComplaint != null) 'hasComplaint': hasComplaint,
+        if (hasReview != null) 'hasReview': hasReview,
+      },
+    );
+    return (response.data as List)
+        .map((e) => PurchaseOrderSummaryDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<PurchaseOrderDetailDto> getPurchaseOrder(int orderId) async {
+    final response = await _dio.get('/api/purchase-orders/$orderId');
+    return PurchaseOrderDetailDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<PurchaseOrderDetailDto> acceptPurchaseOrder(
+    int orderId,
+    PurchaseOrderAcceptanceRequestDto request,
+  ) async {
+    final response = await _dio.post(
+      '/api/purchase-orders/$orderId/acceptance',
+      data: request.toJson(),
+    );
+    return PurchaseOrderDetailDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<PurchaseOrderDetailDto> reviewPurchaseOrder(
+    int orderId,
+    SupplierReviewRequestDto request,
+  ) async {
+    final response = await _dio.post(
+      '/api/purchase-orders/$orderId/reviews',
+      data: request.toJson(),
+    );
+    return PurchaseOrderDetailDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<PurchaseOrderDetailDto> complainPurchaseOrder(
+    int orderId,
+    SupplierComplaintRequestDto request,
+  ) async {
+    final response = await _dio.post(
+      '/api/purchase-orders/$orderId/complaints',
+      data: request.toJson(),
+    );
+    return PurchaseOrderDetailDto.fromJson(Map<String, dynamic>.from(response.data as Map));
   }
 
   /// POST /api/maintenance/requests/{id}/parts - Добавление деталей в существующую заявку
