@@ -37,6 +37,8 @@ import '../../features/clubs/presentation/screens/warehouse_selector_screen.dart
 
 import '../../features/profile/mechanic/presentation/screens/mechanic_profile_screen.dart';
 import '../../features/profile/mechanic/presentation/screens/edit_mechanic_profile_screen.dart';
+import '../../features/specialists/presentation/screens/attestation_applications_screen.dart';
+import '../../features/specialists/presentation/screens/specialists_list_screen.dart';
 
 import '../../features/profile/owner/presentation/screens/owner_profile_screen.dart';
 import '../../features/profile/owner/presentation/screens/edit_owner_profile_screen.dart';
@@ -148,6 +150,10 @@ class AppRouter {
         final args = settings.arguments as EditMechanicProfileArgs?;
         return MaterialPageRoute(builder: (_) => EditMechanicProfileScreen(mechanicId: args?.mechanicId));
       }
+      case Routes.specialistsDirectory:
+        return MaterialPageRoute(builder: (_) => const SpecialistsListScreen());
+      case Routes.attestationApplications:
+        return MaterialPageRoute(builder: (_) => const AttestationApplicationsScreen());
 
       case Routes.profileOwner:
         return MaterialPageRoute(builder: (_) => const OwnerProfileScreen());

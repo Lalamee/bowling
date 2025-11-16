@@ -19,6 +19,8 @@ class Routes {
 
   static const profileMechanic = '/profile/mechanic';
   static const editMechanicProfile = '/profile/mechanic/edit';
+  static const specialistsDirectory = '/specialists';
+  static const attestationApplications = '/specialists/attestations';
 
   static const profileOwner = '/profile/owner';
   static const editOwnerProfile = '/profile/owner/edit';
