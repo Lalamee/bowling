@@ -205,7 +205,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       _isSearchingParts = true;
     });
     try {
-      final results = await _inventoryRepository.search(query, clubId: _selectedClubId);
+      final results = await _inventoryRepository.search(query: query, clubId: _selectedClubId);
       if (!mounted) return;
       setState(() {
         _partSuggestions = results.take(10).toList();

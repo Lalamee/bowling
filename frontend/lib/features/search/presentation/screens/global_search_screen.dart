@@ -176,7 +176,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
 
     for (final id in ids) {
       try {
-        final parts = await _inventoryRepository.search('', clubId: id);
+        final parts = await _inventoryRepository.search(query: '', clubId: id);
         final clubName = clubNames[id];
         for (final part in parts) {
           final key = '$id-${part.inventoryId}';
