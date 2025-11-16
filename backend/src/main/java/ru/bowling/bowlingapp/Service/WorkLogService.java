@@ -103,9 +103,22 @@ public class WorkLogService {
         Sort.Direction direction = "ASC".equalsIgnoreCase(criteria.getSortDirection())
                 ? Sort.Direction.ASC
                 : Sort.Direction.DESC;
-        Comparator<WorkLog> comparator = Comparator.comparing(
-                (WorkLog log) -> (Comparable<?>) resolveComparableField(log, criteria.getSortBy()),
-                Comparator.nullsLast(Comparator.naturalOrder()));
+        Comparator<WorkLog> comparator = (first, second) -> {
+            Comparable<Object> firstValue = (Comparable<Object>) resolveComparableField(first, criteria.getSortBy());
+            Comparable<Object> secondValue = (Comparable<Object>) resolveComparableField(second, criteria.getSortBy());
+
+            if (firstValue == null && secondValue == null) {
+                return 0;
+            }
+            if (firstValue == null) {
+                return 1;
+            }
+            if (secondValue == null) {
+                return -1;
+            }
+
+            return firstValue.compareTo(secondValue);
+        };
         if (direction == Sort.Direction.DESC) {
             comparator = comparator.reversed();
         }
