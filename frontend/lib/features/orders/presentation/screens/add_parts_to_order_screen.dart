@@ -347,7 +347,7 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
     });
     try {
       final results = await _inventoryRepository.search(
-        query,
+        query: query,
         clubId: order.clubId,
       );
       if (!mounted) return;

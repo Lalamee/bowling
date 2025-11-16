@@ -125,7 +125,7 @@ class _AdminClubsScreenState extends State<AdminClubsScreen> {
 
   Future<void> _loadEntryInventory(_ClubEntry entry) async {
     try {
-      final inventory = await _inventoryRepository.search('', clubId: entry.clubId);
+      final inventory = await _inventoryRepository.search(query: '', clubId: entry.clubId);
       if (!mounted) return;
       setState(() {
         entry.inventoryCount = inventory.length;
