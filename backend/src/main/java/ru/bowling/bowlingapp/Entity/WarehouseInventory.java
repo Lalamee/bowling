@@ -31,22 +31,22 @@ public class WarehouseInventory {
     private Integer quantity;
 
     @Column(name = "reserved_quantity")
-    private Integer reservedQuantity; // TODO: требуется колонка reserved_quantity для фиксации резервов
+    private Integer reservedQuantity;
 
     @Column(name = "location_reference")
     private String locationReference;
 
     @Column(name = "cell_code")
-    private String cellCode; // TODO: колонка cell_code для адресного хранения
+    private String cellCode;
 
     @Column(name = "shelf_code")
-    private String shelfCode; // TODO: колонка shelf_code для адресного хранения
+    private String shelfCode;
 
     @Column(name = "lane_number")
-    private Integer laneNumber; // TODO: колонка lane_number для связи с дорожкой
+    private Integer laneNumber;
 
     @Column(name = "placement_status")
-    private String placementStatus; // TODO: статус "на складе" / "на дорожке"
+    private String placementStatus;
 
     @Column(name = "last_checked")
     private LocalDate lastChecked;

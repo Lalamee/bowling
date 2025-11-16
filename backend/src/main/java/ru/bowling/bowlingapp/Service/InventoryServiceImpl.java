@@ -375,9 +375,13 @@ public class InventoryServiceImpl implements InventoryService {
 
     private String resolvePlacementStatus(WarehouseInventory inventory) {
         if (inventory.getLaneNumber() != null) {
-            return "ON_LANE"; // TODO: отдать человекочитаемый статус, когда появится DTO дорожек
+            return "ON_LANE";
         }
         if (inventory.getLocationReference() != null && !inventory.getLocationReference().isBlank()) {
+            return "IN_WAREHOUSE";
+        }
+        if ((inventory.getCellCode() != null && !inventory.getCellCode().isBlank())
+                || (inventory.getShelfCode() != null && !inventory.getShelfCode().isBlank())) {
             return "IN_WAREHOUSE";
         }
         return null;

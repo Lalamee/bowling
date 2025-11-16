@@ -38,7 +38,7 @@ class _ClubSearchScreenState extends State<ClubSearchScreen> {
         }
         return;
       }
-      final data = await _repo.search(widget.query.trim());
+      final data = await _repo.search(query: widget.query.trim());
       if (mounted) {
         setState(() {
           _parts = data;
@@ -62,7 +62,7 @@ class _ClubSearchScreenState extends State<ClubSearchScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final data = await _repo.search(query);
+      final data = await _repo.search(query: query);
       if (mounted) {
         setState(() {
           _parts = data;

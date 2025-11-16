@@ -32,7 +32,7 @@ class _StockSearchSheetState extends State<StockSearchSheet> {
   Future<void> _search() async {
     final q = _queryCtrl.text.trim();
     if (q.isEmpty) return;
-    final data = await _repo.search(q);
+    final data = await _repo.search(query: q);
     setState(() => _items = data);
   }
 
