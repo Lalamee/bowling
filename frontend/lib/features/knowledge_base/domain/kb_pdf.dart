@@ -9,6 +9,7 @@ class KbPdf {
   final int? fileSize;
   final DateTime? uploadDate;
   final String downloadUrl;
+  final String? accessLevel;
 
   const KbPdf({
     required this.id,
@@ -21,6 +22,7 @@ class KbPdf {
     this.fileName,
     this.fileSize,
     this.uploadDate,
+    this.accessLevel,
   });
 
   factory KbPdf.fromJson(Map<String, dynamic> json) {
@@ -47,6 +49,12 @@ class KbPdf {
       fileName: json['fileName']?.toString(),
       fileSize: parseInt(json['fileSize']),
       uploadDate: parseDate(json['uploadDate']),
+      accessLevel: json['accessLevel']?.toString(),
     );
+  }
+
+  bool get isPremiumOnly {
+    final normalized = accessLevel?.toLowerCase().trim() ?? '';
+    return normalized.contains('premium') || normalized.contains('прем');
   }
 }

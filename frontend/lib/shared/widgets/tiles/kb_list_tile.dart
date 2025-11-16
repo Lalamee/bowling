@@ -5,9 +5,12 @@ import '../inputs/adaptive_text.dart';
 class KbListTile extends StatelessWidget {
   final String title;
   final bool accent;
+  final bool locked;
+  final String? subtitle;
   final VoidCallback onTap;
 
-  const KbListTile({Key? key, required this.title, this.accent = false, required this.onTap}) : super(key: key);
+  const KbListTile({Key? key, required this.title, this.accent = false, this.locked = false, this.subtitle, required this.onTap})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -16,8 +19,7 @@ class KbListTile extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        height: 48,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -33,16 +35,30 @@ class KbListTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               alignment: Alignment.center,
-              child: Icon(Icons.history_rounded, size: 16, color: AppColors.primary),
+              child: Icon(locked ? Icons.lock_outline : Icons.history_rounded, size: 16, color: AppColors.primary),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: AdaptiveText(
-                title,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textDark),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AdaptiveText(
+                    title,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark),
+                  ),
+                  if (subtitle != null && subtitle!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        subtitle!,
+                        style: const TextStyle(fontSize: 12, color: AppColors.darkGray),
+                      ),
+                    ),
+                ],
               ),
             ),
-            if (accent) const Icon(Icons.edit, size: 16, color: AppColors.primary),
+            if (accent && !locked) const Icon(Icons.edit, size: 16, color: AppColors.primary),
           ],
         ),
       ),

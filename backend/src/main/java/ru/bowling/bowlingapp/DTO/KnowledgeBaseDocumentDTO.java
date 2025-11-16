@@ -26,4 +26,5 @@ public class KnowledgeBaseDocumentDTO {
     private Long fileSize;
     private LocalDateTime uploadDate;
     private String downloadUrl;
+    private String accessLevel;
 }

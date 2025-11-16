@@ -19,6 +19,7 @@ public interface TechnicalDocumentRepository extends JpaRepository<TechnicalDocu
                    club.name AS clubName,
                    td.title AS title,
                    td.description AS description,
+                   al.name AS accessLevelName,
                    type.name AS documentType,
                    manufacturer.name AS manufacturerName,
                    td.equipment_model AS equipmentModel,
@@ -30,6 +31,7 @@ public interface TechnicalDocumentRepository extends JpaRepository<TechnicalDocu
             JOIN bowling_clubs club ON club.club_id = td.club_id
             LEFT JOIN document_type type ON type.document_type_id = td.document_type_id
             LEFT JOIN manufacturer manufacturer ON manufacturer.manufacturer_id = td.manufacturer_id
+            LEFT JOIN access_level al ON al.access_level_id = td.access_level_id
             ORDER BY td.upload_date DESC, td.document_id DESC
             """, nativeQuery = true)
     List<KnowledgeBaseDocumentSummary> findAllSummaries();
@@ -40,6 +42,7 @@ public interface TechnicalDocumentRepository extends JpaRepository<TechnicalDocu
                    club.name AS clubName,
                    td.title AS title,
                    td.description AS description,
+                   al.name AS accessLevelName,
                    type.name AS documentType,
                    manufacturer.name AS manufacturerName,
                    td.equipment_model AS equipmentModel,
@@ -51,6 +54,7 @@ public interface TechnicalDocumentRepository extends JpaRepository<TechnicalDocu
             JOIN bowling_clubs club ON club.club_id = td.club_id
             LEFT JOIN document_type type ON type.document_type_id = td.document_type_id
             LEFT JOIN manufacturer manufacturer ON manufacturer.manufacturer_id = td.manufacturer_id
+            LEFT JOIN access_level al ON al.access_level_id = td.access_level_id
             WHERE td.club_id IN (:clubIds)
             ORDER BY td.upload_date DESC, td.document_id DESC
             """, nativeQuery = true)

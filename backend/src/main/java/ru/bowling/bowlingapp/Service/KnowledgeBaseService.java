@@ -41,6 +41,7 @@ public class KnowledgeBaseService {
         }
 
         return summaries.stream()
+                .filter(summary -> hasAccessToDocument(user, summary))
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
@@ -95,6 +96,7 @@ public class KnowledgeBaseService {
                         .orElse(null))
                 .uploadDate(summary.getUploadDate())
                 .downloadUrl(buildDownloadUrl(summary.getDocumentId()))
+                .accessLevel(summary.getAccessLevelName())
                 .build();
     }
 
@@ -103,6 +105,64 @@ public class KnowledgeBaseService {
                 .map(Role::getName)
                 .map(name -> name.equalsIgnoreCase("ADMIN"))
                 .orElse(false);
+    }
+
+    private boolean hasAccessToDocument(User user, KnowledgeBaseDocumentSummary summary) {
+        if (hasPremiumKnowledgeAccess(user)) {
+            return true;
+        }
+
+        String accessLevel = Optional.ofNullable(summary.getAccessLevelName())
+                .map(String::trim)
+                .orElse("");
+
+        if (accessLevel.isEmpty()) {
+            return true;
+        }
+
+        String normalized = normalize(accessLevel);
+        return !(normalized.contains("premium") || normalized.contains("прем"));
+    }
+
+    private boolean hasPremiumKnowledgeAccess(User user) {
+        if (isAdmin(user)) {
+            return true;
+        }
+
+        String normalizedAccountType = Optional.ofNullable(user.getAccountType())
+                .map(AccountType::getName)
+                .map(this::normalize)
+                .orElse("");
+
+        if (normalizedAccountType.contains("premium") || normalizedAccountType.contains("прем")) {
+            return true;
+        }
+
+        if (isClubMember(user)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private boolean isClubMember(User user) {
+        if (user.getOwnerProfile() != null && user.getOwnerProfile().getClubs() != null
+                && !user.getOwnerProfile().getClubs().isEmpty()) {
+            return true;
+        }
+
+        ManagerProfile managerProfile = user.getManagerProfile();
+        if (managerProfile != null && managerProfile.getClub() != null
+                && Boolean.TRUE.equals(user.getIsVerified())
+                && Boolean.TRUE.equals(managerProfile.getIsDataVerified())) {
+            return true;
+        }
+
+        return !clubStaffRepository.findByUserUserIdAndIsActiveTrue(user.getUserId()).isEmpty();
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
     private Set<Long> collectAccessibleClubIds(User user) {

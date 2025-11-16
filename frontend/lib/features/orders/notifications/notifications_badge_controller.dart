@@ -97,6 +97,21 @@ class NotificationsBadgeController extends ChangeNotifier {
     _pollingTimer = null;
   }
 
+  void handleRealtimeUpdate(MaintenanceRequestResponseDto order) {
+    // TODO: wire this to WebSocket push once backend channel is available
+    final scope = _scope;
+    if (scope == null) return;
+    if (!scope.canViewOrder(order)) return;
+
+    _pending.removeWhere((item) => item.requestId == order.requestId);
+    final updatedAt = _resolveUpdatedAt(order);
+    if (_lastSeen != null && updatedAt != null && updatedAt.isBefore(_lastSeen!)) {
+      return;
+    }
+    _pending.insert(0, order);
+    notifyListeners();
+  }
+
   void _startPolling() {
     _pollingTimer?.cancel();
     _pollingTimer = Timer.periodic(const Duration(seconds: 30), (_) => refresh());
