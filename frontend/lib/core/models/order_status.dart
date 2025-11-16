@@ -21,6 +21,8 @@ enum OrderStatusType {
 
 const Set<String> _pendingBackendKeys = <String>{
   'NEW',
+  'SENT_TO_MANAGER',
+  'UNDER_REVIEW',
   'PENDING',
   'WAITING',
   'REQUESTED',
@@ -29,6 +31,7 @@ const Set<String> _pendingBackendKeys = <String>{
 
 const Set<String> _confirmedBackendKeys = <String>{
   'APPROVED',
+  'PARTIALLY_APPROVED',
   'CONFIRMED',
   'IN_PROGRESS',
   'ACCEPTED',

@@ -6,6 +6,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import ru.bowling.bowlingapp.DTO.MaintenanceRequestResponseDTO;
 import ru.bowling.bowlingapp.DTO.PartRequestDTO;
+import ru.bowling.bowlingapp.DTO.StockIssueDecisionDTO;
 import ru.bowling.bowlingapp.Service.MaintenanceRequestService;
 
 import java.util.List;
@@ -46,6 +47,13 @@ public class MaintenanceRequestController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'STAFF')")
     public ResponseEntity<MaintenanceRequestResponseDTO> approveRequest(@PathVariable Long requestId, @RequestBody(required = false) String managerNotes) {
         return ResponseEntity.ok(maintenanceRequestService.approveRequest(requestId, managerNotes, null));
+    }
+
+    @PatchMapping("/{requestId}/stock-issue")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'STAFF')")
+    public ResponseEntity<MaintenanceRequestResponseDTO> issueFromStock(@PathVariable Long requestId,
+                                                                        @RequestBody StockIssueDecisionDTO decisionDTO) {
+        return ResponseEntity.ok(maintenanceRequestService.issueFromStock(requestId, decisionDTO));
     }
 
     @PatchMapping("/{requestId}/reject")
