@@ -183,9 +183,23 @@ bool _resolvePremiumAccess(Map<String, dynamic> me, String resolvedRole) {
   }
 
   final accountTypeId = (me['accountTypeId'] as num?)?.toInt();
-  if (accountTypeId != null && accountTypeId == 3) {
-    // TODO: confirm mapping for premium/free-agent types once backend enum is finalized
+  if (accountTypeId != null) {
+    // account_type: 1=INDIVIDUAL (механики/менеджеры), 2=CLUB_OWNER (владельцы клуба)
+    if (accountTypeId == 2) {
+      return true;
+    }
+  }
+
+  final premiumFlag = me['isPremium'];
+  if (premiumFlag is bool && premiumFlag) {
     return true;
+  }
+
+  if (premiumFlag is String) {
+    final normalizedFlag = premiumFlag.toLowerCase().trim();
+    if (normalizedFlag == 'true' || normalizedFlag == '1' || normalizedFlag == 'yes') {
+      return true;
+    }
   }
 
   return false;
