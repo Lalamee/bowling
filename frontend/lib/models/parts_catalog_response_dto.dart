@@ -12,6 +12,11 @@ class PartsCatalogResponseDto {
   final bool? isUnique;
   final int? availableQuantity;
   final String? availabilityStatus; // keep as string for simplicity
+  final String? imageUrl;
+  final String? diagramUrl;
+  final int? equipmentNodeId;
+  final List<int> equipmentNodePath;
+  final List<String> compatibility;
 
   PartsCatalogResponseDto({
     required this.catalogId,
@@ -27,6 +32,11 @@ class PartsCatalogResponseDto {
     this.isUnique,
     this.availableQuantity,
     this.availabilityStatus,
+    this.imageUrl,
+    this.diagramUrl,
+    this.equipmentNodeId,
+    this.equipmentNodePath = const [],
+    this.compatibility = const [],
   });
 
   factory PartsCatalogResponseDto.fromJson(Map<String, dynamic> json) {
@@ -44,6 +54,19 @@ class PartsCatalogResponseDto {
       isUnique: json['isUnique'] as bool?,
       availableQuantity: (json['availableQuantity'] as num?)?.toInt(),
       availabilityStatus: json['availabilityStatus']?.toString(),
+      imageUrl: json['imageUrl']?.toString(),
+      diagramUrl: json['diagramUrl']?.toString(),
+      equipmentNodeId: (json['equipmentNodeId'] as num?)?.toInt(),
+      equipmentNodePath: (json['equipmentNodePath'] as List?)
+              ?.map((e) => (e as num?)?.toInt())
+              .whereType<int>()
+              .toList() ??
+          const [],
+      compatibility: (json['compatibleEquipment'] as List?)
+              ?.map((e) => e?.toString())
+              .whereType<String>()
+              .toList() ??
+          const [],
     );
   }
 
@@ -61,5 +84,10 @@ class PartsCatalogResponseDto {
         'isUnique': isUnique,
         'availableQuantity': availableQuantity,
         'availabilityStatus': availabilityStatus,
+        'imageUrl': imageUrl,
+        'diagramUrl': diagramUrl,
+        'equipmentNodeId': equipmentNodeId,
+        'equipmentNodePath': equipmentNodePath,
+        'compatibleEquipment': compatibility,
       };
 }
