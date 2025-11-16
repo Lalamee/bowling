@@ -12,6 +12,7 @@ import ru.bowling.bowlingapp.Entity.PartsCatalog;
 import ru.bowling.bowlingapp.Entity.User;
 import ru.bowling.bowlingapp.Entity.WarehouseInventory;
 import ru.bowling.bowlingapp.Repository.BowlingClubRepository;
+import ru.bowling.bowlingapp.Repository.PartImageRepository;
 import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
 import ru.bowling.bowlingapp.Repository.WarehouseInventoryRepository;
@@ -45,6 +46,9 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Autowired
     private BowlingClubRepository bowlingClubRepository;
+
+    @Autowired
+    private PartImageRepository partImageRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -142,6 +146,11 @@ public class InventoryServiceImpl implements InventoryService {
                             .orElseGet(() -> resolvePlacementStatus(inventory)))
                     .unique(Boolean.TRUE.equals(inventory.getIsUnique()))
                     .lastChecked(inventory.getLastChecked())
+                    .imageUrl(resolveImageUrl(part))
+                    .diagramUrl(null)
+                    .equipmentNodeId(null)
+                    .equipmentNodePath(Collections.emptyList())
+                    .compatibility(Collections.emptyList())
                     .build();
         }
         return dto;
@@ -279,7 +288,19 @@ public class InventoryServiceImpl implements InventoryService {
                 .warehouseId(inventory.getWarehouseId())
                 .unique(Boolean.TRUE.equals(inventory.getIsUnique()))
                 .lastChecked(inventory.getLastChecked())
+                .imageUrl(resolveImageUrl(part))
+                .diagramUrl(null)
+                .equipmentNodeId(null)
+                .equipmentNodePath(Collections.emptyList())
+                .compatibility(Collections.emptyList())
                 .build();
+    }
+
+    private String resolveImageUrl(PartsCatalog part) {
+        if (part == null || part.getCatalogId() == null) {
+            return null;
+        }
+        return partImageRepository.findFirstByCatalogId(part.getCatalogId()).map(image -> image.getImageUrl()).orElse(null);
     }
 
     private boolean matchesWarehouse(WarehouseInventory inventory, Integer warehouseIdFilter) {

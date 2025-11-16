@@ -14,7 +14,7 @@ public class InventorySearchRequest {
 
     private String query;
     private Integer warehouseId;
-    private Long clubId; // TODO: убрать, когда все вызовы перейдут на warehouseId
-    private String categoryCode; // TODO: заполнить, когда появится категория в PartsCatalog
+    private Long clubId; // временная поддержка для старых вызовов, дублирует warehouseId
+    private String categoryCode;
     private InventoryAvailabilityFilter availability;
 }

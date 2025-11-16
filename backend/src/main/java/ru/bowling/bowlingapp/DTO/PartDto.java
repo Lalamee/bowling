@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 @AllArgsConstructor
@@ -21,14 +22,20 @@ public class PartDto {
     private String description;
     private String catalogNumber;
     private Integer quantity;
-    private Integer reservedQuantity; // TODO: заполнить, когда бэкенд начнёт хранить резерв по складу
+    private Integer reservedQuantity;
     private String location;
-    private String cellCode; // TODO: ожидается код ячейки (cellCode) от API
-    private String shelfCode; // TODO: ожидается код стеллажа (shelfCode) от API
-    private Integer laneNumber; // TODO: требуется номер дорожки для адресного хранения
-    private String placementStatus; // TODO: статус размещения (на складе / на дорожке)
+    private String cellCode;
+    private String shelfCode;
+    private Integer laneNumber;
+    private String placementStatus;
     private Integer warehouseId;
     private Boolean unique;
     private LocalDate lastChecked;
+
+    private String imageUrl;
+    private String diagramUrl;
+    private Long equipmentNodeId;
+    private List<Long> equipmentNodePath;
+    private List<String> compatibility;
 
 }

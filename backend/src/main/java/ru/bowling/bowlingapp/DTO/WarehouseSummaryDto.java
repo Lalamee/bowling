@@ -16,8 +16,8 @@ public class WarehouseSummaryDto {
     private Long clubId;
     private String clubName;
     private WarehouseType warehouseType;
-    private Integer totalPositions; // TODO: приходит с агрегации складов
-    private Integer lowStockPositions; // TODO: приходит с агрегации складов
-    private Integer reservedPositions; // TODO: заполнить, когда появится reservedQuantity в БД
+    private Integer totalPositions;
+    private Integer lowStockPositions;
+    private Integer reservedPositions;
     private Boolean personalAccess;
 }

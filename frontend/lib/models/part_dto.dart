@@ -10,12 +10,17 @@ class PartDto {
   final int? reservedQuantity; // TODO: reservedQuantity придёт из API склада
   final int? warehouseId;
   final String? location;
-  final String? cellCode; // TODO: код ячейки хранения
-  final String? shelfCode; // TODO: код стеллажа/зоны
-  final int? laneNumber; // TODO: привязка к дорожке
-  final String? placementStatus; // TODO: текстовый статус расположения
+  final String? cellCode;
+  final String? shelfCode;
+  final int? laneNumber;
+  final String? placementStatus;
   final bool? isUnique;
   final DateTime? lastChecked;
+  final String? imageUrl;
+  final String? diagramUrl;
+  final int? equipmentNodeId;
+  final List<int> equipmentNodePath;
+  final List<String> compatibility;
 
   PartDto({
     required this.inventoryId,
@@ -35,6 +40,11 @@ class PartDto {
     this.placementStatus,
     this.isUnique,
     this.lastChecked,
+    this.imageUrl,
+    this.diagramUrl,
+    this.equipmentNodeId,
+    this.equipmentNodePath = const [],
+    this.compatibility = const [],
   });
 
   factory PartDto.fromJson(Map<String, dynamic> json) {
@@ -65,6 +75,19 @@ class PartDto {
       placementStatus: json['placementStatus']?.toString(),
       isUnique: _parseOptionalBool(json['unique'] ?? json['isUnique']),
       lastChecked: _parseOptionalDate(json['lastChecked'] ?? json['last_checked']),
+      imageUrl: json['imageUrl']?.toString(),
+      diagramUrl: json['diagramUrl']?.toString(),
+      equipmentNodeId: _parseOptionalInt(json['equipmentNodeId'])?.toInt(),
+      equipmentNodePath: (json['equipmentNodePath'] as List?)
+              ?.map((e) => _parseOptionalInt(e))
+              .whereType<int>()
+              .toList() ??
+          const [],
+      compatibility: (json['compatibility'] as List?)
+              ?.map((e) => e?.toString())
+              .whereType<String>()
+              .toList() ??
+          const [],
     );
   }
 
@@ -86,6 +109,11 @@ class PartDto {
         'placementStatus': placementStatus,
         'unique': isUnique,
         'lastChecked': lastChecked?.toIso8601String(),
+        'imageUrl': imageUrl,
+        'diagramUrl': diagramUrl,
+        'equipmentNodeId': equipmentNodeId,
+        'equipmentNodePath': equipmentNodePath,
+        'compatibility': compatibility,
       };
 }
 

@@ -12,6 +12,7 @@ import ru.bowling.bowlingapp.DTO.PartsSearchDTO;
 import ru.bowling.bowlingapp.Entity.PartsCatalog;
 import ru.bowling.bowlingapp.Entity.WarehouseInventory;
 import ru.bowling.bowlingapp.Entity.enums.AvailabilityStatus;
+import ru.bowling.bowlingapp.Repository.PartImageRepository;
 import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
 import ru.bowling.bowlingapp.Repository.WarehouseInventoryRepository;
 
@@ -24,8 +25,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PartsService {
 
-	private final PartsCatalogRepository partsCatalogRepository;
-	private final WarehouseInventoryRepository warehouseInventoryRepository;
+        private final PartsCatalogRepository partsCatalogRepository;
+        private final WarehouseInventoryRepository warehouseInventoryRepository;
+        private final PartImageRepository partImageRepository;
 
 	@Transactional(readOnly = true)
 	public List<PartsCatalogResponseDTO> searchParts(PartsSearchDTO searchDTO) {
@@ -82,20 +84,34 @@ public class PartsService {
 	}
 
 	private PartsCatalogResponseDTO convertCommon(PartsCatalog part, int totalQuantity, AvailabilityStatus availabilityStatus) {
-		return PartsCatalogResponseDTO.builder()
-				.catalogId(part.getCatalogId())
-				.manufacturerId(part.getManufacturer() != null ? part.getManufacturer().getManufacturerId().longValue() : null)
-				.manufacturerName(part.getManufacturer() != null ? part.getManufacturer().getName() : null)
-				.catalogNumber(part.getCatalogNumber())
+                return PartsCatalogResponseDTO.builder()
+                                .catalogId(part.getCatalogId())
+                                .manufacturerId(part.getManufacturer() != null ? part.getManufacturer().getManufacturerId().longValue() : null)
+                                .manufacturerName(part.getManufacturer() != null ? part.getManufacturer().getName() : null)
+                                .catalogNumber(part.getCatalogNumber())
 				.officialNameEn(part.getOfficialNameEn())
 				.officialNameRu(part.getOfficialNameRu())
 				.commonName(part.getCommonName())
 				.description(part.getDescription())
 				.normalServiceLife(part.getNormalServiceLife())
-				.unit(part.getUnit())
-				.isUnique(part.getIsUnique())
-				.availableQuantity(totalQuantity)
-				.availabilityStatus(availabilityStatus)
-				.build();
-	}
+                                .unit(part.getUnit())
+                                .isUnique(part.getIsUnique())
+                                .availableQuantity(totalQuantity)
+                                .availabilityStatus(availabilityStatus)
+                                .imageUrl(resolveImageUrl(part.getCatalogId()))
+                                .diagramUrl(null)
+                                .equipmentNodeId(null)
+                                .equipmentNodePath(List.of())
+                                .compatibleEquipment(List.of())
+                                .build();
+        }
+
+        private String resolveImageUrl(Long catalogId) {
+                if (catalogId == null) {
+                        return null;
+                }
+                return partImageRepository.findFirstByCatalogId(catalogId)
+                                .map(image -> image.getImageUrl())
+                                .orElse(null);
+        }
 }
