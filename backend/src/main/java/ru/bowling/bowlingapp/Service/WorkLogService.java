@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.DTO.WorkLogDTO;
 import ru.bowling.bowlingapp.DTO.WorkLogSearchDTO;
 import ru.bowling.bowlingapp.Entity.*;
-import ru.bowling.bowlingapp.Entity.enums.MaintenanceRequestStatus;
 import ru.bowling.bowlingapp.Entity.enums.WorkLogStatus;
 import ru.bowling.bowlingapp.Entity.enums.WorkType;
 import ru.bowling.bowlingapp.Repository.*;
@@ -33,7 +32,6 @@ public class WorkLogService {
 
     private final WorkLogRepository workLogRepository;
     private final WorkLogStatusHistoryRepository statusHistoryRepository;
-    private final WorkLogPartUsageRepository partUsageRepository;
     private final MaintenanceRequestRepository maintenanceRequestRepository;
     private final MechanicProfileRepository mechanicProfileRepository;
     private final UserRepository userRepository;
@@ -79,7 +77,7 @@ public class WorkLogService {
                         (log.getClub() != null && criteria.getClubId().equals(log.getClub().getClubId())))
                 .filter(log -> criteria.getLaneNumber() == null || criteria.getLaneNumber().equals(log.getLaneNumber()))
                 .filter(log -> criteria.getMechanicId() == null ||
-                        (log.getMechanic() != null && criteria.getMechanicId().equals(log.getMechanic().getMechanicProfileId())))
+                        (log.getMechanic() != null && criteria.getMechanicId().equals(log.getMechanic().getProfileId())))
                 .filter(log -> criteria.getEquipmentId() == null ||
                         (log.getEquipment() != null && criteria.getEquipmentId().equals(log.getEquipment().getEquipmentId())))
                 .filter(log -> matchesStatus(criteria.getStatus(), log.getStatus()))
@@ -106,7 +104,7 @@ public class WorkLogService {
                 ? Sort.Direction.ASC
                 : Sort.Direction.DESC;
         Comparator<WorkLog> comparator = Comparator.comparing(
-                log -> resolveComparableField(log, criteria.getSortBy()),
+                (WorkLog log) -> (Comparable<?>) resolveComparableField(log, criteria.getSortBy()),
                 Comparator.nullsLast(Comparator.naturalOrder()));
         if (direction == Sort.Direction.DESC) {
             comparator = comparator.reversed();
