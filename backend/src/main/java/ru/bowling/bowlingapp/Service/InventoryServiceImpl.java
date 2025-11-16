@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.DTO.InventorySearchRequest;
 import ru.bowling.bowlingapp.DTO.PartDto;
 import ru.bowling.bowlingapp.DTO.ReservationRequestDto;
+import ru.bowling.bowlingapp.DTO.WarehouseMovementDto;
 import ru.bowling.bowlingapp.DTO.WarehouseSummaryDto;
 import ru.bowling.bowlingapp.Entity.BowlingClub;
 import ru.bowling.bowlingapp.Entity.PartsCatalog;
@@ -174,9 +175,9 @@ public class InventoryServiceImpl implements InventoryService {
 
         inventory.setQuantity(inventory.getQuantity() - reservationRequestDto.getQuantity());
         warehouseInventoryRepository.save(inventory);
-        log.info("Reserved {} units of catalog {} (inventory id {}) in warehouse {} by request {}", 
+        log.info("Reserved {} units of catalog {} (inventory id {}) in warehouse {} by request {}",
                 reservationRequestDto.getQuantity(), inventory.getCatalogId(), inventory.getInventoryId(),
-                inventory.getWarehouseId(), reservationRequestDto.getReservationId());
+                inventory.getWarehouseId(), reservationRequestDto.getMaintenanceRequestId());
     }
 
     @Override
@@ -189,9 +190,9 @@ public class InventoryServiceImpl implements InventoryService {
         WarehouseInventory inventory = inventories.get(0); // Take first available inventory
         inventory.setQuantity(inventory.getQuantity() + reservationRequestDto.getQuantity());
         warehouseInventoryRepository.save(inventory);
-        log.info("Released {} units of catalog {} (inventory id {}) back to warehouse {} for request {}", 
+        log.info("Released {} units of catalog {} (inventory id {}) back to warehouse {} for request {}",
                 reservationRequestDto.getQuantity(), inventory.getCatalogId(), inventory.getInventoryId(),
-                inventory.getWarehouseId(), reservationRequestDto.getReservationId());
+                inventory.getWarehouseId(), reservationRequestDto.getMaintenanceRequestId());
     }
 
     @Override
