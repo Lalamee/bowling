@@ -9,11 +9,13 @@ class UserAccessScope {
   final String role;
   final Set<int> accessibleClubIds;
   final int? userId;
+  final bool hasPremiumAccess;
 
   const UserAccessScope({
     required this.role,
     required this.accessibleClubIds,
     this.userId,
+    this.hasPremiumAccess = false,
   });
 
   bool get isAdmin => role == 'admin';
@@ -39,11 +41,12 @@ class UserAccessScope {
 
   bool canActOnClubId(int? clubId) => canViewClubId(clubId);
 
-  UserAccessScope copyWith({String? role, Set<int>? accessibleClubIds, int? userId}) {
+  UserAccessScope copyWith({String? role, Set<int>? accessibleClubIds, int? userId, bool? hasPremiumAccess}) {
     return UserAccessScope(
       role: role ?? this.role,
       accessibleClubIds: accessibleClubIds ?? this.accessibleClubIds,
       userId: userId ?? this.userId,
+      hasPremiumAccess: hasPremiumAccess ?? this.hasPremiumAccess,
     );
   }
 
@@ -75,7 +78,13 @@ class UserAccessScope {
     }
 
     final userId = (profile['id'] as num?)?.toInt() ?? (profile['userId'] as num?)?.toInt();
-    return UserAccessScope(role: resolvedRole, accessibleClubIds: UnmodifiableSetView(ids), userId: userId);
+    final hasPremium = _resolvePremiumAccess(profile, resolvedRole);
+    return UserAccessScope(
+      role: resolvedRole,
+      accessibleClubIds: UnmodifiableSetView(ids),
+      userId: userId,
+      hasPremiumAccess: hasPremium,
+    );
   }
 }
 
@@ -159,6 +168,27 @@ Future<String> _resolveRole(Map<String, dynamic> me) async {
   }
 
   return resolved ?? 'mechanic';
+}
+
+bool _resolvePremiumAccess(Map<String, dynamic> me, String resolvedRole) {
+  if (resolvedRole == 'admin' || resolvedRole == 'owner' || resolvedRole == 'manager') {
+    return true;
+  }
+
+  String? accessName = me['accountTypeName']?.toString();
+  accessName ??= me['accountType']?.toString();
+  final normalized = accessName?.toLowerCase().trim() ?? '';
+  if (normalized.contains('premium') || normalized.contains('прем')) {
+    return true;
+  }
+
+  final accountTypeId = (me['accountTypeId'] as num?)?.toInt();
+  if (accountTypeId != null && accountTypeId == 3) {
+    // TODO: confirm mapping for premium/free-agent types once backend enum is finalized
+    return true;
+  }
+
+  return false;
 }
 
 bool canViewOrder(UserAccessScope scope, MaintenanceRequestResponseDto order) => scope.canViewOrder(order);

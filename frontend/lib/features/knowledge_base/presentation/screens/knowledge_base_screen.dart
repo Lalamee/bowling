@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/repositories/user_repository.dart';
+import '../../../../core/services/authz/acl.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
@@ -18,10 +20,13 @@ class KnowledgeBaseScreen extends StatefulWidget {
 
 class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
   final KnowledgeBaseRepository _repository = KnowledgeBaseRepository();
+  final UserRepository _userRepository = UserRepository();
 
   bool _loadingDocuments = true;
   bool _documentsError = false;
   List<KbPdf> _documents = const [];
+  UserAccessScope? _scope;
+  bool _hasPremiumAccess = false;
 
   @override
   void initState() {
@@ -35,9 +40,13 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
       _documentsError = false;
     });
     try {
+      final me = await _userRepository.me();
+      final scope = await UserAccessScope.fromProfile(me);
       final docs = await _repository.load();
       if (!mounted) return;
       setState(() {
+        _scope = scope;
+        _hasPremiumAccess = scope.hasPremiumAccess;
         _documents = docs;
         _loadingDocuments = false;
       });
@@ -73,6 +82,20 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         children: [
+          if (!_hasPremiumAccess)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: const Color(0xFFE9E9E9)),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Text(
+                'Часть материалов доступна только премиум-аккаунтам свободных механиков. ',
+                style: TextStyle(fontSize: 13, color: AppColors.darkGray),
+              ),
+            ),
+          if (!_hasPremiumAccess) const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
@@ -132,12 +155,21 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
                 final displayTitle = (doc.fileName != null && doc.fileName!.isNotEmpty)
                     ? doc.fileName!
                     : doc.title;
+                final locked = doc.isPremiumOnly && !_hasPremiumAccess;
                 return Padding(
                   padding: EdgeInsets.only(bottom: i == _documents.length - 1 ? 0 : 10),
                   child: KbListTile(
                     title: displayTitle,
                     accent: i == 0,
+                    locked: locked,
+                    subtitle: locked ? 'Доступно только для премиум-аккаунтов' : doc.documentType,
                     onTap: () {
+                      if (locked) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Функция доступна только премиум-аккаунтам')),
+                        );
+                        return;
+                      }
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => PdfReaderScreen(doc: doc)),

@@ -27,4 +27,6 @@ public interface KnowledgeBaseDocumentSummary {
     Number getFileSize();
 
     LocalDateTime getUploadDate();
+
+    String getAccessLevelName();
 }
