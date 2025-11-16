@@ -369,6 +369,15 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              'Эта заявка отправляется менеджеру клуба для выдачи запчастей со склада. '
+              'Укажите дорожку и нужное количество для каждой позиции.',
+              style: const TextStyle(color: AppColors.darkGray, fontSize: 14),
+            ),
+          ),
+          // TODO: добавить выбор типа заявки, когда на бэке появится поле requestType (ISSUE_FROM_STOCK)
           const Text(
             'Клуб *',
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark),

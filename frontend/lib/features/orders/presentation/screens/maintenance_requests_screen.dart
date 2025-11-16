@@ -78,7 +78,7 @@ class _MaintenanceRequestsScreenState extends State<MaintenanceRequestsScreen> {
           onPressed: () => Navigator.maybePop(context),
         ),
         title: const Text(
-          'Заявки на обслуживание',
+          'Запросы на выдачу запчастей',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textDark),
         ),
         actions: [
@@ -162,7 +162,7 @@ class _MaintenanceRequestsScreenState extends State<MaintenanceRequestsScreen> {
                             Icon(Icons.inbox_outlined, size: 64, color: AppColors.darkGray),
                             const SizedBox(height: 16),
                             Text(
-                              'Нет заявок',
+                              'У вас пока нет запросов на выдачу',
                               style: TextStyle(fontSize: 16, color: AppColors.darkGray),
                             ),
                           ],
@@ -298,6 +298,17 @@ class _RequestCard extends StatelessWidget {
                     ],
                   ),
                 ],
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.build_circle_outlined, size: 16, color: AppColors.darkGray),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${request.requestedParts.length} позиций, согласовано: ${_approvedQty(request)}',
+                      style: const TextStyle(fontSize: 13, color: AppColors.darkGray),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -325,5 +336,9 @@ class _RequestCard extends StatelessWidget {
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+  }
+
+  int _approvedQty(MaintenanceRequestResponseDto dto) {
+    return dto.requestedParts.fold<int>(0, (sum, part) => sum + (part.acceptedQuantity ?? 0));
   }
 }

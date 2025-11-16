@@ -7,6 +7,7 @@ import ru.bowling.bowlingapp.DTO.ApproveRejectRequestDTO;
 import ru.bowling.bowlingapp.DTO.MaintenanceRequestResponseDTO;
 import ru.bowling.bowlingapp.DTO.PartRequestDTO;
 import ru.bowling.bowlingapp.DTO.ReservationRequestDto;
+import ru.bowling.bowlingapp.DTO.StockIssueDecisionDTO;
 import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Entity.enums.MaintenanceRequestStatus;
 import ru.bowling.bowlingapp.Entity.enums.PartStatus;
@@ -76,11 +77,11 @@ public class MaintenanceRequestService {
                                 .club(club)
                                 .laneNumber(requestDTO.getLaneNumber())
                                 .mechanic(mechanicProfile)
-				.requestDate(LocalDateTime.now())
-				.status(MaintenanceRequestStatus.NEW)
-				.managerNotes(requestDTO.getManagerNotes())
-				.verificationStatus("NOT_VERIFIED")
-				.build();
+                                .requestDate(LocalDateTime.now())
+                                .status(MaintenanceRequestStatus.SENT_TO_MANAGER)
+                                .managerNotes(requestDTO.getManagerNotes())
+                                .verificationStatus("NOT_VERIFIED")
+                                .build();
 
                 MaintenanceRequest savedRequest = maintenanceRequestRepository.save(request);
 
@@ -360,7 +361,7 @@ public class MaintenanceRequestService {
                                 .catalogNumber(catalogNumber)
                                 .partName(partName)
                                 .quantity(partDTO.getQuantity())
-                                .status(null)
+                                .status(PartStatus.APPROVAL_PENDING)
                                 .inventoryId(inventoryId)
                                 .catalogId(catalogId)
                                 .warehouseId(warehouseId)
@@ -397,7 +398,7 @@ public class MaintenanceRequestService {
                 return "неизвестная запчасть";
         }
 
-	@Transactional
+        @Transactional
         public MaintenanceRequestResponseDTO approveRequest(Long requestId,
                                                            String managerNotes,
                                                            List<ApproveRejectRequestDTO.PartAvailabilityDTO> availabilityUpdates) {
@@ -438,10 +439,100 @@ public class MaintenanceRequestService {
                 return convertToResponseDTO(savedRequest, parts);
         }
 
-	@Transactional
-	public MaintenanceRequestResponseDTO rejectRequest(Long requestId, String rejectionReason) {
-		Optional<MaintenanceRequest> requestOpt = maintenanceRequestRepository.findById(requestId);
-		if (requestOpt.isEmpty()) {
+        @Transactional
+        public MaintenanceRequestResponseDTO issueFromStock(Long requestId, StockIssueDecisionDTO decisionDTO) {
+                if (decisionDTO == null || decisionDTO.getPartDecisions() == null
+                                || decisionDTO.getPartDecisions().isEmpty()) {
+                        throw new IllegalArgumentException("Не переданы решения по позициям");
+                }
+
+                MaintenanceRequest request = maintenanceRequestRepository.findById(requestId)
+                                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+
+                List<RequestPart> parts = requestPartRepository.findByRequestRequestId(requestId);
+                Map<Long, RequestPart> partsById = parts.stream()
+                                .filter(Objects::nonNull)
+                                .collect(Collectors.toMap(RequestPart::getPartId, p -> p));
+
+                boolean anyApproved = false;
+                boolean anyPartial = false;
+                boolean anyRejected = false;
+
+                for (StockIssueDecisionDTO.PartDecisionDTO decision : decisionDTO.getPartDecisions()) {
+                        if (decision == null) {
+                                continue;
+                        }
+
+                        RequestPart part = partsById.get(decision.getPartId());
+                        if (part == null) {
+                                throw new IllegalArgumentException("Позиция не найдена в заявке");
+                        }
+
+                        int requestedQty = Optional.ofNullable(part.getQuantity()).orElse(0);
+                        int approvedQty = Optional.ofNullable(decision.getApprovedQuantity()).orElse(0);
+
+                        if (approvedQty < 0) {
+                                throw new IllegalArgumentException("Количество не может быть отрицательным");
+                        }
+                        if (approvedQty > requestedQty) {
+                                throw new IllegalArgumentException("Согласованное количество превышает запрошенное");
+                        }
+
+                        part.setAcceptedQuantity(approvedQty);
+                        part.setAcceptanceComment(decision.getManagerComment());
+                        part.setAcceptanceDate(LocalDateTime.now());
+
+                        if (approvedQty == 0) {
+                                part.setStatus(PartStatus.REJECTED);
+                                anyRejected = true;
+                        } else if (approvedQty < requestedQty) {
+                                part.setStatus(PartStatus.PARTIALLY_ACCEPTED);
+                                anyPartial = true;
+                                anyApproved = true;
+                        } else {
+                                part.setStatus(PartStatus.APPROVED_FOR_ISSUE);
+                                anyApproved = true;
+                        }
+
+                        if (approvedQty > 0) {
+                                if (part.getCatalogId() != null) {
+                                        try {
+                                                ReservationRequestDto reservationRequest = new ReservationRequestDto(
+                                                                part.getCatalogId(), approvedQty, requestId);
+                                                inventoryService.reservePart(reservationRequest);
+                                        } catch (RuntimeException ex) {
+                                                throw new IllegalStateException(
+                                                                "Недостаточно остатков для выдачи запчасти '" + part.getPartName() + "'",
+                                                                ex);
+                                        }
+                                } else {
+                                        // TODO: если нет catalogId, согласованное количество нужно синхронизировать со складом отдельно
+                                }
+                                part.setIssueDate(LocalDateTime.now());
+                        }
+
+                        requestPartRepository.save(part);
+                }
+
+                request.setManagerNotes(decisionDTO.getManagerNotes());
+                request.setManagerDecisionDate(LocalDateTime.now());
+                if (anyPartial || anyRejected) {
+                        request.setStatus(MaintenanceRequestStatus.PARTIALLY_APPROVED);
+                } else if (anyApproved) {
+                        request.setStatus(MaintenanceRequestStatus.APPROVED);
+                } else {
+                        request.setStatus(MaintenanceRequestStatus.UNDER_REVIEW);
+                }
+
+                MaintenanceRequest savedRequest = maintenanceRequestRepository.save(request);
+                List<RequestPart> updatedParts = requestPartRepository.findByRequestRequestId(requestId);
+                return convertToResponseDTO(savedRequest, updatedParts);
+        }
+
+        @Transactional
+        public MaintenanceRequestResponseDTO rejectRequest(Long requestId, String rejectionReason) {
+                Optional<MaintenanceRequest> requestOpt = maintenanceRequestRepository.findById(requestId);
+                if (requestOpt.isEmpty()) {
 			throw new IllegalArgumentException("Request not found");
 		}
 
@@ -452,12 +543,12 @@ public class MaintenanceRequestService {
 
 		MaintenanceRequest savedRequest = maintenanceRequestRepository.save(request);
 
-		List<RequestPart> parts = requestPartRepository.findByRequestRequestId(requestId);
-		parts.forEach(part -> {
-			part.setStatus(null);
-			part.setRejectionReason(rejectionReason);
-			requestPartRepository.save(part);
-		});
+                List<RequestPart> parts = requestPartRepository.findByRequestRequestId(requestId);
+                parts.forEach(part -> {
+                        part.setStatus(PartStatus.REJECTED);
+                        part.setRejectionReason(rejectionReason);
+                        requestPartRepository.save(part);
+                });
 
 		return convertToResponseDTO(savedRequest, parts);
 	}
@@ -584,7 +675,8 @@ public class MaintenanceRequestService {
                 }
 
                 if (currentStatus != MaintenanceRequestStatus.APPROVED
-                                && currentStatus != MaintenanceRequestStatus.IN_PROGRESS) {
+                                && currentStatus != MaintenanceRequestStatus.IN_PROGRESS
+                                && currentStatus != MaintenanceRequestStatus.PARTIALLY_APPROVED) {
                         throw new IllegalStateException("Only approved or in-progress requests can be completed");
                 }
 

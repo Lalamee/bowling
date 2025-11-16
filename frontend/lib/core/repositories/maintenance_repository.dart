@@ -3,6 +3,7 @@ import '../../api/api_core.dart';
 import '../../api/api_service.dart';
 import '../../models/maintenance_request_response_dto.dart';
 import '../../models/part_request_dto.dart';
+import '../../models/stock_issue_decision_dto.dart';
 
 class MaintenanceRepository {
   final _dio = ApiCore().dio;
@@ -136,6 +137,18 @@ class MaintenanceRepository {
         return MaintenanceRequestResponseDto.fromJson(res.data);
       }
       return null;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Частичное согласование/выдача со склада
+  Future<MaintenanceRequestResponseDto?> issueFromStock(
+    int id,
+    StockIssueDecisionDto decision,
+  ) async {
+    try {
+      return await _api.issueFromStock(id, decision);
     } catch (e) {
       rethrow;
     }

@@ -19,6 +19,7 @@ import '../models/service_history_dto.dart';
 import '../models/order_parts_request_dto.dart';
 import '../models/delivery_request_dto.dart';
 import '../models/issue_request_dto.dart';
+import '../models/stock_issue_decision_dto.dart';
 import '../models/close_request_dto.dart';
 import '../models/club_summary_dto.dart';
 import '../models/purchase_order_summary_dto.dart';
@@ -176,6 +177,15 @@ class ApiService {
   /// PUT /api/maintenance/requests/{id}/issue - Выдача запчастей
   Future<MaintenanceRequestResponseDto> markIssued(int id, IssueRequestDto request) async {
     final response = await _dio.put('/api/maintenance/requests/$id/issue', data: request.toJson());
+    return MaintenanceRequestResponseDto.fromJson(response.data);
+  }
+
+  /// PATCH /api/requests/{id}/stock-issue - Частичное согласование и выдача со склада
+  Future<MaintenanceRequestResponseDto> issueFromStock(
+    int id,
+    StockIssueDecisionDto request,
+  ) async {
+    final response = await _dio.patch('/api/requests/$id/stock-issue', data: request.toJson());
     return MaintenanceRequestResponseDto.fromJson(response.data);
   }
 
