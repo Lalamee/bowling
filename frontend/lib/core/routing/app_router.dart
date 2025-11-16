@@ -33,6 +33,7 @@ import '../../features/clubs/presentation/screens/club_search_screen.dart';
 import '../../features/clubs/presentation/screens/club_warehouse_screen.dart';
 import '../../features/clubs/presentation/screens/club_lanes_screen.dart';
 import '../../features/clubs/presentation/screens/club_staff_screen.dart';
+import '../../features/clubs/presentation/screens/warehouse_selector_screen.dart';
 
 import '../../features/profile/mechanic/presentation/screens/mechanic_profile_screen.dart';
 import '../../features/profile/mechanic/presentation/screens/edit_mechanic_profile_screen.dart';
@@ -107,13 +108,24 @@ class AppRouter {
         if (args == null) {
           return MaterialPageRoute(builder: (_) => const ClubScreen());
         }
+        final warehouseId = args.warehouseId ?? args.clubId;
+        if (warehouseId == null) {
+          return MaterialPageRoute(builder: (_) => const ClubScreen());
+        }
         return MaterialPageRoute(
           builder: (_) => ClubWarehouseScreen(
-            clubId: args.clubId,
+            warehouseId: warehouseId,
+            clubId: args.clubId ?? warehouseId,
             clubName: args.clubName,
+            warehouseType: args.warehouseType,
             initialInventoryId: args.inventoryId,
             initialQuery: args.searchQuery,
           ),
+        );
+      case Routes.warehouseSelector:
+        final args = settings.arguments as WarehouseSelectorArgs?;
+        return MaterialPageRoute(
+          builder: (_) => WarehouseSelectorScreen(preferredClubId: args?.preferredClubId),
         );
       case Routes.clubLanes:
         final args = settings.arguments as ClubLanesArgs?;

@@ -21,7 +21,12 @@ public class PartDto {
     private String description;
     private String catalogNumber;
     private Integer quantity;
+    private Integer reservedQuantity; // TODO: заполнить, когда бэкенд начнёт хранить резерв по складу
     private String location;
+    private String cellCode; // TODO: ожидается код ячейки (cellCode) от API
+    private String shelfCode; // TODO: ожидается код стеллажа (shelfCode) от API
+    private Integer laneNumber; // TODO: требуется номер дорожки для адресного хранения
+    private String placementStatus; // TODO: статус размещения (на складе / на дорожке)
     private Integer warehouseId;
     private Boolean unique;
     private LocalDate lastChecked;

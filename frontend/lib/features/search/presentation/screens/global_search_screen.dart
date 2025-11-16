@@ -271,6 +271,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
       context,
       Routes.clubWarehouse,
       arguments: ClubWarehouseArgs(
+        warehouseId: clubId,
         clubId: clubId,
         clubName: entry.clubName,
         inventoryId: entry.part.inventoryId,

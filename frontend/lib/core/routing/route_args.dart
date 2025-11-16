@@ -19,12 +19,21 @@ class EditMechanicProfileArgs {
 }
 
 class ClubWarehouseArgs {
-  final int clubId;
+  final int? warehouseId;
+  final int? clubId;
   final String? clubName;
+  final String? warehouseType;
   final int? inventoryId;
   final String? searchQuery;
 
-  const ClubWarehouseArgs({required this.clubId, this.clubName, this.inventoryId, this.searchQuery});
+  const ClubWarehouseArgs({
+    this.warehouseId,
+    this.clubId,
+    this.clubName,
+    this.warehouseType,
+    this.inventoryId,
+    this.searchQuery,
+  });
 }
 
 class ClubLanesArgs {
@@ -40,4 +49,10 @@ class SupplyOrderDetailsArgs {
   final PurchaseOrderSummaryDto? summary;
 
   const SupplyOrderDetailsArgs({required this.orderId, this.summary});
+}
+
+class WarehouseSelectorArgs {
+  final int? preferredClubId;
+
+  const WarehouseSelectorArgs({this.preferredClubId});
 }
