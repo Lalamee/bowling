@@ -10,6 +10,7 @@ import ru.bowling.bowlingapp.Entity.User;
 import ru.bowling.bowlingapp.Repository.MechanicProfileRepository;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -61,8 +62,8 @@ public class MechanicDirectoryService {
                 .specialization(profile.getSkills())
                 .rating(profile.getRating())
                 .status(resolveStatus(profile))
-                .region(null) // TODO: подтянуть регион из анкеты, когда поле появится
-                .certifications(new ArrayList<>()) // TODO: заменить на реальные сертификаты из БД
+                .region(resolveRegion(profile))
+                .certifications(resolveCertifications(profile))
                 .totalExperienceYears(profile.getTotalExperienceYears())
                 .bowlingExperienceYears(profile.getBowlingExperienceYears())
                 .isEntrepreneur(profile.getIsEntrepreneur())
@@ -71,7 +72,7 @@ public class MechanicDirectoryService {
                 .relatedClubs(clubs)
                 .workPlaces(profile.getWorkPlaces())
                 .workPeriods(profile.getWorkPeriods())
-                .attestationStatus("TODO: добавить статус аттестации после появления модели")
+                .attestationStatus(resolveAttestationStatus(profile))
                 .build();
     }
 
@@ -93,16 +94,24 @@ public class MechanicDirectoryService {
         if (loweredRegion == null) {
             return true;
         }
-        // TODO: заменить на фильтр по региону из анкеты, когда поле появится в БД
-        return true;
+        String region = resolveRegion(profile);
+        if (region == null) {
+            return true;
+        }
+        return region.toLowerCase(Locale.ROOT).contains(loweredRegion);
     }
 
     private boolean matchesCertification(MechanicProfile profile, String loweredCertification) {
         if (loweredCertification == null) {
             return true;
         }
-        // TODO: фильтр по сертификатам, когда будет модель сертификации
-        return true;
+        List<String> certifications = resolveCertifications(profile);
+        if (certifications.isEmpty()) {
+            return true;
+        }
+        return certifications.stream()
+                .map(value -> value.toLowerCase(Locale.ROOT))
+                .anyMatch(value -> value.contains(loweredCertification));
     }
 
     private MechanicDirectorySummaryDTO toSummary(MechanicProfile profile) {
@@ -120,9 +129,9 @@ public class MechanicDirectoryService {
                 .specialization(profile.getSkills())
                 .rating(profile.getRating())
                 .status(resolveStatus(profile))
-                .region(null) // TODO: подтянуть регион из анкеты, когда поле появится
+                .region(resolveRegion(profile))
                 .clubs(clubs)
-                .certifications(List.of()) // TODO: заменить на реальные данные из БД
+                .certifications(resolveCertifications(profile))
                 .build();
     }
 
@@ -133,7 +142,7 @@ public class MechanicDirectoryService {
                 .specialization(null)
                 .rating(null)
                 .status("CLUB")
-                .region(null) // TODO: использовать адрес/регион клуба, когда появится структура
+                .region(resolveClubRegion(club))
                 .clubs(null)
                 .certifications(null)
                 .build();
@@ -144,6 +153,65 @@ public class MechanicDirectoryService {
             return "CLUB_MECHANIC";
         }
         return "FREE_AGENT";
+    }
+
+    private String resolveRegion(MechanicProfile profile) {
+        if (profile == null) {
+            return null;
+        }
+
+        String fromClubAddress = Optional.ofNullable(profile.getClubs())
+                .orElse(List.of())
+                .stream()
+                .map(this::resolveClubRegion)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+        if (fromClubAddress != null) {
+            return fromClubAddress;
+        }
+
+        String workPlaces = profile.getWorkPlaces();
+        if (workPlaces != null && !workPlaces.isBlank()) {
+            return extractRegionFragment(workPlaces);
+        }
+        return null;
+    }
+
+    private String resolveClubRegion(BowlingClub club) {
+        if (club == null || club.getAddress() == null) {
+            return null;
+        }
+        return extractRegionFragment(club.getAddress());
+    }
+
+    private String extractRegionFragment(String rawAddress) {
+        String trimmed = rawAddress.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        int commaIndex = trimmed.indexOf(',');
+        return commaIndex > 0 ? trimmed.substring(0, commaIndex).trim() : trimmed;
+    }
+
+    private List<String> resolveCertifications(MechanicProfile profile) {
+        if (profile == null || profile.getAdvantages() == null || profile.getAdvantages().isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(profile.getAdvantages().split("[,\\n;]+"))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .collect(Collectors.toList());
+    }
+
+    private String resolveAttestationStatus(MechanicProfile profile) {
+        if (profile == null) {
+            return "UNKNOWN";
+        }
+        if (Boolean.TRUE.equals(profile.getIsDataVerified())) {
+            return "VERIFIED";
+        }
+        return "NOT_VERIFIED";
     }
 
     private String normalize(String value) {
