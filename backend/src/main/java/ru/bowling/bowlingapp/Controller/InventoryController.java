@@ -8,6 +8,7 @@ import ru.bowling.bowlingapp.DTO.InventorySearchRequest;
 import ru.bowling.bowlingapp.DTO.PartDto;
 import ru.bowling.bowlingapp.DTO.ReservationRequestDto;
 import ru.bowling.bowlingapp.DTO.WarehouseSummaryDto;
+import ru.bowling.bowlingapp.DTO.WarehouseMovementDto;
 import ru.bowling.bowlingapp.Security.UserPrincipal;
 import ru.bowling.bowlingapp.Service.InventoryAvailabilityFilter;
 import ru.bowling.bowlingapp.Service.InventoryService;
@@ -45,7 +46,12 @@ public class InventoryController {
         }
         List<WarehouseSummaryDto> warehouses = inventoryService.getAccessibleWarehouses(userPrincipal.getId());
         return ResponseEntity.ok(warehouses);
-        // TODO: добавить /api/inventory/warehouses/{id}/movements для истории операций склада
+    }
+
+    @GetMapping("/warehouses/{id}/movements")
+    public ResponseEntity<List<WarehouseMovementDto>> getWarehouseMovements(@PathVariable("id") Integer warehouseId) {
+        List<WarehouseMovementDto> movements = inventoryService.getWarehouseMovements(warehouseId);
+        return ResponseEntity.ok(movements);
     }
 
     @GetMapping("/{id}")

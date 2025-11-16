@@ -3,7 +3,10 @@ package ru.bowling.bowlingapp.Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.DTO.WorkLogDTO;
@@ -17,8 +20,11 @@ import ru.bowling.bowlingapp.Repository.BowlingClubRepository;
 import ru.bowling.bowlingapp.Repository.ClubEquipmentRepository;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.Objects;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -65,8 +71,103 @@ public class WorkLogService {
 
     @Transactional(readOnly = true)
     public Page<WorkLog> searchWorkLogs(WorkLogSearchDTO searchDTO, Long userId) {
-        // TODO: Implement proper search logic using Specification or QueryDSL
-        return workLogRepository.findAll(Pageable.unpaged());
+        WorkLogSearchDTO criteria = Optional.ofNullable(searchDTO)
+                .orElseGet(WorkLogSearchDTO::new);
+
+        List<WorkLog> filtered = workLogRepository.findAll().stream()
+                .filter(log -> criteria.getClubId() == null ||
+                        (log.getClub() != null && criteria.getClubId().equals(log.getClub().getClubId())))
+                .filter(log -> criteria.getLaneNumber() == null || criteria.getLaneNumber().equals(log.getLaneNumber()))
+                .filter(log -> criteria.getMechanicId() == null ||
+                        (log.getMechanic() != null && criteria.getMechanicId().equals(log.getMechanic().getMechanicProfileId())))
+                .filter(log -> criteria.getEquipmentId() == null ||
+                        (log.getEquipment() != null && criteria.getEquipmentId().equals(log.getEquipment().getEquipmentId())))
+                .filter(log -> matchesStatus(criteria.getStatus(), log.getStatus()))
+                .filter(log -> matchesWorkType(criteria.getWorkType(), log.getWorkType()))
+                .filter(log -> criteria.getPriority() == null ||
+                        (log.getPriority() != null && log.getPriority() <= criteria.getPriority()))
+                .filter(log -> criteria.getStartDate() == null ||
+                        (log.getCreatedDate() != null && !log.getCreatedDate().isBefore(criteria.getStartDate())))
+                .filter(log -> criteria.getEndDate() == null ||
+                        (log.getCreatedDate() != null && !log.getCreatedDate().isAfter(criteria.getEndDate())))
+                .filter(log -> criteria.getCompletedOnly() == null || !criteria.getCompletedOnly()
+                        || log.getCompletedDate() != null)
+                .filter(log -> criteria.getActiveOnly() == null || !criteria.getActiveOnly()
+                        || isActiveStatus(log.getStatus()))
+                .filter(log -> criteria.getIncludeManualEdits() == null || criteria.getIncludeManualEdits()
+                        || Boolean.FALSE.equals(log.getIsManualEdit()))
+                .filter(log -> criteria.getKeyword() == null || criteria.getKeyword().isBlank()
+                        || containsKeyword(log, criteria.getKeyword()))
+                .filter(log -> userId == null || Objects.equals(log.getCreatedBy(), userId)
+                        || (log.getMechanic() != null && Objects.equals(log.getMechanic().getUser().getUserId(), userId)))
+                .collect(Collectors.toList());
+
+        Sort.Direction direction = "ASC".equalsIgnoreCase(criteria.getSortDirection())
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
+        Comparator<WorkLog> comparator = Comparator.comparing(
+                log -> resolveComparableField(log, criteria.getSortBy()),
+                Comparator.nullsLast(Comparator.naturalOrder()));
+        if (direction == Sort.Direction.DESC) {
+            comparator = comparator.reversed();
+        }
+        filtered.sort(comparator);
+
+        int page = criteria.getPage() != null && criteria.getPage() >= 0 ? criteria.getPage() : 0;
+        int size = criteria.getSize() != null && criteria.getSize() > 0 ? criteria.getSize() : 20;
+        int fromIndex = Math.min(page * size, filtered.size());
+        int toIndex = Math.min(fromIndex + size, filtered.size());
+        List<WorkLog> pageContent = filtered.subList(fromIndex, toIndex);
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, criteria.getSortBy()));
+        return new PageImpl<>(pageContent, pageable, filtered.size());
+    }
+
+    private boolean matchesStatus(String requestedStatus, WorkLogStatus actualStatus) {
+        if (requestedStatus == null || requestedStatus.isBlank()) {
+            return true;
+        }
+        try {
+            return WorkLogStatus.valueOf(requestedStatus.toUpperCase()).equals(actualStatus);
+        } catch (IllegalArgumentException ex) {
+            return true;
+        }
+    }
+
+    private boolean matchesWorkType(String requestedType, WorkType actualType) {
+        if (requestedType == null || requestedType.isBlank()) {
+            return true;
+        }
+        try {
+            return WorkType.valueOf(requestedType.toUpperCase()).equals(actualType);
+        } catch (IllegalArgumentException ex) {
+            return true;
+        }
+    }
+
+    private boolean containsKeyword(WorkLog workLog, String keyword) {
+        String lowered = keyword.toLowerCase();
+        return (workLog.getProblemDescription() != null && workLog.getProblemDescription().toLowerCase().contains(lowered))
+                || (workLog.getWorkPerformed() != null && workLog.getWorkPerformed().toLowerCase().contains(lowered))
+                || (workLog.getSolutionDescription() != null && workLog.getSolutionDescription().toLowerCase().contains(lowered));
+    }
+
+    private boolean isActiveStatus(WorkLogStatus status) {
+        return status != null && status != WorkLogStatus.CLOSED && status != WorkLogStatus.CANCELLED;
+    }
+
+    private Comparable<?> resolveComparableField(WorkLog log, String sortBy) {
+        if (log == null) {
+            return null;
+        }
+        String normalized = sortBy != null ? sortBy : "createdDate";
+        return switch (normalized) {
+            case "priority" -> log.getPriority();
+            case "status" -> Optional.ofNullable(log.getStatus()).map(Enum::name).orElse(null);
+            case "workType" -> Optional.ofNullable(log.getWorkType()).map(Enum::name).orElse(null);
+            case "completedDate" -> log.getCompletedDate();
+            default -> log.getCreatedDate();
+        };
     }
 
     private WorkLog convertToEntity(WorkLogDTO dto) {
