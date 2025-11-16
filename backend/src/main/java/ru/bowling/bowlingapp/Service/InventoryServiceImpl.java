@@ -1,5 +1,7 @@
 package ru.bowling.bowlingapp.Service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +20,7 @@ import ru.bowling.bowlingapp.Repository.UserRepository;
 import ru.bowling.bowlingapp.Repository.WarehouseInventoryRepository;
 import ru.bowling.bowlingapp.Repository.projection.WarehouseAggregateProjection;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,6 +37,7 @@ import java.util.stream.Collectors;
 public class InventoryServiceImpl implements InventoryService {
 
     private static final int LOW_STOCK_THRESHOLD = 3;
+    private static final Logger log = LoggerFactory.getLogger(InventoryServiceImpl.class);
 
     @Autowired
     private PartsCatalogRepository partsCatalogRepository;
@@ -170,7 +174,9 @@ public class InventoryServiceImpl implements InventoryService {
 
         inventory.setQuantity(inventory.getQuantity() - reservationRequestDto.getQuantity());
         warehouseInventoryRepository.save(inventory);
-        // TODO: Add transaction logging
+        log.info("Reserved {} units of catalog {} (inventory id {}) in warehouse {} by request {}", 
+                reservationRequestDto.getQuantity(), inventory.getCatalogId(), inventory.getInventoryId(),
+                inventory.getWarehouseId(), reservationRequestDto.getReservationId());
     }
 
     @Override
@@ -183,7 +189,9 @@ public class InventoryServiceImpl implements InventoryService {
         WarehouseInventory inventory = inventories.get(0); // Take first available inventory
         inventory.setQuantity(inventory.getQuantity() + reservationRequestDto.getQuantity());
         warehouseInventoryRepository.save(inventory);
-        // TODO: Add transaction logging
+        log.info("Released {} units of catalog {} (inventory id {}) back to warehouse {} for request {}", 
+                reservationRequestDto.getQuantity(), inventory.getCatalogId(), inventory.getInventoryId(),
+                inventory.getWarehouseId(), reservationRequestDto.getReservationId());
     }
 
     @Override
@@ -258,6 +266,34 @@ public class InventoryServiceImpl implements InventoryService {
                     .build());
         }
         return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<WarehouseMovementDto> getWarehouseMovements(Integer warehouseId) {
+        if (warehouseId == null) {
+            return Collections.emptyList();
+        }
+
+        List<WarehouseInventory> inventories = warehouseInventoryRepository.findByWarehouseId(warehouseId);
+        if (inventories.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        return inventories.stream()
+                .map(inv -> WarehouseMovementDto.builder()
+                        .warehouseId(inv.getWarehouseId())
+                        .catalogId(inv.getCatalogId())
+                        .inventoryId(inv.getInventoryId())
+                        .quantityDelta(inv.getQuantity())
+                        .operationType("SNAPSHOT")
+                        .comment("Текущее количество по позиции склада")
+                        .occurredAt(Optional.ofNullable(inv.getLastChecked())
+                                .map(date -> date.atStartOfDay())
+                                .orElse(now))
+                        .build())
+                .collect(Collectors.toList());
     }
 
     private PartDto convertToDto(PartsCatalog part, WarehouseInventory inventory) {

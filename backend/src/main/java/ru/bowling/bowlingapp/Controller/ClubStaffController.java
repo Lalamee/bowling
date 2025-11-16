@@ -48,9 +48,17 @@ public class ClubStaffController {
     public ResponseEntity<?> assignStaff(
         @PathVariable Long clubId,
         @PathVariable Long userId,
-        @RequestBody(required = false) Map<String, Object> body
+        @RequestBody(required = false) Map<String, Object> body,
+        Authentication authentication
     ) {
-        // TODO: Реализовать назначение сотрудника
+        String roleName = null;
+        if (body != null && body.containsKey("role")) {
+            Object rawRole = body.get("role");
+            roleName = rawRole != null ? rawRole.toString() : null;
+        }
+
+        String requestedBy = authentication != null ? authentication.getName() : null;
+        clubStaffService.assignStaff(clubId, userId, roleName, requestedBy);
         return ResponseEntity.ok(
             StandardResponseDTO.builder()
                 .message("Staff member assigned successfully")
@@ -119,9 +127,12 @@ public class ClubStaffController {
     public ResponseEntity<?> updateStaffRole(
         @PathVariable Long clubId,
         @PathVariable Long userId,
-        @RequestBody Map<String, String> body
+        @RequestBody Map<String, String> body,
+        Authentication authentication
     ) {
-        // TODO: Реализовать обновление роли
+        String roleName = body != null ? body.get("role") : null;
+        String requestedBy = authentication != null ? authentication.getName() : null;
+        clubStaffService.updateStaffRole(clubId, userId, roleName, requestedBy);
         return ResponseEntity.ok(
             StandardResponseDTO.builder()
                 .message("Staff role updated successfully")

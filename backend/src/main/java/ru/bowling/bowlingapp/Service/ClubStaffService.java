@@ -199,6 +199,38 @@ public class ClubStaffService {
     }
 
     @Transactional
+    public void assignStaff(Long clubId, Long userId, String roleName, String requestedByLogin) {
+        BowlingClub club = bowlingClubRepository.findById(clubId)
+                .orElseThrow(() -> new IllegalArgumentException("Club not found"));
+
+        User requestedBy = findUserByLogin(requestedByLogin);
+        if (requestedBy != null) {
+            ensureClubAccess(club, requestedBy);
+        }
+
+        User targetUser = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (clubStaffRepository.existsByClubAndUser(club, targetUser)) {
+            throw new IllegalArgumentException("User is already assigned to this club");
+        }
+
+        Role resolvedRole = resolveRoleForAssignment(roleName, targetUser);
+        ClubStaff staff = ClubStaff.builder()
+                .club(club)
+                .user(targetUser)
+                .role(resolvedRole)
+                .isActive(Boolean.TRUE)
+                .assignedAt(LocalDateTime.now())
+                .assignedBy(requestedBy != null ? requestedBy.getUserId() : null)
+                .build();
+
+        clubStaffRepository.save(staff);
+        targetUser.setRole(resolvedRole);
+        userRepository.save(targetUser);
+    }
+
+    @Transactional
     public void removeStaff(Long clubId, Long userId, String requestedByLogin) {
         BowlingClub club = bowlingClubRepository.findById(clubId)
                 .orElseThrow(() -> new IllegalArgumentException("Club not found"));
@@ -219,6 +251,32 @@ public class ClubStaffService {
                 .ifPresent(clubStaffRepository::delete);
 
         detachProfilesFromClub(club, user);
+    }
+
+    @Transactional
+    public void updateStaffRole(Long clubId, Long userId, String roleName, String requestedByLogin) {
+        BowlingClub club = bowlingClubRepository.findById(clubId)
+                .orElseThrow(() -> new IllegalArgumentException("Club not found"));
+
+        User requestedBy = findUserByLogin(requestedByLogin);
+        if (requestedBy != null) {
+            ensureClubAccess(club, requestedBy);
+        }
+
+        ClubStaff staff = clubStaffRepository.findByClubAndUser(club,
+                        userRepository.findById(userId)
+                                .orElseThrow(() -> new IllegalArgumentException("User not found")))
+                .orElseThrow(() -> new IllegalArgumentException("Staff member is not assigned to this club"));
+
+        Role resolvedRole = resolveRoleForAssignment(roleName, staff.getUser());
+        staff.setRole(resolvedRole);
+        clubStaffRepository.save(staff);
+
+        User user = staff.getUser();
+        if (user != null) {
+            user.setRole(resolvedRole);
+            userRepository.save(user);
+        }
     }
 
     private CreateStaffResponseDTO createManagerStaff(
@@ -835,6 +893,22 @@ public class ClubStaffService {
             return specific;
         }
         return resolveIndividualAccountType();
+    }
+
+    private Role resolveRoleForAssignment(String requestedRoleName, User targetUser) {
+        if (requestedRoleName != null && !requestedRoleName.isBlank()) {
+            Role role = findRoleByName(requestedRoleName);
+            if (role == null) {
+                role = createRoleIfMissing(requestedRoleName);
+            }
+            if (role != null) {
+                return role;
+            }
+        }
+        if (targetUser != null && targetUser.getRole() != null) {
+            return targetUser.getRole();
+        }
+        throw new IllegalArgumentException("Role must be specified for staff assignment");
     }
 
     private AccountType resolveAccountType(long id, String... fallbackNames) {

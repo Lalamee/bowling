@@ -4,6 +4,7 @@ import ru.bowling.bowlingapp.DTO.InventorySearchRequest;
 import ru.bowling.bowlingapp.DTO.PartDto;
 import ru.bowling.bowlingapp.DTO.ReservationRequestDto;
 import ru.bowling.bowlingapp.DTO.WarehouseSummaryDto;
+import ru.bowling.bowlingapp.DTO.WarehouseMovementDto;
 
 import java.util.List;
 
@@ -18,5 +19,7 @@ public interface InventoryService {
     void releasePart(ReservationRequestDto reservationRequestDto);
 
     List<WarehouseSummaryDto> getAccessibleWarehouses(Long userId);
+
+    List<WarehouseMovementDto> getWarehouseMovements(Integer warehouseId);
 
 }
