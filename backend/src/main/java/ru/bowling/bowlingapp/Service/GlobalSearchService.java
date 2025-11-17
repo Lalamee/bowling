@@ -88,9 +88,14 @@ public class GlobalSearchService {
 
     private List<PartDto> searchParts(String query, int limit, List<Long> accessibleClubIds, String roleName) {
         Map<Long, PartDto> aggregated = new LinkedHashMap<>();
+        boolean isAdmin = "ADMIN".equals(roleName);
 
-        if ("ADMIN".equals(roleName) || accessibleClubIds.isEmpty()) {
-            inventoryService.searchParts(buildInventorySearchRequest(query, null))
+        if (!isAdmin && (accessibleClubIds == null || accessibleClubIds.isEmpty())) {
+            return List.of();
+        }
+
+        if (isAdmin) {
+            inventoryService.searchParts(buildInventorySearchRequest(query, null, null))
                     .stream()
                     .limit(limit)
                     .forEach(part -> aggregated.putIfAbsent(safeInventoryKey(part), part));
@@ -98,9 +103,15 @@ public class GlobalSearchService {
         }
 
         for (Long clubId : accessibleClubIds) {
-            inventoryService.searchParts(buildInventorySearchRequest(query, clubId))
+            if (clubId == null) {
+                continue;
+            }
+            inventoryService.searchParts(buildInventorySearchRequest(
+                            query,
+                            clubId,
+                            Set.of(Math.toIntExact(clubId))))
                     .stream()
-                    .filter(part -> part != null)
+                    .filter(Objects::nonNull)
                     .forEach(part -> aggregated.putIfAbsent(safeInventoryKey(part), part));
             if (aggregated.size() >= limit) {
                 break;
@@ -112,10 +123,14 @@ public class GlobalSearchService {
                 .collect(Collectors.toList());
     }
 
-    private InventorySearchRequest buildInventorySearchRequest(String query, Long clubId) {
+    private InventorySearchRequest buildInventorySearchRequest(String query,
+                                                             Long clubId,
+                                                             Set<Integer> allowedWarehouseIds) {
         return InventorySearchRequest.builder()
                 .query(query)
                 .clubId(clubId)
+                .warehouseId(clubId != null ? Math.toIntExact(clubId) : null)
+                .allowedWarehouseIds(allowedWarehouseIds)
                 .build();
     }
 

@@ -25,7 +25,7 @@ public class PurchaseOrderController {
     private final PurchaseOrderService purchaseOrderService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','OWNER','CLUB_OWNER','MANAGER','STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OWNER','CLUB_OWNER','MANAGER','HEAD_MECHANIC','STAFF')")
     public ResponseEntity<List<PurchaseOrderSummaryDTO>> getOrders(
             @RequestParam(value = "clubId", required = false) Long clubId,
             @RequestParam(value = "archived", defaultValue = "false") boolean archived,
@@ -36,20 +36,20 @@ public class PurchaseOrderController {
     }
 
     @GetMapping("/{orderId}")
-    @PreAuthorize("hasAnyRole('ADMIN','OWNER','CLUB_OWNER','MANAGER','STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OWNER','CLUB_OWNER','MANAGER','HEAD_MECHANIC','STAFF')")
     public ResponseEntity<PurchaseOrderDetailDTO> getOrder(@PathVariable Long orderId) {
         return ResponseEntity.ok(purchaseOrderService.getOrderDetails(orderId));
     }
 
     @PostMapping("/{orderId}/acceptance")
-    @PreAuthorize("hasAnyRole('ADMIN','OWNER','CLUB_OWNER','MANAGER','STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OWNER','CLUB_OWNER','MANAGER','HEAD_MECHANIC','STAFF')")
     public ResponseEntity<PurchaseOrderDetailDTO> acceptOrder(@PathVariable Long orderId,
                                                              @Valid @RequestBody PurchaseOrderAcceptanceRequestDTO request) {
         return ResponseEntity.ok(purchaseOrderService.acceptOrder(orderId, request));
     }
 
     @PostMapping("/{orderId}/reviews")
-    @PreAuthorize("hasAnyRole('ADMIN','OWNER','CLUB_OWNER','MANAGER','STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OWNER','CLUB_OWNER','MANAGER','HEAD_MECHANIC','STAFF')")
     public ResponseEntity<PurchaseOrderDetailDTO> createReview(@PathVariable Long orderId,
                                                                @Valid @RequestBody SupplierReviewRequestDTO request,
                                                                @AuthenticationPrincipal UserPrincipal principal) {
@@ -58,7 +58,7 @@ public class PurchaseOrderController {
     }
 
     @PostMapping("/{orderId}/complaints")
-    @PreAuthorize("hasAnyRole('ADMIN','OWNER','CLUB_OWNER','MANAGER','STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OWNER','CLUB_OWNER','MANAGER','HEAD_MECHANIC','STAFF')")
     public ResponseEntity<PurchaseOrderDetailDTO> submitComplaint(@PathVariable Long orderId,
                                                                   @Valid @RequestBody SupplierComplaintRequestDTO request,
                                                                   @AuthenticationPrincipal UserPrincipal principal) {
