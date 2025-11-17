@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../api/api_core.dart';
 import '../../../../core/repositories/inventory_repository.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/net_ui.dart';
@@ -21,6 +22,7 @@ class _WarehouseSelectorScreenState extends State<WarehouseSelectorScreen> {
   var _isLoading = true;
   var _hasError = false;
   List<WarehouseSummaryDto> _warehouses = const [];
+  bool _forbidden = false;
 
   @override
   void initState() {
@@ -32,6 +34,7 @@ class _WarehouseSelectorScreenState extends State<WarehouseSelectorScreen> {
     setState(() {
       _isLoading = true;
       _hasError = false;
+      _forbidden = false;
     });
     try {
       final data = await _repository.getWarehouses();
@@ -52,14 +55,19 @@ class _WarehouseSelectorScreenState extends State<WarehouseSelectorScreen> {
       setState(() {
         _warehouses = sorted;
         _isLoading = false;
+        _forbidden = false;
       });
     } catch (e) {
       if (!mounted) return;
+      final forbidden = e is ApiException && e.statusCode == 403;
       setState(() {
         _isLoading = false;
-        _hasError = true;
+        _hasError = !forbidden;
+        _forbidden = forbidden;
       });
-      showApiError(context, e);
+      if (!forbidden) {
+        showApiError(context, e);
+      }
     }
   }
 
@@ -80,6 +88,9 @@ class _WarehouseSelectorScreenState extends State<WarehouseSelectorScreen> {
   Widget _buildBody() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
+    if (_forbidden) {
+      return const _ForbiddenWarehouseState();
     }
     if (_hasError) {
       return Center(
@@ -168,6 +179,37 @@ class _WarehouseSelectorScreenState extends State<WarehouseSelectorScreen> {
         actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh, color: AppColors.primary))],
       ),
       body: _buildBody(),
+    );
+  }
+}
+
+class _ForbiddenWarehouseState extends StatelessWidget {
+  const _ForbiddenWarehouseState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.inventory_2_outlined, size: 64, color: AppColors.darkGray),
+            SizedBox(height: 16),
+            Text(
+              'У вас пока нет доступных складов.',
+              style: TextStyle(color: AppColors.darkGray, fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Попросите владельца клуба добавить вас в команду или настройте личный склад механика.',
+              style: TextStyle(color: AppColors.darkGray, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

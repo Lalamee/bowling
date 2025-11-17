@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../api/api_core.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/service_history_repository.dart';
 import '../../../../core/theme/colors.dart';
@@ -29,6 +30,7 @@ class _ClubLanesScreenState extends State<ClubLanesScreen> {
   bool _hasError = false;
   List<_LaneTechInfo> _lanes = const [];
   int? _selectedLaneNumber;
+  bool _requestsRestricted = false;
 
   @override
   void initState() {
@@ -40,26 +42,37 @@ class _ClubLanesScreenState extends State<ClubLanesScreen> {
     setState(() {
       _isLoading = true;
       _hasError = false;
+      _requestsRestricted = false;
     });
+
     try {
-      final results = await Future.wait([
-        _serviceHistoryRepository.getByClub(widget.clubId),
-        _maintenanceRepository.getRequestsByClub(widget.clubId),
-      ]);
-      final history = results[0] as List<ServiceHistoryDto>;
-      final requests = results[1] as List<MaintenanceRequestResponseDto>;
+      final history = await _serviceHistoryRepository.getByClub(widget.clubId);
+      List<MaintenanceRequestResponseDto> requests = const [];
+      bool restricted = false;
+      try {
+        requests = await _maintenanceRepository.getRequestsByClub(widget.clubId);
+      } catch (error) {
+        if (error is ApiException && error.statusCode == 403) {
+          restricted = true;
+        } else {
+          rethrow;
+        }
+      }
+
       final lanes = _buildLaneInfos(history, requests);
       if (!mounted) return;
       setState(() {
         _lanes = lanes;
         _selectedLaneNumber = lanes.isNotEmpty ? lanes.first.laneNumber : null;
         _isLoading = false;
+        _requestsRestricted = restricted;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
         _hasError = true;
+        _requestsRestricted = false;
       });
       showApiError(context, e);
     }
@@ -186,6 +199,10 @@ class _ClubLanesScreenState extends State<ClubLanesScreen> {
             selectedLane: _selectedLaneNumber,
             onSelect: _selectLane,
           ),
+          if (_requestsRestricted) ...[
+            const SizedBox(height: 12),
+            const _LimitedAccessBanner(),
+          ],
           const SizedBox(height: 16),
           if (selectedLane != null) ...[
             _TechnicalInfoCard(info: selectedLane),
@@ -665,6 +682,37 @@ class _ErrorPlaceholder extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: const Text('Повторить'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LimitedAccessBanner extends StatelessWidget {
+  const _LimitedAccessBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF4E5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFC48B)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          Icon(Icons.lock_outline, color: Color(0xFFD17A00)),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'История заявок клуба недоступна для вашей роли. Обратитесь к владельцу клуба, '
+              'чтобы подтвердить доступ менеджера или пригласить вас в клуб.',
+              style: TextStyle(color: Color(0xFFD17A00), fontSize: 13, height: 1.4),
+            ),
           ),
         ],
       ),
