@@ -57,14 +57,14 @@ Future<T?> handleApiCall<T>(
   String? successMessage,
 }) async {
   try {
-    final result = showLoader 
+    final result = showLoader
         ? await withLoader(ctx, apiCall)
         : await apiCall();
-    
-    if (successMessage != null && ctx.mounted) {
+
+    if (successMessage != null && ctx.mounted && result != null) {
       showSnack(ctx, successMessage, success: true);
     }
-    
+
     return result;
   } catch (e) {
     if (ctx.mounted) {

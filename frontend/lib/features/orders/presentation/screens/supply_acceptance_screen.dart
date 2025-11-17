@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../api/api_core.dart';
 import '../../../../core/models/user_club.dart';
 import '../../../../core/repositories/purchase_orders_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
@@ -27,6 +28,7 @@ class _SupplyAcceptanceScreenState extends State<SupplyAcceptanceScreen> {
 
   bool _loading = true;
   bool _error = false;
+  bool _forbidden = false;
   List<PurchaseOrderSummaryDto> _orders = const [];
   List<UserClub> _clubs = const [];
   int? _selectedClubId;
@@ -47,6 +49,7 @@ class _SupplyAcceptanceScreenState extends State<SupplyAcceptanceScreen> {
     setState(() {
       _loading = true;
       _error = false;
+      _forbidden = false;
     });
     try {
       final me = await _userRepository.me();
@@ -61,14 +64,19 @@ class _SupplyAcceptanceScreenState extends State<SupplyAcceptanceScreen> {
         _clubs = clubs;
         _orders = orders;
         _loading = false;
+        _forbidden = false;
       });
     } catch (e) {
       if (!mounted) return;
+      final forbidden = e is ApiException && e.statusCode == 403;
       setState(() {
         _loading = false;
-        _error = true;
+        _error = !forbidden;
+        _forbidden = forbidden;
       });
-      showApiError(context, e);
+      if (!forbidden) {
+        showApiError(context, e);
+      }
     }
   }
 
@@ -101,6 +109,9 @@ class _SupplyAcceptanceScreenState extends State<SupplyAcceptanceScreen> {
   Widget _buildBody() {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
+    }
+    if (_forbidden) {
+      return _ForbiddenState(onRetry: _load);
     }
     if (_error) {
       return _ErrorState(onRetry: _load);
@@ -295,6 +306,41 @@ class _ErrorState extends StatelessWidget {
             child: const Text('Повторить'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ForbiddenState extends StatelessWidget {
+  final Future<void> Function() onRetry;
+
+  const _ForbiddenState({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.lock_outline, size: 64, color: AppColors.darkGray),
+            const SizedBox(height: 16),
+            const Text(
+              'Приёмка поставок доступна только подтверждённым менеджерам клуба.',
+              style: TextStyle(color: AppColors.darkGray),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Попросите владельца клуба выдать или обновить доступ. После подтверждения обновите экран.',
+              style: TextStyle(color: AppColors.darkGray, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(onPressed: onRetry, child: const Text('Проверить доступ')),
+          ],
+        ),
       ),
     );
   }

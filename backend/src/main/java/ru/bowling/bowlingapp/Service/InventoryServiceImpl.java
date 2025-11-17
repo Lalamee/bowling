@@ -15,6 +15,7 @@ import ru.bowling.bowlingapp.Entity.PartsCatalog;
 import ru.bowling.bowlingapp.Entity.User;
 import ru.bowling.bowlingapp.Entity.WarehouseInventory;
 import ru.bowling.bowlingapp.Repository.BowlingClubRepository;
+import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
 import ru.bowling.bowlingapp.Repository.PartImageRepository;
 import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
@@ -55,6 +56,9 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Autowired
     private PartImageRepository partImageRepository;
+
+    @Autowired
+    private ClubStaffRepository clubStaffRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -225,6 +229,9 @@ public class InventoryServiceImpl implements InventoryService {
                 if (club == null || club.getClubId() == null) {
                     continue;
                 }
+                if (!hasActiveStaffAccess(user, club)) {
+                    continue;
+                }
                 Integer warehouseId = club.getClubId().intValue();
                 warehouseIds.add(warehouseId);
                 typeByWarehouse.put(warehouseId, WarehouseType.CLUB);
@@ -281,6 +288,13 @@ public class InventoryServiceImpl implements InventoryService {
                     .build());
         }
         return result;
+    }
+
+    private boolean hasActiveStaffAccess(User user, BowlingClub club) {
+        if (user == null || club == null || club.getClubId() == null || user.getUserId() == null) {
+            return false;
+        }
+        return clubStaffRepository.existsByClubClubIdAndUserUserIdAndIsActiveTrue(club.getClubId(), user.getUserId());
     }
 
     @Override
