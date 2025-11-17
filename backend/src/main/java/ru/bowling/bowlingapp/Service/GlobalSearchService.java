@@ -5,6 +5,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.DTO.GlobalSearchResponseDTO;
+import ru.bowling.bowlingapp.DTO.InventorySearchRequest;
 import ru.bowling.bowlingapp.DTO.PartDto;
 import ru.bowling.bowlingapp.Entity.BowlingClub;
 import ru.bowling.bowlingapp.Entity.ClubStaff;
@@ -89,7 +90,7 @@ public class GlobalSearchService {
         Map<Long, PartDto> aggregated = new LinkedHashMap<>();
 
         if ("ADMIN".equals(roleName) || accessibleClubIds.isEmpty()) {
-            inventoryService.searchParts(query, null)
+            inventoryService.searchParts(buildInventorySearchRequest(query, null))
                     .stream()
                     .limit(limit)
                     .forEach(part -> aggregated.putIfAbsent(safeInventoryKey(part), part));
@@ -97,7 +98,7 @@ public class GlobalSearchService {
         }
 
         for (Long clubId : accessibleClubIds) {
-            inventoryService.searchParts(query, clubId)
+            inventoryService.searchParts(buildInventorySearchRequest(query, clubId))
                     .stream()
                     .filter(part -> part != null)
                     .forEach(part -> aggregated.putIfAbsent(safeInventoryKey(part), part));
@@ -109,6 +110,13 @@ public class GlobalSearchService {
         return aggregated.values().stream()
                 .limit(limit)
                 .collect(Collectors.toList());
+    }
+
+    private InventorySearchRequest buildInventorySearchRequest(String query, Long clubId) {
+        return InventorySearchRequest.builder()
+                .query(query)
+                .clubId(clubId)
+                .build();
     }
 
     private Long safeInventoryKey(PartDto part) {
