@@ -9,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 import ru.bowling.bowlingapp.Entity.User;
 import ru.bowling.bowlingapp.Security.UserPrincipal;
@@ -72,17 +71,12 @@ public class JwtTokenProvider {
             }
         }
 
-        UserPrincipal principal = new UserPrincipal(
-                userId,
-                phone,
-                null,
-                true
-        );
+        UserPrincipal principal = UserPrincipal.fromClaims(userId, phone, role);
 
         return new UsernamePasswordAuthenticationToken(
                 principal,
                 null,
-                java.util.List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                principal.getAuthorities()
         );
     }
 
