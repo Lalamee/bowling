@@ -22,7 +22,7 @@ public class WorkLogController {
     private final WorkLogService workLogService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'MECHANIC', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'MECHANIC', 'CHIEF_MECHANIC', 'HEAD_MECHANIC', 'STAFF')")
     public ResponseEntity<WorkLogDTO> createWorkLog(@RequestBody WorkLogDTO workLogDTO, Authentication authentication) {
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
         WorkLog createdWorkLog = workLogService.createWorkLog(workLogDTO, userPrincipal.getId());
@@ -30,14 +30,14 @@ public class WorkLogController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'MECHANIC', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'MECHANIC', 'CHIEF_MECHANIC', 'HEAD_MECHANIC', 'STAFF')")
     public ResponseEntity<WorkLogDTO> getWorkLog(@PathVariable Long id) {
         WorkLog workLog = workLogService.getWorkLog(id);
         return ResponseEntity.ok(convertToDto(workLog));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'MECHANIC', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'MECHANIC', 'CHIEF_MECHANIC', 'HEAD_MECHANIC', 'STAFF')")
     public ResponseEntity<WorkLogDTO> updateWorkLog(@PathVariable Long id, @RequestBody WorkLogDTO workLogDTO) {
         WorkLog updatedWorkLog = workLogService.updateWorkLog(id, workLogDTO);
         return ResponseEntity.ok(convertToDto(updatedWorkLog));
@@ -51,7 +51,7 @@ public class WorkLogController {
     }
 
     @PostMapping("/search")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'MECHANIC', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'MECHANIC', 'CHIEF_MECHANIC', 'HEAD_MECHANIC', 'STAFF')")
     public ResponseEntity<Page<WorkLogDTO>> searchWorkLogs(@RequestBody WorkLogSearchDTO searchDTO, Authentication authentication) {
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
         Page<WorkLog> workLogs = workLogService.searchWorkLogs(searchDTO, userPrincipal.getId());

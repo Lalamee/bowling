@@ -44,20 +44,20 @@ public class MaintenanceRequestController {
     }
 
     @PatchMapping("/{requestId}/approve")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'HEAD_MECHANIC', 'STAFF')")
     public ResponseEntity<MaintenanceRequestResponseDTO> approveRequest(@PathVariable Long requestId, @RequestBody(required = false) String managerNotes) {
         return ResponseEntity.ok(maintenanceRequestService.approveRequest(requestId, managerNotes, null));
     }
 
     @PatchMapping("/{requestId}/stock-issue")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'HEAD_MECHANIC', 'STAFF')")
     public ResponseEntity<MaintenanceRequestResponseDTO> issueFromStock(@PathVariable Long requestId,
                                                                         @RequestBody StockIssueDecisionDTO decisionDTO) {
         return ResponseEntity.ok(maintenanceRequestService.issueFromStock(requestId, decisionDTO));
     }
 
     @PatchMapping("/{requestId}/reject")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'HEAD_MECHANIC', 'STAFF')")
     public ResponseEntity<MaintenanceRequestResponseDTO> rejectRequest(@PathVariable Long requestId, @RequestBody(required = false) String managerNotes) {
         return ResponseEntity.ok(maintenanceRequestService.rejectRequest(requestId, managerNotes));
     }

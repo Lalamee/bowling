@@ -6,6 +6,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import ru.bowling.bowlingapp.Service.InventoryAvailabilityFilter;
 
+import java.util.Set;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -17,4 +19,5 @@ public class InventorySearchRequest {
     private Long clubId; // временная поддержка для старых вызовов, дублирует warehouseId
     private String categoryCode;
     private InventoryAvailabilityFilter availability;
+    private Set<Integer> allowedWarehouseIds;
 }

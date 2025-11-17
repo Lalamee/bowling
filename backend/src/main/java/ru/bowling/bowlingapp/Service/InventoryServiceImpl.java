@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -61,6 +62,8 @@ public class InventoryServiceImpl implements InventoryService {
         String normalizedQuery = request != null && request.getQuery() != null ? request.getQuery().trim() : "";
         Integer warehouseIdFilter = resolveWarehouseId(request);
         InventoryAvailabilityFilter availabilityFilter = request != null ? request.getAvailability() : null;
+        Set<Integer> allowedWarehouses = normalizeAllowedWarehouses(
+                request != null ? request.getAllowedWarehouseIds() : null);
 
         if (normalizedQuery.isEmpty()) {
             List<WarehouseInventory> inventories = warehouseIdFilter != null
@@ -83,7 +86,7 @@ public class InventoryServiceImpl implements InventoryService {
                             .collect(Collectors.toMap(PartsCatalog::getCatalogId, Function.identity()));
 
             return inventories.stream()
-                    .filter(inv -> matchesWarehouse(inv, warehouseIdFilter))
+                    .filter(inv -> matchesWarehouse(inv, warehouseIdFilter, allowedWarehouses))
                     .filter(inv -> matchesAvailability(inv, availabilityFilter))
                     .map(inv -> {
                         Long catalogId = inv.getCatalogId() != null ? inv.getCatalogId().longValue() : null;
@@ -104,7 +107,7 @@ public class InventoryServiceImpl implements InventoryService {
         for (PartsCatalog part : parts) {
             List<WarehouseInventory> inventories = warehouseInventoryRepository.findByCatalogId(part.getCatalogId().intValue());
             for (WarehouseInventory inventory : inventories) {
-                if (!matchesWarehouse(inventory, warehouseIdFilter)) {
+                if (!matchesWarehouse(inventory, warehouseIdFilter, allowedWarehouses)) {
                     continue;
                 }
                 if (!matchesAvailability(inventory, availabilityFilter)) {
@@ -228,6 +231,17 @@ public class InventoryServiceImpl implements InventoryService {
             }
         }
 
+        if (user.getOwnerProfile() != null && user.getOwnerProfile().getClubs() != null) {
+            for (BowlingClub club : user.getOwnerProfile().getClubs()) {
+                if (club == null || club.getClubId() == null) {
+                    continue;
+                }
+                Integer warehouseId = club.getClubId().intValue();
+                warehouseIds.add(warehouseId);
+                typeByWarehouse.putIfAbsent(warehouseId, WarehouseType.CLUB);
+            }
+        }
+
         // TODO: добавить персональные склады механиков, когда появится отдельная таблица personal_warehouses
 
         if (warehouseIds.isEmpty()) {
@@ -340,8 +354,19 @@ public class InventoryServiceImpl implements InventoryService {
         return partImageRepository.findFirstByCatalogId(part.getCatalogId()).map(image -> image.getImageUrl()).orElse(null);
     }
 
-    private boolean matchesWarehouse(WarehouseInventory inventory, Integer warehouseIdFilter) {
-        return warehouseIdFilter == null || Objects.equals(warehouseIdFilter, inventory.getWarehouseId());
+    private boolean matchesWarehouse(WarehouseInventory inventory,
+                                     Integer warehouseIdFilter,
+                                     Set<Integer> allowedWarehouses) {
+        if (warehouseIdFilter != null && !Objects.equals(warehouseIdFilter, inventory.getWarehouseId())) {
+            return false;
+        }
+        if (allowedWarehouses != null) {
+            Integer warehouseId = inventory.getWarehouseId();
+            if (warehouseId == null || !allowedWarehouses.contains(warehouseId)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean matchesAvailability(WarehouseInventory inventory, InventoryAvailabilityFilter filter) {
@@ -372,6 +397,15 @@ public class InventoryServiceImpl implements InventoryService {
             return request.getClubId().intValue();
         }
         return null;
+    }
+
+    private Set<Integer> normalizeAllowedWarehouses(Set<Integer> allowedWarehouseIds) {
+        if (allowedWarehouseIds == null) {
+            return null;
+        }
+        return allowedWarehouseIds.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private String resolvePlacementStatus(WarehouseInventory inventory) {
