@@ -2,6 +2,7 @@ package ru.bowling.bowlingapp.Repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import ru.bowling.bowlingapp.Entity.MechanicProfile;
 
 import java.util.List;
@@ -16,7 +17,20 @@ public interface MechanicProfileRepository extends JpaRepository<MechanicProfile
             FROM MechanicProfile mp
             LEFT JOIN FETCH mp.user u
             LEFT JOIN FETCH mp.clubs c
+            LEFT JOIN FETCH mp.certifications cert
+            LEFT JOIN FETCH mp.workHistoryEntries history
             """)
     List<MechanicProfile> findAllWithUserAndClubs();
+
+    @Query("""
+            SELECT mp
+            FROM MechanicProfile mp
+            LEFT JOIN FETCH mp.user u
+            LEFT JOIN FETCH mp.clubs c
+            LEFT JOIN FETCH mp.certifications cert
+            LEFT JOIN FETCH mp.workHistoryEntries history
+            WHERE mp.profileId = :profileId
+            """)
+    Optional<MechanicProfile> findDetailedById(@Param("profileId") Long profileId);
 }
 

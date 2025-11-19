@@ -38,6 +38,9 @@ public class PartsCatalog {
     @Column(name = "description")
     private String description;
 
+    @Column(name = "category_code")
+    private String categoryCode;
+
     @Column(name = "normal_service_life")
     private Integer normalServiceLife;
 

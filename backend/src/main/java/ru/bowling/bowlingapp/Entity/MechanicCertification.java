@@ -9,33 +9,36 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "mechanic_work_history")
+@Table(name = "mechanic_certifications")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MechanicWorkHistory {
+public class MechanicCertification {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "history_id")
-    private Long historyId;
+    @Column(name = "certification_id")
+    private Long certificationId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "mechanic_profile_id", nullable = false)
     private MechanicProfile mechanicProfile;
 
-    @Column(name = "organization")
-    private String organization;
+    @Column(name = "title")
+    private String title;
 
-    @Column(name = "position")
-    private String position;
+    @Column(name = "issuer")
+    private String issuer;
 
-    @Column(name = "start_date")
-    private LocalDate startDate;
+    @Column(name = "issue_date")
+    private LocalDate issueDate;
 
-    @Column(name = "end_date")
-    private LocalDate endDate;
+    @Column(name = "expiration_date")
+    private LocalDate expirationDate;
+
+    @Column(name = "credential_url")
+    private String credentialUrl;
 
     @Column(name = "description")
     private String description;

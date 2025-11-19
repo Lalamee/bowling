@@ -336,7 +336,7 @@ public class ClubStaffService {
                 .isDataVerified(false)
                 .createdAt(today)
                 .updatedAt(today)
-                .workPlaces(club.getName())
+                .region(trimNullable(club.getAddress()))
                 .build();
 
         List<BowlingClub> clubs = new ArrayList<>();

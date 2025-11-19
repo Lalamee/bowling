@@ -12,10 +12,12 @@ import ru.bowling.bowlingapp.DTO.WarehouseMovementDto;
 import ru.bowling.bowlingapp.DTO.WarehouseSummaryDto;
 import ru.bowling.bowlingapp.Entity.BowlingClub;
 import ru.bowling.bowlingapp.Entity.PartsCatalog;
+import ru.bowling.bowlingapp.Entity.PersonalWarehouse;
 import ru.bowling.bowlingapp.Entity.User;
 import ru.bowling.bowlingapp.Entity.WarehouseInventory;
 import ru.bowling.bowlingapp.Repository.BowlingClubRepository;
 import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
+import ru.bowling.bowlingapp.Repository.PersonalWarehouseRepository;
 import ru.bowling.bowlingapp.Repository.PartImageRepository;
 import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
@@ -29,6 +31,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -60,12 +63,16 @@ public class InventoryServiceImpl implements InventoryService {
     @Autowired
     private ClubStaffRepository clubStaffRepository;
 
+    @Autowired
+    private PersonalWarehouseRepository personalWarehouseRepository;
+
     @Override
     @Transactional(readOnly = true)
     public List<PartDto> searchParts(InventorySearchRequest request) {
         String normalizedQuery = request != null && request.getQuery() != null ? request.getQuery().trim() : "";
         Integer warehouseIdFilter = resolveWarehouseId(request);
         InventoryAvailabilityFilter availabilityFilter = request != null ? request.getAvailability() : null;
+        String categoryCodeFilter = normalizeCategoryCode(request != null ? request.getCategoryCode() : null);
         Set<Integer> allowedWarehouses = normalizeAllowedWarehouses(
                 request != null ? request.getAllowedWarehouseIds() : null);
 
@@ -102,11 +109,15 @@ public class InventoryServiceImpl implements InventoryService {
         }
 
         List<PartsCatalog> parts = partsCatalogRepository.searchByNameOrNumber(normalizedQuery);
+        if (categoryCodeFilter != null) {
+            parts = parts.stream()
+                    .filter(part -> categoryCodeFilter.equalsIgnoreCase(
+                            normalizeCategoryCode(part.getCategoryCode())))
+                    .collect(Collectors.toList());
+        }
         if (parts.isEmpty()) {
             return Collections.emptyList();
         }
-        // TODO: добавить фильтр по categoryCode, когда поле появится в PartsCatalog
-
         List<PartDto> results = new ArrayList<>();
         for (PartsCatalog part : parts) {
             List<WarehouseInventory> inventories = warehouseInventoryRepository.findByCatalogId(part.getCatalogId().intValue());
@@ -213,6 +224,7 @@ public class InventoryServiceImpl implements InventoryService {
 
         Set<Integer> warehouseIds = new HashSet<>();
         Map<Integer, WarehouseType> typeByWarehouse = new HashMap<>();
+        Map<Integer, PersonalWarehouse> personalWarehouseById = new HashMap<>();
 
         if (user.getManagerProfile() != null && user.getManagerProfile().getClub() != null) {
             Integer clubWarehouseId = user.getManagerProfile().getClub().getClubId() != null
@@ -238,6 +250,20 @@ public class InventoryServiceImpl implements InventoryService {
             }
         }
 
+        if (user.getMechanicProfile() != null && user.getMechanicProfile().getProfileId() != null) {
+            List<PersonalWarehouse> personalWarehouses = personalWarehouseRepository
+                    .findByMechanicProfile_ProfileIdAndIsActiveTrue(user.getMechanicProfile().getProfileId());
+            for (PersonalWarehouse warehouse : personalWarehouses) {
+                if (warehouse == null || warehouse.getWarehouseId() == null) {
+                    continue;
+                }
+                Integer warehouseId = warehouse.getWarehouseId();
+                warehouseIds.add(warehouseId);
+                typeByWarehouse.put(warehouseId, WarehouseType.PERSONAL);
+                personalWarehouseById.put(warehouseId, warehouse);
+            }
+        }
+
         if (user.getOwnerProfile() != null && user.getOwnerProfile().getClubs() != null) {
             for (BowlingClub club : user.getOwnerProfile().getClubs()) {
                 if (club == null || club.getClubId() == null) {
@@ -248,8 +274,6 @@ public class InventoryServiceImpl implements InventoryService {
                 typeByWarehouse.putIfAbsent(warehouseId, WarehouseType.CLUB);
             }
         }
-
-        // TODO: добавить персональные склады механиков, когда появится отдельная таблица personal_warehouses
 
         if (warehouseIds.isEmpty()) {
             return Collections.emptyList();
@@ -270,10 +294,19 @@ public class InventoryServiceImpl implements InventoryService {
             BowlingClub club = clubsById.get(warehouseId.longValue());
             WarehouseAggregateProjection projection = aggregateByWarehouse.get(warehouseId);
             WarehouseType warehouseType = typeByWarehouse.getOrDefault(warehouseId, WarehouseType.CLUB);
+            PersonalWarehouse personalWarehouse = personalWarehouseById.get(warehouseId);
+            Long clubId = club != null ? club.getClubId() : null;
+            String displayName = club != null ? club.getName() : null;
+            if (warehouseType == WarehouseType.PERSONAL) {
+                clubId = null;
+                displayName = personalWarehouse != null && personalWarehouse.getName() != null
+                        ? personalWarehouse.getName()
+                        : "Личный склад";
+            }
             result.add(WarehouseSummaryDto.builder()
                     .warehouseId(warehouseId)
-                    .clubId(club != null ? club.getClubId() : warehouseId.longValue())
-                    .clubName(club != null ? club.getName() : "Личный склад")
+                    .clubId(clubId)
+                    .clubName(displayName != null ? displayName : "Личный склад")
                     .warehouseType(warehouseType)
                     .totalPositions(projection != null && projection.getTotalItems() != null
                             ? projection.getTotalItems().intValue()
@@ -434,5 +467,16 @@ public class InventoryServiceImpl implements InventoryService {
             return "IN_WAREHOUSE";
         }
         return null;
+    }
+
+    private String normalizeCategoryCode(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed.toUpperCase(Locale.ROOT);
     }
 }

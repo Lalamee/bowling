@@ -2,27 +2,35 @@ package ru.bowling.bowlingapp.Service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import ru.bowling.bowlingapp.DTO.MechanicCertificationDTO;
 import ru.bowling.bowlingapp.DTO.MechanicDirectoryDetailDTO;
 import ru.bowling.bowlingapp.DTO.MechanicDirectorySummaryDTO;
+import ru.bowling.bowlingapp.DTO.MechanicWorkHistoryDTO;
+import ru.bowling.bowlingapp.Entity.AttestationApplication;
 import ru.bowling.bowlingapp.Entity.BowlingClub;
+import ru.bowling.bowlingapp.Entity.MechanicCertification;
 import ru.bowling.bowlingapp.Entity.MechanicProfile;
+import ru.bowling.bowlingapp.Entity.MechanicWorkHistory;
 import ru.bowling.bowlingapp.Entity.User;
+import ru.bowling.bowlingapp.Entity.enums.AttestationStatus;
+import ru.bowling.bowlingapp.Repository.AttestationApplicationRepository;
 import ru.bowling.bowlingapp.Repository.MechanicProfileRepository;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
 public class MechanicDirectoryService {
 
     private final MechanicProfileRepository mechanicProfileRepository;
+    private final AttestationApplicationRepository attestationApplicationRepository;
 
     public List<MechanicDirectorySummaryDTO> searchMechanics(String query, String region, String certification) {
         List<MechanicProfile> profiles = mechanicProfileRepository.findAllWithUserAndClubs();
@@ -42,7 +50,7 @@ public class MechanicDirectoryService {
     }
 
     public MechanicDirectoryDetailDTO getMechanicDetail(Long profileId) {
-        MechanicProfile profile = mechanicProfileRepository.findById(profileId)
+        MechanicProfile profile = mechanicProfileRepository.findDetailedById(profileId)
                 .orElseThrow(() -> new IllegalArgumentException("Mechanic profile not found"));
 
         List<MechanicDirectorySummaryDTO> clubs = Optional.ofNullable(profile.getClubs())
@@ -63,15 +71,14 @@ public class MechanicDirectoryService {
                 .rating(profile.getRating())
                 .status(resolveStatus(profile))
                 .region(resolveRegion(profile))
-                .certifications(resolveCertifications(profile))
+                .certifications(resolveCertificationDtos(profile))
                 .totalExperienceYears(profile.getTotalExperienceYears())
                 .bowlingExperienceYears(profile.getBowlingExperienceYears())
                 .isEntrepreneur(profile.getIsEntrepreneur())
                 .isDataVerified(profile.getIsDataVerified())
                 .verificationDate(profile.getVerificationDate())
                 .relatedClubs(clubs)
-                .workPlaces(profile.getWorkPlaces())
-                .workPeriods(profile.getWorkPeriods())
+                .workHistory(resolveWorkHistory(profile))
                 .attestationStatus(resolveAttestationStatus(profile))
                 .build();
     }
@@ -105,7 +112,7 @@ public class MechanicDirectoryService {
         if (loweredCertification == null) {
             return true;
         }
-        List<String> certifications = resolveCertifications(profile);
+        List<String> certifications = resolveCertificationTokens(profile);
         if (certifications.isEmpty()) {
             return true;
         }
@@ -131,7 +138,7 @@ public class MechanicDirectoryService {
                 .status(resolveStatus(profile))
                 .region(resolveRegion(profile))
                 .clubs(clubs)
-                .certifications(resolveCertifications(profile))
+                .certifications(resolveCertificationDtos(profile))
                 .build();
     }
 
@@ -160,6 +167,11 @@ public class MechanicDirectoryService {
             return null;
         }
 
+        String profileRegion = normalizeRegion(profile.getRegion());
+        if (profileRegion != null) {
+            return profileRegion;
+        }
+
         String fromClubAddress = Optional.ofNullable(profile.getClubs())
                 .orElse(List.of())
                 .stream()
@@ -171,9 +183,16 @@ public class MechanicDirectoryService {
             return fromClubAddress;
         }
 
-        String workPlaces = profile.getWorkPlaces();
-        if (workPlaces != null && !workPlaces.isBlank()) {
-            return extractRegionFragment(workPlaces);
+        String fromHistory = Optional.ofNullable(profile.getWorkHistoryEntries())
+                .orElse(List.of())
+                .stream()
+                .map(MechanicWorkHistory::getOrganization)
+                .map(this::normalizeRegion)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+        if (fromHistory != null) {
+            return fromHistory;
         }
         return null;
     }
@@ -194,24 +213,85 @@ public class MechanicDirectoryService {
         return commaIndex > 0 ? trimmed.substring(0, commaIndex).trim() : trimmed;
     }
 
-    private List<String> resolveCertifications(MechanicProfile profile) {
-        if (profile == null || profile.getAdvantages() == null || profile.getAdvantages().isBlank()) {
-            return List.of();
+    private String normalizeRegion(String value) {
+        if (value == null) {
+            return null;
         }
-        return Arrays.stream(profile.getAdvantages().split("[,\\n;]+"))
-                .map(String::trim)
-                .filter(value -> !value.isEmpty())
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return extractRegionFragment(trimmed);
+    }
+
+    private List<MechanicCertificationDTO> resolveCertificationDtos(MechanicProfile profile) {
+        return Optional.ofNullable(profile)
+                .map(MechanicProfile::getCertifications)
+                .orElse(List.of())
+                .stream()
+                .filter(Objects::nonNull)
+                .map(this::toCertificationDto)
                 .collect(Collectors.toList());
     }
 
-    private String resolveAttestationStatus(MechanicProfile profile) {
-        if (profile == null) {
-            return "UNKNOWN";
+    private MechanicCertificationDTO toCertificationDto(MechanicCertification certification) {
+        if (certification == null) {
+            return null;
         }
-        if (Boolean.TRUE.equals(profile.getIsDataVerified())) {
-            return "VERIFIED";
+        return MechanicCertificationDTO.builder()
+                .certificationId(certification.getCertificationId())
+                .title(certification.getTitle())
+                .issuer(certification.getIssuer())
+                .issueDate(certification.getIssueDate())
+                .expirationDate(certification.getExpirationDate())
+                .credentialUrl(certification.getCredentialUrl())
+                .description(certification.getDescription())
+                .build();
+    }
+
+    private List<String> resolveCertificationTokens(MechanicProfile profile) {
+        return resolveCertificationDtos(profile).stream()
+                .flatMap(dto -> Stream.of(dto.getTitle(), dto.getIssuer()))
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(token -> !token.isEmpty())
+                .collect(Collectors.toList());
+    }
+
+    private List<MechanicWorkHistoryDTO> resolveWorkHistory(MechanicProfile profile) {
+        return Optional.ofNullable(profile)
+                .map(MechanicProfile::getWorkHistoryEntries)
+                .orElse(List.of())
+                .stream()
+                .filter(Objects::nonNull)
+                .map(this::toWorkHistoryDto)
+                .collect(Collectors.toList());
+    }
+
+    private MechanicWorkHistoryDTO toWorkHistoryDto(MechanicWorkHistory history) {
+        if (history == null) {
+            return null;
         }
-        return "NOT_VERIFIED";
+        return MechanicWorkHistoryDTO.builder()
+                .historyId(history.getHistoryId())
+                .organization(history.getOrganization())
+                .position(history.getPosition())
+                .startDate(history.getStartDate())
+                .endDate(history.getEndDate())
+                .description(history.getDescription())
+                .build();
+    }
+
+    private AttestationStatus resolveAttestationStatus(MechanicProfile profile) {
+        if (profile == null || profile.getProfileId() == null) {
+            return AttestationStatus.NEW;
+        }
+        return attestationApplicationRepository
+                .findFirstByMechanicProfile_ProfileIdOrderByUpdatedAtDesc(profile.getProfileId())
+                .map(AttestationApplication::getStatus)
+                .orElseGet(() -> Boolean.TRUE.equals(profile.getIsDataVerified())
+                        ? AttestationStatus.APPROVED
+                        : AttestationStatus.NEW);
     }
 
     private String normalize(String value) {
