@@ -17,8 +17,8 @@ public class MechanicDirectorySummaryDTO {
     private String specialization;
     private Double rating;
     private String status; // CLUB_MECHANIC | FREE_AGENT
-    private String region; // TODO: заполнить из анкеты, когда поле появится в БД
+    private String region;
     private List<String> clubs;
-    private List<String> certifications; // TODO: заменить на отдельные DTO после появления модели сертификатов
+    private List<MechanicCertificationDTO> certifications;
 }
 

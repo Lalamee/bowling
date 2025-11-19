@@ -4,6 +4,7 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 @Builder
@@ -31,9 +32,9 @@ public class MechanicProfileDTO {
     private String skills;
     private String advantages;
 
-    // Дополнительные поля для работы
-    private String workPlaces; // Места работы (JSON или текст)
-    private String workPeriods; // Периоды работы (JSON или текст)
+    private String region;
+    private List<MechanicCertificationDTO> certifications;
+    private List<MechanicWorkHistoryDTO> workHistory;
 
     private Long clubId;
 }

@@ -19,6 +19,7 @@ import ru.bowling.bowlingapp.Repository.ManagerProfileRepository;
 import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
 import ru.bowling.bowlingapp.Repository.RequestPartRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
+import ru.bowling.bowlingapp.Repository.WarehouseInventoryRepository;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -47,6 +48,7 @@ public class MaintenanceRequestService {
         private final InventoryService inventoryService;
         private final SupplierService supplierService;
         private final NotificationService notificationService;
+        private final WarehouseInventoryRepository warehouseInventoryRepository;
 
         @Transactional
         public MaintenanceRequestResponseDTO createPartRequest(PartRequestDTO requestDTO) {
@@ -78,7 +80,7 @@ public class MaintenanceRequestService {
                                 .laneNumber(requestDTO.getLaneNumber())
                                 .mechanic(mechanicProfile)
                                 .requestDate(LocalDateTime.now())
-                                .status(MaintenanceRequestStatus.SENT_TO_MANAGER)
+                                .status(MaintenanceRequestStatus.UNDER_REVIEW)
                                 .managerNotes(requestDTO.getManagerNotes())
                                 .verificationStatus("NOT_VERIFIED")
                                 .build();
@@ -398,6 +400,27 @@ public class MaintenanceRequestService {
                 return "неизвестная запчасть";
         }
 
+        private void synchronizeManualWarehouse(RequestPart part, int approvedQty) {
+                if (part == null || approvedQty <= 0) {
+                        return;
+                }
+                Long inventoryId = part.getInventoryId();
+                if (inventoryId == null) {
+                        return;
+                }
+                WarehouseInventory inventory = warehouseInventoryRepository.findById(inventoryId)
+                        .orElseThrow(() -> new IllegalStateException(
+                                "Складская позиция не найдена для inventoryId=" + inventoryId));
+                int currentQty = Optional.ofNullable(inventory.getQuantity()).orElse(0);
+                if (currentQty < approvedQty) {
+                        throw new IllegalStateException("Недостаточно остатков на складе для inventoryId=" + inventoryId);
+                }
+                inventory.setQuantity(currentQty - approvedQty);
+                Integer reserved = Optional.ofNullable(inventory.getReservedQuantity()).orElse(0);
+                inventory.setReservedQuantity(reserved + approvedQty);
+                warehouseInventoryRepository.save(inventory);
+        }
+
         @Transactional
         public MaintenanceRequestResponseDTO approveRequest(Long requestId,
                                                            String managerNotes,
@@ -506,7 +529,7 @@ public class MaintenanceRequestService {
                                                                 ex);
                                         }
                                 } else {
-                                        // TODO: если нет catalogId, согласованное количество нужно синхронизировать со складом отдельно
+                                        synchronizeManualWarehouse(part, approvedQty);
                                 }
                                 part.setIssueDate(LocalDateTime.now());
                         }

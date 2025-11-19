@@ -7,6 +7,9 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+import ru.bowling.bowlingapp.Entity.enums.AttestationStatus;
+import ru.bowling.bowlingapp.Entity.enums.MechanicGrade;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -16,10 +19,10 @@ public class AttestationApplicationDTO {
     private Long userId;
     private Long mechanicProfileId;
     private Long clubId; // опционально для клубных механиков
-    private String status; // NEW, IN_REVIEW, APPROVED, REJECTED — TODO: заменить на enum + таблицу
+    private AttestationStatus status;
     private String comment; // обязательный комментарий при отклонении
     private LocalDateTime submittedAt;
     private LocalDateTime updatedAt;
-    private String requestedGrade; // TODO: конкретизировать грейд после уточнения модели
+    private MechanicGrade requestedGrade;
 }
 

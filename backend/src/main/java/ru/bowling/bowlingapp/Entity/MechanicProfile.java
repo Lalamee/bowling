@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -53,6 +54,9 @@ public class MechanicProfile {
     @Column(name = "advantages")
     private String advantages;
 
+    @Column(name = "region")
+    private String region;
+
     @Column(name = "is_data_verified")
     private Boolean isDataVerified;
 
@@ -68,12 +72,6 @@ public class MechanicProfile {
     @Column(name = "updated_at", nullable = false)
     private LocalDate updatedAt;
 
-    @Column(name = "work_places", columnDefinition = "TEXT")
-    private String workPlaces; // JSON или текст с местами работы
-
-    @Column(name = "work_periods", columnDefinition = "TEXT")
-    private String workPeriods; // JSON или текст с периодами работы
-
     @ManyToMany
     @JoinTable(
         name = "club_mechanics",
@@ -81,4 +79,12 @@ public class MechanicProfile {
         inverseJoinColumns = @JoinColumn(name = "club_id")
     )
     private List<BowlingClub> clubs;
+
+    @OneToMany(mappedBy = "mechanicProfile", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<MechanicCertification> certifications = new ArrayList<>();
+
+    @OneToMany(mappedBy = "mechanicProfile", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<MechanicWorkHistory> workHistoryEntries = new ArrayList<>();
 }

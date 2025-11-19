@@ -194,12 +194,13 @@ public class AuthService implements UserDetailsService {
                     .specializationId(mechanicDto.getSpecializationId())
                     .skills(mechanicDto.getSkills())
                     .advantages(mechanicDto.getAdvantages())
-                    .workPlaces(mechanicDto.getWorkPlaces())
-                    .workPeriods(mechanicDto.getWorkPeriods())
+                    .region(trimOrNull(mechanicDto.getRegion()))
                     .isDataVerified(false)
                     .createdAt(LocalDate.now())
                     .updatedAt(LocalDate.now())
                     .build();
+            applyCertifications(mechanicProfile, mechanicDto.getCertifications());
+            applyWorkHistory(mechanicProfile, mechanicDto.getWorkHistory());
             if (mechanicDto.getClubId() != null) {
                 mechanicClub = bowlingClubRepository.findById(mechanicDto.getClubId())
                         .orElseThrow(() -> new IllegalArgumentException("Selected club not found"));
@@ -503,8 +504,9 @@ public class AuthService implements UserDetailsService {
         result.put("birthDate", profile.getBirthDate() != null ? profile.getBirthDate().toString() : null);
         result.put("isEntrepreneur", profile.getIsEntrepreneur());
         result.put("isVerified", profile.getIsDataVerified());
-        result.put("workPlaces", trimOrNull(profile.getWorkPlaces()));
-        result.put("workPeriods", trimOrNull(profile.getWorkPeriods()));
+        result.put("region", trimOrNull(profile.getRegion()));
+        result.put("certifications", buildCertificationDtos(profile));
+        result.put("workHistory", buildWorkHistoryDtos(profile));
 
         List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs()).orElse(Collections.emptyList());
         List<String> clubNames = clubs.stream()
@@ -1158,5 +1160,89 @@ public class AuthService implements UserDetailsService {
 
     private String trimOrNull(String value) {
         return isNotBlank(value) ? value.trim() : null;
+    }
+
+    private List<MechanicCertificationDTO> buildCertificationDtos(MechanicProfile profile) {
+        return Optional.ofNullable(profile)
+                .map(MechanicProfile::getCertifications)
+                .orElse(List.of())
+                .stream()
+                .filter(Objects::nonNull)
+                .map(cert -> MechanicCertificationDTO.builder()
+                        .certificationId(cert.getCertificationId())
+                        .title(cert.getTitle())
+                        .issuer(cert.getIssuer())
+                        .issueDate(cert.getIssueDate())
+                        .expirationDate(cert.getExpirationDate())
+                        .credentialUrl(cert.getCredentialUrl())
+                        .description(cert.getDescription())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    private List<MechanicWorkHistoryDTO> buildWorkHistoryDtos(MechanicProfile profile) {
+        return Optional.ofNullable(profile)
+                .map(MechanicProfile::getWorkHistoryEntries)
+                .orElse(List.of())
+                .stream()
+                .filter(Objects::nonNull)
+                .map(entry -> MechanicWorkHistoryDTO.builder()
+                        .historyId(entry.getHistoryId())
+                        .organization(entry.getOrganization())
+                        .position(entry.getPosition())
+                        .startDate(entry.getStartDate())
+                        .endDate(entry.getEndDate())
+                        .description(entry.getDescription())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    private void applyCertifications(MechanicProfile profile, List<MechanicCertificationDTO> certifications) {
+        if (profile == null) {
+            return;
+        }
+        profile.getCertifications().clear();
+        if (certifications == null) {
+            return;
+        }
+        for (MechanicCertificationDTO dto : certifications) {
+            if (dto == null) {
+                continue;
+            }
+            MechanicCertification certification = MechanicCertification.builder()
+                    .mechanicProfile(profile)
+                    .title(trimOrNull(dto.getTitle()))
+                    .issuer(trimOrNull(dto.getIssuer()))
+                    .issueDate(dto.getIssueDate())
+                    .expirationDate(dto.getExpirationDate())
+                    .credentialUrl(trimOrNull(dto.getCredentialUrl()))
+                    .description(trimOrNull(dto.getDescription()))
+                    .build();
+            profile.getCertifications().add(certification);
+        }
+    }
+
+    private void applyWorkHistory(MechanicProfile profile, List<MechanicWorkHistoryDTO> history) {
+        if (profile == null) {
+            return;
+        }
+        profile.getWorkHistoryEntries().clear();
+        if (history == null) {
+            return;
+        }
+        for (MechanicWorkHistoryDTO dto : history) {
+            if (dto == null) {
+                continue;
+            }
+            MechanicWorkHistory entry = MechanicWorkHistory.builder()
+                    .mechanicProfile(profile)
+                    .organization(trimOrNull(dto.getOrganization()))
+                    .position(trimOrNull(dto.getPosition()))
+                    .startDate(dto.getStartDate())
+                    .endDate(dto.getEndDate())
+                    .description(trimOrNull(dto.getDescription()))
+                    .build();
+            profile.getWorkHistoryEntries().add(entry);
+        }
     }
 }
