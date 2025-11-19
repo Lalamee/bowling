@@ -101,7 +101,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
   }
 
-  void _addPart() {
+  void _addPart({bool helpRequested = false}) {
     final name = _partNameController.text.trim();
     if (name.isEmpty) {
       showSnack(context, 'Укажите название запчасти');
@@ -129,6 +129,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
         quantity: quantity,
         warehouseId: selected?.warehouseId ?? _selectedClubId,
         location: selected?.location,
+        helpRequested: helpRequested,
       );
 
       if (newItem.inventoryId != null) {
@@ -143,6 +144,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
             quantity: existing.quantity + quantity,
             warehouseId: existing.warehouseId ?? newItem.warehouseId,
             location: existing.location ?? newItem.location,
+            helpRequested: existing.helpRequested || helpRequested,
           );
         } else {
           requestedParts.add(newItem);
@@ -468,15 +470,38 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
           const SizedBox(height: 16),
 
           // Кнопка добавления запчасти
-          OutlinedButton.icon(
-            onPressed: _addPart,
-            icon: const Icon(Icons.add, color: AppColors.primary),
-            label: const Text('Добавить запчасть', style: TextStyle(color: AppColors.primary)),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppColors.primary),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _addPart,
+                  icon: const Icon(Icons.add, color: AppColors.primary),
+                  label: const Text('Добавить запчасть', style: TextStyle(color: AppColors.primary)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  // кнопка для добавления позиции с пометкой "просьба о помощи"
+                  onPressed: () => _addPart(helpRequested: true),
+                  icon: const Icon(Icons.priority_high, color: Colors.orange),
+                  label: const Text(
+                    'Добавить с просьбой о помощи',
+                    style: TextStyle(color: Colors.orange),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.orange),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
 
@@ -507,9 +532,24 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  part.partName,
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                Row(
+                                  children: [
+                                    if (part.helpRequested)
+                                      const Padding(
+                                        padding: EdgeInsets.only(right: 4),
+                                        child: Icon(
+                                          Icons.priority_high,
+                                          color: Colors.orange,
+                                          size: 18,
+                                        ),
+                                      ),
+                                    Expanded(
+                                      child: Text(
+                                        part.partName,
+                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 Text(
                                   'Кат. №: ${part.catalogNumber != null && part.catalogNumber!.trim().isNotEmpty ? part.catalogNumber : "—"}',

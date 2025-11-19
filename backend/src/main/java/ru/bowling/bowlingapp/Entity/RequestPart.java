@@ -48,6 +48,10 @@ public class RequestPart {
     @Column(name = "inventory_location")
     private String inventoryLocation;
 
+    // Индикация запроса помощи по детали от механика (для отображения в заказе)
+    @Column(name = "help_requested")
+    private Boolean helpRequested = Boolean.FALSE;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     private PartStatus status;

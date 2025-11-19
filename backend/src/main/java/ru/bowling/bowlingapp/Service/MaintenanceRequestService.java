@@ -368,6 +368,8 @@ public class MaintenanceRequestService {
                                 .catalogId(catalogId)
                                 .warehouseId(warehouseId)
                                 .inventoryLocation(location)
+                                // сохраняем признак запроса помощи по детали
+                                .helpRequested(Boolean.TRUE.equals(partDTO.getHelpRequested()))
                                 .build();
         }
 
@@ -852,6 +854,8 @@ public class MaintenanceRequestService {
                                                         .acceptedQuantity(part.getAcceptedQuantity())
                                                         .acceptanceComment(part.getAcceptanceComment())
                                                         .acceptanceDate(part.getAcceptanceDate())
+                                                        // для UI механика и менеджера показываем, что нужна помощь
+                                                        .helpRequested(part.getHelpRequested())
                                                         .build();
                                 })
                                 .collect(Collectors.toList());
