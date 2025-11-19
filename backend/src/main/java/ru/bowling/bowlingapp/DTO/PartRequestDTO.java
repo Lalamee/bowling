@@ -51,5 +51,8 @@ public class PartRequestDTO {
         private Integer warehouseId;
 
         private String location;
+
+        // TODO: уточнить список ролей, которые могут ставить признак помощи
+        private Boolean helpRequested;
     }
 }

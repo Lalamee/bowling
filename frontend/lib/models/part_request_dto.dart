@@ -42,6 +42,7 @@ class RequestedPartDto {
   final int quantity;
   final int? warehouseId;
   final String? location;
+  final bool helpRequested;
 
   RequestedPartDto({
     this.inventoryId,
@@ -51,6 +52,7 @@ class RequestedPartDto {
     required this.quantity,
     this.warehouseId,
     this.location,
+    this.helpRequested = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -61,6 +63,7 @@ class RequestedPartDto {
         'quantity': quantity,
         'warehouseId': warehouseId,
         'location': location,
+        'helpRequested': helpRequested,
       };
 
   factory RequestedPartDto.fromJson(Map<String, dynamic> json) {
@@ -81,6 +84,7 @@ class RequestedPartDto {
       quantity: (json['quantity'] as num).toInt(),
       warehouseId: (json['warehouseId'] as num?)?.toInt(),
       location: json['location']?.toString(),
+      helpRequested: json['helpRequested'] == true,
     );
   }
 }

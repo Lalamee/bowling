@@ -235,9 +235,20 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      part.partName ?? part.catalogNumber ?? 'Неизвестная деталь',
-                      style: t.formLabel,
+                    Row(
+                      children: [
+                        if (part.helpRequested == true)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 4),
+                            child: Icon(Icons.priority_high, color: Colors.orange, size: 18),
+                          ),
+                        Expanded(
+                          child: Text(
+                            part.partName ?? part.catalogNumber ?? 'Неизвестная деталь',
+                            style: t.formLabel,
+                          ),
+                        ),
+                      ],
                     ),
                     if (part.catalogNumber != null && part.catalogNumber!.isNotEmpty)
                       Padding(

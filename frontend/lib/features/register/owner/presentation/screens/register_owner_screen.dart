@@ -38,7 +38,8 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
   String? selectedEquipment;
 
   final List<String> _equipmentOptions = ['AMF', 'Brunswick', 'VIA', 'XIMA', 'другое'];
-  final List<String> _statusOptions = ['ИП', 'Самозанятый'];
+  // обновлено по замечанию: юридическое лицо добавлено, самозанятый скрыт
+  final List<String> _statusOptions = ['ИП', 'Юрлицо (ООО, ПАО, АО)'];
 
   GlobalKey<FormState> get formKey => _formKey;
   int get step => _step;
@@ -249,7 +250,12 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
         ),
         formStepTitle('Добро пожаловать!'),
         formDescription('Это нужно, чтобы мы знали, каким клубом вы управляете, и могли предоставить вам доступ к инструментам управления.'),
-        LabeledTextField(label: 'ФИО', controller: _fio, validator: Validators.notEmpty, icon: Icons.person, isRequired: true),
+        LabeledTextField(
+            label: 'ФИО/Наименование организации',
+            controller: _fio,
+            validator: Validators.notEmpty,
+            icon: Icons.person,
+            isRequired: true),
         LabeledTextField(label: 'Номер телефона', controller: _phone, validator: Validators.phone, keyboardType: TextInputType.phone, icon: Icons.phone, isRequired: true),
         LabeledTextField(label: 'Email', controller: _email, validator: Validators.email, keyboardType: TextInputType.emailAddress, icon: Icons.email, isRequired: true),
         LabeledTextField(label: 'ИНН организации', controller: _inn, validator: Validators.notEmpty, keyboardType: TextInputType.number, icon: Icons.badge, isRequired: true),

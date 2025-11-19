@@ -53,5 +53,8 @@ public class MaintenanceRequestResponseDTO {
         private Integer acceptedQuantity;
         private String acceptanceComment;
         private LocalDateTime acceptanceDate;
+
+        // Индикатор "просьбы о помощи" по позиции заявки
+        private Boolean helpRequested;
     }
 }
