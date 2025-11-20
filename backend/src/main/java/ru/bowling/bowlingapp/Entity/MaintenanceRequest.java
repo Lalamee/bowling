@@ -53,6 +53,10 @@ public class MaintenanceRequest {
     @Column(name = "verification_status")
     private String verificationStatus;
 
+    // Причина закупки или выдачи запчасти (обязательное поле по ТЗ)
+    @Column(name = "request_reason")
+    private String requestReason;
+
     @Column(name = "published_at")
     private java.time.LocalDateTime publishedAt;
 

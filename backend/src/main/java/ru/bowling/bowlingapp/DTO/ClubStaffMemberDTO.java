@@ -12,4 +12,6 @@ public class ClubStaffMemberDTO {
     private String email;
     private String role;
     private Boolean isActive;
+    // Показатель, что владелец ограничил доступ механика к данным клуба
+    private Boolean accessRestricted;
 }

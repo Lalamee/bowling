@@ -32,7 +32,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -116,12 +115,17 @@ public class ClubStaffService {
         List<MechanicProfile> mechanics = mechanicProfileRepository.findByClubs_ClubId(clubId);
         for (MechanicProfile mechanic : mechanics) {
             User mechanicUser = mechanic.getUser();
+            ClubStaff clubStaff = mechanicUser != null
+                    ? clubStaffRepository.findByClubAndUser(club, mechanicUser).orElse(null)
+                    : null;
             staff.add(ClubStaffMemberDTO.builder()
                     .userId(mechanicUser != null ? mechanicUser.getUserId() : null)
                     .fullName(trim(mechanic.getFullName(), mechanicUser != null ? mechanicUser.getPhone() : null))
                     .phone(mechanicUser != null ? mechanicUser.getPhone() : null)
                     .role(staffRoleToResponse(StaffRole.MECHANIC, mechanicUser != null ? mechanicUser.getRole() : null))
                     .isActive(resolveStaffActiveStatus(club, mechanicUser, mechanicUser != null ? mechanicUser.getIsActive() : Boolean.TRUE))
+                    // Передаем флаг, чтобы на фронте можно было ограничить доступ механика в рамках конкретного клуба
+                    .accessRestricted(clubStaff != null && Boolean.TRUE.equals(clubStaff.getInfoAccessRestricted()))
                     .build());
         }
 
@@ -195,6 +199,32 @@ public class ClubStaffService {
         }
 
         clubStaff.setIsActive(active);
+        clubStaffRepository.save(clubStaff);
+    }
+
+    @Transactional
+    public void updateMechanicAccessRestriction(Long clubId, Long userId, boolean restricted, String requestedByLogin) {
+        BowlingClub club = bowlingClubRepository.findById(clubId)
+                .orElseThrow(() -> new IllegalArgumentException("Club not found"));
+
+        User requestedBy = findUserByLogin(requestedByLogin);
+        if (requestedBy != null) {
+            ensureClubAccess(club, requestedBy);
+        }
+
+        User targetUser = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        MechanicProfile mechanicProfile = targetUser.getMechanicProfile();
+        if (mechanicProfile == null) {
+            throw new IllegalArgumentException("Target user is not a mechanic");
+        }
+
+        ClubStaff clubStaff = clubStaffRepository.findByClubAndUser(club, targetUser)
+                .orElseThrow(() -> new IllegalArgumentException("Mechanic is not assigned to this club"));
+
+        // Ограничиваем доступ только в рамках конкретного clubId
+        clubStaff.setInfoAccessRestricted(restricted);
         clubStaffRepository.save(clubStaff);
     }
 
