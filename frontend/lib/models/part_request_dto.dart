@@ -2,7 +2,6 @@ class PartRequestDto {
   final int clubId;
   final int? laneNumber;
   final int mechanicId;
-  final String? managerNotes;
   final String reason;
   final List<RequestedPartDto> requestedParts;
 
@@ -10,7 +9,6 @@ class PartRequestDto {
     required this.clubId,
     this.laneNumber,
     required this.mechanicId,
-    this.managerNotes,
     required this.reason,
     required this.requestedParts,
   });
@@ -19,7 +17,6 @@ class PartRequestDto {
         'clubId': clubId,
         'laneNumber': laneNumber,
         'mechanicId': mechanicId,
-        'managerNotes': managerNotes,
         'reason': reason,
         'requestedParts': requestedParts.map((e) => e.toJson()).toList(),
       };
@@ -29,7 +26,6 @@ class PartRequestDto {
       clubId: (json['clubId'] as num).toInt(),
       laneNumber: (json['laneNumber'] as num?)?.toInt(),
       mechanicId: (json['mechanicId'] as num).toInt(),
-      managerNotes: json['managerNotes'] as String?,
       reason: (json['reason'] ?? '').toString(),
       requestedParts: (json['requestedParts'] as List<dynamic>)
           .map((e) => RequestedPartDto.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -41,7 +37,7 @@ class PartRequestDto {
 class RequestedPartDto {
   final int? inventoryId;
   final int? catalogId;
-  final String? catalogNumber;
+  final String catalogNumber;
   final String partName;
   final int quantity;
   final int? warehouseId;
@@ -51,7 +47,7 @@ class RequestedPartDto {
   RequestedPartDto({
     this.inventoryId,
     this.catalogId,
-    this.catalogNumber,
+    required this.catalogNumber,
     required this.partName,
     required this.quantity,
     this.warehouseId,
@@ -83,7 +79,7 @@ class RequestedPartDto {
     return RequestedPartDto(
       inventoryId: inventoryRaw != null ? _parseId(inventoryRaw) : null,
       catalogId: catalogRaw != null ? _parseId(catalogRaw) : null,
-      catalogNumber: json['catalogNumber']?.toString(),
+      catalogNumber: (json['catalogNumber'] ?? '').toString(),
       partName: json['partName'] as String,
       quantity: (json['quantity'] as num).toInt(),
       warehouseId: (json['warehouseId'] as num?)?.toInt(),
