@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/repositories/maintenance_repository.dart';
 import '../../../core/services/authz/acl.dart';
+import '../../../core/services/notifications/local_notification_service.dart';
 import '../../../core/services/storage/last_seen_storage.dart';
 import '../../../models/maintenance_request_response_dto.dart';
 
@@ -16,6 +17,7 @@ class NotificationsBadgeController extends ChangeNotifier {
   NotificationsBadgeController._internal();
 
   final MaintenanceRepository _maintenanceRepository = MaintenanceRepository();
+  final LocalNotificationService _notificationService = LocalNotificationService();
 
   final List<MaintenanceRequestResponseDto> _pending = <MaintenanceRequestResponseDto>[];
   Timer? _pollingTimer;
@@ -50,6 +52,8 @@ class NotificationsBadgeController extends ChangeNotifier {
     if (scope == null || _isFetching) return;
     _isFetching = true;
     try {
+      await _notificationService.init();
+      final previousIds = _pending.map((item) => item.requestId).toSet();
       final orders = await _maintenanceRepository.getAllRequests();
       final accessible = orders.where(scope.canViewOrder).toList();
       accessible.sort((a, b) {
@@ -68,10 +72,12 @@ class NotificationsBadgeController extends ChangeNotifier {
         if (updated == null) return false;
         return updated.isAfter(threshold);
       }).toList();
+      final newItems = fresh.where((order) => !previousIds.contains(order.requestId)).toList();
       _pending
         ..clear()
         ..addAll(fresh);
       notifyListeners();
+      await _notifyAboutNewOrders(newItems);
     } catch (error, stackTrace) {
       debugPrint('Notifications refresh failed: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -97,7 +103,7 @@ class NotificationsBadgeController extends ChangeNotifier {
     _pollingTimer = null;
   }
 
-  void handleRealtimeUpdate(MaintenanceRequestResponseDto order) {
+  Future<void> handleRealtimeUpdate(MaintenanceRequestResponseDto order) async {
     // TODO: wire this to WebSocket push once backend channel is available
     final scope = _scope;
     if (scope == null) return;
@@ -110,11 +116,18 @@ class NotificationsBadgeController extends ChangeNotifier {
     }
     _pending.insert(0, order);
     notifyListeners();
+    await _notificationService.showOrderNotification(order);
   }
 
   void _startPolling() {
     _pollingTimer?.cancel();
     _pollingTimer = Timer.periodic(const Duration(seconds: 30), (_) => refresh());
+  }
+
+  Future<void> _notifyAboutNewOrders(List<MaintenanceRequestResponseDto> newOrders) async {
+    for (final order in newOrders) {
+      await _notificationService.showOrderNotification(order);
+    }
   }
 
   DateTime? _resolveUpdatedAt(MaintenanceRequestResponseDto order) {
