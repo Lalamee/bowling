@@ -71,8 +71,14 @@ public class MaintenanceRequestService {
 
                 validateRequestedParts(requestDTO.getRequestedParts());
 
-                if (requestDTO.getLaneNumber() == null || requestDTO.getLaneNumber() <= 0) {
-                        throw new IllegalArgumentException("Lane number must be > 0");
+                String reason = normalizeValue(requestDTO.getReason());
+                if (reason == null || reason.isBlank()) {
+                        throw new IllegalArgumentException("Причина закупки/выдачи запчасти обязательна");
+                }
+
+                // Для закупки дорожка по замечанию не обязательна. Для выдачи со склада придётся уточнить, есть ли отдельный флаг типа заявки.
+                if (requestDTO.getLaneNumber() != null && requestDTO.getLaneNumber() <= 0) {
+                        throw new IllegalArgumentException("Lane number must be > 0 when provided");
                 }
 
                 MaintenanceRequest request = MaintenanceRequest.builder()
@@ -83,6 +89,7 @@ public class MaintenanceRequestService {
                                 .status(MaintenanceRequestStatus.UNDER_REVIEW)
                                 .managerNotes(requestDTO.getManagerNotes())
                                 .verificationStatus("NOT_VERIFIED")
+                                .requestReason(reason)
                                 .build();
 
                 MaintenanceRequest savedRequest = maintenanceRequestRepository.save(request);
@@ -873,6 +880,7 @@ public class MaintenanceRequestService {
                                 .managerNotes(request.getManagerNotes())
                                 .managerDecisionDate(request.getManagerDecisionDate())
                                 .verificationStatus(request.getVerificationStatus())
+                                .reason(request.getRequestReason())
                                 .requestedParts(partDTOs)
                                 .build();
         }

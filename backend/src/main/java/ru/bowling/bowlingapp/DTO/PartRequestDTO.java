@@ -26,6 +26,10 @@ public class PartRequestDTO {
 
     private String managerNotes;
 
+    // Обязательное поле: причина закупки или выдачи детали
+    @NotBlank(message = "Причина запроса обязательна")
+    private String reason;
+
     @NotNull(message = "At least one part is required")
     private List<RequestedPartDTO> requestedParts;
 

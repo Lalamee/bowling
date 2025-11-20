@@ -31,6 +31,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
   final _userRepository = UserRepository();
   final _inventoryRepository = InventoryRepository();
 
+  final _reasonController = TextEditingController();
   final _notesController = TextEditingController();
   final _laneController = TextEditingController();
   final _catalogNumberController = TextEditingController();
@@ -58,6 +59,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
 
   @override
   void dispose() {
+    _reasonController.dispose();
     _notesController.dispose();
     _laneController.dispose();
     _catalogNumberController.dispose();
@@ -253,13 +255,13 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     final laneOptions = _availableLaneNumbers;
     int? lane = laneOptions.isNotEmpty ? _selectedLane : int.tryParse(_laneController.text.trim());
 
-    if (lane == null || lane <= 0) {
+    if (lane != null && lane <= 0) {
       showSnack(context, 'Укажите корректный номер дорожки');
       return;
     }
 
     final laneLimit = _laneLimitForSelectedClub();
-    if (laneLimit != null && lane > laneLimit) {
+    if (lane != null && laneLimit != null && lane > laneLimit) {
       showSnack(context, 'В клубе только $laneLimit дорожек');
       return;
     }
@@ -269,6 +271,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       mechanicId: _mechanicProfileId!,
       laneNumber: lane,
       managerNotes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      reason: _reasonController.text.trim(),
       requestedParts: requestedParts,
     );
 
@@ -410,6 +413,21 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
 
           // Номер дорожки
           _buildLaneField(),
+          const SizedBox(height: 16),
+
+          const Text(
+            'Причина закупки / выдачи *',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _reasonController,
+            decoration: _inputDecoration(hint: 'Опишите, зачем нужна запчасть'),
+            maxLines: 3,
+            validator: (value) => (value == null || value.trim().isEmpty)
+                ? 'Укажите причину заявки'
+                : null,
+          ),
           const SizedBox(height: 16),
 
           // Заметки менеджера

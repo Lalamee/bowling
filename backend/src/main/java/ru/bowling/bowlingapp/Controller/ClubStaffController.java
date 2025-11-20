@@ -140,4 +140,29 @@ public class ClubStaffController {
                 .build()
         );
     }
+
+    @PatchMapping("/{clubId}/mechanics/{userId}/access")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CLUB_OWNER')")
+    public ResponseEntity<StandardResponseDTO> updateMechanicAccessRestriction(
+            @PathVariable Long clubId,
+            @PathVariable Long userId,
+            @RequestBody Map<String, Object> body,
+            Authentication authentication
+    ) {
+        Object rawRestricted = body != null ? body.get("restricted") : null;
+        if (rawRestricted == null) {
+            throw new IllegalArgumentException("restricted flag is required");
+        }
+        boolean restricted = rawRestricted instanceof Boolean ? (Boolean) rawRestricted : Boolean.parseBoolean(rawRestricted.toString());
+
+        String requestedBy = authentication != null ? authentication.getName() : null;
+        clubStaffService.updateMechanicAccessRestriction(clubId, userId, restricted, requestedBy);
+
+        return ResponseEntity.ok(
+                StandardResponseDTO.builder()
+                        .message(restricted ? "Доступ механика ограничен" : "Доступ механика восстановлен")
+                        .status("success")
+                        .build()
+        );
+    }
 }

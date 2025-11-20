@@ -3,6 +3,7 @@ class PartRequestDto {
   final int? laneNumber;
   final int mechanicId;
   final String? managerNotes;
+  final String reason;
   final List<RequestedPartDto> requestedParts;
 
   PartRequestDto({
@@ -10,6 +11,7 @@ class PartRequestDto {
     this.laneNumber,
     required this.mechanicId,
     this.managerNotes,
+    required this.reason,
     required this.requestedParts,
   });
 
@@ -18,6 +20,7 @@ class PartRequestDto {
         'laneNumber': laneNumber,
         'mechanicId': mechanicId,
         'managerNotes': managerNotes,
+        'reason': reason,
         'requestedParts': requestedParts.map((e) => e.toJson()).toList(),
       };
 
@@ -27,6 +30,7 @@ class PartRequestDto {
       laneNumber: (json['laneNumber'] as num?)?.toInt(),
       mechanicId: (json['mechanicId'] as num).toInt(),
       managerNotes: json['managerNotes'] as String?,
+      reason: (json['reason'] ?? '').toString(),
       requestedParts: (json['requestedParts'] as List<dynamic>)
           .map((e) => RequestedPartDto.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList(),

@@ -26,6 +26,7 @@ public class MaintenanceRequestResponseDTO {
     private String managerNotes;
     private LocalDateTime managerDecisionDate;
     private String verificationStatus;
+    private String reason;
     
     private List<RequestPartResponseDTO> requestedParts;
 

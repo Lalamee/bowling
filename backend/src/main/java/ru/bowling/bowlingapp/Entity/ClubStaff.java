@@ -41,5 +41,10 @@ public class ClubStaff {
 
     @Column(name = "assigned_by")
     private Long assignedBy;
+
+    // Ограничение доступа механика к информации конкретного клуба
+    @Column(name = "info_access_restricted")
+    @Builder.Default
+    private Boolean infoAccessRestricted = Boolean.FALSE;
 }
 
