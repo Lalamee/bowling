@@ -27,6 +27,7 @@ class MaintenanceRequestResponseDto {
     this.managerNotes,
     this.managerDecisionDate,
     this.verificationStatus,
+    this.reason,
     required this.requestedParts,
   });
 
