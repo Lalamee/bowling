@@ -43,6 +43,7 @@ public class PartRequestDTO {
 
         private Long catalogId;
 
+        @NotBlank(message = "Каталожный номер обязателен")
         private String catalogNumber;
 
         @NotBlank(message = "Part name is required")

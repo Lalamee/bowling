@@ -76,9 +76,16 @@ public class MaintenanceRequestService {
                         throw new IllegalArgumentException("Причина закупки/выдачи запчасти обязательна");
                 }
 
-                // Для закупки дорожка по замечанию не обязательна. Для выдачи со склада придётся уточнить, есть ли отдельный флаг типа заявки.
                 if (requestDTO.getLaneNumber() != null && requestDTO.getLaneNumber() <= 0) {
                         throw new IllegalArgumentException("Lane number must be > 0 when provided");
+                }
+
+                boolean requiresLaneForStock = Optional.ofNullable(requestDTO.getRequestedParts())
+                                .orElse(List.of())
+                                .stream()
+                                .anyMatch(part -> part != null && part.getInventoryId() != null);
+                if (requiresLaneForStock && requestDTO.getLaneNumber() == null) {
+                        throw new IllegalArgumentException("Для выдачи со склада необходимо указать дорожку");
                 }
 
                 MaintenanceRequest request = MaintenanceRequest.builder()
@@ -87,7 +94,7 @@ public class MaintenanceRequestService {
                                 .mechanic(mechanicProfile)
                                 .requestDate(LocalDateTime.now())
                                 .status(MaintenanceRequestStatus.UNDER_REVIEW)
-                                .managerNotes(requestDTO.getManagerNotes())
+                                // заметки менеджера заполняются на стадии решения заявки, не механиком
                                 .verificationStatus("NOT_VERIFIED")
                                 .requestReason(reason)
                                 .build();
@@ -194,6 +201,12 @@ public class MaintenanceRequestService {
                 }
 
                 validateRequestedParts(partsToAdd);
+
+                boolean containsStockItems = partsToAdd.stream()
+                                .anyMatch(part -> part != null && part.getInventoryId() != null);
+                if (containsStockItems && request.getLaneNumber() == null) {
+                        throw new IllegalStateException("Для выдачи со склада в заявке должен быть указан номер дорожки");
+                }
 
                 for (PartRequestDTO.RequestedPartDTO partDTO : partsToAdd) {
                         RequestPart requestPart = buildRequestPart(request, partDTO);
@@ -335,8 +348,14 @@ public class MaintenanceRequestService {
                         }
 
                         String partName = normalizeValue(partDTO.getPartName());
+                        String catalogNumber = normalizeValue(partDTO.getCatalogNumber());
                         if (partName == null) {
                                 throw new IllegalArgumentException("Название запчасти обязательно для заполнения");
+                        }
+
+                        if (catalogNumber == null) {
+                                throw new IllegalArgumentException(
+                                                "Каталожный номер обязателен для запчасти '" + partName + "'");
                         }
 
                         Integer quantity = partDTO.getQuantity();
@@ -344,6 +363,32 @@ public class MaintenanceRequestService {
                                 throw new IllegalArgumentException("Количество для детали '" + safePartName(partDTO) + "' должно быть больше нуля");
                         }
                 }
+        }
+
+        private Long parseLongId(Object primaryValue, Object fallbackValue, String fieldName) {
+                Object value = primaryValue != null ? primaryValue : fallbackValue;
+                if (value == null) {
+                        return null;
+                }
+
+                if (value instanceof Number) {
+                        return ((Number) value).longValue();
+                }
+
+                if (value instanceof String) {
+                        try {
+                                return Long.parseLong(((String) value).trim());
+                        } catch (NumberFormatException ex) {
+                                throw new IllegalArgumentException("Invalid " + fieldName + " value: " + value);
+                        }
+                }
+
+                if (value instanceof java.util.Map<?, ?> mapValue) {
+                        Object nested = mapValue.getOrDefault("id", null);
+                        return parseLongId(nested, null, fieldName);
+                }
+
+                throw new IllegalArgumentException("Invalid " + fieldName + " value: " + value);
         }
 
         private RequestPart buildRequestPart(MaintenanceRequest request, PartRequestDTO.RequestedPartDTO partDTO) {
@@ -565,13 +610,17 @@ public class MaintenanceRequestService {
         public MaintenanceRequestResponseDTO rejectRequest(Long requestId, String rejectionReason) {
                 Optional<MaintenanceRequest> requestOpt = maintenanceRequestRepository.findById(requestId);
                 if (requestOpt.isEmpty()) {
-			throw new IllegalArgumentException("Request not found");
-		}
+                        throw new IllegalArgumentException("Request not found");
+                }
+
+                if (rejectionReason == null || rejectionReason.trim().isEmpty()) {
+                        throw new IllegalArgumentException("Необходимо указать причину отказа");
+                }
 
 		MaintenanceRequest request = requestOpt.get();
-		request.setStatus(MaintenanceRequestStatus.CLOSED);
-		request.setManagerNotes(rejectionReason);
-		request.setManagerDecisionDate(LocalDateTime.now());
+                request.setStatus(MaintenanceRequestStatus.CLOSED);
+                request.setManagerNotes(rejectionReason.trim());
+                request.setManagerDecisionDate(LocalDateTime.now());
 
 		MaintenanceRequest savedRequest = maintenanceRequestRepository.save(request);
 
@@ -585,29 +634,33 @@ public class MaintenanceRequestService {
 		return convertToResponseDTO(savedRequest, parts);
 	}
 
-	@SuppressWarnings("unchecked")
-	@Transactional
-	public MaintenanceRequestResponseDTO orderParts(Long requestId, java.util.Map<String, Object> payload) {
-		MaintenanceRequest req = maintenanceRequestRepository.findById(requestId)
-				.orElseThrow(() -> new IllegalArgumentException("Request not found"));
+        @SuppressWarnings("unchecked")
+        @Transactional
+        public MaintenanceRequestResponseDTO orderParts(Long requestId, java.util.Map<String, Object> payload) {
+                MaintenanceRequest req = maintenanceRequestRepository.findById(requestId)
+                                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
 
-		List<Map<String, Object>> items = (List<Map<String, Object>>) payload.getOrDefault("items", List.of());
+                List<Map<String, Object>> items = (List<Map<String, Object>>) payload.getOrDefault("items", List.of());
+                if (items.isEmpty()) {
+                        throw new IllegalArgumentException("At least one part must be provided to create an order");
+                }
 
-		Map<Long, List<RequestPart>> partsBySupplier = items.stream()
-				.map(item -> {
-					Long partId = Long.valueOf(item.get("partId").toString());
-					RequestPart part = requestPartRepository.findById(partId).orElseThrow(() -> new IllegalArgumentException("Part not found"));
-					if (!part.getRequest().getRequestId().equals(requestId)) {
-						throw new IllegalArgumentException("Part does not belong to the request");
-					}
-					Long supplierId = item.get("supplierId") != null ? Long.valueOf(item.get("supplierId").toString()) : null;
-					if (supplierId == null) {
-						throw new IllegalArgumentException("Supplier ID is required for part " + part.getPartName());
-					}
-					part.setSupplierId(supplierId);
-					return part;
-				})
-				.collect(Collectors.groupingBy(RequestPart::getSupplierId));
+                Map<Long, List<RequestPart>> partsBySupplier = items.stream()
+                                .map(item -> {
+                                        Long partId = parseLongId(item.get("partId"), item.get("part_id"), "partId");
+                                        RequestPart part = requestPartRepository.findById(partId)
+                                                        .orElseThrow(() -> new IllegalArgumentException("Part not found"));
+                                        if (!part.getRequest().getRequestId().equals(requestId)) {
+                                                throw new IllegalArgumentException("Part does not belong to the request");
+                                        }
+                                        Long supplierId = parseLongId(item.get("supplierId"), item.get("supplier_id"), "supplierId");
+                                        if (supplierId == null) {
+                                                throw new IllegalArgumentException("Supplier ID is required for part " + part.getPartName());
+                                        }
+                                        part.setSupplierId(supplierId);
+                                        return part;
+                                })
+                                .collect(Collectors.groupingBy(RequestPart::getSupplierId));
 
 		for (Map.Entry<Long, List<RequestPart>> entry : partsBySupplier.entrySet()) {
 			Long supplierId = entry.getKey();
@@ -841,6 +894,18 @@ public class MaintenanceRequestService {
                                         Supplier supplier = Optional.ofNullable(part.getPurchaseOrder())
                                                         .map(PurchaseOrder::getSupplier)
                                                         .orElse(null);
+                                        Boolean availability = part.getIsAvailable();
+                                        if (availability == null && part.getInventoryId() != null) {
+                                                availability = warehouseInventoryRepository.findById(part.getInventoryId())
+                                                                .map(inv -> {
+                                                                        int qty = Optional.ofNullable(inv.getQuantity()).orElse(0);
+                                                                        int reserved = Optional
+                                                                                        .ofNullable(inv.getReservedQuantity())
+                                                                                        .orElse(0);
+                                                                        return (qty - reserved) > 0;
+                                                                })
+                                                                .orElse(null);
+                                        }
                                         return MaintenanceRequestResponseDTO.RequestPartResponseDTO.builder()
                                                         .partId(part.getPartId())
                                                         .catalogNumber(part.getCatalogNumber())
@@ -857,7 +922,7 @@ public class MaintenanceRequestService {
                                                         .orderDate(part.getOrderDate())
                                                         .deliveryDate(part.getDeliveryDate())
                                                         .issueDate(part.getIssueDate())
-                                                        .available(part.getIsAvailable())
+                                                        .available(availability)
                                                         .acceptedQuantity(part.getAcceptedQuantity())
                                                         .acceptanceComment(part.getAcceptanceComment())
                                                         .acceptanceDate(part.getAcceptanceDate())

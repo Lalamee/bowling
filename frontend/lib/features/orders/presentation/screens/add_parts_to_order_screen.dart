@@ -144,6 +144,11 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
         ? manualCatalog
         : (selected != null ? _resolveCatalogNumber(selected) : null);
 
+    if (resolvedCatalogNumber == null || resolvedCatalogNumber.isEmpty) {
+      showSnack(context, 'Укажите каталожный номер детали');
+      return;
+    }
+
     setState(() {
       _pendingParts.add(
         RequestedPartDto(

@@ -18,6 +18,7 @@ public class ApproveRejectRequestDTO {
         @Size(max = 1000)
         private String managerNotes;
 
+        @jakarta.validation.constraints.NotBlank(message = "Причина отказа обязательна")
         @Size(max = 1000)
         private String rejectionReason;
 

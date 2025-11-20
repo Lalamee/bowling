@@ -32,7 +32,6 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
   final _inventoryRepository = InventoryRepository();
 
   final _reasonController = TextEditingController();
-  final _notesController = TextEditingController();
   final _laneController = TextEditingController();
   final _catalogNumberController = TextEditingController();
   final _partNameController = TextEditingController();
@@ -60,7 +59,6 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
   @override
   void dispose() {
     _reasonController.dispose();
-    _notesController.dispose();
     _laneController.dispose();
     _catalogNumberController.dispose();
     _partNameController.dispose();
@@ -121,6 +119,11 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     final resolvedCatalogNumber = catalogNumberInput.isNotEmpty
         ? catalogNumberInput
         : (selected != null ? _resolveCatalogNumber(selected) : null);
+
+    if (resolvedCatalogNumber == null || resolvedCatalogNumber.isEmpty) {
+      showSnack(context, 'Укажите каталожный номер запчасти');
+      return;
+    }
 
     setState(() {
       final newItem = RequestedPartDto(
@@ -270,7 +273,6 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       clubId: _selectedClubId!,
       mechanicId: _mechanicProfileId!,
       laneNumber: lane,
-      managerNotes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       reason: _reasonController.text.trim(),
       requestedParts: requestedParts,
     );
@@ -430,19 +432,6 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
           ),
           const SizedBox(height: 16),
 
-          // Заметки менеджера
-          const Text(
-            'Заметки менеджера',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark),
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _notesController,
-            maxLines: 3,
-            decoration: _inputDecoration(hint: 'Дополнительная информация (опционально)'),
-          ),
-          const SizedBox(height: 24),
-
           // Секция добавления запчастей
           const Divider(),
           const SizedBox(height: 16),
@@ -458,10 +447,19 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
 
           // Каталожный номер
           _buildTextField(
-            label: 'Каталожный номер',
-            hint: 'Укажите номер (если известен)',
+            label: 'Каталожный номер *',
+            hint: 'Укажите каталожный номер',
             controller: _catalogNumberController,
-            validator: (_) => null,
+            validator: (_) {
+              if (requestedParts.isNotEmpty) {
+                return null;
+              }
+              final value = _catalogNumberController.text.trim();
+              if (value.isEmpty && _selectedCatalogPart == null) {
+                return 'Каталожный номер обязателен';
+              }
+              return null;
+            },
           ),
           const SizedBox(height: 16),
 
@@ -615,13 +613,13 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     final options = _availableLaneNumbers;
     if (options.isEmpty) {
       return _buildTextField(
-        label: 'Номер дорожки *',
-        hint: 'Введите номер дорожки',
+        label: 'Номер дорожки',
+        hint: 'Укажите номер дорожки (опционально)',
         keyboardType: TextInputType.number,
         controller: _laneController,
         validator: (value) {
           if (value == null || value.trim().isEmpty) {
-            return 'Укажите номер дорожки';
+            return null;
           }
           final lane = int.tryParse(value.trim());
           if (lane == null || lane <= 0) {
@@ -640,7 +638,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Номер дорожки *',
+          'Номер дорожки',
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark),
         ),
         const SizedBox(height: 8),
@@ -657,7 +655,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
               )
               .toList(),
           onChanged: (value) => setState(() => _selectedLane = value),
-          validator: (value) => value == null ? 'Выберите дорожку' : null,
+          validator: (_) => null,
         ),
       ],
     );
