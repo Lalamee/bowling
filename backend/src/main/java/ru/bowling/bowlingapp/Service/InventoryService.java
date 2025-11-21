@@ -1,5 +1,6 @@
 package ru.bowling.bowlingapp.Service;
 
+import ru.bowling.bowlingapp.DTO.InventoryItemRequest;
 import ru.bowling.bowlingapp.DTO.InventorySearchRequest;
 import ru.bowling.bowlingapp.DTO.PartDto;
 import ru.bowling.bowlingapp.DTO.ReservationRequestDto;
@@ -21,5 +22,7 @@ public interface InventoryService {
     List<WarehouseSummaryDto> getAccessibleWarehouses(Long userId);
 
     List<WarehouseMovementDto> getWarehouseMovements(Integer warehouseId);
+
+    PartDto addInventoryItem(Long userId, InventoryItemRequest request);
 
 }

@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import ru.bowling.bowlingapp.DTO.InventoryItemRequest;
 import ru.bowling.bowlingapp.DTO.InventorySearchRequest;
 import ru.bowling.bowlingapp.DTO.PartDto;
 import ru.bowling.bowlingapp.DTO.ReservationRequestDto;
@@ -27,6 +28,16 @@ public class InventoryController {
 
     @Autowired
     private InventoryService inventoryService;
+
+    @PostMapping
+    public ResponseEntity<PartDto> addInventoryItem(@RequestBody InventoryItemRequest request,
+                                                    @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        if (userPrincipal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        PartDto created = inventoryService.addInventoryItem(userPrincipal.getId(), request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
 
     @GetMapping("/search")
     public ResponseEntity<List<PartDto>> searchParts(@RequestParam(required = false) String query,
