@@ -5,12 +5,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.bowling.bowlingapp.DTO.InventoryItemRequest;
 import ru.bowling.bowlingapp.DTO.InventorySearchRequest;
 import ru.bowling.bowlingapp.DTO.PartDto;
 import ru.bowling.bowlingapp.DTO.ReservationRequestDto;
 import ru.bowling.bowlingapp.DTO.WarehouseMovementDto;
 import ru.bowling.bowlingapp.DTO.WarehouseSummaryDto;
 import ru.bowling.bowlingapp.Entity.BowlingClub;
+import ru.bowling.bowlingapp.Entity.ManagerProfile;
+import ru.bowling.bowlingapp.Entity.MechanicProfile;
+import ru.bowling.bowlingapp.Entity.OwnerProfile;
 import ru.bowling.bowlingapp.Entity.PartsCatalog;
 import ru.bowling.bowlingapp.Entity.PersonalWarehouse;
 import ru.bowling.bowlingapp.Entity.User;
@@ -356,6 +360,186 @@ public class InventoryServiceImpl implements InventoryService {
                                 .orElse(now))
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public PartDto addInventoryItem(Long userId, InventoryItemRequest request) {
+        if (userId == null) {
+            throw new IllegalArgumentException("Пользователь обязателен для добавления на склад");
+        }
+        if (request == null) {
+            throw new IllegalArgumentException("Данные о позиции склада не переданы");
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
+
+        WarehouseTarget target = resolveWarehouseTarget(user, request);
+
+        PartsCatalog part = partsCatalogRepository.findById(request.getCatalogId())
+                .orElseThrow(() -> new IllegalArgumentException("Каталожная позиция не найдена"));
+
+        WarehouseInventory inventory = warehouseInventoryRepository
+                .findFirstByWarehouseIdAndCatalogId(target.warehouseId, part.getCatalogId().intValue());
+
+        int quantityToAdd = Optional.ofNullable(request.getQuantity()).orElse(0);
+        int reservedToAdd = Optional.ofNullable(request.getReservedQuantity()).orElse(0);
+
+        if (inventory == null) {
+            inventory = WarehouseInventory.builder()
+                    .warehouseId(target.warehouseId)
+                    .catalogId(part.getCatalogId().intValue())
+                    .quantity(quantityToAdd)
+                    .reservedQuantity(reservedToAdd)
+                    .locationReference(request.getLocationReference())
+                    .cellCode(request.getCellCode())
+                    .shelfCode(request.getShelfCode())
+                    .laneNumber(request.getLaneNumber())
+                    .placementStatus(request.getPlacementStatus())
+                    .notes(request.getNotes())
+                    .isUnique(request.getIsUnique())
+                    .build();
+        } else {
+            inventory.setQuantity(Optional.ofNullable(inventory.getQuantity()).orElse(0) + quantityToAdd);
+            inventory.setReservedQuantity(Optional.ofNullable(inventory.getReservedQuantity()).orElse(0) + reservedToAdd);
+            if (request.getLocationReference() != null) {
+                inventory.setLocationReference(request.getLocationReference());
+            }
+            if (request.getCellCode() != null) {
+                inventory.setCellCode(request.getCellCode());
+            }
+            if (request.getShelfCode() != null) {
+                inventory.setShelfCode(request.getShelfCode());
+            }
+            if (request.getLaneNumber() != null) {
+                inventory.setLaneNumber(request.getLaneNumber());
+            }
+            if (request.getPlacementStatus() != null) {
+                inventory.setPlacementStatus(request.getPlacementStatus());
+            }
+            if (request.getNotes() != null) {
+                inventory.setNotes(request.getNotes());
+            }
+            if (request.getIsUnique() != null) {
+                inventory.setIsUnique(request.getIsUnique());
+            }
+        }
+
+        WarehouseInventory saved = warehouseInventoryRepository.save(inventory);
+        return convertToDto(part, saved);
+    }
+
+    private WarehouseTarget resolveWarehouseTarget(User user, InventoryItemRequest request) {
+        Integer requestedWarehouseId = request.getWarehouseId();
+        Long requestedClubId = request.getClubId();
+
+        if (requestedWarehouseId != null) {
+            Optional<PersonalWarehouse> personal = personalWarehouseRepository.findById(requestedWarehouseId);
+            if (personal.isPresent()) {
+                requirePersonalAccess(user, personal.get());
+                return WarehouseTarget.personal(requestedWarehouseId);
+            }
+            BowlingClub club = bowlingClubRepository.findById(requestedWarehouseId.longValue())
+                    .orElseThrow(() -> new IllegalArgumentException("Клубный склад не найден"));
+            requireClubManagementAccess(user, club);
+            return WarehouseTarget.club(requestedWarehouseId, club);
+        }
+
+        if (requestedClubId != null) {
+            BowlingClub club = bowlingClubRepository.findById(requestedClubId)
+                    .orElseThrow(() -> new IllegalArgumentException("Клуб не найден"));
+            requireClubManagementAccess(user, club);
+            return WarehouseTarget.club(Math.toIntExact(club.getClubId()), club);
+        }
+
+        if (user.getMechanicProfile() != null) {
+            PersonalWarehouse personalWarehouse = ensurePersonalWarehouse(user.getMechanicProfile());
+            return WarehouseTarget.personal(personalWarehouse.getWarehouseId());
+        }
+
+        throw new IllegalStateException("Не удалось определить доступный склад для добавления позиции");
+    }
+
+    private void requirePersonalAccess(User user, PersonalWarehouse warehouse) {
+        if (user == null || warehouse == null || warehouse.getMechanicProfile() == null
+                || user.getMechanicProfile() == null) {
+            throw new IllegalArgumentException("Личный склад доступен только владельцу-механику");
+        }
+        if (!Objects.equals(warehouse.getMechanicProfile().getProfileId(), user.getMechanicProfile().getProfileId())) {
+            throw new IllegalArgumentException("Вы не можете добавлять позиции в чужой личный склад");
+        }
+    }
+
+    private void requireClubManagementAccess(User user, BowlingClub club) {
+        if (club == null) {
+            throw new IllegalArgumentException("Клуб не найден");
+        }
+        if (isAdministrator(user)) {
+            return;
+        }
+        if (isOwnerOfClub(user, club)) {
+            return;
+        }
+        if (isManagerOfClub(user, club)) {
+            return;
+        }
+        throw new IllegalArgumentException("Добавлять позиции могут только менеджер или владелец клуба");
+    }
+
+    private boolean isOwnerOfClub(User user, BowlingClub club) {
+        OwnerProfile ownerProfile = user != null ? user.getOwnerProfile() : null;
+        if (ownerProfile == null || club == null || club.getClubId() == null) {
+            return false;
+        }
+        return Optional.ofNullable(ownerProfile.getClubs())
+                .orElseGet(ArrayList::new)
+                .stream()
+                .filter(Objects::nonNull)
+                .anyMatch(c -> Objects.equals(c.getClubId(), club.getClubId()));
+    }
+
+    private boolean isManagerOfClub(User user, BowlingClub club) {
+        ManagerProfile managerProfile = user != null ? user.getManagerProfile() : null;
+        if (managerProfile == null || club == null || club.getClubId() == null) {
+            return false;
+        }
+        if (!Boolean.TRUE.equals(managerProfile.getIsDataVerified())) {
+            return false;
+        }
+        return managerProfile.getClub() != null && Objects.equals(managerProfile.getClub().getClubId(), club.getClubId());
+    }
+
+    private boolean isAdministrator(User user) {
+        if (user == null || user.getRole() == null || user.getRole().getName() == null) {
+            return false;
+        }
+        return user.getRole().getName().toUpperCase(Locale.ROOT).contains("ADMIN");
+    }
+
+    private PersonalWarehouse ensurePersonalWarehouse(MechanicProfile mechanicProfile) {
+        List<PersonalWarehouse> warehouses = personalWarehouseRepository
+                .findByMechanicProfile_ProfileIdAndIsActiveTrue(mechanicProfile.getProfileId());
+        if (!warehouses.isEmpty()) {
+            return warehouses.get(0);
+        }
+        PersonalWarehouse created = PersonalWarehouse.builder()
+                .mechanicProfile(mechanicProfile)
+                .name("Личный склад механика")
+                .isActive(true)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+        return personalWarehouseRepository.save(created);
+    }
+
+    private record WarehouseTarget(Integer warehouseId, BowlingClub club, boolean personal) {
+        private static WarehouseTarget personal(Integer warehouseId) {
+            return new WarehouseTarget(warehouseId, null, true);
+        }
+
+        private static WarehouseTarget club(Integer warehouseId, BowlingClub club) {
+            return new WarehouseTarget(warehouseId, club, false);
+        }
     }
 
     private PartDto convertToDto(PartsCatalog part, WarehouseInventory inventory) {
