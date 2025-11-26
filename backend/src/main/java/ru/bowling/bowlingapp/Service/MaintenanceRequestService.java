@@ -16,6 +16,7 @@ import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
 import ru.bowling.bowlingapp.Repository.MaintenanceRequestRepository;
 import ru.bowling.bowlingapp.Repository.MechanicProfileRepository;
 import ru.bowling.bowlingapp.Repository.ManagerProfileRepository;
+import ru.bowling.bowlingapp.Repository.PersonalWarehouseRepository;
 import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
 import ru.bowling.bowlingapp.Repository.RequestPartRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
@@ -49,6 +50,7 @@ public class MaintenanceRequestService {
         private final SupplierService supplierService;
         private final NotificationService notificationService;
         private final WarehouseInventoryRepository warehouseInventoryRepository;
+        private final PersonalWarehouseRepository personalWarehouseRepository;
 
         @Transactional
         public MaintenanceRequestResponseDTO createPartRequest(PartRequestDTO requestDTO) {
@@ -410,7 +412,7 @@ public class MaintenanceRequestService {
                         partName = catalogNumber != null ? catalogNumber : "Неизвестная запчасть";
                 }
 
-                return RequestPart.builder()
+                RequestPart part = RequestPart.builder()
                                 .request(request)
                                 .catalogNumber(catalogNumber)
                                 .partName(partName)
@@ -423,6 +425,9 @@ public class MaintenanceRequestService {
                                 // сохраняем признак запроса помощи по детали
                                 .helpRequested(Boolean.TRUE.equals(partDTO.getHelpRequested()))
                                 .build();
+
+                autoAssignAvailability(part, request);
+                return part;
         }
 
         private String normalizeValue(String value) {
@@ -452,6 +457,73 @@ public class MaintenanceRequestService {
                         return partDTO.getInventoryId().toString();
                 }
                 return "неизвестная запчасть";
+        }
+
+        private void autoAssignAvailability(RequestPart part, MaintenanceRequest request) {
+                if (part == null || request == null) {
+                        return;
+                }
+
+                Long resolvedCatalogId = part.getCatalogId();
+                if (resolvedCatalogId == null && part.getCatalogNumber() != null) {
+                        partsCatalogRepository.findByCatalogNumber(part.getCatalogNumber())
+                                        .map(PartsCatalog::getCatalogId)
+                                        .ifPresent(part::setCatalogId);
+                        resolvedCatalogId = part.getCatalogId();
+                }
+                if (resolvedCatalogId == null) {
+                        part.setIsAvailable(false);
+                        return;
+                }
+
+                List<Integer> candidateWarehouses = new ArrayList<>();
+                MechanicProfile mechanic = request.getMechanic();
+                if (mechanic != null && mechanic.getProfileId() != null) {
+                        personalWarehouseRepository.findByMechanicProfile_ProfileIdAndIsActiveTrue(mechanic.getProfileId())
+                                        .forEach(wh -> candidateWarehouses.add(wh.getWarehouseId()));
+                }
+
+                if (request.getClub() != null && request.getClub().getClubId() != null) {
+                        candidateWarehouses.add(Math.toIntExact(request.getClub().getClubId()));
+                }
+
+                for (Integer warehouseId : candidateWarehouses) {
+                        WarehouseInventory inventory = warehouseInventoryRepository
+                                        .findFirstByWarehouseIdAndCatalogId(warehouseId, resolvedCatalogId.intValue());
+                        if (inventory == null) {
+                                continue;
+                        }
+                        int available = Optional.ofNullable(inventory.getQuantity()).orElse(0)
+                                        - Optional.ofNullable(inventory.getReservedQuantity()).orElse(0);
+                        if (available >= Optional.ofNullable(part.getQuantity()).orElse(0)) {
+                                part.setIsAvailable(true);
+                                part.setWarehouseId(warehouseId);
+                                part.setInventoryId(inventory.getInventoryId());
+                                part.setInventoryLocation(Optional.ofNullable(inventory.getLocationReference())
+                                                .orElse(joinLocation(inventory)));
+                                part.setStatus(PartStatus.APPROVED_FOR_ISSUE);
+                                return;
+                        }
+                }
+
+                part.setIsAvailable(false);
+        }
+
+        private String joinLocation(WarehouseInventory inventory) {
+                if (inventory == null) {
+                        return null;
+                }
+                List<String> chunks = new ArrayList<>();
+                if (inventory.getCellCode() != null) {
+                        chunks.add("ячейка " + inventory.getCellCode());
+                }
+                if (inventory.getShelfCode() != null) {
+                        chunks.add("полка " + inventory.getShelfCode());
+                }
+                if (inventory.getLaneNumber() != null) {
+                        chunks.add("дорожка " + inventory.getLaneNumber());
+                }
+                return chunks.isEmpty() ? null : String.join(", ", chunks);
         }
 
         private void synchronizeManualWarehouse(RequestPart part, int approvedQty) {

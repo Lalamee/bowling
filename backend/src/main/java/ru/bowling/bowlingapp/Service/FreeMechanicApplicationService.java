@@ -34,6 +34,7 @@ public class FreeMechanicApplicationService {
     private final AccountTypeRepository accountTypeRepository;
     private final MechanicProfileRepository mechanicProfileRepository;
     private final AttestationApplicationRepository attestationApplicationRepository;
+    private final PersonalWarehouseRepository personalWarehouseRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
@@ -149,6 +150,8 @@ public class FreeMechanicApplicationService {
         profile.setIsDataVerified(true);
         profile.setVerificationDate(LocalDate.now());
         profile.setUpdatedAt(LocalDate.now());
+
+        ensurePersonalWarehouse(profile);
 
         application.setStatus(AttestationStatus.APPROVED);
         application.setComment(decision.getComment());
@@ -353,6 +356,28 @@ public class FreeMechanicApplicationService {
                 .submittedAt(application.getSubmittedAt())
                 .updatedAt(application.getUpdatedAt())
                 .build();
+    }
+
+    private void ensurePersonalWarehouse(MechanicProfile profile) {
+        if (profile == null || profile.getProfileId() == null) {
+            return;
+        }
+
+        List<PersonalWarehouse> existing = personalWarehouseRepository
+                .findByMechanicProfile_ProfileIdAndIsActiveTrue(profile.getProfileId());
+        if (!existing.isEmpty()) {
+            return;
+        }
+
+        String ownerName = profile.getFullName() != null ? profile.getFullName() : "механика";
+        PersonalWarehouse warehouse = PersonalWarehouse.builder()
+                .mechanicProfile(profile)
+                .name("Личный zip-склад " + ownerName)
+                .isActive(true)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+        personalWarehouseRepository.save(warehouse);
     }
 }
 
