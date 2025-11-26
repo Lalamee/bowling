@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.DTO.ApproveRejectRequestDTO;
+import ru.bowling.bowlingapp.DTO.HelpRequestDTO;
+import ru.bowling.bowlingapp.DTO.HelpResponseDTO;
 import ru.bowling.bowlingapp.DTO.MaintenanceRequestResponseDTO;
 import ru.bowling.bowlingapp.DTO.PartRequestDTO;
 import ru.bowling.bowlingapp.DTO.ReservationRequestDto;
@@ -703,8 +705,108 @@ public class MaintenanceRequestService {
                         requestPartRepository.save(part);
                 });
 
-		return convertToResponseDTO(savedRequest, parts);
-	}
+                return convertToResponseDTO(savedRequest, parts);
+        }
+
+        @Transactional
+        public MaintenanceRequestResponseDTO requestHelp(Long requestId, HelpRequestDTO helpRequest) {
+                MaintenanceRequest request = maintenanceRequestRepository.findById(requestId)
+                                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+
+                List<Long> targetPartIds = Optional.ofNullable(helpRequest.getPartIds()).orElse(List.of());
+                if (targetPartIds.isEmpty()) {
+                        throw new IllegalArgumentException("Не выбраны позиции для запроса помощи");
+                }
+
+                List<RequestPart> parts = requestPartRepository.findByRequestRequestId(requestId);
+                Map<Long, RequestPart> byId = parts.stream()
+                                .filter(Objects::nonNull)
+                                .collect(Collectors.toMap(RequestPart::getPartId, p -> p));
+
+                List<RequestPart> affected = new ArrayList<>();
+                for (Long id : targetPartIds) {
+                        RequestPart part = byId.get(id);
+                        if (part == null) {
+                                throw new IllegalArgumentException("Позиция не найдена в заявке");
+                        }
+                        part.setHelpRequested(true);
+                        requestPartRepository.save(part);
+                        affected.add(part);
+                }
+
+                if (helpRequest.getReason() != null && !helpRequest.getReason().isBlank()) {
+                        appendManagerNote(request, "Запрос помощи: " + helpRequest.getReason().trim());
+                }
+
+                notificationService.notifyHelpRequested(request, affected, helpRequest.getReason());
+                MaintenanceRequest saved = maintenanceRequestRepository.save(request);
+                List<RequestPart> updated = requestPartRepository.findByRequestRequestId(requestId);
+                return convertToResponseDTO(saved, updated);
+        }
+
+        @Transactional
+        public MaintenanceRequestResponseDTO resolveHelpRequest(Long requestId, HelpResponseDTO responseDTO) {
+                MaintenanceRequest request = maintenanceRequestRepository.findById(requestId)
+                                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+
+                List<Long> targetPartIds = Optional.ofNullable(responseDTO.getPartIds()).orElse(List.of());
+                if (targetPartIds.isEmpty()) {
+                        throw new IllegalArgumentException("Не выбраны позиции для обработки запроса помощи");
+                }
+
+                List<RequestPart> parts = requestPartRepository.findByRequestRequestId(requestId);
+                Map<Long, RequestPart> byId = parts.stream()
+                                .filter(Objects::nonNull)
+                                .collect(Collectors.toMap(RequestPart::getPartId, p -> p));
+
+                List<RequestPart> affected = new ArrayList<>();
+                for (Long id : targetPartIds) {
+                        RequestPart part = byId.get(id);
+                        if (part == null) {
+                                throw new IllegalArgumentException("Позиция не найдена в заявке");
+                        }
+                        part.setHelpRequested(false);
+                        requestPartRepository.save(part);
+                        affected.add(part);
+                }
+
+                String comment = responseDTO.getComment();
+                if (comment != null && !comment.isBlank()) {
+                        appendManagerNote(request, comment.trim());
+                }
+
+                switch (responseDTO.getDecision()) {
+                        case APPROVED -> notificationService.notifyHelpConfirmed(request, affected, comment);
+                        case DECLINED -> notificationService.notifyHelpDeclined(request, affected, comment);
+                        case REASSIGNED -> {
+                                if (responseDTO.getReassignedMechanicId() == null) {
+                                        throw new IllegalArgumentException("Нужно указать нового механика для переназначения");
+                                }
+                                MechanicProfile newMechanic = mechanicProfileRepository.findById(responseDTO.getReassignedMechanicId())
+                                                .orElseThrow(() -> new IllegalArgumentException("Новый механик не найден"));
+                                request.setMechanic(newMechanic);
+                                notificationService.notifyHelpReassigned(request, affected, newMechanic.getProfileId(), comment);
+                        }
+                        default -> {
+                        }
+                }
+
+                MaintenanceRequest saved = maintenanceRequestRepository.save(request);
+                List<RequestPart> updated = requestPartRepository.findByRequestRequestId(requestId);
+                return convertToResponseDTO(saved, updated);
+        }
+
+        private void appendManagerNote(MaintenanceRequest request, String note) {
+                if (request == null || note == null || note.isBlank()) {
+                        return;
+                }
+                String current = Optional.ofNullable(request.getManagerNotes()).orElse("");
+                if (current.isBlank()) {
+                        request.setManagerNotes(note);
+                } else {
+                        request.setManagerNotes(current + "\n" + note);
+                }
+        }
 
         @SuppressWarnings("unchecked")
         @Transactional
