@@ -138,7 +138,7 @@ public class AuthService implements UserDetailsService {
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
                 .role(role)
                 .registrationDate(LocalDate.now())
-                .isActive(true)
+                .isActive(resolveInitialActiveFlag(accountTypeName))
                 .isVerified(resolveVerificationFlag(accountTypeName))
                 .accountType(accountType)
                 .build();
@@ -775,6 +775,13 @@ public class AuthService implements UserDetailsService {
 
     private boolean resolveVerificationFlag(AccountTypeName accountTypeName) {
         return accountTypeName == AccountTypeName.MAIN_ADMIN;
+    }
+
+    private boolean resolveInitialActiveFlag(AccountTypeName accountTypeName) {
+        if (isFreeMechanic(accountTypeName)) {
+            return false;
+        }
+        return true;
     }
 
     private void attachClubToOwner(OwnerProfile ownerProfile, OwnerProfileDTO ownerDto, BowlingClubDTO clubDto) {

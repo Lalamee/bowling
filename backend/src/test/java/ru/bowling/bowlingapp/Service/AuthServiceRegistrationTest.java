@@ -98,6 +98,8 @@ class AuthServiceRegistrationTest {
         User saved = userRepository.findByPhone("+79990000001").orElseThrow();
         assertThat(saved.getRole().getName()).isEqualTo("MECHANIC");
         assertThat(saved.getAccountType().getName()).isEqualTo("FREE_MECHANIC_BASIC");
+        assertThat(saved.getIsActive()).isFalse();
+        assertThat(saved.getIsVerified()).isFalse();
         assertThat(saved.getMechanicProfile()).isNotNull();
         assertThat(saved.getMechanicProfile().getClubs()).isEmpty();
         assertThat(clubStaffRepository.findAll()).isEmpty();
