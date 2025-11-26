@@ -2,13 +2,7 @@ package ru.bowling.bowlingapp.integration;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import ru.bowling.bowlingapp.Entity.AccountType;
 import ru.bowling.bowlingapp.Entity.Role;
 import ru.bowling.bowlingapp.Entity.User;
@@ -17,25 +11,11 @@ import ru.bowling.bowlingapp.Repository.RoleRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Testcontainers
 @DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 public class UserRepositoryIntegrationTest {
-
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine");
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
-    }
 
     @Autowired
     private UserRepository userRepository;
@@ -62,7 +42,7 @@ public class UserRepositoryIntegrationTest {
                 .passwordHash("hashed_password")
                 .role(savedRole)
                 .accountType(savedAccountType)
-                .registrationDate(LocalDateTime.now())
+                .registrationDate(LocalDate.now())
                 .isActive(true)
                 .isVerified(true)
                 .build();
