@@ -170,6 +170,12 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
           ),
           const SizedBox(height: 10),
           ProfileTile(
+            icon: Icons.verified_user_outlined,
+            text: 'Аттестации',
+            onTap: () => Navigator.pushNamed(context, Routes.adminAttestations),
+          ),
+          const SizedBox(height: 10),
+          ProfileTile(
             icon: Icons.history_rounded,
             text: 'История заказов',
             onTap: () => Navigator.pushNamed(context, Routes.adminOrders),

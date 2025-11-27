@@ -19,4 +19,7 @@ public class PurchaseOrderPartDTO {
     private PartStatus status;
     private String rejectionReason;
     private String acceptanceComment;
+    private Integer warehouseId;
+    private Long inventoryId;
+    private String inventoryLocation;
 }

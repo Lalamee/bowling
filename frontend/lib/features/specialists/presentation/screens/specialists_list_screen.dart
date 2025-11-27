@@ -13,11 +13,12 @@ class SpecialistsListScreen extends StatefulWidget {
 
 class _SpecialistsListScreenState extends State<SpecialistsListScreen> {
   final SpecialistsRepository _repository = SpecialistsRepository();
-  final TextEditingController _queryCtrl = TextEditingController();
   final TextEditingController _regionCtrl = TextEditingController();
-  final TextEditingController _certCtrl = TextEditingController();
+  final TextEditingController _specializationCtrl = TextEditingController();
+  final TextEditingController _ratingCtrl = TextEditingController(text: '0');
+  MechanicGrade? _grade;
 
-  Future<List<MechanicDirectoryItem>>? _future;
+  Future<List<SpecialistCard>>? _future;
 
   @override
   void initState() {
@@ -27,18 +28,21 @@ class _SpecialistsListScreenState extends State<SpecialistsListScreen> {
 
   @override
   void dispose() {
-    _queryCtrl.dispose();
     _regionCtrl.dispose();
-    _certCtrl.dispose();
+    _specializationCtrl.dispose();
+    _ratingCtrl.dispose();
     super.dispose();
   }
 
   void _load() {
     setState(() {
-      _future = _repository.search(
-        query: _queryCtrl.text,
+      final specializationId = int.tryParse(_specializationCtrl.text.trim());
+      final rating = double.tryParse(_ratingCtrl.text.trim());
+      _future = _repository.specialistBase(
         region: _regionCtrl.text,
-        certification: _certCtrl.text,
+        specializationId: specializationId,
+        grade: _grade,
+        minRating: rating,
       );
     });
   }
@@ -46,7 +50,7 @@ class _SpecialistsListScreenState extends State<SpecialistsListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Специалисты (база техников)')),
+      appBar: AppBar(title: const Text('База аттестованных специалистов')),
       body: RefreshIndicator(
         onRefresh: () async => _load(),
         child: ListView(
@@ -54,7 +58,7 @@ class _SpecialistsListScreenState extends State<SpecialistsListScreen> {
           children: [
             _buildFilters(),
             const SizedBox(height: 12),
-            FutureBuilder<List<MechanicDirectoryItem>>(
+            FutureBuilder<List<SpecialistCard>>(
               future: _future,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -83,29 +87,49 @@ class _SpecialistsListScreenState extends State<SpecialistsListScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextField(
-          controller: _queryCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Поиск по ФИО или навыкам',
-            prefixIcon: Icon(Icons.search),
-          ),
-          onSubmitted: (_) => _load(),
-        ),
-        const SizedBox(height: 8),
-        TextField(
           controller: _regionCtrl,
           decoration: const InputDecoration(
-            labelText: 'Регион (TODO поле в анкете)',
+            labelText: 'Регион',
             prefixIcon: Icon(Icons.place_outlined),
           ),
           onSubmitted: (_) => _load(),
         ),
         const SizedBox(height: 8),
         TextField(
-          controller: _certCtrl,
+          controller: _specializationCtrl,
           decoration: const InputDecoration(
-            labelText: 'Квалификация / сертификация (TODO)',
+            labelText: 'ID специализации',
+            prefixIcon: Icon(Icons.build_circle_outlined),
+          ),
+          keyboardType: TextInputType.number,
+          onSubmitted: (_) => _load(),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<MechanicGrade?>(
+          value: _grade,
+          decoration: const InputDecoration(
+            labelText: 'Подтверждённый грейд',
             prefixIcon: Icon(Icons.verified_outlined),
           ),
+          items: [
+            const DropdownMenuItem<MechanicGrade?>(value: null, child: Text('Любой')),
+            ...MechanicGrade.values
+                .map((g) => DropdownMenuItem<MechanicGrade?>(
+                      value: g,
+                      child: Text(g.toApiValue()),
+                    ))
+                .toList(),
+          ],
+          onChanged: (value) => setState(() => _grade = value),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _ratingCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Мин. рейтинг',
+            prefixIcon: Icon(Icons.star_half),
+          ),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
           onSubmitted: (_) => _load(),
         ),
         const SizedBox(height: 8),
@@ -121,22 +145,25 @@ class _SpecialistsListScreenState extends State<SpecialistsListScreen> {
     );
   }
 
-  Widget _buildTile(MechanicDirectoryItem item) {
+  Widget _buildTile(SpecialistCard item) {
     final subtitleParts = <String>[];
-    if (item.specialization != null && item.specialization!.isNotEmpty) {
-      subtitleParts.add(item.specialization!);
-    }
-    if (item.region != null && item.region!.isNotEmpty) {
-      subtitleParts.add('Регион: ${item.region}');
-    }
-    if (item.clubs.isNotEmpty) {
-      subtitleParts.add('Клубы: ${item.clubs.join(', ')}');
-    }
+    if (item.attestedGrade != null) subtitleParts.add('Грейд: ${item.attestedGrade!.toApiValue()}');
+    if (item.region != null && item.region!.isNotEmpty) subtitleParts.add('Регион: ${item.region}');
+    if (item.totalExperienceYears != null) subtitleParts.add('Стаж: ${item.totalExperienceYears} лет');
+    if (item.skills != null && item.skills!.isNotEmpty) subtitleParts.add(item.skills!);
+    if (item.isEntrepreneur == true) subtitleParts.add('Формат: свободный / самозанятый');
+    if (item.clubs.isNotEmpty) subtitleParts.add('Клубы: ${item.clubs.join(', ')}');
     return Card(
       child: ListTile(
         title: Text(item.fullName ?? 'Без имени'),
         subtitle: subtitleParts.isNotEmpty ? Text(subtitleParts.join(' • ')) : null,
-        trailing: item.rating != null ? Text('★ ${item.rating!.toStringAsFixed(1)}') : null,
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (item.rating != null) Text('★ ${item.rating!.toStringAsFixed(1)}'),
+            if (item.accountType != null) Text(item.accountType!, style: const TextStyle(fontSize: 12)),
+          ],
+        ),
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
