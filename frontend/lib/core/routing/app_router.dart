@@ -34,10 +34,12 @@ import '../../features/clubs/presentation/screens/club_warehouse_screen.dart';
 import '../../features/clubs/presentation/screens/club_lanes_screen.dart';
 import '../../features/clubs/presentation/screens/club_staff_screen.dart';
 import '../../features/clubs/presentation/screens/warehouse_selector_screen.dart';
+import '../../features/warehouse/presentation/personal_warehouse_screen.dart';
 
 import '../../features/profile/mechanic/presentation/screens/mechanic_profile_screen.dart';
 import '../../features/profile/mechanic/presentation/screens/edit_mechanic_profile_screen.dart';
 import '../../features/specialists/presentation/screens/attestation_applications_screen.dart';
+import '../../features/specialists/presentation/screens/admin_attestation_screen.dart';
 import '../../features/specialists/presentation/screens/specialists_list_screen.dart';
 
 import '../../features/profile/owner/presentation/screens/owner_profile_screen.dart';
@@ -45,6 +47,7 @@ import '../../features/profile/owner/presentation/screens/edit_owner_profile_scr
 
 import '../../features/profile/manager/presentation/screens/manager_profile_screen.dart';
 import '../../features/orders/notifications/notifications_page.dart';
+import '../../features/orders/notifications/admin_help_requests_screen.dart';
 
 import '../../features/knowledge_base/presentation/screens/knowledge_base_screen.dart';
 import '../../features/knowledge_base/presentation/screens/pdf_reader_screen.dart';
@@ -124,6 +127,8 @@ class AppRouter {
             initialQuery: args.searchQuery,
           ),
         );
+      case Routes.personalWarehouse:
+        return MaterialPageRoute(builder: (_) => const PersonalWarehouseScreen());
       case Routes.warehouseSelector:
         final args = settings.arguments as WarehouseSelectorArgs?;
         return MaterialPageRoute(
@@ -211,7 +216,11 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const AdminMechanicsScreen());
       case Routes.adminOrders:
         return MaterialPageRoute(builder: (_) => const AdminOrdersScreen());
-      
+      case Routes.adminAttestations:
+        return MaterialPageRoute(builder: (_) => const AdminAttestationScreen());
+      case Routes.adminHelpRequests:
+        return MaterialPageRoute(builder: (_) => const AdminHelpRequestsScreen());
+
       case Routes.maintenanceRequests:
         return MaterialPageRoute(builder: (_) => const MaintenanceRequestsScreen());
       case Routes.createMaintenanceRequest:

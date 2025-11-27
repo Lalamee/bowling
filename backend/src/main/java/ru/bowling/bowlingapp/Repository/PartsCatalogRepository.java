@@ -26,19 +26,21 @@ public interface PartsCatalogRepository extends JpaRepository<PartsCatalog, Long
 	
 	List<PartsCatalog> findByCatalogNumberContainingIgnoreCase(String catalogNumber);
 
-	@Query("select p from PartsCatalog p left join p.manufacturer m " +
-			"where (:q is null or lower(p.officialNameRu) like lower(concat('%', :q, '%')) " +
-			"or lower(p.officialNameEn) like lower(concat('%', :q, '%')) " +
-			"or lower(p.commonName) like lower(concat('%', :q, '%')) " +
-			"or lower(p.catalogNumber) like lower(concat('%', :q, '%'))) " +
-			"and (:manufacturerId is null or m.manufacturerId = :manufacturerId) " +
-			"and (:isUnique is null or p.isUnique = :isUnique)")
-	Page<PartsCatalog> search(
-		@Param("q") String q,
-		@Param("manufacturerId") Integer manufacturerId,
-		@Param("isUnique") Boolean isUnique,
-		Pageable pageable
-	);
+        @Query("select p from PartsCatalog p left join p.manufacturer m " +
+                        "where (:q is null or lower(p.officialNameRu) like lower(concat('%', :q, '%')) " +
+                        "or lower(p.officialNameEn) like lower(concat('%', :q, '%')) " +
+                        "or lower(p.commonName) like lower(concat('%', :q, '%')) " +
+                        "or lower(p.catalogNumber) like lower(concat('%', :q, '%'))) " +
+                        "and (:manufacturerId is null or m.manufacturerId = :manufacturerId) " +
+                        "and (:isUnique is null or p.isUnique = :isUnique) " +
+                        "and (:categoryCode is null or p.categoryCode = :categoryCode)")
+        Page<PartsCatalog> search(
+                @Param("q") String q,
+                @Param("manufacturerId") Integer manufacturerId,
+                @Param("isUnique") Boolean isUnique,
+                @Param("categoryCode") String categoryCode,
+                Pageable pageable
+        );
 
         @Query("select p from PartsCatalog p left join p.manufacturer m " +
                         "where lower(p.officialNameRu) like lower(concat('%', :query, '%')) " +

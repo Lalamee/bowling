@@ -14,6 +14,7 @@ class Routes {
   static const club = '/clubs';
   static const clubSearch = '/clubs/search';
   static const clubWarehouse = '/clubs/warehouse';
+  static const personalWarehouse = '/warehouses/personal';
   static const warehouseSelector = '/warehouses';
   static const clubLanes = '/clubs/lanes';
 
@@ -43,6 +44,8 @@ class Routes {
   static const adminMechanics = '/admin/mechanics';
   static const adminOrders = '/admin/orders';
   static const adminProfile = '/admin/profile';
+  static const adminAttestations = '/admin/attestations';
+  static const adminHelpRequests = '/admin/help-requests';
 
   static const ordersPersonalHistory = '/orders/history-personal';
   static const clubOrdersHistory = '/orders/history-club';

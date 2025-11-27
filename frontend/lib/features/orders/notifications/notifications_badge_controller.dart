@@ -144,6 +144,13 @@ class NotificationsBadgeController extends ChangeNotifier {
     consider(order.completionDate);
     consider(order.requestDate);
 
+    if (order.requestedParts.any((part) => part.helpRequested == true)) {
+      final helpTimestamp = order.managerDecisionDate ??
+          order.requestDate ??
+          DateTime.fromMillisecondsSinceEpoch(order.requestId * 1000);
+      consider(helpTimestamp);
+    }
+
     for (final part in order.requestedParts) {
       consider(part.deliveryDate);
       consider(part.issueDate);

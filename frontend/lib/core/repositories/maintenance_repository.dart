@@ -4,6 +4,8 @@ import '../../api/api_service.dart';
 import '../../models/maintenance_request_response_dto.dart';
 import '../../models/part_request_dto.dart';
 import '../../models/stock_issue_decision_dto.dart';
+import '../../models/help_request_dto.dart';
+import '../../models/admin_help_request_dto.dart';
 
 class MaintenanceRepository {
   final _dio = ApiCore().dio;
@@ -152,5 +154,31 @@ class MaintenanceRepository {
     } catch (e) {
       rethrow;
     }
+  }
+
+  Future<MaintenanceRequestResponseDto> requestHelp(
+    int requestId,
+    HelpRequestDto request,
+  ) async {
+    try {
+      return await _api.requestHelp(requestId, request);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<MaintenanceRequestResponseDto> resolveHelp(
+    int requestId,
+    HelpResponseDto request,
+  ) async {
+    try {
+      return await _api.resolveHelp(requestId, request);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<List<AdminHelpRequestDto>> getAdminHelpRequests() async {
+    return _api.getAdminHelpRequests();
   }
 }

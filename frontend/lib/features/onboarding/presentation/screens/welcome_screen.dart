@@ -7,6 +7,8 @@ import '../../../../core/theme/colors.dart';
 import '../../../../../core/routing/routes.dart';
 import '../../../../../core/debug/test_overrides.dart';
 import '../../../../../core/services/local_auth_storage.dart';
+import '../../../../../core/authz/role_context_resolver.dart';
+import '../../../../../core/authz/role_access.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -17,7 +19,7 @@ class WelcomeScreen extends StatefulWidget {
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
   late final TapGestureRecognizer _policyRecognizer;
-  String? _registeredRole;
+  RoleAccountContext? _registeredContext;
 
   @override
   void initState() {
@@ -34,9 +36,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   Future<void> _loadRegistrationStatus() async {
     final role = await LocalAuthStorage.getRegisteredRole();
+    final accountType = await LocalAuthStorage.getRegisteredAccountType();
     if (!mounted) return;
     setState(() {
-      _registeredRole = role?.toLowerCase();
+      _registeredContext = RoleContextResolver.fromStored(role, accountType);
     });
   }
 
@@ -45,23 +48,21 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       Navigator.pushNamed(context, Routes.authLogin);
       return;
     }
-    var role = _registeredRole?.trim().toLowerCase();
-    if ((role == null || role.isEmpty) && TestOverrides.enabled) {
-      role = TestOverrides.userRole.toLowerCase();
+    RoleAccountContext? resolved = _registeredContext;
+
+    if (resolved == null && TestOverrides.enabled) {
+      final forcedRole = RoleAccessMatrix.parseRole(TestOverrides.userRole);
+      if (forcedRole != null) {
+        resolved = RoleAccountContext(role: forcedRole, accountType: null);
+      }
     }
-    if (role == null || role.isEmpty) {
+
+    if (resolved == null) {
       Navigator.pushNamed(context, Routes.authLogin);
       return;
     }
-    if (role == 'owner') {
-      Navigator.pushReplacementNamed(context, Routes.profileOwner);
-    } else if (role == 'manager') {
-      Navigator.pushReplacementNamed(context, Routes.profileManager);
-    } else if (role == 'admin') {
-      Navigator.pushReplacementNamed(context, Routes.profileAdmin);
-    } else {
-      Navigator.pushReplacementNamed(context, Routes.profileMechanic);
-    }
+
+    Navigator.pushReplacementNamed(context, resolved.access.homeRoute);
   }
 
   @override
