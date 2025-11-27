@@ -9,6 +9,7 @@ import '../../features/orders/presentation/screens/admin_orders_screen.dart';
 
 import '../../features/search/presentation/screens/global_search_screen.dart';
 import '../../features/clubs/presentation/screens/club_screen.dart';
+import '../routing/routes.dart';
 
 import '../../features/profile/mechanic/presentation/screens/mechanic_profile_screen.dart';
 import '../../features/profile/owner/presentation/screens/owner_profile_screen.dart';
@@ -55,7 +56,11 @@ class BottomNavDirect {
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GlobalSearchScreen()));
           break;
         case 2:
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ClubScreen()));
+          if (ctx.access.allows(AccessSection.freeWarehouse) && !ctx.access.allows(AccessSection.clubEquipment)) {
+            Navigator.pushReplacementNamed(context, Routes.personalWarehouse);
+          } else {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ClubScreen()));
+          }
           break;
         case 3:
           if (ctx.role == RoleName.clubOwner) {
@@ -131,7 +136,9 @@ class BottomNavDirect {
       case 1:
         return true;
       case 2:
-        return ctx.access.allows(AccessSection.clubEquipment) || ctx.access.allows(AccessSection.technicalInfo);
+        return ctx.access.allows(AccessSection.clubEquipment) ||
+            ctx.access.allows(AccessSection.technicalInfo) ||
+            ctx.access.allows(AccessSection.freeWarehouse);
       case 3:
         return true;
       default:

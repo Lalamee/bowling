@@ -31,6 +31,8 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   Map<String, dynamic>? _cachedRawProfile;
   bool _canEditProfile = false;
   String? _localRole;
+  String? _accountType;
+  bool _isFreeMechanic = false;
   String? _applicationStatus;
   String? _applicationComment;
   String? _applicationAccountType;
@@ -55,11 +57,20 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
 
   Future<void> _resolveLocalRole() async {
     final role = await LocalAuthStorage.getRegisteredRole();
+    final accountType = await LocalAuthStorage.getRegisteredAccountType();
     if (!mounted) return;
     setState(() {
       _localRole = role;
+      _accountType = accountType;
       _canEditProfile = _roleAllowsEditing(role);
+      _isFreeMechanic = _isFreeMechanicType(accountType);
     });
+  }
+
+  bool _isFreeMechanicType(String? accountType) {
+    if (accountType == null) return false;
+    final normalized = accountType.trim().toUpperCase();
+    return normalized == 'FREE_MECHANIC_BASIC' || normalized == 'FREE_MECHANIC_PREMIUM';
   }
 
   bool _roleAllowsEditing(String? role) {
@@ -79,6 +90,8 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     _applicationStatus = application?['status']?.toString() ?? stored['applicationStatus']?.toString();
     _applicationComment = application?['comment']?.toString() ?? stored['applicationComment']?.toString();
     _applicationAccountType = application?['accountType']?.toString() ?? stored['accountType']?.toString();
+    _accountType ??= stored['accountType']?.toString();
+    _isFreeMechanic = _isFreeMechanic || _isFreeMechanicType(_accountType);
     _applyProfile(normalized);
   }
 
@@ -608,6 +621,13 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 10),
+                    if (_isFreeMechanic)
+                      ProfileTile(
+                        icon: Icons.warehouse_outlined,
+                        text: 'Личный ZIP-склад',
+                        onTap: () => Navigator.pushNamed(context, Routes.personalWarehouse),
+                      ),
                     const SizedBox(height: 10),
                     ProfileTile(
                       icon: Icons.menu_book_rounded,

@@ -34,6 +34,7 @@ import '../../features/clubs/presentation/screens/club_warehouse_screen.dart';
 import '../../features/clubs/presentation/screens/club_lanes_screen.dart';
 import '../../features/clubs/presentation/screens/club_staff_screen.dart';
 import '../../features/clubs/presentation/screens/warehouse_selector_screen.dart';
+import '../../features/warehouse/presentation/personal_warehouse_screen.dart';
 
 import '../../features/profile/mechanic/presentation/screens/mechanic_profile_screen.dart';
 import '../../features/profile/mechanic/presentation/screens/edit_mechanic_profile_screen.dart';
@@ -125,6 +126,8 @@ class AppRouter {
             initialQuery: args.searchQuery,
           ),
         );
+      case Routes.personalWarehouse:
+        return MaterialPageRoute(builder: (_) => const PersonalWarehouseScreen());
       case Routes.warehouseSelector:
         final args = settings.arguments as WarehouseSelectorArgs?;
         return MaterialPageRoute(

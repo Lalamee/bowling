@@ -14,6 +14,7 @@ class Routes {
   static const club = '/clubs';
   static const clubSearch = '/clubs/search';
   static const clubWarehouse = '/clubs/warehouse';
+  static const personalWarehouse = '/warehouses/personal';
   static const warehouseSelector = '/warehouses';
   static const clubLanes = '/clubs/lanes';
 
