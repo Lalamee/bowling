@@ -8,6 +8,8 @@ import '../models/refresh_token_request_dto.dart';
 import '../models/password_change_request_dto.dart';
 import '../models/standard_response_dto.dart';
 import '../models/maintenance_request_response_dto.dart';
+import '../models/free_mechanic_application_request_dto.dart';
+import '../models/free_mechanic_application_response_dto.dart';
 import '../models/part_request_dto.dart';
 import '../models/approve_reject_request_dto.dart';
 import '../models/parts_catalog_response_dto.dart';
@@ -47,6 +49,13 @@ class ApiService {
   Future<StandardResponseDto> register(RegisterRequestDto request) async {
     final response = await _dio.post('/api/auth/register', data: request.toJson());
     return StandardResponseDto.fromJson(response.data);
+  }
+
+  /// POST /api/auth/free-mechanics/apply - Регистрация свободного механика
+  Future<FreeMechanicApplicationResponseDto> applyFreeMechanic(
+      FreeMechanicApplicationRequestDto request) async {
+    final response = await _dio.post('/api/auth/free-mechanics/apply', data: request.toJson());
+    return FreeMechanicApplicationResponseDto.fromJson(response.data);
   }
 
   /// GET /api/public/clubs - Получение списка клубов

@@ -31,6 +31,9 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   Map<String, dynamic>? _cachedRawProfile;
   bool _canEditProfile = false;
   String? _localRole;
+  String? _applicationStatus;
+  String? _applicationComment;
+  String? _applicationAccountType;
 
   @override
   void initState() {
@@ -67,11 +70,15 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
 
   Future<void> _loadLocalProfile() async {
     final stored = await LocalAuthStorage.loadMechanicProfile();
+    final application = await LocalAuthStorage.loadMechanicApplication();
     if (!mounted || stored == null) {
       return;
     }
 
     final normalized = _normalizeProfileData(Map<String, dynamic>.from(stored));
+    _applicationStatus = application?['status']?.toString() ?? stored['applicationStatus']?.toString();
+    _applicationComment = application?['comment']?.toString() ?? stored['applicationComment']?.toString();
+    _applicationAccountType = application?['accountType']?.toString() ?? stored['accountType']?.toString();
     _applyProfile(normalized);
   }
 
@@ -465,6 +472,64 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
   }
 
+  Widget _buildApplicationBanner() {
+    if (_applicationStatus == null) return const SizedBox.shrink();
+    final status = _applicationStatus!.toUpperCase();
+    String title;
+    String? description;
+    Color color = AppColors.primary;
+
+    switch (status) {
+      case 'APPROVED':
+        title = 'Заявка одобрена';
+        description = 'Тип аккаунта: ${_applicationAccountType ?? 'FREE_MECHANIC_BASIC'}';
+        color = Colors.green.shade700;
+        break;
+      case 'REJECTED':
+        title = 'Заявка отклонена';
+        description = _applicationComment ?? 'Причина не указана';
+        color = Colors.red.shade700;
+        break;
+      case 'IN_REVIEW':
+      case 'NEW':
+      default:
+        title = 'Заявка на рассмотрении';
+        description = 'Администрация проверяет ваши данные';
+        color = AppColors.primary;
+        break;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 15)),
+                if (description != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(description, style: const TextStyle(fontSize: 13)),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -512,6 +577,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   children: [
+                    _buildApplicationBanner(),
                     ProfileTile(
                       icon: Icons.person,
                       text: profile.fullName,
