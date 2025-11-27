@@ -8,19 +8,27 @@ import ru.bowling.bowlingapp.DTO.PurchaseOrderDetailDTO;
 import ru.bowling.bowlingapp.DTO.PurchaseOrderPartDTO;
 import ru.bowling.bowlingapp.DTO.PurchaseOrderSummaryDTO;
 import ru.bowling.bowlingapp.DTO.SupplierComplaintRequestDTO;
+import ru.bowling.bowlingapp.DTO.SupplierComplaintStatusUpdateDTO;
 import ru.bowling.bowlingapp.DTO.SupplierReviewDTO;
 import ru.bowling.bowlingapp.DTO.SupplierReviewRequestDTO;
 import ru.bowling.bowlingapp.Entity.BowlingClub;
 import ru.bowling.bowlingapp.Entity.MaintenanceRequest;
+import ru.bowling.bowlingapp.Entity.MechanicProfile;
 import ru.bowling.bowlingapp.Entity.PurchaseOrder;
 import ru.bowling.bowlingapp.Entity.RequestPart;
 import ru.bowling.bowlingapp.Entity.Supplier;
 import ru.bowling.bowlingapp.Entity.SupplierReview;
+import ru.bowling.bowlingapp.Entity.WarehouseInventory;
 import ru.bowling.bowlingapp.Entity.enums.PartStatus;
 import ru.bowling.bowlingapp.Entity.enums.PurchaseOrderStatus;
+import ru.bowling.bowlingapp.Entity.enums.SupplierComplaintStatus;
+import ru.bowling.bowlingapp.Repository.PersonalWarehouseRepository;
 import ru.bowling.bowlingapp.Repository.PurchaseOrderRepository;
+import ru.bowling.bowlingapp.Repository.SupplierRepository;
 import ru.bowling.bowlingapp.Repository.SupplierReviewRepository;
+import ru.bowling.bowlingapp.Repository.WarehouseInventoryRepository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -40,6 +48,9 @@ public class PurchaseOrderService {
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final SupplierReviewRepository supplierReviewRepository;
     private final ClubWarehouseService clubWarehouseService;
+    private final SupplierRepository supplierRepository;
+    private final WarehouseInventoryRepository warehouseInventoryRepository;
+    private final PersonalWarehouseRepository personalWarehouseRepository;
 
     @Transactional(readOnly = true)
     public List<PurchaseOrderSummaryDTO> getOrders(Long clubId, boolean archived,
@@ -118,6 +129,9 @@ public class PurchaseOrderService {
         PurchaseOrder order = purchaseOrderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Purchase order not found"));
 
+        Supplier resolvedSupplier = resolveSupplier(request, order.getSupplier());
+        order.setSupplier(resolvedSupplier);
+
         List<PurchaseOrderAcceptanceRequestDTO.PartAcceptanceDTO> payload = Optional.ofNullable(request.getParts())
                 .filter(list -> !list.isEmpty())
                 .orElseThrow(() -> new IllegalArgumentException("Acceptance payload is empty"));
@@ -128,7 +142,6 @@ public class PurchaseOrderService {
                         (left, right) -> right));
 
         LocalDateTime acceptanceMoment = LocalDateTime.now();
-        Map<Integer, Integer> acceptedByCatalog = new HashMap<>();
         int acceptedPositions = 0;
         int rejectedPositions = 0;
 
@@ -154,6 +167,7 @@ public class PurchaseOrderService {
             part.setStatus(targetStatus);
             part.setAcceptedQuantity(targetStatus == PartStatus.REJECTED ? 0 : acceptedQuantity);
             part.setAcceptanceComment(acceptance.getComment());
+            part.setSupplierId(resolvedSupplier != null ? resolvedSupplier.getSupplierId() : part.getSupplierId());
             if (targetStatus == PartStatus.REJECTED) {
                 part.setRejectionReason(acceptance.getComment());
                 rejectedPositions++;
@@ -161,10 +175,6 @@ public class PurchaseOrderService {
                 acceptedPositions++;
             }
             part.setAcceptanceDate(acceptanceMoment);
-
-            if (targetStatus != PartStatus.REJECTED && part.getCatalogId() != null && acceptedQuantity > 0) {
-                acceptedByCatalog.merge(part.getCatalogId().intValue(), acceptedQuantity, Integer::sum);
-            }
         }
 
         if (acceptedPositions == 0 && rejectedPositions == 0) {
@@ -185,10 +195,7 @@ public class PurchaseOrderService {
         purchaseOrderRepository.save(order);
 
         MaintenanceRequest requestEntity = order.getMaintenanceRequest();
-        BowlingClub club = requestEntity != null ? requestEntity.getClub() : null;
-        if (!acceptedByCatalog.isEmpty() && club != null) {
-            clubWarehouseService.registerDelivery(club, acceptedByCatalog);
-        }
+        placeAcceptedParts(requestEntity, acceptanceByPart, parts);
 
         List<SupplierReview> reviews = supplierReviewRepository.findByPurchaseOrder_OrderId(orderId);
         return toDetail(order, reviews);
@@ -214,6 +221,7 @@ public class PurchaseOrderService {
                 .complaintResolved(Boolean.FALSE)
                 .build();
         supplierReviewRepository.save(review);
+        recalculateSupplierRating(review.getSupplierId());
         List<SupplierReview> reviews = supplierReviewRepository.findByPurchaseOrder_OrderId(orderId);
         return toDetail(order, reviews);
     }
@@ -241,6 +249,30 @@ public class PurchaseOrderService {
                 .complaintTitle(complaintRequest.getTitle())
                 .build();
         supplierReviewRepository.save(complaint);
+        recalculateSupplierRating(complaint.getSupplierId());
+        List<SupplierReview> reviews = supplierReviewRepository.findByPurchaseOrder_OrderId(orderId);
+        return toDetail(order, reviews);
+    }
+
+    @Transactional
+    public PurchaseOrderDetailDTO updateComplaintStatus(Long orderId, Long reviewId,
+                                                        SupplierComplaintStatusUpdateDTO updateRequest) {
+        PurchaseOrder order = purchaseOrderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Purchase order not found"));
+        SupplierReview review = supplierReviewRepository.findById(reviewId)
+                .orElseThrow(() -> new IllegalArgumentException("Complaint review not found"));
+        if (!Boolean.TRUE.equals(review.getIsComplaint())) {
+            throw new IllegalArgumentException("Selected review is not a complaint");
+        }
+        review.setComplaintStatus(updateRequest.getStatus());
+        if (updateRequest.getResolved() != null) {
+            review.setComplaintResolved(updateRequest.getResolved());
+        }
+        if (updateRequest.getResolutionNotes() != null) {
+            review.setResolutionNotes(updateRequest.getResolutionNotes());
+        }
+        supplierReviewRepository.save(review);
+        recalculateSupplierRating(review.getSupplierId());
         List<SupplierReview> reviews = supplierReviewRepository.findByPurchaseOrder_OrderId(orderId);
         return toDetail(order, reviews);
     }
@@ -299,6 +331,9 @@ public class PurchaseOrderService {
                         .status(part.getStatus())
                         .rejectionReason(part.getRejectionReason())
                         .acceptanceComment(part.getAcceptanceComment())
+                        .warehouseId(part.getWarehouseId())
+                        .inventoryId(part.getInventoryId())
+                        .inventoryLocation(part.getInventoryLocation())
                         .build())
                 .collect(Collectors.toList());
 
@@ -320,6 +355,179 @@ public class PurchaseOrderService {
                 .reviews(reviewDtos)
                 .complaints(complaintDtos)
                 .build();
+    }
+
+    private Supplier resolveSupplier(PurchaseOrderAcceptanceRequestDTO request, Supplier current) {
+        String inn = Optional.ofNullable(request.getSupplierInn())
+                .map(String::trim)
+                .orElse(null);
+        if (inn == null || inn.isBlank()) {
+            return current;
+        }
+        Supplier supplier = supplierRepository.findFirstByInn(inn);
+        if (supplier == null) {
+            supplier = Supplier.builder()
+                    .inn(inn)
+                    .legalName(request.getSupplierName())
+                    .contactPerson(request.getSupplierContactPerson())
+                    .contactPhone(request.getSupplierPhone())
+                    .contactEmail(request.getSupplierEmail())
+                    .isVerified(Boolean.TRUE.equals(request.getSupplierVerified()))
+                    .rating(current != null ? current.getRating() : null)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+        } else {
+            if (request.getSupplierName() != null) {
+                supplier.setLegalName(request.getSupplierName());
+            }
+            if (request.getSupplierContactPerson() != null) {
+                supplier.setContactPerson(request.getSupplierContactPerson());
+            }
+            if (request.getSupplierPhone() != null) {
+                supplier.setContactPhone(request.getSupplierPhone());
+            }
+            if (request.getSupplierEmail() != null) {
+                supplier.setContactEmail(request.getSupplierEmail());
+            }
+            if (request.getSupplierVerified() != null) {
+                supplier.setIsVerified(request.getSupplierVerified());
+            }
+        }
+        supplier.setUpdatedAt(LocalDateTime.now());
+        supplierRepository.save(supplier);
+        return supplier;
+    }
+
+    private void placeAcceptedParts(MaintenanceRequest request,
+                                    Map<Long, PurchaseOrderAcceptanceRequestDTO.PartAcceptanceDTO> acceptanceByPart,
+                                    List<RequestPart> parts) {
+        if (parts == null || parts.isEmpty()) {
+            return;
+        }
+        BowlingClub club = request != null ? request.getClub() : null;
+        MechanicProfile mechanic = request != null ? request.getMechanic() : null;
+        Integer personalWarehouseId = null;
+        if (club == null && mechanic != null) {
+            personalWarehouseId = ensurePersonalWarehouse(mechanic);
+        }
+        for (RequestPart part : parts) {
+            if (part == null || part.getAcceptedQuantity() == null || part.getAcceptedQuantity() <= 0
+                    || part.getCatalogId() == null) {
+                continue;
+            }
+            PurchaseOrderAcceptanceRequestDTO.PartAcceptanceDTO acceptance = acceptanceByPart.get(part.getPartId());
+            Integer targetWarehouseId = club != null && club.getClubId() != null
+                    ? Math.toIntExact(club.getClubId())
+                    : personalWarehouseId;
+            if (targetWarehouseId == null) {
+                continue;
+            }
+            WarehouseInventory inventory = updateOrCreateInventory(targetWarehouseId,
+                    part.getCatalogId().intValue(),
+                    part.getAcceptedQuantity(),
+                    acceptance);
+            part.setWarehouseId(targetWarehouseId);
+            if (inventory != null) {
+                part.setInventoryId(inventory.getInventoryId());
+                part.setInventoryLocation(buildInventoryLocation(inventory, acceptance));
+                part.setIsAvailable(Boolean.TRUE);
+            }
+        }
+    }
+
+    private String buildInventoryLocation(WarehouseInventory inventory,
+                                          PurchaseOrderAcceptanceRequestDTO.PartAcceptanceDTO acceptance) {
+        List<String> tokens = new ArrayList<>();
+        if (acceptance != null && acceptance.getStorageLocation() != null) {
+            tokens.add(acceptance.getStorageLocation());
+        }
+        if (inventory != null) {
+            if (inventory.getShelfCode() != null) {
+                tokens.add("shelf: " + inventory.getShelfCode());
+            }
+            if (inventory.getCellCode() != null) {
+                tokens.add("cell: " + inventory.getCellCode());
+            }
+        }
+        return String.join(", ", tokens);
+    }
+
+    private WarehouseInventory updateOrCreateInventory(Integer warehouseId,
+                                                       Integer catalogId,
+                                                       Integer quantity,
+                                                       PurchaseOrderAcceptanceRequestDTO.PartAcceptanceDTO acceptance) {
+        if (warehouseId == null || catalogId == null || quantity == null || quantity <= 0) {
+            return null;
+        }
+        WarehouseInventory inventory = warehouseInventoryRepository
+                .findFirstByWarehouseIdAndCatalogId(warehouseId, catalogId);
+        if (inventory == null) {
+            inventory = WarehouseInventory.builder()
+                    .warehouseId(warehouseId)
+                    .catalogId(catalogId)
+                    .quantity(quantity)
+                    .lastChecked(LocalDate.now())
+                    .build();
+        } else {
+            int currentQty = Optional.ofNullable(inventory.getQuantity()).orElse(0);
+            inventory.setQuantity(currentQty + quantity);
+            if (inventory.getLastChecked() == null) {
+                inventory.setLastChecked(LocalDate.now());
+            }
+        }
+        if (acceptance != null) {
+            if (acceptance.getStorageLocation() != null) {
+                inventory.setLocationReference(acceptance.getStorageLocation());
+            }
+            if (acceptance.getShelfCode() != null) {
+                inventory.setShelfCode(acceptance.getShelfCode());
+            }
+            if (acceptance.getCellCode() != null) {
+                inventory.setCellCode(acceptance.getCellCode());
+            }
+            if (acceptance.getPlacementNotes() != null) {
+                inventory.setNotes(acceptance.getPlacementNotes());
+            }
+        }
+        return warehouseInventoryRepository.save(inventory);
+    }
+
+    private Integer ensurePersonalWarehouse(MechanicProfile mechanicProfile) {
+        return personalWarehouseRepository.findByMechanicProfile_ProfileIdAndIsActiveTrue(mechanicProfile.getProfileId())
+                .stream()
+                .findFirst()
+                .map(warehouse -> warehouse.getWarehouseId())
+                .orElseGet(() -> {
+                    var warehouse = ru.bowling.bowlingapp.Entity.PersonalWarehouse.builder()
+                            .mechanicProfile(mechanicProfile)
+                            .name("Личный zip-склад " + Optional.ofNullable(mechanicProfile.getFullName()).orElse("механика"))
+                            .isActive(true)
+                            .createdAt(LocalDateTime.now())
+                            .updatedAt(LocalDateTime.now())
+                            .build();
+                    return personalWarehouseRepository.save(warehouse).getWarehouseId();
+                });
+    }
+
+    private void recalculateSupplierRating(Long supplierId) {
+        if (supplierId == null) {
+            return;
+        }
+        Supplier supplier = supplierRepository.findById(supplierId)
+                .orElse(null);
+        if (supplier == null) {
+            return;
+        }
+        List<SupplierReview> reviews = supplierReviewRepository.findBySupplierId(supplierId);
+        double average = reviews.stream()
+                .map(SupplierReview::getRating)
+                .filter(Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .average()
+                .orElse(0.0);
+        supplier.setRating(average > 0 ? average : null);
+        supplier.setUpdatedAt(LocalDateTime.now());
+        supplierRepository.save(supplier);
     }
 
     private SupplierReviewDTO toReviewDto(SupplierReview review) {
