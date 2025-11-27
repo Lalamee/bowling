@@ -31,6 +31,8 @@ import '../models/purchase_order_acceptance_request_dto.dart';
 import '../models/supplier_review_request_dto.dart';
 import '../models/supplier_complaint_request_dto.dart';
 import '../models/supplier_complaint_status_update_dto.dart';
+import '../models/help_request_dto.dart';
+import '../models/admin_help_request_dto.dart';
 
 /// Типизированный API сервис для взаимодействия с backend
 class ApiService {
@@ -218,6 +220,24 @@ class ApiService {
     return MaintenanceRequestResponseDto.fromJson(response.data);
   }
 
+  /// POST /api/maintenance/requests/{id}/help - Запрос помощи механика
+  Future<MaintenanceRequestResponseDto> requestHelp(int id, HelpRequestDto request) async {
+    final response = await _dio.post(
+      '/api/maintenance/requests/$id/help',
+      data: request.toJson(),
+    );
+    return MaintenanceRequestResponseDto.fromJson(response.data);
+  }
+
+  /// POST /api/maintenance/requests/{id}/help/decision - Ответ менеджера/админа на запрос помощи
+  Future<MaintenanceRequestResponseDto> resolveHelp(int id, HelpResponseDto request) async {
+    final response = await _dio.post(
+      '/api/maintenance/requests/$id/help/decision',
+      data: request.toJson(),
+    );
+    return MaintenanceRequestResponseDto.fromJson(response.data);
+  }
+
   /// PUT /api/maintenance/requests/{id}/unrepairable - Отметка как неремонтопригодное
   Future<MaintenanceRequestResponseDto> markAsUnrepairable(
     int id,
@@ -228,6 +248,14 @@ class ApiService {
       data: request.toJson(),
     );
     return MaintenanceRequestResponseDto.fromJson(response.data);
+  }
+
+  /// GET /api/admin/help-requests - Список запросов помощи для Администрации
+  Future<List<AdminHelpRequestDto>> getAdminHelpRequests() async {
+    final response = await _dio.get('/api/admin/help-requests');
+    return (response.data as List)
+        .map((e) => AdminHelpRequestDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
   }
 
   // ============================================

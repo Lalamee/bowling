@@ -38,7 +38,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     try {
       final me = await _userRepository.me();
       final scope = await UserAccessScope.fromProfile(me);
-      if (scope.role != 'manager' && scope.role != 'owner') {
+      if (scope.role != 'manager' && scope.role != 'owner' && scope.role != 'admin') {
         if (!mounted) return;
         setState(() {
           _scope = scope;
@@ -131,12 +131,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
       );
     }
 
-    if (scope == null || (scope.role != 'manager' && scope.role != 'owner')) {
+    if (scope == null || (scope.role != 'manager' && scope.role != 'owner' && scope.role != 'admin')) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 24),
           child: Text(
-            'Оповещения доступны только для менеджеров и владельцев клубов',
+            'Оповещения доступны только для менеджеров, владельцев клубов и Администрации',
             textAlign: TextAlign.center,
             style: TextStyle(color: AppColors.darkGray),
           ),
@@ -235,6 +235,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   String _buildSubtitle(MaintenanceRequestResponseDto order, DateTime? updatedAt) {
     final parts = <String>[];
+    if (order.requestedParts.any((part) => part.helpRequested == true)) {
+      final helpCount = order.requestedParts.where((part) => part.helpRequested == true).length;
+      parts.add('Запрос помощи: $helpCount поз.');
+    }
     if (order.clubName != null && order.clubName!.isNotEmpty) {
       parts.add(order.clubName!);
     }
