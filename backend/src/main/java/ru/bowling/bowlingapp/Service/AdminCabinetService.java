@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.DTO.*;
 import ru.bowling.bowlingapp.Entity.*;
+import ru.bowling.bowlingapp.Entity.enums.AttestationDecisionStatus;
 import ru.bowling.bowlingapp.Entity.enums.SupplierComplaintStatus;
 import ru.bowling.bowlingapp.Enum.AccountTypeName;
 import ru.bowling.bowlingapp.Enum.RoleName;
@@ -262,7 +263,7 @@ public class AdminCabinetService {
                 .id(application.getApplicationId())
                 .userId(application.getUser() != null ? application.getUser().getUserId() : null)
                 .mechanicProfileId(application.getMechanicProfile() != null ? application.getMechanicProfile().getProfileId() : null)
-                .status(application.getStatus())
+                .status(AttestationDecisionStatus.fromEntity(application.getStatus()))
                 .comment(application.getComment())
                 .requestedGrade(application.getRequestedGrade())
                 .clubId(application.getClub() != null ? application.getClub().getClubId() : null)
@@ -391,11 +392,9 @@ public class AdminCabinetService {
         if (user == null || club == null) {
             return;
         }
-        Role role = user.getRole();
-        if (role == null) {
-            role = roleRepository.findByNameIgnoreCase(RoleName.MECHANIC.name())
-                    .orElse(null);
-        }
+        Role resolvedRole = user.getRole() != null
+                ? user.getRole()
+                : roleRepository.findByNameIgnoreCase(RoleName.MECHANIC.name()).orElse(null);
 
         ClubStaff staff = clubStaffRepository.findByClubAndUser(club, user)
                 .orElseGet(() -> ClubStaff.builder()
@@ -403,9 +402,9 @@ public class AdminCabinetService {
                         .user(user)
                         .assignedAt(LocalDateTime.now())
                         .isActive(true)
-                        .role(role)
+                        .role(resolvedRole)
                         .build());
-        staff.setRole(role);
+        staff.setRole(resolvedRole);
         staff.setIsActive(true);
         clubStaffRepository.save(staff);
     }
