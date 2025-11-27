@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.DTO.*;
 import ru.bowling.bowlingapp.Entity.*;
+import ru.bowling.bowlingapp.Enum.AccountTypeName;
+import ru.bowling.bowlingapp.Enum.RoleName;
 import ru.bowling.bowlingapp.Repository.*;
 import ru.bowling.bowlingapp.Security.UserPrincipal;
 
@@ -110,43 +112,15 @@ public class AuthService implements UserDetailsService {
         return null;
     }
 
-    private boolean isMechanicAccountType(String accountTypeName) {
-        String normalized = normalizeAccountTypeName(accountTypeName);
-        if (normalized == null) {
-            return false;
-        }
-
-        if (isManagerAccountType(accountTypeName)) {
-            return false;
-        }
-
-        return "INDIVIDUAL".equals(normalized)
-                || "МЕХАНИК".equals(normalized)
-                || "ФИЗИЧЕСКОЕ ЛИЦО".equals(normalized)
-                || "ФИЗ ЛИЦО".equals(normalized)
-                || "ФИЗЛИЦО".equals(normalized);
-    }
-
-    private boolean isOwnerAccountType(String accountTypeName) {
-        String normalized = normalizeAccountTypeName(accountTypeName);
-        return "CLUB_OWNER".equals(normalized)
-                || "ВЛАДЕЛЕЦ".equals(normalized);
-    }
-
-    private String normalizeAccountTypeName(String accountTypeName) {
-        if (accountTypeName == null) {
-            return null;
-        }
-        return accountTypeName.trim().toUpperCase(Locale.ROOT);
-    }
-
     @Transactional
     public void registerUser(RegisterUserDTO dto,
                              MechanicProfileDTO mechanicDto,
                              OwnerProfileDTO ownerDto,
                              ManagerProfileDTO managerDto,
                              BowlingClubDTO clubDto) {
-        AccountType accountType = validateRegistrationData(dto, mechanicDto, ownerDto, managerDto, clubDto);
+        AccountType accountType = resolveAccountType(dto);
+        AccountTypeName accountTypeName = AccountTypeName.from(accountType.getName());
+        validateRegistrationData(dto, mechanicDto, ownerDto, managerDto, clubDto, accountTypeName);
 
         String normalizedPhone = normalizePhone(dto.getPhone());
         if (normalizedPhone == null) {
@@ -157,22 +131,17 @@ public class AuthService implements UserDetailsService {
             throw new IllegalArgumentException("Phone already registered");
         }
 
-        Role role = resolveRole(dto, accountType);
+        Role role = resolveRole(dto, accountTypeName);
 
         User user = User.builder()
                 .phone(normalizedPhone)
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
                 .role(role)
                 .registrationDate(LocalDate.now())
-                .isActive(true)
-                .isVerified(false)
+                .isActive(resolveInitialActiveFlag(accountTypeName))
+                .isVerified(resolveVerificationFlag(accountTypeName))
                 .accountType(accountType)
                 .build();
-
-        String accountTypeName = accountType.getName();
-        boolean managerAccount = isManagerAccountType(accountTypeName) || isManagerRole(role);
-        boolean mechanicAccount = !managerAccount
-                && (isMechanicAccountType(accountTypeName) || isMechanicRole(role));
 
         BowlingClub mechanicClub = null;
         BowlingClub managerClub = null;
@@ -181,7 +150,8 @@ public class AuthService implements UserDetailsService {
         ManagerProfile managerProfile = null;
         AdministratorProfile administratorProfile = null;
 
-        if (mechanicAccount) {
+        if (isMechanicAccount(accountTypeName)) {
+            AccountTypeName mechanicAccountType = accountTypeName;
             mechanicProfile = MechanicProfile.builder()
                     .user(user)
                     .fullName(mechanicDto.getFullName())
@@ -190,7 +160,7 @@ public class AuthService implements UserDetailsService {
                     .educationalInstitution(mechanicDto.getEducationalInstitution())
                     .totalExperienceYears(mechanicDto.getTotalExperienceYears())
                     .bowlingExperienceYears(mechanicDto.getBowlingExperienceYears())
-                    .isEntrepreneur(mechanicDto.getIsEntrepreneur())
+                    .isEntrepreneur(Boolean.TRUE.equals(mechanicDto.getIsEntrepreneur()))
                     .specializationId(mechanicDto.getSpecializationId())
                     .skills(mechanicDto.getSkills())
                     .advantages(mechanicDto.getAdvantages())
@@ -201,7 +171,7 @@ public class AuthService implements UserDetailsService {
                     .build();
             applyCertifications(mechanicProfile, mechanicDto.getCertifications());
             applyWorkHistory(mechanicProfile, mechanicDto.getWorkHistory());
-            if (mechanicDto.getClubId() != null) {
+            if (isClubMechanic(mechanicAccountType)) {
                 mechanicClub = bowlingClubRepository.findById(mechanicDto.getClubId())
                         .orElseThrow(() -> new IllegalArgumentException("Selected club not found"));
                 mechanicProfile.setClubs(new ArrayList<>(Collections.singletonList(mechanicClub)));
@@ -223,7 +193,7 @@ public class AuthService implements UserDetailsService {
                     .build();
             ownerProfile.setClubs(new ArrayList<>());
             user.setOwnerProfile(ownerProfile);
-        } else if (managerAccount) {
+        } else if (isManagerAccount(accountTypeName)) {
             String managerFullName = managerDto != null && managerDto.getFullName() != null
                     ? managerDto.getFullName().trim()
                     : (ownerDto != null ? trimOrNull(ownerDto.getContactPerson()) : null);
@@ -252,7 +222,7 @@ public class AuthService implements UserDetailsService {
         } else if (isAdministratorAccountType(accountTypeName)) {
             administratorProfile = AdministratorProfile.builder()
                     .user(user)
-                    .fullName(ownerDto != null ? ownerDto.getContactPerson() : null)
+                    .fullName(ownerDto != null ? ownerDto.getContactPerson() : normalizedPhone)
                     .contactPhone(normalizedPhone)
                     .contactEmail(ownerDto != null ? ownerDto.getContactEmail() : null)
                     .isDataVerified(false)
@@ -288,12 +258,9 @@ public class AuthService implements UserDetailsService {
                             .club(finalMechanicClub)
                             .user(user)
                             .assignedAt(LocalDateTime.now())
-                            .isActive(!mechanicAccount)
+                            .isActive(true)
                             .build());
             clubStaff.setRole(user.getRole());
-            if (mechanicAccount) {
-                clubStaff.setIsActive(false);
-            }
             if (clubStaff.getAssignedAt() == null) {
                 clubStaff.setAssignedAt(LocalDateTime.now());
             }
@@ -307,12 +274,9 @@ public class AuthService implements UserDetailsService {
                             .club(finalManagerClub)
                             .user(user)
                             .assignedAt(LocalDateTime.now())
-                            .isActive(!managerAccount)
+                            .isActive(true)
                             .build());
             clubStaff.setRole(user.getRole());
-            if (managerAccount) {
-                clubStaff.setIsActive(false);
-            }
             if (clubStaff.getAssignedAt() == null) {
                 clubStaff.setAssignedAt(LocalDateTime.now());
             }
@@ -342,11 +306,12 @@ public class AuthService implements UserDetailsService {
         userRepository.save(user);
     }
     
-    private AccountType validateRegistrationData(RegisterUserDTO dto,
-                                                 MechanicProfileDTO mechanicDto,
-                                                 OwnerProfileDTO ownerDto,
-                                                 ManagerProfileDTO managerDto,
-                                                 BowlingClubDTO clubDto) {
+    private void validateRegistrationData(RegisterUserDTO dto,
+                                          MechanicProfileDTO mechanicDto,
+                                          OwnerProfileDTO ownerDto,
+                                          ManagerProfileDTO managerDto,
+                                          BowlingClubDTO clubDto,
+                                          AccountTypeName accountTypeName) {
         if (dto == null) {
             throw new IllegalArgumentException("User registration data is required");
         }
@@ -359,19 +324,11 @@ public class AuthService implements UserDetailsService {
             throw new IllegalArgumentException("Password must be at least 8 characters long");
         }
 
-        if (dto.getRoleId() == null && dto.getAccountTypeId() == null) {
-            throw new IllegalArgumentException("Role or account type must be specified");
+        if (dto.getRoleId() == null || dto.getAccountTypeId() == null) {
+            throw new IllegalArgumentException("Role and account type must be specified");
         }
 
-        AccountType accountType = resolveAccountType(dto);
-
-        boolean managerRegistration = isManagerAccountType(accountType.getName())
-                || isManagerRoleCode(dto.getRoleId());
-        boolean mechanicRegistration = !managerRegistration
-                && (isMechanicAccountType(accountType.getName())
-                || isMechanicRoleCode(dto.getRoleId()));
-
-        if (mechanicRegistration) {
+        if (isMechanicAccount(accountTypeName)) {
             if (mechanicDto == null) {
                 throw new IllegalArgumentException("Mechanic profile data is required for mechanic account type");
             }
@@ -387,7 +344,16 @@ public class AuthService implements UserDetailsService {
             if (mechanicDto.getBowlingExperienceYears() == null || mechanicDto.getBowlingExperienceYears() < 0) {
                 throw new IllegalArgumentException("Bowling experience years must be non-negative");
             }
-        } else if (managerRegistration) {
+            if (isClubMechanic(accountTypeName) && mechanicDto.getClubId() == null) {
+                throw new IllegalArgumentException("Club selection is required for employed mechanics");
+            }
+            if (isFreeMechanic(accountTypeName) && mechanicDto.getClubId() != null) {
+                throw new IllegalArgumentException("Free mechanics cannot be attached to a club during registration");
+            }
+            if (isFreeMechanic(accountTypeName) && mechanicDto.getIsEntrepreneur() == null) {
+                throw new IllegalArgumentException("Self-employment flag is required for free mechanics");
+            }
+        } else if (isManagerAccount(accountTypeName)) {
             if (managerDto == null) {
                 throw new IllegalArgumentException("Manager profile data is required for manager account type");
             }
@@ -397,7 +363,7 @@ public class AuthService implements UserDetailsService {
             if (managerDto.getClubId() == null) {
                 throw new IllegalArgumentException("Club selection is required for manager profile");
             }
-        } else if (isOwnerAccountType(accountType.getName())) {
+        } else if (isOwnerAccountType(accountTypeName)) {
             if (ownerDto == null) {
                 throw new IllegalArgumentException("Owner profile data is required for club owner account type");
             }
@@ -417,8 +383,6 @@ public class AuthService implements UserDetailsService {
                 throw new IllegalArgumentException("Club lanes count must be greater than zero");
             }
         }
-
-        return accountType;
     }
 
     private Map<String, Object> buildUserInfoResponse(User user) {
@@ -751,293 +715,77 @@ public class AuthService implements UserDetailsService {
     }
 
     private AccountType resolveAccountType(RegisterUserDTO dto) {
-        if (dto.getAccountTypeId() != null) {
-            Long id = dto.getAccountTypeId().longValue();
-            Optional<AccountType> byId = accountTypeRepository.findById(id);
-            if (byId.isPresent()) {
-                return byId.get();
-            }
-
-            AccountType byCodeFallback = findAccountTypeByNameCandidates(accountTypeNamesByCode(dto.getAccountTypeId()));
-            if (byCodeFallback != null) {
-                return byCodeFallback;
-            }
+        if (dto.getAccountTypeId() == null) {
+            throw new IllegalArgumentException("Account type is required");
         }
-
-        AccountType byRoleFallback = findAccountTypeByNameCandidates(accountTypeNamesForRoleCode(dto.getRoleId()));
-        if (byRoleFallback != null) {
-            return byRoleFallback;
-        }
-
-        if (!Objects.equals(dto.getAccountTypeId(), ACCOUNT_TYPE_CLUB_OWNER_ID)
-                && !Objects.equals(dto.getRoleId(), ROLE_CLUB_OWNER_ID)) {
-            return resolveIndividualAccountType();
-        }
-
-        throw new IllegalArgumentException("Account type not found");
+        return accountTypeRepository.findById(dto.getAccountTypeId().longValue())
+                .orElseThrow(() -> new IllegalArgumentException("Account type not found"));
     }
 
-    private Role resolveRole(RegisterUserDTO dto, AccountType accountType) {
+    private Role resolveRole(RegisterUserDTO dto, AccountTypeName accountTypeName) {
+        RoleName expectedRoleName = mapRoleByAccountType(accountTypeName);
         if (dto.getRoleId() != null) {
-            Long id = dto.getRoleId().longValue();
-            Optional<Role> byId = roleRepository.findById(id);
-            if (byId.isPresent()) {
-                return byId.get();
+            Role provided = roleRepository.findById(dto.getRoleId().longValue())
+                    .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+            RoleName providedName = RoleName.from(provided.getName());
+            if (!providedName.equals(expectedRoleName)) {
+                throw new IllegalArgumentException("Provided role does not match selected account type");
             }
-            String fallbackName = roleNameByCode(dto.getRoleId());
-            if (fallbackName != null) {
-                return roleByName(fallbackName);
-            }
+            return provided;
         }
-
-        if (accountType != null) {
-            String normalized = normalizeAccountTypeName(accountType.getName());
-            if (isOwnerAccountType(normalized)) {
-                return roleByName("CLUB_OWNER");
-            }
-            if (isMechanicAccountType(normalized)) {
-                return roleByName("MECHANIC");
-            }
-            if (isManagerAccountType(normalized)) {
-                return roleByName("HEAD_MECHANIC");
-            }
-        }
-
-        return roleByName("STAFF");
+        return roleByName(expectedRoleName.name());
     }
 
     private Role roleByName(String name) {
-        if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("Role not found");
-        }
+        return roleRepository.findByNameIgnoreCase(name)
+                .orElseThrow(() -> new IllegalArgumentException("Role not found: " + name));
+    }
 
-        Optional<Role> directMatch = roleRepository.findByNameIgnoreCase(name)
-                .or(() -> roleRepository.findByName(name));
-        if (directMatch.isPresent()) {
-            return directMatch.get();
-        }
-
-        String normalized = name.trim().toUpperCase(Locale.ROOT);
-        return switch (normalized) {
-            case "HEAD_MECHANIC" -> roleRepository.findByNameIgnoreCase("HEAD_MECHANIC")
-                    .or(() -> roleRepository.findByNameIgnoreCase("MANAGER"))
-                    .or(() -> roleRepository.findByNameIgnoreCase("STAFF"))
-                    .orElseThrow(() -> new IllegalArgumentException("Role not found"));
-            case "ADMIN" -> roleRepository.findByNameIgnoreCase("ADMIN")
-                    .or(() -> roleRepository.findByNameIgnoreCase("ADMINISTRATOR"))
-                    .or(() -> roleRepository.findByNameIgnoreCase("STAFF"))
-                    .orElseThrow(() -> new IllegalArgumentException("Role not found"));
-            case "MECHANIC" -> roleRepository.findByNameIgnoreCase("MECHANIC")
-                    .orElseThrow(() -> new IllegalArgumentException("Role not found"));
-            case "CLUB_OWNER" -> roleRepository.findByNameIgnoreCase("CLUB_OWNER")
-                    .orElseThrow(() -> new IllegalArgumentException("Role not found"));
-            default -> throw new IllegalArgumentException("Role not found");
+    private RoleName mapRoleByAccountType(AccountTypeName type) {
+        return switch (type) {
+            case MAIN_ADMIN -> RoleName.ADMIN;
+            case CLUB_OWNER -> RoleName.CLUB_OWNER;
+            case CLUB_MANAGER -> RoleName.HEAD_MECHANIC;
+            case INDIVIDUAL, FREE_MECHANIC_BASIC, FREE_MECHANIC_PREMIUM -> RoleName.MECHANIC;
         };
     }
 
-    private static final int ROLE_ADMIN_ID = 1;
-    private static final int ROLE_MECHANIC_ID = 4;
-    private static final int ROLE_CLUB_OWNER_ID = 5;
-    private static final int ROLE_HEAD_MECHANIC_ID = 6;
-
-    private static final int ACCOUNT_TYPE_INDIVIDUAL_ID = 1;
-    private static final int ACCOUNT_TYPE_CLUB_OWNER_ID = 2;
-
-    private AccountType findAccountTypeByNameCandidates(Collection<String> candidates) {
-        if (candidates == null || candidates.isEmpty()) {
-            return null;
-        }
-
-        List<AccountType> allAccountTypes = null;
-
-        for (String candidate : candidates) {
-            String trimmed = trimOrNull(candidate);
-            if (trimmed == null) {
-                continue;
-            }
-
-            Optional<AccountType> directMatch = accountTypeRepository.findByNameIgnoreCase(trimmed)
-                    .or(() -> accountTypeRepository.findByName(trimmed));
-            if (directMatch.isPresent()) {
-                return directMatch.get();
-            }
-
-            if (allAccountTypes == null) {
-                allAccountTypes = accountTypeRepository.findAll();
-            }
-
-            String normalizedCandidate = normalizeAccountTypeName(trimmed);
-            for (AccountType type : allAccountTypes) {
-                if (normalizedCandidate != null
-                        && normalizedCandidate.equals(normalizeAccountTypeName(type.getName()))) {
-                    return type;
-                }
-            }
-        }
-
-        return null;
+    private boolean isMechanicAccount(AccountTypeName accountTypeName) {
+        return accountTypeName == AccountTypeName.INDIVIDUAL
+                || accountTypeName == AccountTypeName.FREE_MECHANIC_BASIC
+                || accountTypeName == AccountTypeName.FREE_MECHANIC_PREMIUM;
     }
 
-    private List<String> accountTypeNamesByCode(Integer code) {
-        if (code == null) {
-            return Collections.emptyList();
-        }
-        return switch (code) {
-            case ACCOUNT_TYPE_INDIVIDUAL_ID -> Arrays.asList(
-                    "INDIVIDUAL",
-                    "Физическое лицо",
-                    "ФИЗ ЛИЦО",
-                    "ФИЗЛИЦО",
-                    "ФИЗ. ЛИЦО",
-                    "MECHANIC",
-                    "Механик"
-            );
-            case ACCOUNT_TYPE_CLUB_OWNER_ID -> Arrays.asList(
-                    "CLUB_OWNER",
-                    "OWNER",
-                    "Владелец"
-            );
-            case 3 -> Arrays.asList(
-                    "HEAD_MECHANIC",
-                    "HEADMECHANIC",
-                    "ГЛАВНЫЙ МЕХАНИК",
-                    "Главный механик",
-                    "MANAGER",
-                    "Менеджер"
-            );
-            case 4 -> Arrays.asList(
-                    "ADMINISTRATOR",
-                    "ADMIN",
-                    "Администратор",
-                    "INDIVIDUAL",
-                    "Физическое лицо"
-            );
-            case 5 -> Arrays.asList(
-                    "MANAGER",
-                    "Менеджер",
-                    "HEAD_MECHANIC",
-                    "HEADMECHANIC",
-                    "ГЛАВНЫЙ МЕХАНИК",
-                    "Главный механик"
-            );
-            default -> Collections.emptyList();
-        };
+    private boolean isFreeMechanic(AccountTypeName accountTypeName) {
+        return accountTypeName == AccountTypeName.FREE_MECHANIC_BASIC
+                || accountTypeName == AccountTypeName.FREE_MECHANIC_PREMIUM;
     }
 
-    private List<String> accountTypeNamesForRoleCode(Integer code) {
-        if (code == null) {
-            return Collections.emptyList();
-        }
-        return switch (code) {
-            case ROLE_CLUB_OWNER_ID -> Arrays.asList(
-                    "CLUB_OWNER",
-                    "OWNER",
-                    "Владелец"
-            );
-            case ROLE_ADMIN_ID -> Arrays.asList(
-                    "ADMINISTRATOR",
-                    "ADMIN",
-                    "Администратор",
-                    "INDIVIDUAL",
-                    "Физическое лицо"
-            );
-            case ROLE_MECHANIC_ID -> Arrays.asList(
-                    "MECHANIC",
-                    "Механик",
-                    "INDIVIDUAL",
-                    "Физическое лицо",
-                    "ФИЗ ЛИЦО",
-                    "ФИЗЛИЦО",
-                    "ФИЗ. ЛИЦО"
-            );
-            case ROLE_HEAD_MECHANIC_ID -> Arrays.asList(
-                    "HEAD_MECHANIC",
-                    "HEADMECHANIC",
-                    "ГЛАВНЫЙ МЕХАНИК",
-                    "Главный механик",
-                    "MANAGER",
-                    "Менеджер"
-            );
-            default -> Collections.emptyList();
-        };
+    private boolean isClubMechanic(AccountTypeName accountTypeName) {
+        return accountTypeName == AccountTypeName.INDIVIDUAL;
     }
 
-    private AccountType resolveIndividualAccountType() {
-        return accountTypeRepository.findById((long) ACCOUNT_TYPE_INDIVIDUAL_ID)
-                .or(() -> accountTypeRepository.findByNameIgnoreCase("INDIVIDUAL"))
-                .or(() -> accountTypeRepository.findByNameIgnoreCase("Физическое лицо"))
-                .orElseThrow(() -> new IllegalStateException(
-                        "Individual account type (id=" + ACCOUNT_TYPE_INDIVIDUAL_ID + ") is not configured"));
+    private boolean isManagerAccount(AccountTypeName accountTypeName) {
+        return accountTypeName == AccountTypeName.CLUB_MANAGER;
     }
 
-    private String roleNameByCode(Integer code) {
-        if (code == null) {
-            return null;
-        }
-        return switch (code) {
-            case ROLE_ADMIN_ID -> "ADMIN";
-            case ROLE_MECHANIC_ID -> "MECHANIC";
-            case ROLE_CLUB_OWNER_ID -> "CLUB_OWNER";
-            case ROLE_HEAD_MECHANIC_ID -> "HEAD_MECHANIC";
-            default -> null;
-        };
+    private boolean isOwnerAccountType(AccountTypeName accountTypeName) {
+        return accountTypeName == AccountTypeName.CLUB_OWNER;
     }
 
-    private boolean isManagerAccountType(String accountTypeName) {
-        String normalized = normalizeAccountTypeName(accountTypeName);
-        if (normalized == null) {
+    private boolean isAdministratorAccountType(AccountTypeName accountTypeName) {
+        return accountTypeName == AccountTypeName.MAIN_ADMIN;
+    }
+
+    private boolean resolveVerificationFlag(AccountTypeName accountTypeName) {
+        return accountTypeName == AccountTypeName.MAIN_ADMIN;
+    }
+
+    private boolean resolveInitialActiveFlag(AccountTypeName accountTypeName) {
+        if (isFreeMechanic(accountTypeName)) {
             return false;
         }
-
-        String compact = normalizeAccountTypeKey(accountTypeName);
-
-        return "MANAGER".equals(normalized)
-                || "MANAGER".equals(compact)
-                || "HEADMECHANIC".equals(normalized)
-                || "HEADMECHANIC".equals(compact)
-                || "МЕНЕДЖЕР".equals(normalized)
-                || "МЕНЕДЖЕР".equals(compact)
-                || "ГЛАВНЫЙМЕХАНИК".equals(normalized)
-                || "ГЛАВНЫЙМЕХАНИК".equals(compact);
-    }
-
-    private String normalizeAccountTypeKey(String accountTypeName) {
-        if (accountTypeName == null) {
-            return null;
-        }
-        return accountTypeName.replaceAll("[\\s_\\-]", "").toUpperCase(Locale.ROOT);
-    }
-
-    private boolean isManagerRole(Role role) {
-        if (role == null || role.getName() == null) {
-            return false;
-        }
-        String normalized = role.getName().trim().toUpperCase(Locale.ROOT);
-        return "HEAD_MECHANIC".equals(normalized) || "MANAGER".equals(normalized);
-    }
-
-    private boolean isMechanicRole(Role role) {
-        if (role == null || role.getName() == null) {
-            return false;
-        }
-        String normalized = role.getName().trim().toUpperCase(Locale.ROOT);
-        return "MECHANIC".equals(normalized);
-    }
-
-    private boolean isManagerRoleCode(Integer roleId) {
-        return roleId != null && roleId == ROLE_HEAD_MECHANIC_ID;
-    }
-
-    private boolean isMechanicRoleCode(Integer roleId) {
-        return roleId != null && roleId == ROLE_MECHANIC_ID;
-    }
-
-    private boolean isAdministratorAccountType(String accountTypeName) {
-        String normalized = normalizeAccountTypeName(accountTypeName);
-        if (normalized == null) {
-            return false;
-        }
-        return normalized.contains("ADMIN") || normalized.contains("АДМИН");
+        return true;
     }
 
     private void attachClubToOwner(OwnerProfile ownerProfile, OwnerProfileDTO ownerDto, BowlingClubDTO clubDto) {

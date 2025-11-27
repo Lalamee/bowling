@@ -379,6 +379,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
     return resolved == OrderStatusType.confirmed;
   }
 
+  bool _canRequestHelp(MaintenanceRequestResponseDto request) {
+    if (!_isMechanic) return false;
+    return !isArchivedStatus(request.status) && request.requestedParts.isNotEmpty;
+  }
+
+  bool _canResolveHelp(MaintenanceRequestResponseDto request) {
+    return _isManagerLike || (_role == 'admin');
+  }
+
   bool? _guessAvailabilityFromNotes(String? notes) {
     if (notes == null) return null;
     final normalized = notes.toLowerCase();
@@ -506,6 +515,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Future<void> _openSummary(MaintenanceRequestResponseDto request) async {
     final canConfirm = _canConfirmRequest(request);
     final canComplete = _canCompleteRequest(request);
+    final canRequestHelp = _canRequestHelp(request);
+    final canResolveHelp = _canResolveHelp(request);
     final initialAvailability = _guessAvailabilityFromNotes(request.managerNotes);
 
     await Navigator.push<bool>(
@@ -516,15 +527,31 @@ class _OrdersScreenState extends State<OrdersScreen> {
           order: request,
           canConfirm: canConfirm,
           canComplete: canComplete,
+          canRequestHelp: canRequestHelp,
+          canResolveHelp: canResolveHelp,
           initialAvailability: initialAvailability,
           onConfirm: canConfirm
               ? ({required Map<int, bool> availability, String? comment}) =>
                   _confirmRequest(request, availability: availability, comment: comment)
               : null,
           onComplete: canComplete ? () => _completeRequest(request) : null,
+          onOrderUpdated: _replaceOrder,
         ),
       ),
     );
+  }
+
+  void _replaceOrder(MaintenanceRequestResponseDto updated) {
+    if (!mounted) return;
+    setState(() {
+      final index = _allRequests.indexWhere((e) => e.requestId == updated.requestId);
+      if (index != -1) {
+        _allRequests[index] = updated;
+      } else {
+        _allRequests = [..._allRequests, updated];
+      }
+      _sortRequests(_allRequests);
+    });
   }
 
   Future<List<MaintenanceRequestResponseDto>> _fetchRequestsForClubs(List<UserClub> clubs) async {
@@ -809,6 +836,20 @@ class _OrderCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 OrderStatusBadge(category: statusCategory),
+                if (request.requestedParts.any((part) => part.helpRequested == true)) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      'Запрос помощи',
+                      style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
                 const SizedBox(width: 8),
                 InkWell(
                   onTap: onToggle,

@@ -25,6 +25,8 @@ public interface WorkLogPartUsageRepository extends JpaRepository<WorkLogPartUsa
     // Поиск по периоду установки
     List<WorkLogPartUsage> findByInstalledDateBetweenOrderByInstalledDateDesc(LocalDateTime startDate, LocalDateTime endDate);
 
+    List<WorkLogPartUsage> findByWorkLogClubClubId(Long clubId);
+
     // Поиск по стоимости
     List<WorkLogPartUsage> findByTotalCostGreaterThanOrderByTotalCostDesc(Double cost);
     List<WorkLogPartUsage> findByTotalCostBetweenOrderByTotalCostDesc(Double minCost, Double maxCost);
