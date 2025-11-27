@@ -516,19 +516,20 @@ public class InventoryServiceImpl implements InventoryService {
         return user.getRole().getName().toUpperCase(Locale.ROOT).contains("ADMIN");
     }
 
-    private PersonalWarehouse ensurePersonalWarehouse(MechanicProfile mechanicProfile) {
-        List<PersonalWarehouse> warehouses = personalWarehouseRepository
-                .findByMechanicProfile_ProfileIdAndIsActiveTrue(mechanicProfile.getProfileId());
-        if (!warehouses.isEmpty()) {
-            return warehouses.get(0);
-        }
-        PersonalWarehouse created = PersonalWarehouse.builder()
-                .mechanicProfile(mechanicProfile)
-                .name("Личный склад механика")
-                .isActive(true)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
+        private PersonalWarehouse ensurePersonalWarehouse(MechanicProfile mechanicProfile) {
+                List<PersonalWarehouse> warehouses = personalWarehouseRepository
+                        .findByMechanicProfile_ProfileIdAndIsActiveTrue(mechanicProfile.getProfileId());
+                if (!warehouses.isEmpty()) {
+                        return warehouses.get(0);
+                }
+                PersonalWarehouse created = PersonalWarehouse.builder()
+                        .mechanicProfile(mechanicProfile)
+                        .name("Личный zip-склад " + Optional.ofNullable(mechanicProfile.getFullName())
+                                .orElse("механика"))
+                        .isActive(true)
+                        .createdAt(LocalDateTime.now())
+                        .updatedAt(LocalDateTime.now())
+                        .build();
         return personalWarehouseRepository.save(created);
     }
 

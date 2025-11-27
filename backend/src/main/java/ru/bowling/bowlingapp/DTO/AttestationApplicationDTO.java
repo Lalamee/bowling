@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-import ru.bowling.bowlingapp.Entity.enums.AttestationStatus;
+import ru.bowling.bowlingapp.Entity.enums.AttestationDecisionStatus;
 import ru.bowling.bowlingapp.Entity.enums.MechanicGrade;
 
 @Data
@@ -19,7 +19,7 @@ public class AttestationApplicationDTO {
     private Long userId;
     private Long mechanicProfileId;
     private Long clubId; // опционально для клубных механиков
-    private AttestationStatus status;
+    private AttestationDecisionStatus status;
     private String comment; // обязательный комментарий при отклонении
     private LocalDateTime submittedAt;
     private LocalDateTime updatedAt;

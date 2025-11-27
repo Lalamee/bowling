@@ -6,6 +6,7 @@ import ru.bowling.bowlingapp.DTO.MechanicCertificationDTO;
 import ru.bowling.bowlingapp.DTO.MechanicDirectoryDetailDTO;
 import ru.bowling.bowlingapp.DTO.MechanicDirectorySummaryDTO;
 import ru.bowling.bowlingapp.DTO.MechanicWorkHistoryDTO;
+import ru.bowling.bowlingapp.DTO.SpecialistCardDTO;
 import ru.bowling.bowlingapp.Entity.AttestationApplication;
 import ru.bowling.bowlingapp.Entity.BowlingClub;
 import ru.bowling.bowlingapp.Entity.MechanicCertification;
@@ -13,15 +14,16 @@ import ru.bowling.bowlingapp.Entity.MechanicProfile;
 import ru.bowling.bowlingapp.Entity.MechanicWorkHistory;
 import ru.bowling.bowlingapp.Entity.User;
 import ru.bowling.bowlingapp.Entity.enums.AttestationStatus;
+import ru.bowling.bowlingapp.Entity.enums.MechanicGrade;
 import ru.bowling.bowlingapp.Repository.AttestationApplicationRepository;
 import ru.bowling.bowlingapp.Repository.MechanicProfileRepository;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -46,6 +48,38 @@ public class MechanicDirectoryService {
                 .filter(profile -> matchesCertification(profile, loweredCertification))
                 .map(this::toSummary)
                 .sorted(Comparator.comparing(MechanicDirectorySummaryDTO::getFullName, Comparator.nullsLast(String::compareToIgnoreCase)))
+                .collect(Collectors.toList());
+    }
+
+    public List<SpecialistCardDTO> getSpecialistBase(String region,
+                                                    Integer specializationId,
+                                                    MechanicGrade grade,
+                                                    Double minRating) {
+        List<MechanicProfile> profiles = mechanicProfileRepository.findAllWithUserAndClubs();
+        var approvedGrades = attestationApplicationRepository.findByStatus(AttestationStatus.APPROVED)
+                .stream()
+                .filter(app -> app.getMechanicProfile() != null && app.getMechanicProfile().getProfileId() != null)
+                .collect(Collectors.toMap(app -> app.getMechanicProfile().getProfileId(),
+                        Function.identity(),
+                        this::selectLatestByUpdate))
+                .entrySet()
+                .stream()
+                .collect(Collectors.toMap(
+                        java.util.Map.Entry::getKey,
+                        entry -> entry.getValue().getRequestedGrade()
+                ));
+
+        String normalizedRegion = normalize(region);
+
+        return profiles.stream()
+                .filter(profile -> Boolean.TRUE.equals(profile.getIsDataVerified()))
+                .filter(profile -> approvedGrades.containsKey(profile.getProfileId()))
+                .filter(profile -> specializationId == null || Objects.equals(profile.getSpecializationId(), specializationId))
+                .filter(profile -> matchesRegion(profile, normalizedRegion))
+                .filter(profile -> minRating == null || (profile.getRating() != null && profile.getRating() >= minRating))
+                .filter(profile -> grade == null || grade.equals(approvedGrades.get(profile.getProfileId())))
+                .map(profile -> toSpecialistCard(profile, approvedGrades.get(profile.getProfileId())))
+                .sorted(Comparator.comparing(SpecialistCardDTO::getFullName, Comparator.nullsLast(String::compareToIgnoreCase)))
                 .collect(Collectors.toList());
     }
 
@@ -139,6 +173,35 @@ public class MechanicDirectoryService {
                 .region(resolveRegion(profile))
                 .clubs(clubs)
                 .certifications(resolveCertificationDtos(profile))
+                .build();
+    }
+
+    private SpecialistCardDTO toSpecialistCard(MechanicProfile profile, MechanicGrade grade) {
+        List<String> clubs = Optional.ofNullable(profile.getClubs())
+                .orElse(List.of())
+                .stream()
+                .filter(Objects::nonNull)
+                .map(BowlingClub::getName)
+                .filter(Objects::nonNull)
+                .toList();
+
+        User user = profile.getUser();
+        return SpecialistCardDTO.builder()
+                .profileId(profile.getProfileId())
+                .userId(user != null ? user.getUserId() : null)
+                .fullName(profile.getFullName())
+                .region(resolveRegion(profile))
+                .specializationId(profile.getSpecializationId())
+                .skills(profile.getSkills())
+                .advantages(profile.getAdvantages())
+                .totalExperienceYears(profile.getTotalExperienceYears())
+                .bowlingExperienceYears(profile.getBowlingExperienceYears())
+                .isEntrepreneur(profile.getIsEntrepreneur())
+                .rating(profile.getRating())
+                .attestedGrade(grade)
+                .accountType(user != null && user.getAccountType() != null ? user.getAccountType().getName() : null)
+                .verificationDate(profile.getVerificationDate())
+                .clubs(clubs)
                 .build();
     }
 
@@ -292,6 +355,16 @@ public class MechanicDirectoryService {
                 .orElseGet(() -> Boolean.TRUE.equals(profile.getIsDataVerified())
                         ? AttestationStatus.APPROVED
                         : AttestationStatus.NEW);
+    }
+
+    private AttestationApplication selectLatestByUpdate(AttestationApplication left, AttestationApplication right) {
+        if (left.getUpdatedAt() == null) {
+            return right;
+        }
+        if (right.getUpdatedAt() == null) {
+            return left;
+        }
+        return left.getUpdatedAt().isAfter(right.getUpdatedAt()) ? left : right;
     }
 
     private String normalize(String value) {

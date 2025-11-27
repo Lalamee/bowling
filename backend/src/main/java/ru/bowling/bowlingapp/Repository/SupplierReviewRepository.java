@@ -12,4 +12,6 @@ public interface SupplierReviewRepository extends JpaRepository<SupplierReview, 
     List<SupplierReview> findByPurchaseOrder_OrderId(Long orderId);
 
     List<SupplierReview> findByPurchaseOrder_OrderIdIn(Collection<Long> orderIds);
+
+    List<SupplierReview> findBySupplierId(Long supplierId);
 }

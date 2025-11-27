@@ -1,11 +1,14 @@
 package ru.bowling.bowlingapp.Entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.*;
 
 @Entity
 @Table(name = "club_invitations")
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ClubInvitation {
 
     @Id
