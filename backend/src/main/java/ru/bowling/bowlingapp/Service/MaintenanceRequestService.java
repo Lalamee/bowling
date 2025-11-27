@@ -13,16 +13,8 @@ import ru.bowling.bowlingapp.DTO.StockIssueDecisionDTO;
 import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Entity.enums.MaintenanceRequestStatus;
 import ru.bowling.bowlingapp.Entity.enums.PartStatus;
-import ru.bowling.bowlingapp.Repository.BowlingClubRepository;
-import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
-import ru.bowling.bowlingapp.Repository.MaintenanceRequestRepository;
-import ru.bowling.bowlingapp.Repository.MechanicProfileRepository;
-import ru.bowling.bowlingapp.Repository.ManagerProfileRepository;
-import ru.bowling.bowlingapp.Repository.PersonalWarehouseRepository;
-import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
-import ru.bowling.bowlingapp.Repository.RequestPartRepository;
-import ru.bowling.bowlingapp.Repository.UserRepository;
-import ru.bowling.bowlingapp.Repository.WarehouseInventoryRepository;
+import ru.bowling.bowlingapp.Enum.AccountTypeName;
+import ru.bowling.bowlingapp.Repository.*;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -53,6 +45,8 @@ public class MaintenanceRequestService {
         private final NotificationService notificationService;
         private final WarehouseInventoryRepository warehouseInventoryRepository;
         private final PersonalWarehouseRepository personalWarehouseRepository;
+        private final ClubInvitationRepository clubInvitationRepository;
+        private final UserClubAccessService userClubAccessService;
 
         @Transactional
         public MaintenanceRequestResponseDTO createPartRequest(PartRequestDTO requestDTO) {
@@ -69,7 +63,21 @@ public class MaintenanceRequestService {
                                 .orElseThrow(() -> new IllegalArgumentException("Club not found"));
 
                 MechanicProfile mechanicProfile = mechanic.get();
-                if (!mechanicWorksInClub(mechanicProfile, club.getClubId())) {
+                User mechanicUser = mechanicProfile.getUser();
+                AccountTypeName accountTypeName = mechanicUser != null && mechanicUser.getAccountType() != null
+                        ? AccountTypeName.from(mechanicUser.getAccountType().getName())
+                        : AccountTypeName.INDIVIDUAL;
+
+                if ((accountTypeName == AccountTypeName.FREE_MECHANIC_BASIC || accountTypeName == AccountTypeName.FREE_MECHANIC_PREMIUM)
+                        && !mechanicWorksInClub(mechanicProfile, club.getClubId())) {
+                        throw new IllegalArgumentException("Free mechanic has no granted access to the specified club");
+                }
+
+                if (accountTypeName == AccountTypeName.FREE_MECHANIC_BASIC) {
+                        throw new IllegalStateException("Basic free mechanics cannot create maintenance requests without upgrade");
+                }
+
+                if (accountTypeName == AccountTypeName.INDIVIDUAL && !mechanicWorksInClub(mechanicProfile, club.getClubId())) {
                         throw new IllegalArgumentException("Mechanic is not assigned to the specified club");
                 }
 
@@ -227,17 +235,7 @@ public class MaintenanceRequestService {
                 }
 
                 User mechanicUser = mechanicProfile.getUser();
-                if (mechanicUser != null && mechanicUser.getUserId() != null
-                                && clubStaffRepository.existsByClubClubIdAndUserUserIdAndIsActiveTrue(clubId, mechanicUser.getUserId())) {
-                        return true;
-                }
-
-                return Optional.ofNullable(mechanicProfile.getClubs())
-                                .orElse(List.of())
-                                .stream()
-                                .map(BowlingClub::getClubId)
-                                .filter(Objects::nonNull)
-                                .anyMatch(id -> id.equals(clubId));
+                return mechanicUser != null && userClubAccessService.hasClubAccess(mechanicUser, clubId);
         }
 
         private boolean userHasAccessToClub(User user, BowlingClub club) {
@@ -249,27 +247,13 @@ public class MaintenanceRequestService {
                         return true;
                 }
 
-                OwnerProfile owner = club.getOwner();
-                if (owner != null && owner.getUser() != null && Objects.equals(owner.getUser().getUserId(), user.getUserId())) {
-                        return true;
-                }
-
-                if (clubStaffRepository.existsByClubAndUserAndIsActiveTrue(club, user)) {
-                        return true;
-                }
-
-                if (hasActiveManagerAccess(user, club)) {
+                if (userClubAccessService.hasClubAccess(user, club.getClubId())) {
                         return true;
                 }
 
                 AdministratorProfile administratorProfile = user.getAdministratorProfile();
                 if (administratorProfile != null && administratorProfile.getClub() != null
                                 && Objects.equals(administratorProfile.getClub().getClubId(), club.getClubId())) {
-                        return true;
-                }
-
-                MechanicProfile mechanicProfile = user.getMechanicProfile();
-                if (mechanicProfile != null && mechanicWorksInClub(mechanicProfile, club.getClubId())) {
                         return true;
                 }
 
@@ -282,31 +266,6 @@ public class MaintenanceRequestService {
                 }
                 String roleName = user.getRole().getName().toUpperCase(Locale.ROOT);
                 return roleName.contains("ADMIN");
-        }
-
-        private boolean hasActiveManagerAccess(User user, BowlingClub club) {
-                if (user == null || club == null) {
-                        return false;
-                }
-
-                ManagerProfile managerProfile = user.getManagerProfile();
-                if (managerProfile == null || managerProfile.getClub() == null) {
-                        return false;
-                }
-
-                if (!Boolean.TRUE.equals(user.getIsVerified())) {
-                        return false;
-                }
-
-                if (!Boolean.TRUE.equals(managerProfile.getIsDataVerified())) {
-                        return false;
-                }
-
-                if (!Objects.equals(managerProfile.getClub().getClubId(), club.getClubId())) {
-                        return false;
-                }
-
-                return clubStaffRepository.existsByClubAndUserAndIsActiveTrue(club, user);
         }
 
         private User findUserByLogin(String login) {

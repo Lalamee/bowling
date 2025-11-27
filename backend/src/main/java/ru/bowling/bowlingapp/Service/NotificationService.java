@@ -31,6 +31,21 @@ public class NotificationService {
                 .collect(Collectors.toList());
     }
 
+    public List<NotificationEvent> getNotificationsForUser(User user, List<Long> accessibleClubIds) {
+        if (user == null || user.getRole() == null) {
+            return List.of();
+        }
+        RoleName role = RoleName.from(user.getRole().getName());
+        Long mechanicProfileId = user.getMechanicProfile() != null ? user.getMechanicProfile().getProfileId() : null;
+        List<Long> clubs = accessibleClubIds != null ? accessibleClubIds : List.of();
+
+        return notifications.stream()
+                .filter(event -> event.getAudiences() != null && event.getAudiences().contains(role))
+                .filter(event -> event.getClubId() == null || clubs.contains(event.getClubId()))
+                .filter(event -> event.getMechanicId() == null || Objects.equals(event.getMechanicId(), mechanicProfileId))
+                .collect(Collectors.toList());
+    }
+
     public void clearNotifications() {
         notifications.clear();
     }

@@ -151,6 +151,7 @@ public class AuthService implements UserDetailsService {
         AdministratorProfile administratorProfile = null;
 
         if (isMechanicAccount(accountTypeName)) {
+            AccountTypeName mechanicAccountType = accountTypeName;
             mechanicProfile = MechanicProfile.builder()
                     .user(user)
                     .fullName(mechanicDto.getFullName())
@@ -159,7 +160,7 @@ public class AuthService implements UserDetailsService {
                     .educationalInstitution(mechanicDto.getEducationalInstitution())
                     .totalExperienceYears(mechanicDto.getTotalExperienceYears())
                     .bowlingExperienceYears(mechanicDto.getBowlingExperienceYears())
-                    .isEntrepreneur(mechanicDto.getIsEntrepreneur())
+                    .isEntrepreneur(Boolean.TRUE.equals(mechanicDto.getIsEntrepreneur()))
                     .specializationId(mechanicDto.getSpecializationId())
                     .skills(mechanicDto.getSkills())
                     .advantages(mechanicDto.getAdvantages())
@@ -170,7 +171,7 @@ public class AuthService implements UserDetailsService {
                     .build();
             applyCertifications(mechanicProfile, mechanicDto.getCertifications());
             applyWorkHistory(mechanicProfile, mechanicDto.getWorkHistory());
-            if (isClubMechanic(accountTypeName)) {
+            if (isClubMechanic(mechanicAccountType)) {
                 mechanicClub = bowlingClubRepository.findById(mechanicDto.getClubId())
                         .orElseThrow(() -> new IllegalArgumentException("Selected club not found"));
                 mechanicProfile.setClubs(new ArrayList<>(Collections.singletonList(mechanicClub)));
@@ -257,7 +258,7 @@ public class AuthService implements UserDetailsService {
                             .club(finalMechanicClub)
                             .user(user)
                             .assignedAt(LocalDateTime.now())
-                            .isActive(false)
+                            .isActive(true)
                             .build());
             clubStaff.setRole(user.getRole());
             if (clubStaff.getAssignedAt() == null) {
@@ -348,6 +349,9 @@ public class AuthService implements UserDetailsService {
             }
             if (isFreeMechanic(accountTypeName) && mechanicDto.getClubId() != null) {
                 throw new IllegalArgumentException("Free mechanics cannot be attached to a club during registration");
+            }
+            if (isFreeMechanic(accountTypeName) && mechanicDto.getIsEntrepreneur() == null) {
+                throw new IllegalArgumentException("Self-employment flag is required for free mechanics");
             }
         } else if (isManagerAccount(accountTypeName)) {
             if (managerDto == null) {
