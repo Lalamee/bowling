@@ -17,6 +17,7 @@ class Routes {
   static const personalWarehouse = '/warehouses/personal';
   static const warehouseSelector = '/warehouses';
   static const clubLanes = '/clubs/lanes';
+  static const ownerDashboard = '/clubs/dashboard';
 
   static const profileMechanic = '/profile/mechanic';
   static const editMechanicProfile = '/profile/mechanic/edit';

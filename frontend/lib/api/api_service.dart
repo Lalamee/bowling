@@ -31,6 +31,10 @@ import '../models/purchase_order_acceptance_request_dto.dart';
 import '../models/supplier_review_request_dto.dart';
 import '../models/supplier_complaint_request_dto.dart';
 import '../models/supplier_complaint_status_update_dto.dart';
+import '../models/technical_info_dto.dart';
+import '../models/service_journal_entry_dto.dart';
+import '../models/warning_dto.dart';
+import '../models/notification_event_dto.dart';
 import '../models/help_request_dto.dart';
 import '../models/admin_help_request_dto.dart';
 
@@ -460,6 +464,63 @@ class ApiService {
     final response = await _dio.get('/api/service-history/club/$clubId');
     return (response.data as List)
         .map((e) => ServiceHistoryDto.fromJson(e))
+        .toList();
+  }
+
+  // ============================================
+  // OWNER/MANAGER DASHBOARD ENDPOINTS
+  // ============================================
+
+  Future<List<TechnicalInfoDto>> getTechnicalInfo({int? clubId}) async {
+    final response = await _dio.get(
+      '/api/owner-dashboard/technical-info',
+      queryParameters: clubId != null ? {'clubId': clubId} : null,
+    );
+    return (response.data as List)
+        .map((e) => TechnicalInfoDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<List<ServiceJournalEntryDto>> getServiceJournal({
+    int? clubId,
+    int? laneNumber,
+    DateTime? start,
+    DateTime? end,
+    String? workType,
+    String? status,
+  }) async {
+    final params = <String, dynamic>{};
+    if (clubId != null) params['clubId'] = clubId;
+    if (laneNumber != null) params['laneNumber'] = laneNumber;
+    if (start != null) params['start'] = start.toIso8601String();
+    if (end != null) params['end'] = end.toIso8601String();
+    if (workType != null && workType.isNotEmpty) params['workType'] = workType;
+    if (status != null && status.isNotEmpty) params['status'] = status;
+
+    final response = await _dio.get('/api/owner-dashboard/service-history', queryParameters: params);
+    return (response.data as List)
+        .map((e) => ServiceJournalEntryDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<List<WarningDto>> getWarnings({int? clubId}) async {
+    final response = await _dio.get(
+      '/api/owner-dashboard/warnings',
+      queryParameters: clubId != null ? {'clubId': clubId} : null,
+    );
+    return (response.data as List)
+        .map((e) => WarningDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<List<NotificationEventDto>> getManagerNotifications({int? clubId, String? role}) async {
+    final params = <String, dynamic>{};
+    if (clubId != null) params['clubId'] = clubId;
+    if (role != null && role.isNotEmpty) params['role'] = role;
+
+    final response = await _dio.get('/api/owner-dashboard/notifications', queryParameters: params);
+    return (response.data as List)
+        .map((e) => NotificationEventDto.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
   }
 

@@ -32,6 +32,7 @@ import '../../features/clubs/presentation/screens/club_screen.dart';
 import '../../features/clubs/presentation/screens/club_search_screen.dart';
 import '../../features/clubs/presentation/screens/club_warehouse_screen.dart';
 import '../../features/clubs/presentation/screens/club_lanes_screen.dart';
+import '../../features/clubs/presentation/screens/owner_dashboard_screen.dart';
 import '../../features/clubs/presentation/screens/club_staff_screen.dart';
 import '../../features/clubs/presentation/screens/warehouse_selector_screen.dart';
 import '../../features/warehouse/presentation/personal_warehouse_screen.dart';
@@ -146,6 +147,17 @@ class AppRouter {
             lanesCount: args.lanesCount,
           ),
         );
+      case Routes.ownerDashboard:
+        int? clubId;
+        final args = settings.arguments;
+        if (args is int) {
+          clubId = args;
+        } else if (args is Map) {
+          final map = Map<String, dynamic>.from(args as Map);
+          final val = map['clubId'];
+          if (val is num) clubId = val.toInt();
+        }
+        return MaterialPageRoute(builder: (_) => OwnerDashboardScreen(initialClubId: clubId));
       case Routes.clubStaff:
         return MaterialPageRoute(builder: (_) => const ClubStaffScreen());
 
