@@ -73,6 +73,9 @@ class PurchaseOrderPartDto {
   final String? status;
   final String? rejectionReason;
   final String? acceptanceComment;
+  final int? warehouseId;
+  final int? inventoryId;
+  final String? inventoryLocation;
 
   PurchaseOrderPartDto({
     required this.partId,
@@ -83,6 +86,9 @@ class PurchaseOrderPartDto {
     this.status,
     this.rejectionReason,
     this.acceptanceComment,
+    this.warehouseId,
+    this.inventoryId,
+    this.inventoryLocation,
   });
 
   factory PurchaseOrderPartDto.fromJson(Map<String, dynamic> json) {
@@ -95,6 +101,9 @@ class PurchaseOrderPartDto {
       status: json['status']?.toString(),
       rejectionReason: json['rejectionReason'] as String?,
       acceptanceComment: json['acceptanceComment'] as String?,
+      warehouseId: (json['warehouseId'] as num?)?.toInt(),
+      inventoryId: (json['inventoryId'] as num?)?.toInt(),
+      inventoryLocation: json['inventoryLocation'] as String?,
     );
   }
 }

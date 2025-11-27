@@ -4,6 +4,7 @@ class PartsSearchDto {
   String? catalogNumber;
   bool? isUnique;
   String? equipmentType;
+  String? categoryCode;
   int page;
   int size;
   String sortBy;
@@ -15,6 +16,7 @@ class PartsSearchDto {
     this.catalogNumber,
     this.isUnique,
     this.equipmentType,
+    this.categoryCode,
     this.page = 0,
     this.size = 20,
     this.sortBy = 'catalogId',
@@ -27,6 +29,7 @@ class PartsSearchDto {
         'catalogNumber': catalogNumber,
         'isUnique': isUnique,
         'equipmentType': equipmentType,
+        'categoryCode': categoryCode,
         'page': page,
         'size': size,
         'sortBy': sortBy,
