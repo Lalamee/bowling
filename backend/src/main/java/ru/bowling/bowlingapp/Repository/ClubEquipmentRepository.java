@@ -6,4 +6,5 @@ import ru.bowling.bowlingapp.Entity.ClubEquipment;
 
 @Repository
 public interface ClubEquipmentRepository extends JpaRepository<ClubEquipment, Long> {
+    java.util.List<ClubEquipment> findByClubClubId(Long clubId);
 }

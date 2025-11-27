@@ -8,6 +8,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import ru.bowling.bowlingapp.DTO.AddRequestPartsDTO;
 import ru.bowling.bowlingapp.DTO.ApproveRejectRequestDTO;
+import ru.bowling.bowlingapp.DTO.HelpRequestDTO;
+import ru.bowling.bowlingapp.DTO.HelpResponseDTO;
 import ru.bowling.bowlingapp.DTO.MaintenanceRequestResponseDTO;
 import ru.bowling.bowlingapp.DTO.PartRequestDTO;
 import ru.bowling.bowlingapp.DTO.StandardResponseDTO;
@@ -157,6 +159,22 @@ public class MaintenanceController {
                                         .body(StandardResponseDTO.builder().status("error").message("At least one part is required").build());
                 }
                 MaintenanceRequestResponseDTO response = maintenanceRequestService.addPartsToRequest(id, request.getRequestedParts());
+                return ResponseEntity.ok(response);
+        }
+
+        @PostMapping("/requests/{id}/help")
+        public ResponseEntity<MaintenanceRequestResponseDTO> requestHelp(
+                        @PathVariable("id") Long id,
+                        @RequestBody HelpRequestDTO helpRequestDTO) {
+                MaintenanceRequestResponseDTO response = maintenanceRequestService.requestHelp(id, helpRequestDTO);
+                return ResponseEntity.ok(response);
+        }
+
+        @PostMapping("/requests/{id}/help/decision")
+        public ResponseEntity<MaintenanceRequestResponseDTO> resolveHelp(
+                        @PathVariable("id") Long id,
+                        @RequestBody HelpResponseDTO helpResponseDTO) {
+                MaintenanceRequestResponseDTO response = maintenanceRequestService.resolveHelpRequest(id, helpResponseDTO);
                 return ResponseEntity.ok(response);
         }
 }
