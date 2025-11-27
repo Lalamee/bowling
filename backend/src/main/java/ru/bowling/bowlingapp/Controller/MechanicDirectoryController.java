@@ -5,6 +5,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.bowling.bowlingapp.DTO.MechanicDirectoryDetailDTO;
 import ru.bowling.bowlingapp.DTO.MechanicDirectorySummaryDTO;
+import ru.bowling.bowlingapp.DTO.SpecialistCardDTO;
+import ru.bowling.bowlingapp.Entity.enums.MechanicGrade;
 import ru.bowling.bowlingapp.Service.MechanicDirectoryService;
 
 import java.util.List;
@@ -23,6 +25,16 @@ public class MechanicDirectoryController {
             @RequestParam(name = "certification", required = false) String certification
     ) {
         return ResponseEntity.ok(mechanicDirectoryService.searchMechanics(query, region, certification));
+    }
+
+    @GetMapping("/specialists")
+    public ResponseEntity<List<SpecialistCardDTO>> specialistBase(
+            @RequestParam(name = "region", required = false) String region,
+            @RequestParam(name = "specializationId", required = false) Integer specializationId,
+            @RequestParam(name = "grade", required = false) MechanicGrade grade,
+            @RequestParam(name = "minRating", required = false) Double minRating
+    ) {
+        return ResponseEntity.ok(mechanicDirectoryService.getSpecialistBase(region, specializationId, grade, minRating));
     }
 
     @GetMapping("/{profileId}")
