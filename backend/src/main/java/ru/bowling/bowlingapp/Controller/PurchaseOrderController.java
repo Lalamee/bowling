@@ -10,6 +10,7 @@ import ru.bowling.bowlingapp.DTO.PurchaseOrderAcceptanceRequestDTO;
 import ru.bowling.bowlingapp.DTO.PurchaseOrderDetailDTO;
 import ru.bowling.bowlingapp.DTO.PurchaseOrderSummaryDTO;
 import ru.bowling.bowlingapp.DTO.SupplierComplaintRequestDTO;
+import ru.bowling.bowlingapp.DTO.SupplierComplaintStatusUpdateDTO;
 import ru.bowling.bowlingapp.DTO.SupplierReviewRequestDTO;
 import ru.bowling.bowlingapp.Entity.enums.PurchaseOrderStatus;
 import ru.bowling.bowlingapp.Security.UserPrincipal;
@@ -64,5 +65,13 @@ public class PurchaseOrderController {
                                                                   @AuthenticationPrincipal UserPrincipal principal) {
         Long userId = principal != null ? principal.getId() : null;
         return ResponseEntity.ok(purchaseOrderService.submitComplaint(orderId, request, userId));
+    }
+
+    @PatchMapping("/{orderId}/complaints/{reviewId}")
+    @PreAuthorize("hasAnyRole('ADMIN','OWNER','CLUB_OWNER','MANAGER','HEAD_MECHANIC','STAFF')")
+    public ResponseEntity<PurchaseOrderDetailDTO> updateComplaintStatus(@PathVariable Long orderId,
+                                                                        @PathVariable Long reviewId,
+                                                                        @Valid @RequestBody SupplierComplaintStatusUpdateDTO request) {
+        return ResponseEntity.ok(purchaseOrderService.updateComplaintStatus(orderId, reviewId, request));
     }
 }

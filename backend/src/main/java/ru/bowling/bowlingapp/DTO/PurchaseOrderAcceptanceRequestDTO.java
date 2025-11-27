@@ -21,6 +21,19 @@ public class PurchaseOrderAcceptanceRequestDTO {
     @Valid
     private List<PartAcceptanceDTO> parts;
 
+    @NotBlank
+    private String supplierInn;
+
+    private String supplierName;
+
+    private String supplierContactPerson;
+
+    private String supplierPhone;
+
+    private String supplierEmail;
+
+    private Boolean supplierVerified;
+
     @Data
     @Builder
     @NoArgsConstructor
@@ -36,5 +49,13 @@ public class PurchaseOrderAcceptanceRequestDTO {
         private Integer acceptedQuantity;
 
         private String comment;
+
+        private String storageLocation;
+
+        private String shelfCode;
+
+        private String cellCode;
+
+        private String placementNotes;
     }
 }
