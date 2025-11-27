@@ -178,6 +178,15 @@ class _ClubScreenState extends State<ClubScreen> {
     }
   }
 
+  void _openOwnerDashboard() {
+    final selected = _selectedIndex != null ? _clubs[_selectedIndex!] : null;
+    if (selected == null) {
+      showSnack(context, 'Выберите клуб');
+      return;
+    }
+    Navigator.pushNamed(context, Routes.ownerDashboard, arguments: selected.id);
+  }
+
   int? _parseLaneCount(String? raw) {
     if (raw == null) return null;
     final trimmed = raw.trim();
@@ -260,6 +269,10 @@ class _ClubScreenState extends State<ClubScreen> {
         const SizedBox(height: 16),
         if (selectedClub != null) _ClubDetailsCard(club: selectedClub),
         const SizedBox(height: 20),
+        if (_scope?.role == 'owner' || _scope?.role == 'manager' || _scope?.role == 'admin') ...[
+          CustomButton(text: 'Техинформация и ТО', onPressed: _openOwnerDashboard),
+          const SizedBox(height: 12),
+        ],
         CustomButton(text: 'Дорожки и ТО', onPressed: _openLanesOverview),
         const SizedBox(height: 12),
         CustomButton(text: 'Добавить деталь в заказ', onPressed: _openAddPartFlow),
