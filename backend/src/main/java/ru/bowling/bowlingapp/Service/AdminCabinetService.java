@@ -162,17 +162,18 @@ public class AdminCabinetService {
 
         BowlingClub club = bowlingClubRepository.findById(request.getClubId())
                 .orElseThrow(() -> new IllegalArgumentException("Club not found"));
+        Long clubId = club.getClubId();
 
         List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs()).orElseGet(ArrayList::new);
         if (request.isAttach()) {
-            if (clubs.stream().noneMatch(c -> Objects.equals(c.getClubId(), club.getClubId()))) {
+            if (clubs.stream().noneMatch(c -> Objects.equals(c.getClubId(), clubId))) {
                 clubs.add(club);
                 profile.setClubs(clubs);
             }
             upsertStaff(user, club);
         } else {
             profile.setClubs(clubs.stream()
-                    .filter(c -> !Objects.equals(c.getClubId(), club.getClubId()))
+                    .filter(c -> !Objects.equals(c.getClubId(), clubId))
                     .toList());
             clubStaffRepository.findByClubAndUser(club, user).ifPresent(staff -> {
                 staff.setIsActive(false);
@@ -258,7 +259,7 @@ public class AdminCabinetService {
 
     private AttestationApplicationDTO toAttestationDto(AttestationApplication application) {
         return AttestationApplicationDTO.builder()
-                .applicationId(application.getApplicationId())
+                .id(application.getApplicationId())
                 .userId(application.getUser() != null ? application.getUser().getUserId() : null)
                 .mechanicProfileId(application.getMechanicProfile() != null ? application.getMechanicProfile().getProfileId() : null)
                 .status(application.getStatus())
