@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/repositories/user_repository.dart';
+import '../../../core/repositories/specialists_repository.dart';
 import '../../../core/services/authz/acl.dart';
+import '../../../core/services/local_auth_storage.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/utils/net_ui.dart';
 import '../../../models/maintenance_request_response_dto.dart';
+import '../../../models/mechanic_directory_models.dart';
 import '../notifications/notifications_badge_controller.dart';
 
 class NotificationsPage extends StatefulWidget {
@@ -18,11 +21,16 @@ class NotificationsPage extends StatefulWidget {
 class _NotificationsPageState extends State<NotificationsPage> {
   final _badgeController = NotificationsBadgeController();
   final _userRepository = UserRepository();
+  final _specialistsRepository = SpecialistsRepository();
   final _dateFormatter = DateFormat('dd.MM.yyyy HH:mm');
 
   UserAccessScope? _scope;
   bool _loading = true;
   bool _error = false;
+  bool _loadingMechanicEvents = false;
+  bool _isMechanic = false;
+  bool _isFreeMechanic = false;
+  List<_MechanicEvent> _mechanicEvents = const [];
 
   @override
   void initState() {
@@ -38,18 +46,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
     try {
       final me = await _userRepository.me();
       final scope = await UserAccessScope.fromProfile(me);
-      if (scope.role != 'manager' && scope.role != 'owner' && scope.role != 'admin') {
-        if (!mounted) return;
-        setState(() {
-          _scope = scope;
-          _loading = false;
-        });
-        return;
-      }
       await _badgeController.ensureInitialized(scope);
+      List<_MechanicEvent> mechanicEvents = _mechanicEvents;
+      bool isMechanic = scope.role == 'mechanic';
+      bool isFreeMechanic = scope.isFreeMechanic;
+      if (isMechanic) {
+        mechanicEvents = await _loadMechanicEvents(scope);
+      }
       if (!mounted) return;
       setState(() {
         _scope = scope;
+        _isMechanic = isMechanic;
+        _isFreeMechanic = isFreeMechanic;
+        _mechanicEvents = mechanicEvents;
         _loading = false;
       });
     } catch (e) {
@@ -64,6 +73,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   Future<void> _refresh() async {
     await _badgeController.refresh();
+    if (_scope != null && _scope!.role == 'mechanic') {
+      _mechanicEvents = await _loadMechanicEvents(_scope!);
+    }
     if (mounted) {
       setState(() {});
     }
@@ -131,17 +143,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
       );
     }
 
-    if (scope == null || (scope.role != 'manager' && scope.role != 'owner' && scope.role != 'admin')) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24),
-          child: Text(
-            'Оповещения доступны только для менеджеров, владельцев клубов и Администрации',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.darkGray),
-          ),
-        ),
-      );
+    if (scope == null) {
+      return const Center(child: Text('Нет данных профиля'));
     }
 
     return AnimatedBuilder(
@@ -149,55 +152,34 @@ class _NotificationsPageState extends State<NotificationsPage> {
       builder: (context, _) {
         final items = _badgeController.newOrders;
 
-        if (items.isEmpty) {
-          return RefreshIndicator(
-            onRefresh: _refresh,
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-              children: const [
-                SizedBox(height: 120),
-                Center(
-                  child: Text(
-                    'Новых оповещений нет',
-                    style: TextStyle(color: AppColors.darkGray, fontSize: 16),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
+        final hasOrders = items.isNotEmpty;
 
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _markAsRead,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        return RefreshIndicator(
+          onRefresh: _refresh,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
+              if (_isMechanic) _buildMechanicEventBlock(),
+              if (hasOrders) ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0, top: 8),
+                  child: ElevatedButton(
+                    onPressed: _markAsRead,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Отметить все как прочитано'),
                   ),
-                  child: const Text('Отметить все как прочитано'),
                 ),
-              ),
-            ),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _refresh,
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (_, index) {
-                    final order = items[index];
-                    final updatedAt = _resolveUpdatedAt(order);
-                    final subtitle = _buildSubtitle(order, updatedAt);
-                    return Container(
+                ...items.map((order) {
+                  final updatedAt = _resolveUpdatedAt(order);
+                  final subtitle = _buildSubtitle(order, updatedAt);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
@@ -222,14 +204,171 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                 style: const TextStyle(fontSize: 13, color: AppColors.darkGray),
                               ),
                       ),
-                    );
-                  },
+                    ),
+                  );
+                }),
+              ],
+              if (!hasOrders && _mechanicEvents.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 48.0),
+                  child: Center(
+                    child: Text(
+                      _isMechanic
+                          ? 'Пока нет новых оповещений по заявкам и заявкам на аттестацию'
+                          : 'Новых оповещений нет',
+                      style: const TextStyle(color: AppColors.darkGray, fontSize: 16),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ],
+            ],
+          ),
         );
       },
+    );
+  }
+
+  Future<List<_MechanicEvent>> _loadMechanicEvents(UserAccessScope scope) async {
+    try {
+      setState(() => _loadingMechanicEvents = true);
+      final events = <_MechanicEvent>[];
+      final applications = await _specialistsRepository.getAttestationApplications();
+      final profileId = scope.mechanicProfileId;
+      final userId = scope.userId;
+      for (final app in applications) {
+        final matchesProfile = profileId != null && app.mechanicProfileId != null && app.mechanicProfileId == profileId;
+        final matchesUser = userId != null && app.userId != null && app.userId == userId;
+        if (matchesProfile || matchesUser) {
+          events.add(_MechanicEvent(
+            title: 'Аттестация: ${_statusLabel(app.status)}',
+            description: app.comment ?? 'Заявленный грейд: ${app.requestedGrade?.toApiValue() ?? '-'}',
+            createdAt: app.updatedAt ?? app.submittedAt,
+          ));
+        }
+      }
+
+      final registration = await LocalAuthStorage.loadMechanicApplication();
+      if (registration != null) {
+        final status = registration['status']?.toString();
+        final comment = registration['comment']?.toString();
+        final accountType = registration['accountType']?.toString();
+        if (status != null && status.isNotEmpty) {
+          events.add(_MechanicEvent(
+            title: 'Регистрация: $status',
+            description: comment?.isNotEmpty == true
+                ? comment
+                : (accountType != null && accountType.isNotEmpty
+                    ? 'Тип аккаунта: $accountType'
+                    : 'Заявка на регистрацию обработана'),
+            createdAt: DateTime.now(),
+          ));
+        }
+      }
+
+      events.sort((a, b) {
+        final aDate = a.createdAt;
+        final bDate = b.createdAt;
+        if (aDate == null && bDate == null) return 0;
+        if (aDate == null) return 1;
+        if (bDate == null) return -1;
+        return bDate.compareTo(aDate);
+      });
+      return events;
+    } finally {
+      if (mounted) {
+        setState(() => _loadingMechanicEvents = false);
+      }
+    }
+  }
+
+  String _statusLabel(AttestationDecisionStatus? status) {
+    switch (status) {
+      case AttestationDecisionStatus.approved:
+        return 'Одобрена';
+      case AttestationDecisionStatus.rejected:
+        return 'Отклонена';
+      case AttestationDecisionStatus.pending:
+      default:
+        return 'На рассмотрении';
+    }
+  }
+
+  Widget _buildMechanicEventBlock() {
+    if (_loadingMechanicEvents) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_mechanicEvents.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.lightGray),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _isFreeMechanic ? 'Кабинет свободного механика' : 'Оповещения механика',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Новых решений по регистрации и аттестации нет',
+              style: TextStyle(color: AppColors.darkGray),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _isFreeMechanic ? 'Клубы и доступы' : 'Оповещения механика',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
+          ),
+          const SizedBox(height: 10),
+          ..._mechanicEvents.map((event) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(event.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    if (event.description != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(event.description!, style: const TextStyle(color: AppColors.darkGray)),
+                      ),
+                    if (event.createdAt != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          _dateFormatter.format(event.createdAt!),
+                          style: const TextStyle(color: AppColors.darkGray, fontSize: 12),
+                        ),
+                      ),
+                  ],
+                ),
+              )),
+        ],
+      ),
     );
   }
 
@@ -271,4 +410,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     return latest;
   }
+}
+
+class _MechanicEvent {
+  final String title;
+  final String? description;
+  final DateTime? createdAt;
+
+  const _MechanicEvent({required this.title, this.description, this.createdAt});
 }

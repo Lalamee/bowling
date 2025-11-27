@@ -623,6 +623,47 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                     ),
                     const SizedBox(height: 10),
                     if (_isFreeMechanic)
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.lightGray),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Клубы и доступы',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
+                            ),
+                            const SizedBox(height: 6),
+                            if (profile.clubs.isEmpty)
+                              const Text(
+                                'Временные доступы к клубам отсутствуют. Доступ появится после приглашения от клуба или менеджера.',
+                                style: TextStyle(color: AppColors.darkGray, fontSize: 13),
+                              )
+                            else
+                              ...profile.clubs.map((club) => Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.lock_clock_rounded, size: 18, color: AppColors.primary),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            club,
+                                            style: const TextStyle(fontSize: 14, color: AppColors.textDark),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )),
+                          ],
+                        ),
+                      ),
+                    if (_isFreeMechanic) const SizedBox(height: 10),
+                    if (_isFreeMechanic)
                       ProfileTile(
                         icon: Icons.warehouse_outlined,
                         text: 'Личный ZIP-склад',

@@ -10,21 +10,37 @@ class UserAccessScope {
   final Set<int> accessibleClubIds;
   final int? userId;
   final bool hasPremiumAccess;
+  final String? accountTypeName;
+  final int? mechanicProfileId;
 
   const UserAccessScope({
     required this.role,
     required this.accessibleClubIds,
     this.userId,
+    this.accountTypeName,
+    this.mechanicProfileId,
     this.hasPremiumAccess = false,
   });
 
   bool get isAdmin => role == 'admin';
+  bool get isMechanic => role == 'mechanic';
+  bool get isFreeMechanic =>
+      isMechanic && (accountTypeName?.toUpperCase().contains('FREE_MECHANIC') ?? false);
 
   String get storageKeySuffix => (userId ?? role).toString();
 
   bool canViewOrder(MaintenanceRequestResponseDto order) {
     if (isAdmin) return true;
     final clubId = order.clubId;
+    if (isMechanic) {
+      if (mechanicProfileId != null && order.mechanicId != null &&
+          order.mechanicId == mechanicProfileId) {
+        return true;
+      }
+      if (userId != null && order.mechanicId != null && order.mechanicId == userId) {
+        return true;
+      }
+    }
     if (clubId == null) return false;
     return accessibleClubIds.contains(clubId);
   }
@@ -41,17 +57,27 @@ class UserAccessScope {
 
   bool canActOnClubId(int? clubId) => canViewClubId(clubId);
 
-  UserAccessScope copyWith({String? role, Set<int>? accessibleClubIds, int? userId, bool? hasPremiumAccess}) {
+  UserAccessScope copyWith({
+    String? role,
+    Set<int>? accessibleClubIds,
+    int? userId,
+    bool? hasPremiumAccess,
+    String? accountTypeName,
+    int? mechanicProfileId,
+  }) {
     return UserAccessScope(
       role: role ?? this.role,
       accessibleClubIds: accessibleClubIds ?? this.accessibleClubIds,
       userId: userId ?? this.userId,
+      accountTypeName: accountTypeName ?? this.accountTypeName,
+      mechanicProfileId: mechanicProfileId ?? this.mechanicProfileId,
       hasPremiumAccess: hasPremiumAccess ?? this.hasPremiumAccess,
     );
   }
 
   static Future<UserAccessScope> fromProfile(Map<String, dynamic> profile) async {
     final resolvedRole = await _resolveRole(profile);
+    final accountTypeName = _resolveAccountTypeName(profile);
     final clubs = resolveUserClubs(profile);
     final ids = clubs.map((e) => e.id).toSet();
 
@@ -78,11 +104,14 @@ class UserAccessScope {
     }
 
     final userId = (profile['id'] as num?)?.toInt() ?? (profile['userId'] as num?)?.toInt();
-    final hasPremium = _resolvePremiumAccess(profile, resolvedRole);
+    final mechanicProfileId = _resolveMechanicProfileId(profile);
+    final hasPremium = _resolvePremiumAccess(profile, resolvedRole, accountTypeName);
     return UserAccessScope(
       role: resolvedRole,
       accessibleClubIds: UnmodifiableSetView(ids),
       userId: userId,
+      accountTypeName: accountTypeName,
+      mechanicProfileId: mechanicProfileId,
       hasPremiumAccess: hasPremium,
     );
   }
@@ -170,12 +199,42 @@ Future<String> _resolveRole(Map<String, dynamic> me) async {
   return resolved ?? 'mechanic';
 }
 
-bool _resolvePremiumAccess(Map<String, dynamic> me, String resolvedRole) {
+String? _resolveAccountTypeName(Map<String, dynamic> me) {
+  String? accountType = me['accountTypeName']?.toString();
+  accountType ??= me['accountType']?.toString();
+  if (accountType != null && accountType.isNotEmpty) {
+    return accountType;
+  }
+  final accountTypeId = (me['accountTypeId'] as num?)?.toInt();
+  if (accountTypeId != null) {
+    switch (accountTypeId) {
+      case 1:
+        return 'INDIVIDUAL';
+      case 2:
+        return 'CLUB_OWNER';
+    }
+  }
+  return null;
+}
+
+int? _resolveMechanicProfileId(Map<String, dynamic> me) {
+  final direct = (me['mechanicProfileId'] as num?)?.toInt();
+  if (direct != null) return direct;
+  final profile = me['mechanicProfile'];
+  if (profile is Map) {
+    final map = Map<String, dynamic>.from(profile);
+    final id = (map['profileId'] as num?)?.toInt();
+    if (id != null) return id;
+  }
+  return null;
+}
+
+bool _resolvePremiumAccess(Map<String, dynamic> me, String resolvedRole, String? accountTypeName) {
   if (resolvedRole == 'admin' || resolvedRole == 'owner' || resolvedRole == 'manager') {
     return true;
   }
 
-  String? accessName = me['accountTypeName']?.toString();
+  String? accessName = accountTypeName ?? me['accountTypeName']?.toString();
   accessName ??= me['accountType']?.toString();
   final normalized = accessName?.toLowerCase().trim() ?? '';
   if (normalized.contains('premium') || normalized.contains('прем')) {
