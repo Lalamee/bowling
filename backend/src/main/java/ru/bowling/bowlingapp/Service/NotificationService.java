@@ -1,18 +1,127 @@
 package ru.bowling.bowlingapp.Service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ru.bowling.bowlingapp.DTO.NotificationEvent;
+import ru.bowling.bowlingapp.DTO.NotificationEventType;
 import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Entity.enums.WorkLogStatus;
+import ru.bowling.bowlingapp.Enum.RoleName;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class NotificationService {
+    private final CopyOnWriteArrayList<NotificationEvent> notifications = new CopyOnWriteArrayList<>();
+
+    public List<NotificationEvent> getNotificationsForRole(RoleName role) {
+        if (role == null) {
+            return List.of();
+        }
+        return notifications.stream()
+                .filter(event -> event.getAudiences() != null && event.getAudiences().contains(role))
+                .collect(Collectors.toList());
+    }
+
+    public List<NotificationEvent> getNotificationsForUser(User user, List<Long> accessibleClubIds) {
+        if (user == null || user.getRole() == null) {
+            return List.of();
+        }
+        RoleName role = RoleName.from(user.getRole().getName());
+        Long mechanicProfileId = user.getMechanicProfile() != null ? user.getMechanicProfile().getProfileId() : null;
+        List<Long> clubs = accessibleClubIds != null ? accessibleClubIds : List.of();
+
+        return notifications.stream()
+                .filter(event -> event.getAudiences() != null && event.getAudiences().contains(role))
+                .filter(event -> event.getClubId() == null || clubs.contains(event.getClubId()))
+                .filter(event -> event.getMechanicId() == null || Objects.equals(event.getMechanicId(), mechanicProfileId))
+                .collect(Collectors.toList());
+    }
+
+    public void clearNotifications() {
+        notifications.clear();
+    }
+
+    public NotificationEvent notifyHelpRequested(
+            MaintenanceRequest request,
+            List<RequestPart> parts,
+            String reason
+    ) {
+        String message = "Механик не может выполнить работы самостоятельно (запрос помощи)";
+        NotificationEvent event = buildBaseEvent(NotificationEventType.MECHANIC_HELP_REQUESTED, request, parts, reason, Set.of(RoleName.ADMIN, RoleName.HEAD_MECHANIC, RoleName.CLUB_OWNER, RoleName.MECHANIC));
+        notifications.add(event);
+        log.info("NOTIFICATION: {}. Request #{}, parts={}, reason={}", message, request != null ? request.getRequestId() : null, partIds(parts), reason);
+        return event;
+    }
+
+    public NotificationEvent notifyHelpConfirmed(MaintenanceRequest request, List<RequestPart> parts, String comment) {
+        NotificationEvent event = buildBaseEvent(NotificationEventType.MECHANIC_HELP_CONFIRMED, request, parts, comment, Set.of(RoleName.MECHANIC, RoleName.ADMIN, RoleName.HEAD_MECHANIC));
+        notifications.add(event);
+        log.info("NOTIFICATION: Запрос помощи подтвержден по заявке #{}: {}", request != null ? request.getRequestId() : null, comment);
+        return event;
+    }
+
+    public NotificationEvent notifyHelpDeclined(MaintenanceRequest request, List<RequestPart> parts, String comment) {
+        NotificationEvent event = buildBaseEvent(NotificationEventType.MECHANIC_HELP_DECLINED, request, parts, comment, Set.of(RoleName.MECHANIC, RoleName.ADMIN, RoleName.HEAD_MECHANIC));
+        notifications.add(event);
+        log.info("NOTIFICATION: Запрос помощи отклонен по заявке #{}: {}", request != null ? request.getRequestId() : null, comment);
+        return event;
+    }
+
+    public NotificationEvent notifyHelpReassigned(MaintenanceRequest request, List<RequestPart> parts, Long newMechanicId, String comment) {
+        NotificationEvent event = NotificationEvent.builder()
+                .id(UUID.randomUUID())
+                .type(NotificationEventType.MECHANIC_HELP_REASSIGNED)
+                .message("Назначен другой специалист для заявки")
+                .requestId(request != null ? request.getRequestId() : null)
+                .mechanicId(newMechanicId)
+                .partIds(partIds(parts))
+                .payload(comment)
+                .createdAt(LocalDateTime.now())
+                .clubId(request != null && request.getClub() != null ? request.getClub().getClubId() : null)
+                .audiences(Set.of(RoleName.MECHANIC, RoleName.ADMIN, RoleName.HEAD_MECHANIC))
+                .build();
+        notifications.add(event);
+        log.info("NOTIFICATION: Заявка #{} переназначена другому механику {}: {}", request != null ? request.getRequestId() : null, newMechanicId, comment);
+        return event;
+    }
+
+    private NotificationEvent buildBaseEvent(NotificationEventType type,
+                                             MaintenanceRequest request,
+                                             List<RequestPart> parts,
+                                             String payload,
+                                             Set<RoleName> audiences) {
+        return NotificationEvent.builder()
+                .id(UUID.randomUUID())
+                .type(type)
+                .message("Механик не может выполнить работы самостоятельно (запрос помощи)")
+                .requestId(request != null ? request.getRequestId() : null)
+                .mechanicId(request != null && request.getMechanic() != null ? request.getMechanic().getProfileId() : null)
+                .clubId(request != null && request.getClub() != null ? request.getClub().getClubId() : null)
+                .partIds(partIds(parts))
+                .payload(payload)
+                .createdAt(LocalDateTime.now())
+                .audiences(audiences)
+                .build();
+    }
+
+    private List<Long> partIds(List<RequestPart> parts) {
+        if (parts == null) {
+            return new ArrayList<>();
+        }
+        return parts.stream()
+                .filter(p -> p != null && p.getPartId() != null)
+                .map(RequestPart::getPartId)
+                .collect(Collectors.toList());
+    }
     public void notifyMaintenanceRequestCreated(
             MaintenanceRequest request,
             List<OwnerProfile> owners,

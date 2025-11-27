@@ -7,7 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../../api/api_core.dart';
 import '../../../../../core/debug/test_overrides.dart';
 import '../../../../../core/routing/routes.dart';
+import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/local_auth_storage.dart';
+import '../../../../../core/authz/role_access.dart';
+import '../../../../../core/authz/role_context_resolver.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -50,17 +53,31 @@ class _SplashScreenState extends State<SplashScreen> {
 
       final storedRole = await _safeAsync(() => LocalAuthStorage.getRegisteredRole(),
           timeout: const Duration(seconds: 2));
+      final storedType = await _safeAsync(() => LocalAuthStorage.getRegisteredAccountType(), timeout: const Duration(seconds: 2));
       final token = await _safeAsync(
           () => ApiCore().getAccessToken(),
           timeout: const Duration(seconds: 2));
 
       if (!mounted) return;
 
-      if (storedRole != null && storedRole.isNotEmpty && token != null && token.isNotEmpty) {
-        Navigator.pushReplacementNamed(context, _resolveRouteForRole(storedRole));
-      } else {
-        _goToWelcome();
+      if (token != null && token.isNotEmpty) {
+        RoleAccountContext? ctx = RoleContextResolver.fromStored(storedRole, storedType);
+        if (ctx == null) {
+          final info = await _safeAsync(() => AuthService.currentUser(), timeout: const Duration(seconds: 3));
+          if (info != null) {
+            ctx = RoleContextResolver.resolveFrom(info);
+            await LocalAuthStorage.setRegisteredRole(ctx.role.name);
+            await LocalAuthStorage.setRegisteredAccountType(ctx.accountType?.name);
+          }
+        }
+
+        if (ctx != null) {
+          Navigator.pushReplacementNamed(context, ctx.access.homeRoute);
+          return;
+        }
       }
+
+      _goToWelcome();
     } catch (e, s) {
       if (kDebugMode) {
         debugPrint('Splash boot failed: $e');
@@ -85,19 +102,6 @@ class _SplashScreenState extends State<SplashScreen> {
   void _goToWelcome() {
     if (!mounted) return;
     Navigator.pushReplacementNamed(context, Routes.welcome);
-  }
-
-  String _resolveRouteForRole(String role) {
-    switch (role.trim().toLowerCase()) {
-      case 'owner':
-        return Routes.profileOwner;
-      case 'manager':
-        return Routes.profileManager;
-      case 'admin':
-        return Routes.profileAdmin;
-      default:
-        return Routes.profileMechanic;
-    }
   }
 
   @override

@@ -38,6 +38,7 @@ public class WorkLogService {
     private final NotificationService notificationService;
     private final BowlingClubRepository clubRepository;
     private final ClubEquipmentRepository equipmentRepository;
+    private final UserClubAccessService userClubAccessService;
 
     @Transactional
     public WorkLog createWorkLog(WorkLogDTO dto, Long userId) {
@@ -72,7 +73,17 @@ public class WorkLogService {
         WorkLogSearchDTO criteria = Optional.ofNullable(searchDTO)
                 .orElseGet(WorkLogSearchDTO::new);
 
+        User viewer = userId != null ? userRepository.findById(userId).orElse(null) : null;
+        String viewerRole = viewer != null && viewer.getRole() != null ? viewer.getRole().getName() : null;
+        boolean isAdmin = "ADMIN".equalsIgnoreCase(viewerRole);
+        List<Long> accessibleClubIds = viewer != null ? userClubAccessService.resolveAccessibleClubIds(viewer) : List.of();
+
+        if (!isAdmin && accessibleClubIds.isEmpty()) {
+            return Page.empty();
+        }
+
         List<WorkLog> filtered = workLogRepository.findAll().stream()
+                .filter(log -> isAdmin || (log.getClub() != null && accessibleClubIds.contains(log.getClub().getClubId())))
                 .filter(log -> criteria.getClubId() == null ||
                         (log.getClub() != null && criteria.getClubId().equals(log.getClub().getClubId())))
                 .filter(log -> criteria.getLaneNumber() == null || criteria.getLaneNumber().equals(log.getLaneNumber()))
