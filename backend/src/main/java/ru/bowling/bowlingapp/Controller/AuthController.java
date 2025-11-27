@@ -15,6 +15,7 @@ import ru.bowling.bowlingapp.Config.JwtTokenProvider;
 import ru.bowling.bowlingapp.DTO.*;
 import ru.bowling.bowlingapp.Entity.User;
 import ru.bowling.bowlingapp.Service.AuthService;
+import ru.bowling.bowlingapp.Service.FreeMechanicApplicationService;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -24,6 +25,7 @@ public class AuthController {
     private final AuthService authService;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
+    private final FreeMechanicApplicationService freeMechanicApplicationService;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequestDTO request) {
@@ -36,6 +38,14 @@ public class AuthController {
         );
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(StandardResponseDTO.builder().message("User registered successfully").status("success").build());
+    }
+
+    @PostMapping("/free-mechanics/apply")
+    public ResponseEntity<FreeMechanicApplicationResponseDTO> applyForFreeMechanic(
+            @Valid @RequestBody FreeMechanicApplicationRequestDTO request
+    ) {
+        FreeMechanicApplicationResponseDTO response = freeMechanicApplicationService.submitApplication(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PostMapping("/login")

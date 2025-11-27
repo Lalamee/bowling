@@ -24,6 +24,8 @@ public interface ServiceHistoryPartRepository extends JpaRepository<ServiceHisto
 
     List<ServiceHistoryPart> findByCreatedDateBetweenOrderByCreatedDateDesc(LocalDateTime startDate, LocalDateTime endDate);
 
+    List<ServiceHistoryPart> findByServiceHistoryClubClubId(Long clubId);
+
     List<ServiceHistoryPart> findByServiceHistoryServiceIdAndCatalogNumber(Long serviceHistoryId, String catalogNumber);
     List<ServiceHistoryPart> findBySupplierIdAndWarrantyMonthsGreaterThan(Long supplierId, Integer months);
 

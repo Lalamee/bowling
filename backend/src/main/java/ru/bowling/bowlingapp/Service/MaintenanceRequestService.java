@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.DTO.ApproveRejectRequestDTO;
+import ru.bowling.bowlingapp.DTO.HelpRequestDTO;
+import ru.bowling.bowlingapp.DTO.HelpResponseDTO;
 import ru.bowling.bowlingapp.DTO.MaintenanceRequestResponseDTO;
 import ru.bowling.bowlingapp.DTO.PartRequestDTO;
 import ru.bowling.bowlingapp.DTO.ReservationRequestDto;
@@ -11,15 +13,8 @@ import ru.bowling.bowlingapp.DTO.StockIssueDecisionDTO;
 import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Entity.enums.MaintenanceRequestStatus;
 import ru.bowling.bowlingapp.Entity.enums.PartStatus;
-import ru.bowling.bowlingapp.Repository.BowlingClubRepository;
-import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
-import ru.bowling.bowlingapp.Repository.MaintenanceRequestRepository;
-import ru.bowling.bowlingapp.Repository.MechanicProfileRepository;
-import ru.bowling.bowlingapp.Repository.ManagerProfileRepository;
-import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
-import ru.bowling.bowlingapp.Repository.RequestPartRepository;
-import ru.bowling.bowlingapp.Repository.UserRepository;
-import ru.bowling.bowlingapp.Repository.WarehouseInventoryRepository;
+import ru.bowling.bowlingapp.Enum.AccountTypeName;
+import ru.bowling.bowlingapp.Repository.*;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -49,6 +44,9 @@ public class MaintenanceRequestService {
         private final SupplierService supplierService;
         private final NotificationService notificationService;
         private final WarehouseInventoryRepository warehouseInventoryRepository;
+        private final PersonalWarehouseRepository personalWarehouseRepository;
+        private final ClubInvitationRepository clubInvitationRepository;
+        private final UserClubAccessService userClubAccessService;
 
         @Transactional
         public MaintenanceRequestResponseDTO createPartRequest(PartRequestDTO requestDTO) {
@@ -65,7 +63,21 @@ public class MaintenanceRequestService {
                                 .orElseThrow(() -> new IllegalArgumentException("Club not found"));
 
                 MechanicProfile mechanicProfile = mechanic.get();
-                if (!mechanicWorksInClub(mechanicProfile, club.getClubId())) {
+                User mechanicUser = mechanicProfile.getUser();
+                AccountTypeName accountTypeName = mechanicUser != null && mechanicUser.getAccountType() != null
+                        ? AccountTypeName.from(mechanicUser.getAccountType().getName())
+                        : AccountTypeName.INDIVIDUAL;
+
+                if ((accountTypeName == AccountTypeName.FREE_MECHANIC_BASIC || accountTypeName == AccountTypeName.FREE_MECHANIC_PREMIUM)
+                        && !mechanicWorksInClub(mechanicProfile, club.getClubId())) {
+                        throw new IllegalArgumentException("Free mechanic has no granted access to the specified club");
+                }
+
+                if (accountTypeName == AccountTypeName.FREE_MECHANIC_BASIC) {
+                        throw new IllegalStateException("Basic free mechanics cannot create maintenance requests without upgrade");
+                }
+
+                if (accountTypeName == AccountTypeName.INDIVIDUAL && !mechanicWorksInClub(mechanicProfile, club.getClubId())) {
                         throw new IllegalArgumentException("Mechanic is not assigned to the specified club");
                 }
 
@@ -223,17 +235,7 @@ public class MaintenanceRequestService {
                 }
 
                 User mechanicUser = mechanicProfile.getUser();
-                if (mechanicUser != null && mechanicUser.getUserId() != null
-                                && clubStaffRepository.existsByClubClubIdAndUserUserIdAndIsActiveTrue(clubId, mechanicUser.getUserId())) {
-                        return true;
-                }
-
-                return Optional.ofNullable(mechanicProfile.getClubs())
-                                .orElse(List.of())
-                                .stream()
-                                .map(BowlingClub::getClubId)
-                                .filter(Objects::nonNull)
-                                .anyMatch(id -> id.equals(clubId));
+                return mechanicUser != null && userClubAccessService.hasClubAccess(mechanicUser, clubId);
         }
 
         private boolean userHasAccessToClub(User user, BowlingClub club) {
@@ -245,27 +247,13 @@ public class MaintenanceRequestService {
                         return true;
                 }
 
-                OwnerProfile owner = club.getOwner();
-                if (owner != null && owner.getUser() != null && Objects.equals(owner.getUser().getUserId(), user.getUserId())) {
-                        return true;
-                }
-
-                if (clubStaffRepository.existsByClubAndUserAndIsActiveTrue(club, user)) {
-                        return true;
-                }
-
-                if (hasActiveManagerAccess(user, club)) {
+                if (userClubAccessService.hasClubAccess(user, club.getClubId())) {
                         return true;
                 }
 
                 AdministratorProfile administratorProfile = user.getAdministratorProfile();
                 if (administratorProfile != null && administratorProfile.getClub() != null
                                 && Objects.equals(administratorProfile.getClub().getClubId(), club.getClubId())) {
-                        return true;
-                }
-
-                MechanicProfile mechanicProfile = user.getMechanicProfile();
-                if (mechanicProfile != null && mechanicWorksInClub(mechanicProfile, club.getClubId())) {
                         return true;
                 }
 
@@ -278,31 +266,6 @@ public class MaintenanceRequestService {
                 }
                 String roleName = user.getRole().getName().toUpperCase(Locale.ROOT);
                 return roleName.contains("ADMIN");
-        }
-
-        private boolean hasActiveManagerAccess(User user, BowlingClub club) {
-                if (user == null || club == null) {
-                        return false;
-                }
-
-                ManagerProfile managerProfile = user.getManagerProfile();
-                if (managerProfile == null || managerProfile.getClub() == null) {
-                        return false;
-                }
-
-                if (!Boolean.TRUE.equals(user.getIsVerified())) {
-                        return false;
-                }
-
-                if (!Boolean.TRUE.equals(managerProfile.getIsDataVerified())) {
-                        return false;
-                }
-
-                if (!Objects.equals(managerProfile.getClub().getClubId(), club.getClubId())) {
-                        return false;
-                }
-
-                return clubStaffRepository.existsByClubAndUserAndIsActiveTrue(club, user);
         }
 
         private User findUserByLogin(String login) {
@@ -410,7 +373,7 @@ public class MaintenanceRequestService {
                         partName = catalogNumber != null ? catalogNumber : "Неизвестная запчасть";
                 }
 
-                return RequestPart.builder()
+                RequestPart part = RequestPart.builder()
                                 .request(request)
                                 .catalogNumber(catalogNumber)
                                 .partName(partName)
@@ -423,6 +386,9 @@ public class MaintenanceRequestService {
                                 // сохраняем признак запроса помощи по детали
                                 .helpRequested(Boolean.TRUE.equals(partDTO.getHelpRequested()))
                                 .build();
+
+                autoAssignAvailability(part, request);
+                return part;
         }
 
         private String normalizeValue(String value) {
@@ -452,6 +418,73 @@ public class MaintenanceRequestService {
                         return partDTO.getInventoryId().toString();
                 }
                 return "неизвестная запчасть";
+        }
+
+        private void autoAssignAvailability(RequestPart part, MaintenanceRequest request) {
+                if (part == null || request == null) {
+                        return;
+                }
+
+                Long resolvedCatalogId = part.getCatalogId();
+                if (resolvedCatalogId == null && part.getCatalogNumber() != null) {
+                        partsCatalogRepository.findByCatalogNumber(part.getCatalogNumber())
+                                        .map(PartsCatalog::getCatalogId)
+                                        .ifPresent(part::setCatalogId);
+                        resolvedCatalogId = part.getCatalogId();
+                }
+                if (resolvedCatalogId == null) {
+                        part.setIsAvailable(false);
+                        return;
+                }
+
+                List<Integer> candidateWarehouses = new ArrayList<>();
+                MechanicProfile mechanic = request.getMechanic();
+                if (mechanic != null && mechanic.getProfileId() != null) {
+                        personalWarehouseRepository.findByMechanicProfile_ProfileIdAndIsActiveTrue(mechanic.getProfileId())
+                                        .forEach(wh -> candidateWarehouses.add(wh.getWarehouseId()));
+                }
+
+                if (request.getClub() != null && request.getClub().getClubId() != null) {
+                        candidateWarehouses.add(Math.toIntExact(request.getClub().getClubId()));
+                }
+
+                for (Integer warehouseId : candidateWarehouses) {
+                        WarehouseInventory inventory = warehouseInventoryRepository
+                                        .findFirstByWarehouseIdAndCatalogId(warehouseId, resolvedCatalogId.intValue());
+                        if (inventory == null) {
+                                continue;
+                        }
+                        int available = Optional.ofNullable(inventory.getQuantity()).orElse(0)
+                                        - Optional.ofNullable(inventory.getReservedQuantity()).orElse(0);
+                        if (available >= Optional.ofNullable(part.getQuantity()).orElse(0)) {
+                                part.setIsAvailable(true);
+                                part.setWarehouseId(warehouseId);
+                                part.setInventoryId(inventory.getInventoryId());
+                                part.setInventoryLocation(Optional.ofNullable(inventory.getLocationReference())
+                                                .orElse(joinLocation(inventory)));
+                                part.setStatus(PartStatus.APPROVED_FOR_ISSUE);
+                                return;
+                        }
+                }
+
+                part.setIsAvailable(false);
+        }
+
+        private String joinLocation(WarehouseInventory inventory) {
+                if (inventory == null) {
+                        return null;
+                }
+                List<String> chunks = new ArrayList<>();
+                if (inventory.getCellCode() != null) {
+                        chunks.add("ячейка " + inventory.getCellCode());
+                }
+                if (inventory.getShelfCode() != null) {
+                        chunks.add("полка " + inventory.getShelfCode());
+                }
+                if (inventory.getLaneNumber() != null) {
+                        chunks.add("дорожка " + inventory.getLaneNumber());
+                }
+                return chunks.isEmpty() ? null : String.join(", ", chunks);
         }
 
         private void synchronizeManualWarehouse(RequestPart part, int approvedQty) {
@@ -631,8 +664,108 @@ public class MaintenanceRequestService {
                         requestPartRepository.save(part);
                 });
 
-		return convertToResponseDTO(savedRequest, parts);
-	}
+                return convertToResponseDTO(savedRequest, parts);
+        }
+
+        @Transactional
+        public MaintenanceRequestResponseDTO requestHelp(Long requestId, HelpRequestDTO helpRequest) {
+                MaintenanceRequest request = maintenanceRequestRepository.findById(requestId)
+                                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+
+                List<Long> targetPartIds = Optional.ofNullable(helpRequest.getPartIds()).orElse(List.of());
+                if (targetPartIds.isEmpty()) {
+                        throw new IllegalArgumentException("Не выбраны позиции для запроса помощи");
+                }
+
+                List<RequestPart> parts = requestPartRepository.findByRequestRequestId(requestId);
+                Map<Long, RequestPart> byId = parts.stream()
+                                .filter(Objects::nonNull)
+                                .collect(Collectors.toMap(RequestPart::getPartId, p -> p));
+
+                List<RequestPart> affected = new ArrayList<>();
+                for (Long id : targetPartIds) {
+                        RequestPart part = byId.get(id);
+                        if (part == null) {
+                                throw new IllegalArgumentException("Позиция не найдена в заявке");
+                        }
+                        part.setHelpRequested(true);
+                        requestPartRepository.save(part);
+                        affected.add(part);
+                }
+
+                if (helpRequest.getReason() != null && !helpRequest.getReason().isBlank()) {
+                        appendManagerNote(request, "Запрос помощи: " + helpRequest.getReason().trim());
+                }
+
+                notificationService.notifyHelpRequested(request, affected, helpRequest.getReason());
+                MaintenanceRequest saved = maintenanceRequestRepository.save(request);
+                List<RequestPart> updated = requestPartRepository.findByRequestRequestId(requestId);
+                return convertToResponseDTO(saved, updated);
+        }
+
+        @Transactional
+        public MaintenanceRequestResponseDTO resolveHelpRequest(Long requestId, HelpResponseDTO responseDTO) {
+                MaintenanceRequest request = maintenanceRequestRepository.findById(requestId)
+                                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+
+                List<Long> targetPartIds = Optional.ofNullable(responseDTO.getPartIds()).orElse(List.of());
+                if (targetPartIds.isEmpty()) {
+                        throw new IllegalArgumentException("Не выбраны позиции для обработки запроса помощи");
+                }
+
+                List<RequestPart> parts = requestPartRepository.findByRequestRequestId(requestId);
+                Map<Long, RequestPart> byId = parts.stream()
+                                .filter(Objects::nonNull)
+                                .collect(Collectors.toMap(RequestPart::getPartId, p -> p));
+
+                List<RequestPart> affected = new ArrayList<>();
+                for (Long id : targetPartIds) {
+                        RequestPart part = byId.get(id);
+                        if (part == null) {
+                                throw new IllegalArgumentException("Позиция не найдена в заявке");
+                        }
+                        part.setHelpRequested(false);
+                        requestPartRepository.save(part);
+                        affected.add(part);
+                }
+
+                String comment = responseDTO.getComment();
+                if (comment != null && !comment.isBlank()) {
+                        appendManagerNote(request, comment.trim());
+                }
+
+                switch (responseDTO.getDecision()) {
+                        case APPROVED -> notificationService.notifyHelpConfirmed(request, affected, comment);
+                        case DECLINED -> notificationService.notifyHelpDeclined(request, affected, comment);
+                        case REASSIGNED -> {
+                                if (responseDTO.getReassignedMechanicId() == null) {
+                                        throw new IllegalArgumentException("Нужно указать нового механика для переназначения");
+                                }
+                                MechanicProfile newMechanic = mechanicProfileRepository.findById(responseDTO.getReassignedMechanicId())
+                                                .orElseThrow(() -> new IllegalArgumentException("Новый механик не найден"));
+                                request.setMechanic(newMechanic);
+                                notificationService.notifyHelpReassigned(request, affected, newMechanic.getProfileId(), comment);
+                        }
+                        default -> {
+                        }
+                }
+
+                MaintenanceRequest saved = maintenanceRequestRepository.save(request);
+                List<RequestPart> updated = requestPartRepository.findByRequestRequestId(requestId);
+                return convertToResponseDTO(saved, updated);
+        }
+
+        private void appendManagerNote(MaintenanceRequest request, String note) {
+                if (request == null || note == null || note.isBlank()) {
+                        return;
+                }
+                String current = Optional.ofNullable(request.getManagerNotes()).orElse("");
+                if (current.isBlank()) {
+                        request.setManagerNotes(note);
+                } else {
+                        request.setManagerNotes(current + "\n" + note);
+                }
+        }
 
         @SuppressWarnings("unchecked")
         @Transactional

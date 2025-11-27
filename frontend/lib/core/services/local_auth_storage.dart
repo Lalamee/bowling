@@ -10,6 +10,7 @@ class LocalAuthStorage {
   static const String _managerProfileKey = 'manager_profile';
   static const String _adminProfileKey = 'admin_profile';
   static const String _registeredRoleKey = 'registered_role';
+  static const String _registeredAccountTypeKey = 'registered_account_type';
 
   static Future<void> setMechanicRegistered(bool value) async {
     final sp = await SharedPreferences.getInstance();
@@ -149,11 +150,27 @@ class LocalAuthStorage {
     await sp.setString(_registeredRoleKey, role);
   }
 
+  static Future<void> setRegisteredAccountType(String? accountType) async {
+    final sp = await SharedPreferences.getInstance();
+    if (accountType == null || accountType.trim().isEmpty) {
+      await sp.remove(_registeredAccountTypeKey);
+    } else {
+      await sp.setString(_registeredAccountTypeKey, accountType);
+    }
+  }
+
   static Future<String?> getRegisteredRole() async {
     final sp = await SharedPreferences.getInstance();
     final role = sp.getString(_registeredRoleKey);
     if (role == null || role.trim().isEmpty) return null;
     return role.trim();
+  }
+
+  static Future<String?> getRegisteredAccountType() async {
+    final sp = await SharedPreferences.getInstance();
+    final type = sp.getString(_registeredAccountTypeKey);
+    if (type == null || type.trim().isEmpty) return null;
+    return type.trim();
   }
 
   static Future<bool> hasRegisteredAccount() async {
@@ -170,6 +187,7 @@ class LocalAuthStorage {
     await sp.remove(_managerProfileKey);
     await sp.remove(_adminProfileKey);
     await sp.remove(_registeredRoleKey);
+    await sp.remove(_registeredAccountTypeKey);
   }
 
   static Future<void> _clearRegisteredRoleIfMatches(String role) async {
@@ -177,6 +195,7 @@ class LocalAuthStorage {
     final current = sp.getString(_registeredRoleKey);
     if (current != null && current.toLowerCase() == role.toLowerCase()) {
       await sp.remove(_registeredRoleKey);
+      await sp.remove(_registeredAccountTypeKey);
     }
   }
 }
