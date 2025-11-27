@@ -395,6 +395,7 @@ public class AdminCabinetService {
         Role resolvedRole = user.getRole() != null
                 ? user.getRole()
                 : roleRepository.findByNameIgnoreCase(RoleName.MECHANIC.name()).orElse(null);
+        Role roleToApply = resolvedRole;
 
         ClubStaff staff = clubStaffRepository.findByClubAndUser(club, user)
                 .orElseGet(() -> ClubStaff.builder()
@@ -402,9 +403,9 @@ public class AdminCabinetService {
                         .user(user)
                         .assignedAt(LocalDateTime.now())
                         .isActive(true)
-                        .role(resolvedRole)
+                        .role(roleToApply)
                         .build());
-        staff.setRole(resolvedRole);
+        staff.setRole(roleToApply);
         staff.setIsActive(true);
         clubStaffRepository.save(staff);
     }
