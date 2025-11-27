@@ -23,6 +23,7 @@ import '../models/delivery_request_dto.dart';
 import '../models/issue_request_dto.dart';
 import '../models/stock_issue_decision_dto.dart';
 import '../models/close_request_dto.dart';
+import '../models/equipment_component_dto.dart';
 import '../models/club_summary_dto.dart';
 import '../models/purchase_order_summary_dto.dart';
 import '../models/purchase_order_detail_dto.dart';
@@ -315,6 +316,16 @@ class ApiService {
     final response = await _dio.post('/api/parts/search', data: searchDto.toJson());
     return (response.data as List)
         .map((e) => PartsCatalogResponseDto.fromJson(e))
+        .toList();
+  }
+
+  /// GET /api/equipment/components - Получение дерева узлов оборудования
+  Future<List<EquipmentComponentDto>> getEquipmentComponents({int? parentId}) async {
+    final response = await _dio.get('/api/equipment/components', queryParameters: {
+      if (parentId != null) 'parentId': parentId,
+    });
+    return (response.data as List)
+        .map((e) => EquipmentComponentDto.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
   }
 

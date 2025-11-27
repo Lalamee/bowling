@@ -16,6 +16,7 @@ public class PartsSearchDTO {
     private String catalogNumber;
     private Boolean isUnique;
     private String equipmentType;
+    private String categoryCode;
     
     @Builder.Default
     private Integer page = 0;
