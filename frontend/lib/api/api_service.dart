@@ -30,6 +30,7 @@ import '../models/purchase_order_detail_dto.dart';
 import '../models/purchase_order_acceptance_request_dto.dart';
 import '../models/supplier_review_request_dto.dart';
 import '../models/supplier_complaint_request_dto.dart';
+import '../models/supplier_complaint_status_update_dto.dart';
 
 /// Типизированный API сервис для взаимодействия с backend
 class ApiService {
@@ -239,6 +240,9 @@ class ApiService {
     String? status,
     bool? hasComplaint,
     bool? hasReview,
+    String? supplier,
+    DateTime? from,
+    DateTime? to,
   }) async {
     final response = await _dio.get(
       '/api/purchase-orders',
@@ -248,6 +252,9 @@ class ApiService {
         if (status != null) 'status': status,
         if (hasComplaint != null) 'hasComplaint': hasComplaint,
         if (hasReview != null) 'hasReview': hasReview,
+        if (supplier != null && supplier.isNotEmpty) 'supplier': supplier,
+        if (from != null) 'from': from.toIso8601String(),
+        if (to != null) 'to': to.toIso8601String(),
       },
     );
     return (response.data as List)
@@ -288,6 +295,18 @@ class ApiService {
   ) async {
     final response = await _dio.post(
       '/api/purchase-orders/$orderId/complaints',
+      data: request.toJson(),
+    );
+    return PurchaseOrderDetailDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<PurchaseOrderDetailDto> updateComplaintStatus(
+    int orderId,
+    int reviewId,
+    SupplierComplaintStatusUpdateDto request,
+  ) async {
+    final response = await _dio.patch(
+      '/api/purchase-orders/$orderId/complaints/$reviewId',
       data: request.toJson(),
     );
     return PurchaseOrderDetailDto.fromJson(Map<String, dynamic>.from(response.data as Map));
