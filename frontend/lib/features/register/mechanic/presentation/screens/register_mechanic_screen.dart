@@ -43,10 +43,12 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
   final _bowlingYears = TextEditingController();
   final _bowlingHistory = TextEditingController();
   final _skills = TextEditingController();
+  final _region = TextEditingController();
 
   /// здесь храним именно **id** в виде строки, например "1"
   String? educationLevelId;
   String? _status;
+  bool? _isEntrepreneur;
   bool _isSubmitting = false;
 
   late final ClubsRepository _clubsRepository = ClubsRepository();
@@ -102,6 +104,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       _bowlingYears,
       _bowlingHistory,
       _skills,
+      _region,
     ];
     for (final controller in controllers) {
       controller.dispose();
@@ -262,6 +265,22 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     final skills = _skills.text.trim();
     final workPlaces = places.join(', ');
     final workPeriods = periods.join(', ');
+    final region = _region.text.trim();
+    if (region.isEmpty) {
+      _showBar('Укажите регион работы');
+      return;
+    }
+
+    final selfEmployment = _isEntrepreneur ?? (() {
+      final normalized = (_status ?? '').toLowerCase();
+      if (normalized.contains('ип')) return true;
+      if (normalized.contains('самозан')) return false;
+      return null;
+    })();
+    if (selfEmployment == null) {
+      _showBar('Выберите статус: ИП или самозанятый');
+      return;
+    }
 
     final data = {
       'fio': _fio.text.trim(),
@@ -280,6 +299,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'workPlaces': workPlaces.isEmpty ? null : workPlaces,
       'workPeriods': workPeriods.isEmpty ? null : workPeriods,
       'clubId': selectedClub?.id,
+      'region': region,
+      'isEntrepreneur': selfEmployment,
     };
 
     setState(() => _isSubmitting = true);
@@ -324,6 +345,18 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'clubAddress': selectedClub?.address,
       'freeAgent': !hasSelectedClub,
     };
+    if (!hasSelectedClub) {
+      _showBar('Заявка отправлена. Дождитесь проверки администрацией сервиса.');
+      await LocalAuthStorage.saveMechanicProfile(profileData);
+      await LocalAuthStorage.setMechanicRegistered(true);
+      await LocalAuthStorage.setRegisteredRole('mechanic');
+      await LocalAuthStorage.setRegisteredAccountType('FREE_MECHANIC_BASIC');
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil(Routes.authLogin, (route) => false);
+      }
+      setState(() => _isSubmitting = false);
+      return;
+    }
     try {
       final loginResult = await AuthService.login(phone: normalizedPhone, password: passwordValue);
       if (loginResult == null) {
@@ -577,6 +610,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
             style: AppTextStyles.formHint,
           ),
         ),
+        LabeledTextField(label: 'Регион (город/область)', controller: _region, validator: Validators.notEmpty, isRequired: true),
         LabeledTextField(label: 'Навыки и преимущества', controller: _skills),
         const SizedBox(height: 16),
         formDescription('Ваш статус (при наличии):'),
@@ -586,8 +620,10 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
           onChanged: (v) => setState(() {
             if (_status == v) {
               _status = null;
+              _isEntrepreneur = null;
             } else {
               _status = v;
+              _isEntrepreneur = v == 'ИП';
             }
           }),
         ),

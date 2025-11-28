@@ -33,16 +33,29 @@ class _SupplyAcceptanceScreenState extends State<SupplyAcceptanceScreen> {
   List<UserClub> _clubs = const [];
   int? _selectedClubId;
   String? _statusFilter;
+  final TextEditingController _supplierController = TextEditingController();
+  DateTime? _fromDate;
+  DateTime? _toDate;
 
   static const Map<String, String> _statusLabels = {
     'PENDING': 'Ожидает',
     'CONFIRMED': 'Подтверждена',
+    'PARTIALLY_COMPLETED': 'Частично принята',
+    'COMPLETED': 'Полностью принята',
+    'REJECTED': 'Отклонена',
+    'CANCELED': 'Отменена',
   };
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _supplierController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -58,6 +71,9 @@ class _SupplyAcceptanceScreenState extends State<SupplyAcceptanceScreen> {
         clubId: _selectedClubId,
         archived: false,
         status: _statusFilter,
+        supplier: _supplierController.text.trim().isEmpty ? null : _supplierController.text.trim(),
+        from: _fromDate,
+        to: _toDate,
       );
       if (!mounted) return;
       setState(() {
@@ -116,13 +132,14 @@ class _SupplyAcceptanceScreenState extends State<SupplyAcceptanceScreen> {
     if (_error) {
       return _ErrorState(onRetry: _load);
     }
+    final orders = _filteredOrders;
     return Column(
       children: [
         _buildFilters(),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
-            child: _orders.isEmpty
+            child: orders.isEmpty
                 ? ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: const [
@@ -134,14 +151,28 @@ class _SupplyAcceptanceScreenState extends State<SupplyAcceptanceScreen> {
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                    itemBuilder: (_, index) => _buildOrderCard(_orders[index]),
+                    itemBuilder: (_, index) => _buildOrderCard(orders[index]),
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemCount: _orders.length,
+                    itemCount: orders.length,
                   ),
           ),
         ),
       ],
     );
+  }
+
+  List<PurchaseOrderSummaryDto> get _filteredOrders {
+    final supplierQuery = _supplierController.text.trim().toLowerCase();
+    return _orders.where((order) {
+      final matchesSupplier = supplierQuery.isEmpty
+          ? true
+          : ((order.supplierName ?? '').toLowerCase().contains(supplierQuery) ||
+              (order.supplierInn ?? '').toLowerCase().contains(supplierQuery));
+      final date = order.orderDate ?? order.expectedDeliveryDate ?? order.actualDeliveryDate;
+      final matchesFrom = _fromDate == null || (date != null && !date.isBefore(_fromDate!));
+      final matchesTo = _toDate == null || (date != null && !date.isAfter(_toDate!));
+      return matchesSupplier && matchesFrom && matchesTo;
+    }).toList();
   }
 
   Widget _buildFilters() {
@@ -176,6 +207,46 @@ class _SupplyAcceptanceScreenState extends State<SupplyAcceptanceScreen> {
             ],
           ),
           const SizedBox(height: 12),
+          TextField(
+            controller: _supplierController,
+            decoration: InputDecoration(
+              labelText: 'Поставщик/ИНН',
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  _supplierController.clear();
+                  _load();
+                },
+              ),
+            ),
+            onSubmitted: (_) => _load(),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.date_range),
+                  label: Text(
+                    _fromDate == null ? 'Дата с' : DateFormat('dd.MM.yyyy').format(_fromDate!),
+                  ),
+                  onPressed: () => _pickDate(true),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.event),
+                  label: Text(
+                    _toDate == null ? 'Дата по' : DateFormat('dd.MM.yyyy').format(_toDate!),
+                  ),
+                  onPressed: () => _pickDate(false),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             children: _statusLabels.entries
@@ -196,6 +267,27 @@ class _SupplyAcceptanceScreenState extends State<SupplyAcceptanceScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _pickDate(bool from) async {
+    final initial = from ? _fromDate : _toDate;
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial ?? now,
+      firstDate: DateTime(now.year - 2),
+      lastDate: DateTime(now.year + 2),
+    );
+    if (picked != null) {
+      setState(() {
+        if (from) {
+          _fromDate = picked;
+        } else {
+          _toDate = picked;
+        }
+      });
+      _load();
+    }
   }
 
   Widget _buildOrderCard(PurchaseOrderSummaryDto order) {

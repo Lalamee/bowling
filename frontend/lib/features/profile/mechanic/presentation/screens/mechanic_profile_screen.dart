@@ -31,6 +31,11 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   Map<String, dynamic>? _cachedRawProfile;
   bool _canEditProfile = false;
   String? _localRole;
+  String? _accountType;
+  bool _isFreeMechanic = false;
+  String? _applicationStatus;
+  String? _applicationComment;
+  String? _applicationAccountType;
 
   @override
   void initState() {
@@ -52,11 +57,20 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
 
   Future<void> _resolveLocalRole() async {
     final role = await LocalAuthStorage.getRegisteredRole();
+    final accountType = await LocalAuthStorage.getRegisteredAccountType();
     if (!mounted) return;
     setState(() {
       _localRole = role;
+      _accountType = accountType;
       _canEditProfile = _roleAllowsEditing(role);
+      _isFreeMechanic = _isFreeMechanicType(accountType);
     });
+  }
+
+  bool _isFreeMechanicType(String? accountType) {
+    if (accountType == null) return false;
+    final normalized = accountType.trim().toUpperCase();
+    return normalized == 'FREE_MECHANIC_BASIC' || normalized == 'FREE_MECHANIC_PREMIUM';
   }
 
   bool _roleAllowsEditing(String? role) {
@@ -67,11 +81,17 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
 
   Future<void> _loadLocalProfile() async {
     final stored = await LocalAuthStorage.loadMechanicProfile();
+    final application = await LocalAuthStorage.loadMechanicApplication();
     if (!mounted || stored == null) {
       return;
     }
 
     final normalized = _normalizeProfileData(Map<String, dynamic>.from(stored));
+    _applicationStatus = application?['status']?.toString() ?? stored['applicationStatus']?.toString();
+    _applicationComment = application?['comment']?.toString() ?? stored['applicationComment']?.toString();
+    _applicationAccountType = application?['accountType']?.toString() ?? stored['accountType']?.toString();
+    _accountType ??= stored['accountType']?.toString();
+    _isFreeMechanic = _isFreeMechanic || _isFreeMechanicType(_accountType);
     _applyProfile(normalized);
   }
 
@@ -465,6 +485,64 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
   }
 
+  Widget _buildApplicationBanner() {
+    if (_applicationStatus == null) return const SizedBox.shrink();
+    final status = _applicationStatus!.toUpperCase();
+    String title;
+    String? description;
+    Color color = AppColors.primary;
+
+    switch (status) {
+      case 'APPROVED':
+        title = 'Заявка одобрена';
+        description = 'Тип аккаунта: ${_applicationAccountType ?? 'FREE_MECHANIC_BASIC'}';
+        color = Colors.green.shade700;
+        break;
+      case 'REJECTED':
+        title = 'Заявка отклонена';
+        description = _applicationComment ?? 'Причина не указана';
+        color = Colors.red.shade700;
+        break;
+      case 'IN_REVIEW':
+      case 'NEW':
+      default:
+        title = 'Заявка на рассмотрении';
+        description = 'Администрация проверяет ваши данные';
+        color = AppColors.primary;
+        break;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 15)),
+                if (description != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(description, style: const TextStyle(fontSize: 13)),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -512,6 +590,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   children: [
+                    _buildApplicationBanner(),
                     ProfileTile(
                       icon: Icons.person,
                       text: profile.fullName,
@@ -542,6 +621,54 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 10),
+                    if (_isFreeMechanic)
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.lightGray),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Клубы и доступы',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
+                            ),
+                            const SizedBox(height: 6),
+                            if (profile.clubs.isEmpty)
+                              const Text(
+                                'Временные доступы к клубам отсутствуют. Доступ появится после приглашения от клуба или менеджера.',
+                                style: TextStyle(color: AppColors.darkGray, fontSize: 13),
+                              )
+                            else
+                              ...profile.clubs.map((club) => Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.lock_clock_rounded, size: 18, color: AppColors.primary),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            club,
+                                            style: const TextStyle(fontSize: 14, color: AppColors.textDark),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )),
+                          ],
+                        ),
+                      ),
+                    if (_isFreeMechanic) const SizedBox(height: 10),
+                    if (_isFreeMechanic)
+                      ProfileTile(
+                        icon: Icons.warehouse_outlined,
+                        text: 'Личный ZIP-склад',
+                        onTap: () => Navigator.pushNamed(context, Routes.personalWarehouse),
+                      ),
                     const SizedBox(height: 10),
                     ProfileTile(
                       icon: Icons.menu_book_rounded,

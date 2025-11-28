@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../../../../../core/repositories/admin_mechanics_repository.dart';
 import '../../../../../core/repositories/admin_users_repository.dart';
+import '../../../../../core/repositories/admin_cabinet_repository.dart';
 import '../../../../../core/routing/routes.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/utils/net_ui.dart';
+import '../../../../../models/mechanic_club_link_request_dto.dart';
 
 class AdminMechanicsScreen extends StatefulWidget {
   const AdminMechanicsScreen({super.key});
@@ -18,6 +20,7 @@ class AdminMechanicsScreen extends StatefulWidget {
 class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
   final AdminMechanicsRepository _mechanicsRepository = AdminMechanicsRepository();
   final AdminUsersRepository _usersRepository = AdminUsersRepository();
+  final AdminCabinetRepository _cabinetRepository = AdminCabinetRepository();
 
   bool _isLoading = true;
   bool _hasError = false;
@@ -178,6 +181,35 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       setState(() {
         mechanic.isProcessing = false;
       });
+      showApiError(context, e);
+    }
+  }
+
+  Future<void> _detachFromClub(_MechanicInfo mechanic, int? clubId) async {
+    if (mechanic.profileId == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Отвязка механика'),
+        content: Text('Убрать "${mechanic.name}" из клуба?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Убрать')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await _cabinetRepository.changeMechanicClubLink(
+        mechanic.profileId!,
+        MechanicClubLinkRequestDto(clubId: clubId, attach: false),
+      );
+      await _loadData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Механик отвязан')));
+    } catch (e) {
+      if (!mounted) return;
       showApiError(context, e);
     }
   }
@@ -496,6 +528,16 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
               style: const TextStyle(fontSize: 12, color: AppColors.primary),
             ),
           ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              OutlinedButton.icon(
+                onPressed: mechanic.profileId == null ? null : () => _detachFromClub(mechanic, null),
+                icon: const Icon(Icons.link_off),
+                label: const Text('Убрать из клуба'),
+              ),
+            ],
+          ),
         ],
       ),
     );

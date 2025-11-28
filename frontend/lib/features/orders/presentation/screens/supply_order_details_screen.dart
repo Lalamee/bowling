@@ -8,6 +8,7 @@ import '../../../../models/purchase_order_acceptance_request_dto.dart';
 import '../../../../models/purchase_order_detail_dto.dart';
 import '../../../../models/purchase_order_summary_dto.dart';
 import '../../../../models/supplier_complaint_request_dto.dart';
+import '../../../../models/supplier_complaint_status_update_dto.dart';
 import '../../../../models/supplier_review_request_dto.dart';
 
 class SupplyOrderDetailsScreen extends StatefulWidget {
@@ -28,7 +29,9 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
   bool _error = false;
   bool _acceptanceInProgress = false;
   bool _feedbackInProgress = false;
+  bool _complaintStatusInProgress = false;
   final Map<int, _PartAcceptanceState> _partStates = {};
+  static const List<String> _complaintStatuses = ['DRAFT', 'SENT', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
 
   @override
   void initState() {
@@ -218,6 +221,15 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
               padding: const EdgeInsets.only(top: 4),
               child: Text('Комментарий: ${part.acceptanceComment}', style: const TextStyle(color: AppColors.darkGray)),
             ),
+          if (part.inventoryLocation != null || part.warehouseId != null || part.inventoryId != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Размещение: ${part.inventoryLocation ?? 'на складе #${part.warehouseId ?? '-'}'}'
+                '${part.inventoryId != null ? ' • инвентаризация #${part.inventoryId}' : ''}',
+                style: const TextStyle(color: AppColors.darkGray),
+              ),
+            ),
           if (_canAccept && state != null) ...[
             const SizedBox(height: 12),
             DropdownButtonFormField<AcceptanceDecision>(
@@ -302,17 +314,89 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
   }
 
   Widget _buildComplaints(PurchaseOrderDetailDto detail) {
-    return _FeedbackList(
-      title: 'Претензии',
-      emptyText: 'Претензии не создавались',
-      items: detail.complaints,
-      complaint: true,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Претензии', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+          const SizedBox(height: 12),
+          if (detail.complaints.isEmpty)
+            const Text('Претензии не создавались', style: TextStyle(color: AppColors.darkGray))
+          else
+            ...detail.complaints.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Статус: ${item.complaintStatus ?? '-'}', style: const TextStyle(color: AppColors.darkGray)),
+                    if (item.complaintTitle != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text('Тема: ${item.complaintTitle}', style: const TextStyle(color: AppColors.textDark)),
+                      ),
+                    if (item.comment != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(item.comment!, style: const TextStyle(color: AppColors.textDark)),
+                      ),
+                    if (item.resolutionNotes != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text('Решение: ${item.resolutionNotes}', style: const TextStyle(color: AppColors.darkGray)),
+                      ),
+                    if (_complaintStatusInProgress)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: LinearProgressIndicator(minHeight: 2),
+                      )
+                    else
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () => _handleComplaintStatus(item),
+                          icon: const Icon(Icons.edit, color: AppColors.primary),
+                          label: const Text('Обновить статус'),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
   Future<void> _submitAcceptance() async {
     final detail = _detail;
     if (detail == null) return;
+    for (final part in detail.parts) {
+      final state = _partStates[part.partId];
+      if (state == null) continue;
+      final ordered = part.orderedQuantity ?? 0;
+      final qty = state.decision == AcceptanceDecision.rejected ? 0 : state.quantity;
+      if (qty < 0 || qty > ordered) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Количество по ${part.partName ?? 'позиции'} не может превышать заказанное ($ordered)')),
+        );
+        return;
+      }
+      if (state.decision == AcceptanceDecision.accepted && qty != ordered) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Для полного приёма позиции ${part.partName ?? part.partId} нужно принять $ordered шт.')),
+        );
+        return;
+      }
+      if (state.decision == AcceptanceDecision.partial && qty >= ordered) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Укажите принятие меньше $ordered шт. для частичной приёмки.')),
+        );
+        return;
+      }
+    }
     setState(() => _acceptanceInProgress = true);
     try {
       final partsPayload = detail.parts.map((part) {
@@ -378,6 +462,26 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
       if (mounted) {
         setState(() => _feedbackInProgress = false);
       }
+    }
+  }
+
+  Future<void> _handleComplaintStatus(SupplierReviewDto item) async {
+    final update = await _showComplaintStatusDialog(item);
+    if (update == null) return;
+    setState(() => _complaintStatusInProgress = true);
+    try {
+      final updated = await _repository.updateComplaintStatus(
+        widget.orderId,
+        item.reviewId,
+        update,
+      );
+      if (!mounted) return;
+      _applyDetail(updated);
+    } catch (e) {
+      if (!mounted) return;
+      showApiError(context, e);
+    } finally {
+      if (mounted) setState(() => _complaintStatusInProgress = false);
     }
   }
 
@@ -502,6 +606,65 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
     ).then((value) {
       titleController.dispose();
       descriptionController.dispose();
+      return value;
+    });
+  }
+
+  Future<SupplierComplaintStatusUpdateDto?> _showComplaintStatusDialog(SupplierReviewDto item) {
+    String status = item.complaintStatus ?? 'IN_PROGRESS';
+    bool? resolved = item.complaintResolved;
+    final resolutionController = TextEditingController(text: item.resolutionNotes ?? '');
+    return showDialog<SupplierComplaintStatusUpdateDto>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Обновление статуса спора'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              value: status,
+              decoration: const InputDecoration(labelText: 'Статус'),
+              items: _complaintStatuses
+                  .map((value) => DropdownMenuItem(value: value, child: Text(value)))
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) status = value;
+              },
+            ),
+            CheckboxListTile(
+              value: resolved ?? false,
+              onChanged: (val) => resolved = val ?? false,
+              title: const Text('Спор закрыт/решён'),
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+            TextField(
+              controller: resolutionController,
+              decoration: const InputDecoration(labelText: 'Комментарий решения'),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(
+                context,
+                SupplierComplaintStatusUpdateDto(
+                  status: status,
+                  resolved: resolved,
+                  resolutionNotes: resolutionController.text.trim().isEmpty
+                      ? null
+                      : resolutionController.text.trim(),
+                ),
+              );
+            },
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    ).then((value) {
+      resolutionController.dispose();
       return value;
     });
   }

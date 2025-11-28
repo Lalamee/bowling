@@ -8,6 +8,8 @@ import '../models/refresh_token_request_dto.dart';
 import '../models/password_change_request_dto.dart';
 import '../models/standard_response_dto.dart';
 import '../models/maintenance_request_response_dto.dart';
+import '../models/free_mechanic_application_request_dto.dart';
+import '../models/free_mechanic_application_response_dto.dart';
 import '../models/part_request_dto.dart';
 import '../models/approve_reject_request_dto.dart';
 import '../models/parts_catalog_response_dto.dart';
@@ -21,12 +23,24 @@ import '../models/delivery_request_dto.dart';
 import '../models/issue_request_dto.dart';
 import '../models/stock_issue_decision_dto.dart';
 import '../models/close_request_dto.dart';
+import '../models/equipment_component_dto.dart';
 import '../models/club_summary_dto.dart';
 import '../models/purchase_order_summary_dto.dart';
 import '../models/purchase_order_detail_dto.dart';
 import '../models/purchase_order_acceptance_request_dto.dart';
 import '../models/supplier_review_request_dto.dart';
 import '../models/supplier_complaint_request_dto.dart';
+import '../models/supplier_complaint_status_update_dto.dart';
+import '../models/technical_info_dto.dart';
+import '../models/service_journal_entry_dto.dart';
+import '../models/warning_dto.dart';
+import '../models/notification_event_dto.dart';
+import '../models/help_request_dto.dart';
+import '../models/admin_help_request_dto.dart';
+import '../models/admin_registration_application_dto.dart';
+import '../models/admin_account_update_dto.dart';
+import '../models/mechanic_club_link_request_dto.dart';
+import '../models/admin_complaint_dto.dart';
 
 /// Типизированный API сервис для взаимодействия с backend
 class ApiService {
@@ -47,6 +61,13 @@ class ApiService {
   Future<StandardResponseDto> register(RegisterRequestDto request) async {
     final response = await _dio.post('/api/auth/register', data: request.toJson());
     return StandardResponseDto.fromJson(response.data);
+  }
+
+  /// POST /api/auth/free-mechanics/apply - Регистрация свободного механика
+  Future<FreeMechanicApplicationResponseDto> applyFreeMechanic(
+      FreeMechanicApplicationRequestDto request) async {
+    final response = await _dio.post('/api/auth/free-mechanics/apply', data: request.toJson());
+    return FreeMechanicApplicationResponseDto.fromJson(response.data);
   }
 
   /// GET /api/public/clubs - Получение списка клубов
@@ -207,6 +228,24 @@ class ApiService {
     return MaintenanceRequestResponseDto.fromJson(response.data);
   }
 
+  /// POST /api/maintenance/requests/{id}/help - Запрос помощи механика
+  Future<MaintenanceRequestResponseDto> requestHelp(int id, HelpRequestDto request) async {
+    final response = await _dio.post(
+      '/api/maintenance/requests/$id/help',
+      data: request.toJson(),
+    );
+    return MaintenanceRequestResponseDto.fromJson(response.data);
+  }
+
+  /// POST /api/maintenance/requests/{id}/help/decision - Ответ менеджера/админа на запрос помощи
+  Future<MaintenanceRequestResponseDto> resolveHelp(int id, HelpResponseDto request) async {
+    final response = await _dio.post(
+      '/api/maintenance/requests/$id/help/decision',
+      data: request.toJson(),
+    );
+    return MaintenanceRequestResponseDto.fromJson(response.data);
+  }
+
   /// PUT /api/maintenance/requests/{id}/unrepairable - Отметка как неремонтопригодное
   Future<MaintenanceRequestResponseDto> markAsUnrepairable(
     int id,
@@ -219,6 +258,87 @@ class ApiService {
     return MaintenanceRequestResponseDto.fromJson(response.data);
   }
 
+  /// GET /api/admin/help-requests - Список запросов помощи для Администрации
+  Future<List<AdminHelpRequestDto>> getAdminHelpRequests() async {
+    final response = await _dio.get('/api/admin/help-requests');
+    return (response.data as List)
+        .map((e) => AdminHelpRequestDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  /// GET /api/admin/registrations - заявки на регистрацию
+  Future<List<AdminRegistrationApplicationDto>> getAdminRegistrations() async {
+    final response = await _dio.get('/api/admin/registrations');
+    return (response.data as List)
+        .map((e) => AdminRegistrationApplicationDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  /// POST /api/admin/registrations/{userId}/approve - утверждение регистрации
+  Future<AdminRegistrationApplicationDto> approveRegistration(int userId) async {
+    final response = await _dio.post('/api/admin/registrations/$userId/approve');
+    return AdminRegistrationApplicationDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  /// POST /api/admin/registrations/{userId}/reject - отклонение с причиной
+  Future<AdminRegistrationApplicationDto> rejectRegistration(int userId, {String? reason}) async {
+    final response = await _dio.post(
+      '/api/admin/registrations/$userId/reject',
+      data: reason ?? '',
+    );
+    return AdminRegistrationApplicationDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  /// PATCH /api/admin/free-mechanics/{userId}/account - обновление аккаунта свободного механика
+  Future<AdminRegistrationApplicationDto> updateFreeMechanicAccount(
+    int userId,
+    AdminAccountUpdateDto request,
+  ) async {
+    final response = await _dio.patch(
+      '/api/admin/free-mechanics/$userId/account',
+      data: request.toJson(),
+    );
+    return AdminRegistrationApplicationDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  /// PATCH /api/admin/mechanics/{profileId}/clubs - привязка/отвязка механика
+  Future<AdminRegistrationApplicationDto> changeMechanicClubLink(
+    int profileId,
+    MechanicClubLinkRequestDto request,
+  ) async {
+    final response = await _dio.patch(
+      '/api/admin/mechanics/$profileId/clubs',
+      data: request.toJson(),
+    );
+    return AdminRegistrationApplicationDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  /// GET /api/admin/supplier-complaints - список споров с поставщиками
+  Future<List<AdminComplaintDto>> getSupplierComplaints() async {
+    final response = await _dio.get('/api/admin/supplier-complaints');
+    return (response.data as List)
+        .map((e) => AdminComplaintDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  /// PATCH /api/admin/supplier-complaints/{reviewId} - обновление статуса спора
+  Future<AdminComplaintDto> updateSupplierComplaint({
+    required int reviewId,
+    String? status,
+    bool? resolved,
+    String? notes,
+  }) async {
+    final response = await _dio.patch(
+      '/api/admin/supplier-complaints/$reviewId',
+      queryParameters: {
+        if (status != null) 'status': status,
+        if (resolved != null) 'resolved': resolved,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      },
+    );
+    return AdminComplaintDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
   // ============================================
   // PURCHASE ORDERS
   // ============================================
@@ -229,6 +349,9 @@ class ApiService {
     String? status,
     bool? hasComplaint,
     bool? hasReview,
+    String? supplier,
+    DateTime? from,
+    DateTime? to,
   }) async {
     final response = await _dio.get(
       '/api/purchase-orders',
@@ -238,6 +361,9 @@ class ApiService {
         if (status != null) 'status': status,
         if (hasComplaint != null) 'hasComplaint': hasComplaint,
         if (hasReview != null) 'hasReview': hasReview,
+        if (supplier != null && supplier.isNotEmpty) 'supplier': supplier,
+        if (from != null) 'from': from.toIso8601String(),
+        if (to != null) 'to': to.toIso8601String(),
       },
     );
     return (response.data as List)
@@ -283,6 +409,18 @@ class ApiService {
     return PurchaseOrderDetailDto.fromJson(Map<String, dynamic>.from(response.data as Map));
   }
 
+  Future<PurchaseOrderDetailDto> updateComplaintStatus(
+    int orderId,
+    int reviewId,
+    SupplierComplaintStatusUpdateDto request,
+  ) async {
+    final response = await _dio.patch(
+      '/api/purchase-orders/$orderId/complaints/$reviewId',
+      data: request.toJson(),
+    );
+    return PurchaseOrderDetailDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
   /// POST /api/maintenance/requests/{id}/parts - Добавление деталей в существующую заявку
   Future<MaintenanceRequestResponseDto> addPartsToMaintenanceRequest(
     int id,
@@ -306,6 +444,16 @@ class ApiService {
     final response = await _dio.post('/api/parts/search', data: searchDto.toJson());
     return (response.data as List)
         .map((e) => PartsCatalogResponseDto.fromJson(e))
+        .toList();
+  }
+
+  /// GET /api/equipment/components - Получение дерева узлов оборудования
+  Future<List<EquipmentComponentDto>> getEquipmentComponents({int? parentId}) async {
+    final response = await _dio.get('/api/equipment/components', queryParameters: {
+      if (parentId != null) 'parentId': parentId,
+    });
+    return (response.data as List)
+        .map((e) => EquipmentComponentDto.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
   }
 
@@ -393,6 +541,63 @@ class ApiService {
     final response = await _dio.get('/api/service-history/club/$clubId');
     return (response.data as List)
         .map((e) => ServiceHistoryDto.fromJson(e))
+        .toList();
+  }
+
+  // ============================================
+  // OWNER/MANAGER DASHBOARD ENDPOINTS
+  // ============================================
+
+  Future<List<TechnicalInfoDto>> getTechnicalInfo({int? clubId}) async {
+    final response = await _dio.get(
+      '/api/owner-dashboard/technical-info',
+      queryParameters: clubId != null ? {'clubId': clubId} : null,
+    );
+    return (response.data as List)
+        .map((e) => TechnicalInfoDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<List<ServiceJournalEntryDto>> getServiceJournal({
+    int? clubId,
+    int? laneNumber,
+    DateTime? start,
+    DateTime? end,
+    String? workType,
+    String? status,
+  }) async {
+    final params = <String, dynamic>{};
+    if (clubId != null) params['clubId'] = clubId;
+    if (laneNumber != null) params['laneNumber'] = laneNumber;
+    if (start != null) params['start'] = start.toIso8601String();
+    if (end != null) params['end'] = end.toIso8601String();
+    if (workType != null && workType.isNotEmpty) params['workType'] = workType;
+    if (status != null && status.isNotEmpty) params['status'] = status;
+
+    final response = await _dio.get('/api/owner-dashboard/service-history', queryParameters: params);
+    return (response.data as List)
+        .map((e) => ServiceJournalEntryDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<List<WarningDto>> getWarnings({int? clubId}) async {
+    final response = await _dio.get(
+      '/api/owner-dashboard/warnings',
+      queryParameters: clubId != null ? {'clubId': clubId} : null,
+    );
+    return (response.data as List)
+        .map((e) => WarningDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<List<NotificationEventDto>> getManagerNotifications({int? clubId, String? role}) async {
+    final params = <String, dynamic>{};
+    if (clubId != null) params['clubId'] = clubId;
+    if (role != null && role.isNotEmpty) params['role'] = role;
+
+    final response = await _dio.get('/api/owner-dashboard/notifications', queryParameters: params);
+    return (response.data as List)
+        .map((e) => NotificationEventDto.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
   }
 
