@@ -47,6 +47,8 @@ class Routes {
   static const adminProfile = '/admin/profile';
   static const adminAttestations = '/admin/attestations';
   static const adminHelpRequests = '/admin/help-requests';
+  static const adminRegistrations = '/admin/registrations';
+  static const adminComplaints = '/admin/complaints';
 
   static const ordersPersonalHistory = '/orders/history-personal';
   static const clubOrdersHistory = '/orders/history-club';

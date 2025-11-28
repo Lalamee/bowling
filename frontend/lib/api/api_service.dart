@@ -37,6 +37,10 @@ import '../models/warning_dto.dart';
 import '../models/notification_event_dto.dart';
 import '../models/help_request_dto.dart';
 import '../models/admin_help_request_dto.dart';
+import '../models/admin_registration_application_dto.dart';
+import '../models/admin_account_update_dto.dart';
+import '../models/mechanic_club_link_request_dto.dart';
+import '../models/admin_complaint_dto.dart';
 
 /// Типизированный API сервис для взаимодействия с backend
 class ApiService {
@@ -260,6 +264,79 @@ class ApiService {
     return (response.data as List)
         .map((e) => AdminHelpRequestDto.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
+  }
+
+  /// GET /api/admin/registrations - заявки на регистрацию
+  Future<List<AdminRegistrationApplicationDto>> getAdminRegistrations() async {
+    final response = await _dio.get('/api/admin/registrations');
+    return (response.data as List)
+        .map((e) => AdminRegistrationApplicationDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  /// POST /api/admin/registrations/{userId}/approve - утверждение регистрации
+  Future<AdminRegistrationApplicationDto> approveRegistration(int userId) async {
+    final response = await _dio.post('/api/admin/registrations/$userId/approve');
+    return AdminRegistrationApplicationDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  /// POST /api/admin/registrations/{userId}/reject - отклонение с причиной
+  Future<AdminRegistrationApplicationDto> rejectRegistration(int userId, {String? reason}) async {
+    final response = await _dio.post(
+      '/api/admin/registrations/$userId/reject',
+      data: reason ?? '',
+    );
+    return AdminRegistrationApplicationDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  /// PATCH /api/admin/free-mechanics/{userId}/account - обновление аккаунта свободного механика
+  Future<AdminRegistrationApplicationDto> updateFreeMechanicAccount(
+    int userId,
+    AdminAccountUpdateDto request,
+  ) async {
+    final response = await _dio.patch(
+      '/api/admin/free-mechanics/$userId/account',
+      data: request.toJson(),
+    );
+    return AdminRegistrationApplicationDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  /// PATCH /api/admin/mechanics/{profileId}/clubs - привязка/отвязка механика
+  Future<AdminRegistrationApplicationDto> changeMechanicClubLink(
+    int profileId,
+    MechanicClubLinkRequestDto request,
+  ) async {
+    final response = await _dio.patch(
+      '/api/admin/mechanics/$profileId/clubs',
+      data: request.toJson(),
+    );
+    return AdminRegistrationApplicationDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  /// GET /api/admin/supplier-complaints - список споров с поставщиками
+  Future<List<AdminComplaintDto>> getSupplierComplaints() async {
+    final response = await _dio.get('/api/admin/supplier-complaints');
+    return (response.data as List)
+        .map((e) => AdminComplaintDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  /// PATCH /api/admin/supplier-complaints/{reviewId} - обновление статуса спора
+  Future<AdminComplaintDto> updateSupplierComplaint({
+    required int reviewId,
+    String? status,
+    bool? resolved,
+    String? notes,
+  }) async {
+    final response = await _dio.patch(
+      '/api/admin/supplier-complaints/$reviewId',
+      queryParameters: {
+        if (status != null) 'status': status,
+        if (resolved != null) 'resolved': resolved,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      },
+    );
+    return AdminComplaintDto.fromJson(Map<String, dynamic>.from(response.data as Map));
   }
 
   // ============================================

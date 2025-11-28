@@ -170,6 +170,12 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
           ),
           const SizedBox(height: 10),
           ProfileTile(
+            icon: Icons.assignment_turned_in_outlined,
+            text: 'Заявки на регистрацию',
+            onTap: () => Navigator.pushNamed(context, Routes.adminRegistrations),
+          ),
+          const SizedBox(height: 10),
+          ProfileTile(
             icon: Icons.verified_user_outlined,
             text: 'Аттестации',
             onTap: () => Navigator.pushNamed(context, Routes.adminAttestations),
@@ -185,6 +191,12 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
             icon: Icons.history_rounded,
             text: 'История заказов',
             onTap: () => Navigator.pushNamed(context, Routes.adminOrders),
+          ),
+          const SizedBox(height: 10),
+          ProfileTile(
+            icon: Icons.report_problem_outlined,
+            text: 'Споры с поставщиками',
+            onTap: () => Navigator.pushNamed(context, Routes.adminComplaints),
           ),
           const SizedBox(height: 24),
           ProfileTile(
