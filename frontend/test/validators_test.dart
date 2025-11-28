@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:frontend/core/utils/validators.dart';
+import 'package:bowling_market/core/utils/validators.dart';
 
 void main() {
   group('Validators', () {

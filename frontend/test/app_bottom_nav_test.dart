@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:frontend/shared/widgets/nav/app_bottom_nav.dart';
+import 'package:bowling_market/shared/widgets/nav/app_bottom_nav.dart';
 
 void main() {
   testWidgets('AppBottomNav renders all tabs and propagates taps', (tester) async {
