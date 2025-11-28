@@ -103,7 +103,7 @@ class _AdminHelpRequestsScreenState extends State<AdminHelpRequestsScreen> {
     );
   }
 
-  Widget _buildBody(TypographyExtension t) {
+  Widget _buildBody(AppTypography t) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }

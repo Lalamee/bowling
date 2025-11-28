@@ -516,7 +516,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
     }
   }
 
-  Widget _buildHelpRequestSection(TypographyExtension t, MaintenanceRequestResponseDto request) {
+  Widget _buildHelpRequestSection(AppTypography t, MaintenanceRequestResponseDto request) {
     final helpCount = request.requestedParts.where((part) => part.helpRequested == true).length;
     final hasActiveHelp = helpCount > 0;
 

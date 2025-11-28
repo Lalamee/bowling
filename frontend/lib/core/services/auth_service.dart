@@ -13,6 +13,7 @@ import '../../models/user_info_dto.dart';
 import '../../models/free_mechanic_application_request_dto.dart';
 import '../../models/free_mechanic_application_response_dto.dart';
 import '../../models/mechanic_work_history_dto.dart';
+import '../utils/validators.dart';
 import 'local_auth_storage.dart';
 
 class AuthService {

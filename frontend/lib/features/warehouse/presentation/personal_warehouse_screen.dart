@@ -264,7 +264,11 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 2),
                 child: Row(
-                  children: const [Icon(Icons.verified, color: Colors.deepPurple, size: 16), SizedBox(width: 6), Text('Уникальная деталь', style: subtitleStyle)],
+                  children: [
+                    const Icon(Icons.verified, color: Colors.deepPurple, size: 16),
+                    const SizedBox(width: 6),
+                    Text('Уникальная деталь', style: subtitleStyle),
+                  ],
                 ),
               ),
             if (part.lastChecked != null)

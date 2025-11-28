@@ -1,7 +1,7 @@
-import 'package:test/test.dart';
+import 'package:flutter_test/flutter_test.dart';
 
-import 'package:bowling_app/core/services/authz/acl.dart';
-import 'package:bowling_app/models/maintenance_request_response_dto.dart';
+import 'package:bowling_market/core/services/authz/acl.dart';
+import 'package:bowling_market/models/maintenance_request_response_dto.dart';
 
 void main() {
   RequestPartResponseDto _part() => RequestPartResponseDto(partId: 1);

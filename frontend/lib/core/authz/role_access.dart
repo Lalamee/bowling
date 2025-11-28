@@ -18,6 +18,25 @@ enum AccountTypeName {
   mainAdmin,
 }
 
+extension AccountTypeNameApi on AccountTypeName {
+  String get apiName {
+    switch (this) {
+      case AccountTypeName.individual:
+        return 'INDIVIDUAL';
+      case AccountTypeName.clubOwner:
+        return 'CLUB_OWNER';
+      case AccountTypeName.clubManager:
+        return 'CLUB_MANAGER';
+      case AccountTypeName.freeMechanicBasic:
+        return 'FREE_MECHANIC_BASIC';
+      case AccountTypeName.freeMechanicPremium:
+        return 'FREE_MECHANIC_PREMIUM';
+      case AccountTypeName.mainAdmin:
+        return 'MAIN_ADMIN';
+    }
+  }
+}
+
 /// High level UI sections used for access control and menu filtering
 enum AccessSection {
   mechanicCabinet,

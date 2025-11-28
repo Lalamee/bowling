@@ -620,11 +620,6 @@ class ApiService {
     await _dio.put('/api/admin/users/$userId/deactivate', data: {});
   }
 
-  /// DELETE /api/admin/users/{userId}/reject - Отклонение регистрации
-  Future<void> rejectRegistration(int userId) async {
-    await _dio.delete('/api/admin/users/$userId/reject');
-  }
-
   // ============================================
   // INVITATION ENDPOINTS
   // ============================================
