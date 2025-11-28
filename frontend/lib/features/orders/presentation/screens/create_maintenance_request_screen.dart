@@ -8,12 +8,15 @@ import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/routing/routes.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/theme/colors.dart';
+import '../../../../core/utils/part_availability_helper.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../core/utils/user_club_resolver.dart';
 import '../../../../core/models/user_club.dart';
 import '../../../../models/part_request_dto.dart';
 import '../../../../models/part_dto.dart';
+import '../../../../models/parts_catalog_response_dto.dart';
 import '../../../../shared/widgets/buttons/custom_button.dart';
+import '../widgets/part_picker_sheet.dart';
 
 /// Экран создания новой заявки на обслуживание
 class CreateMaintenanceRequestScreen extends StatefulWidget {
@@ -46,6 +49,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
   List<UserClub> _clubs = const [];
 
   List<RequestedPartDto> requestedParts = [];
+  List<PartAvailabilityResult?> _availability = const [];
   List<PartDto> _partSuggestions = const <PartDto>[];
   bool _isSearchingParts = false;
   PartDto? _selectedCatalogPart;
@@ -95,13 +99,36 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     }
   }
 
+  Future<void> _refreshAvailability() async {
+    final clubId = _selectedClubId;
+    if (clubId == null || requestedParts.isEmpty) {
+      setState(() {
+        _availability = List.filled(requestedParts.length, null, growable: false);
+      });
+      return;
+    }
+    final results = <PartAvailabilityResult?>[];
+    for (final part in requestedParts) {
+      try {
+        final matches = await _inventoryRepository.search(query: part.catalogNumber, clubId: clubId);
+        results.add(PartAvailabilityHelper.resolve(part, matches));
+      } catch (_) {
+        results.add(null);
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _availability = results;
+    });
+  }
+
   Future<void> _logout() async {
     await AuthService.logout();
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
   }
 
-  void _addPart({bool helpRequested = false}) {
+  Future<void> _addPart({bool helpRequested = false}) async {
     final name = _partNameController.text.trim();
     if (name.isEmpty) {
       showSnack(context, 'Укажите название запчасти');
@@ -163,13 +190,19 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       _quantityController.clear();
       _selectedCatalogPart = null;
       _partSuggestions = const <PartDto>[];
+      _availability = List.filled(requestedParts.length, null, growable: false);
     });
+    await _refreshAvailability();
   }
 
   void _removePart(int index) {
     setState(() {
       requestedParts.removeAt(index);
+      if (_availability.length > index) {
+        _availability = List.of(_availability)..removeAt(index);
+      }
     });
+    _refreshAvailability();
   }
 
   String _resolvePartDisplayName(PartDto part) {
@@ -180,6 +213,16 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       }
     }
     return part.catalogNumber;
+  }
+
+  String _resolveCatalogNameFromDto(PartsCatalogResponseDto dto) {
+    final names = [dto.commonName, dto.officialNameRu, dto.officialNameEn];
+    for (final name in names) {
+      if (name != null && name.trim().isNotEmpty) {
+        return name.trim();
+      }
+    }
+    return dto.catalogNumber;
   }
 
   String _resolveCatalogNumber(PartDto part) {
@@ -223,6 +266,21 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       setState(() {
         _partSuggestions = const <PartDto>[];
         _isSearchingParts = false;
+      });
+    }
+  }
+
+  Future<void> _openPartPicker() async {
+    final result = await showModalBottomSheet<PartsCatalogResponseDto>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const SizedBox(height: 600, child: PartPickerSheet()),
+    );
+    if (result != null) {
+      setState(() {
+        _selectedCatalogPart = null;
+        _partNameController.text = _resolveCatalogNameFromDto(result);
+        _catalogNumberController.text = result.catalogNumber;
       });
     }
   }
@@ -408,6 +466,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
               _selectedClubId = value;
               _selectedLane = null;
               _laneController.clear();
+              _refreshAvailability();
             }),
             validator: (value) => value == null ? 'Выберите клуб' : null,
           ),
@@ -440,6 +499,21 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textDark),
           ),
           const SizedBox(height: 16),
+
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: _openPartPicker,
+              icon: const Icon(Icons.handyman, color: AppColors.primary),
+              label: const Text('Подбор запчасти', style: TextStyle(color: AppColors.primary)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
 
           // Название запчасти
           _buildPartNameSelector(),
@@ -580,6 +654,8 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
                                   'Кол-во: ${part.quantity}',
                                   style: const TextStyle(fontSize: 12, color: AppColors.darkGray),
                                 ),
+                                const SizedBox(height: 4),
+                                _buildAvailabilityBadge(_availability.length > i ? _availability[i] : null),
                               ],
                             ),
                           ),
@@ -759,6 +835,31 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
           validator: validator,
           onChanged: onChanged,
         ),
+      ],
+    );
+  }
+
+  Widget _buildAvailabilityBadge(PartAvailabilityResult? status) {
+    if (status == null) {
+      return const SizedBox.shrink();
+    }
+    final color = status.available ? Colors.green : Colors.orange;
+    final icon = status.available ? Icons.inventory_2 : Icons.shopping_cart_checkout;
+    final text = status.available
+        ? 'Есть на складе ${status.location != null ? '(${status.location})' : ''}'.trim()
+        : 'Нужно заказывать';
+    final details = status.warehouseHint;
+    return Row(
+      children: [
+        Chip(
+          avatar: Icon(icon, color: Colors.white, size: 18),
+          label: Text(text, style: const TextStyle(color: Colors.white)),
+          backgroundColor: color,
+        ),
+        if (details != null) ...[
+          const SizedBox(width: 6),
+          Text(details, style: const TextStyle(fontSize: 12, color: AppColors.darkGray)),
+        ],
       ],
     );
   }
