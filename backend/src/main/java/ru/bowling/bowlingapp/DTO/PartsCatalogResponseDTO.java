@@ -22,10 +22,11 @@ public class PartsCatalogResponseDTO {
 	private String officialNameEn;
 	private String officialNameRu;
 	private String commonName;
-	private String description;
+        private String description;
         private Integer normalServiceLife;
         private String unit;
         private Boolean isUnique;
+        private String categoryCode;
         private Integer availableQuantity;
         private AvailabilityStatus availabilityStatus;
         private String imageUrl;

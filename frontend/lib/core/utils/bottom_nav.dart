@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import '../debug/test_overrides.dart';
 import '../services/local_auth_storage.dart';
+import '../authz/role_context_resolver.dart';
+import '../authz/role_access.dart';
 
 import '../../features/orders/presentation/screens/orders_screen.dart';
 import '../../features/orders/presentation/screens/admin_orders_screen.dart';
 
 import '../../features/search/presentation/screens/global_search_screen.dart';
 import '../../features/clubs/presentation/screens/club_screen.dart';
+import '../routing/routes.dart';
 
 import '../../features/profile/mechanic/presentation/screens/mechanic_profile_screen.dart';
 import '../../features/profile/owner/presentation/screens/owner_profile_screen.dart';
@@ -18,8 +21,18 @@ class BottomNavDirect {
     if (tapped == current) return;
 
     () async {
-      final role = await _resolveRole();
-      final hasAccess = await _hasFullAccess(role);
+      final ctx = await _resolveContext();
+      final hasAccess = await _hasFullAccess(ctx);
+
+      if (!_isTabAllowed(ctx, tapped)) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Раздел недоступен для текущего типа аккаунта'),
+          ),
+        );
+        return;
+      }
 
       if (tapped != 3 && !hasAccess) {
         if (!context.mounted) return;
@@ -33,7 +46,7 @@ class BottomNavDirect {
 
       switch (tapped) {
         case 0:
-          if (role == 'admin') {
+          if (ctx.role == RoleName.admin) {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminOrdersScreen()));
           } else {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OrdersScreen()));
@@ -43,14 +56,18 @@ class BottomNavDirect {
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GlobalSearchScreen()));
           break;
         case 2:
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ClubScreen()));
+          if (ctx.access.allows(AccessSection.freeWarehouse) && !ctx.access.allows(AccessSection.clubEquipment)) {
+            Navigator.pushReplacementNamed(context, Routes.personalWarehouse);
+          } else {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ClubScreen()));
+          }
           break;
         case 3:
-          if (role == 'owner') {
+          if (ctx.role == RoleName.clubOwner) {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OwnerProfileScreen()));
-          } else if (role == 'manager') {
+          } else if (ctx.role == RoleName.headMechanic) {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ManagerProfileScreen()));
-          } else if (role == 'admin') {
+          } else if (ctx.role == RoleName.admin) {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminProfileScreen()));
           } else {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MechanicProfileScreen()));
@@ -60,30 +77,32 @@ class BottomNavDirect {
     }();
   }
 
-  static Future<String> _resolveRole() async {
+  static Future<RoleAccountContext> _resolveContext() async {
     if (TestOverrides.enabled) {
-      final forced = TestOverrides.userRole.trim().toLowerCase();
-      if (forced.isNotEmpty) {
-        return forced;
+      final forced = RoleAccessMatrix.parseRole(TestOverrides.userRole);
+      if (forced != null) {
+        return RoleAccountContext(role: forced, accountType: null);
       }
     }
 
-    final stored = await LocalAuthStorage.getRegisteredRole();
-    final normalized = stored?.trim().toLowerCase();
-    if (normalized != null && normalized.isNotEmpty) {
-      return normalized;
-    }
+    final storedRole = await LocalAuthStorage.getRegisteredRole();
+    final storedType = await LocalAuthStorage.getRegisteredAccountType();
+    final stored = RoleContextResolver.fromStored(storedRole, storedType);
+    if (stored != null) return stored;
 
-    final fallback = TestOverrides.userRole.trim().toLowerCase();
-    return fallback.isNotEmpty ? fallback : 'mechanic';
+    return const RoleAccountContext(role: RoleName.mechanic, accountType: null);
   }
 
-  static Future<bool> _hasFullAccess(String role) async {
+  static Future<bool> _hasFullAccess(RoleAccountContext ctx) async {
+    if (ctx.role == RoleName.admin || ctx.role == RoleName.clubOwner || ctx.role == RoleName.headMechanic) {
+      return true;
+    }
+
     Map<String, dynamic>? profile;
 
-    if (role == 'mechanic') {
+    if (ctx.role == RoleName.mechanic) {
       profile = await LocalAuthStorage.loadMechanicProfile();
-    } else if (role == 'manager') {
+    } else if (ctx.role == RoleName.headMechanic) {
       profile = await LocalAuthStorage.loadManagerProfile();
     } else {
       return true;
@@ -108,5 +127,22 @@ class BottomNavDirect {
         _boolFrom(profile['verified']);
 
     return verified;
+  }
+
+  static bool _isTabAllowed(RoleAccountContext ctx, int tab) {
+    switch (tab) {
+      case 0:
+        return ctx.access.allows(AccessSection.maintenance) || ctx.role == RoleName.admin;
+      case 1:
+        return true;
+      case 2:
+        return ctx.access.allows(AccessSection.clubEquipment) ||
+            ctx.access.allows(AccessSection.technicalInfo) ||
+            ctx.access.allows(AccessSection.freeWarehouse);
+      case 3:
+        return true;
+      default:
+        return true;
+    }
   }
 }

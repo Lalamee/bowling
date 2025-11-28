@@ -43,12 +43,13 @@ class _SpecialistDetailScreenState extends State<SpecialistDetailScreen> {
               _infoRow('Телефон', detail.contactPhone ?? '—'),
               _infoRow('Специализация', detail.specialization ?? '—'),
               _infoRow('Статус', detail.status ?? '—'),
-              _infoRow('Регион', detail.region ?? 'TODO: поле региона в анкете'),
+              _infoRow('Регион', detail.region ?? '—'),
               _infoRow('Рейтинг', detail.rating?.toStringAsFixed(1) ?? '—'),
               _infoRow('Общий стаж', detail.totalExperienceYears?.toString() ?? '—'),
               _infoRow('Опыт в боулинге', detail.bowlingExperienceYears?.toString() ?? '—'),
               _infoRow('Статус данных', detail.isDataVerified == true ? 'Проверено' : 'Не проверено'),
-              _infoRow('Аттестация', detail.attestationStatus ?? 'TODO: статус аттестации'),
+              _infoRow('Аттестация', detail.attestationStatus ?? 'Нет данных'),
+              _infoRow('Дата верификации', detail.verificationDate != null ? detail.verificationDate!.toLocal().toString().split(' ').first : '—'),
               const SizedBox(height: 12),
               const Text('Связанные клубы'),
               const SizedBox(height: 8),
@@ -62,12 +63,41 @@ class _SpecialistDetailScreenState extends State<SpecialistDetailScreen> {
               const SizedBox(height: 12),
               const Text('Опыт и навыки'),
               const SizedBox(height: 8),
-              if (detail.workPlaces != null) Text('Места работы: ${detail.workPlaces}') else const SizedBox(),
-              if (detail.workPeriods != null) Text('Периоды работы: ${detail.workPeriods}') else const SizedBox(),
-              if (detail.certifications.isNotEmpty)
-                Text('Сертификации: ${detail.certifications.join(', ')}')
+              if (detail.workHistory.isEmpty)
+                const Text('История работ не указана')
               else
-                const Text('Сертификации: TODO — ожидание модели'),
+                ...detail.workHistory.map((work) => ListTile(
+                      leading: const Icon(Icons.work_outline),
+                      title: Text(work.organization ?? 'Организация не указана'),
+                      subtitle: Text(
+                        [
+                          if (work.position != null) work.position,
+                          if (work.startDate != null)
+                            'с ${work.startDate!.toLocal().toString().split(' ').first}',
+                          if (work.endDate != null)
+                            'по ${work.endDate!.toLocal().toString().split(' ').first}',
+                        ].whereType<String>().join(' • '),
+                      ),
+                    )),
+              const SizedBox(height: 8),
+              if (detail.certifications.isNotEmpty)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: detail.certifications
+                      .map(
+                        (cert) => ListTile(
+                          leading: const Icon(Icons.verified),
+                          title: Text(cert.title ?? 'Сертификат'),
+                          subtitle: Text(cert.issuer ?? ''),
+                          trailing: cert.issueDate != null
+                              ? Text(cert.issueDate!.toLocal().toString().split(' ').first)
+                              : null,
+                        ),
+                      )
+                      .toList(),
+                )
+              else
+                const Text('Сертификации отсутствуют'),
             ],
           );
         },

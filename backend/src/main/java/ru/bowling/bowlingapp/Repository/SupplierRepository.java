@@ -6,4 +6,6 @@ import ru.bowling.bowlingapp.Entity.Supplier;
 
 @Repository
 public interface SupplierRepository extends JpaRepository<Supplier, Long> {
+
+    Supplier findFirstByInn(String inn);
 }

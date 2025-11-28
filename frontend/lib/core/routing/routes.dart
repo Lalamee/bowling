@@ -14,8 +14,10 @@ class Routes {
   static const club = '/clubs';
   static const clubSearch = '/clubs/search';
   static const clubWarehouse = '/clubs/warehouse';
+  static const personalWarehouse = '/warehouses/personal';
   static const warehouseSelector = '/warehouses';
   static const clubLanes = '/clubs/lanes';
+  static const ownerDashboard = '/clubs/dashboard';
 
   static const profileMechanic = '/profile/mechanic';
   static const editMechanicProfile = '/profile/mechanic/edit';
@@ -43,6 +45,10 @@ class Routes {
   static const adminMechanics = '/admin/mechanics';
   static const adminOrders = '/admin/orders';
   static const adminProfile = '/admin/profile';
+  static const adminAttestations = '/admin/attestations';
+  static const adminHelpRequests = '/admin/help-requests';
+  static const adminRegistrations = '/admin/registrations';
+  static const adminComplaints = '/admin/complaints';
 
   static const ordersPersonalHistory = '/orders/history-personal';
   static const clubOrdersHistory = '/orders/history-club';

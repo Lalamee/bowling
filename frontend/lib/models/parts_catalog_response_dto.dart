@@ -10,6 +10,7 @@ class PartsCatalogResponseDto {
   final int? normalServiceLife;
   final String? unit;
   final bool? isUnique;
+  final String? categoryCode;
   final int? availableQuantity;
   final String? availabilityStatus; // keep as string for simplicity
   final String? imageUrl;
@@ -30,6 +31,7 @@ class PartsCatalogResponseDto {
     this.normalServiceLife,
     this.unit,
     this.isUnique,
+    this.categoryCode,
     this.availableQuantity,
     this.availabilityStatus,
     this.imageUrl,
@@ -52,6 +54,7 @@ class PartsCatalogResponseDto {
       normalServiceLife: (json['normalServiceLife'] as num?)?.toInt(),
       unit: json['unit'] as String?,
       isUnique: json['isUnique'] as bool?,
+      categoryCode: json['categoryCode']?.toString(),
       availableQuantity: (json['availableQuantity'] as num?)?.toInt(),
       availabilityStatus: json['availabilityStatus']?.toString(),
       imageUrl: json['imageUrl']?.toString(),
@@ -82,6 +85,7 @@ class PartsCatalogResponseDto {
         'normalServiceLife': normalServiceLife,
         'unit': unit,
         'isUnique': isUnique,
+        'categoryCode': categoryCode,
         'availableQuantity': availableQuantity,
         'availabilityStatus': availabilityStatus,
         'imageUrl': imageUrl,
