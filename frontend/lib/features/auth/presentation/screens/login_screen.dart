@@ -5,6 +5,8 @@ import '../../../../core/utils/net_ui.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/local_auth_storage.dart';
 import '../../../../core/utils/phone_utils.dart';
+import '../../../../core/authz/role_access.dart';
+import '../../../../core/authz/role_context_resolver.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/colors.dart';
@@ -84,9 +86,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (res == null || !mounted) {
         return;
       }
-      final role = await _cacheRole();
+      final ctx = await _cacheContext();
       if (!mounted) return;
-      final destination = _routeForRole(role);
+      final destination = ctx?.access.homeRoute ?? Routes.profileMechanic;
       Navigator.of(context).pushNamedAndRemoveUntil(destination, (route) => false);
     } on DioException catch (e) {
       final api = e.error is ApiException ? e.error as ApiException : null;
@@ -122,80 +124,21 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<String?> _cacheRole() async {
+  Future<RoleAccountContext?> _cacheContext() async {
     final info = await AuthService.currentUser();
     if (info == null) return null;
 
-    String? role;
-    String? normalize(String? value) => value?.toLowerCase().trim();
+    final resolved = RoleContextResolver.resolveFrom(info);
 
-    final typeName = normalize(info.accountTypeName);
-    if (typeName != null && typeName.isNotEmpty) {
-      if (typeName.contains('влад') || typeName.contains('owner')) {
-        role = 'owner';
-      } else if (typeName.contains('менедж') || typeName.contains('главн')) {
-        role = 'manager';
-      } else if (typeName.contains('админ')) {
-        role = 'admin';
-      } else if (typeName.contains('механ')) {
-        role = 'mechanic';
-      }
-    }
-
-    if (role == null) {
-      final roleName = normalize(info.roleName);
-      if (roleName != null && roleName.isNotEmpty) {
-        if (roleName.contains('admin')) {
-          role = 'admin';
-        } else if (roleName.contains('owner')) {
-          role = 'owner';
-        } else if (roleName.contains('manager') || roleName.contains('staff') || roleName.contains('head')) {
-          role = 'manager';
-        } else if (roleName.contains('mechanic')) {
-          role = 'mechanic';
-        }
-      }
-    }
-
-    if (role == null && info.roleId != null) {
-      switch (info.roleId) {
-        case 1:
-          role = 'admin';
-          break;
-        case 4:
-          role = 'mechanic';
-          break;
-        case 5:
-          role = 'owner';
-          break;
-        case 6:
-          role = 'manager';
-          break;
-      }
-    }
-
-    if (role == null && info.accountTypeId != null) {
-      switch (info.accountTypeId) {
-        case 2:
-          role = 'owner';
-          break;
-        case 1:
-          role = 'mechanic';
-          break;
-      }
-    }
-
-    if (role == null) return null;
-
-    if (role == 'mechanic') {
+    if (resolved.role == RoleName.mechanic) {
       await LocalAuthStorage.clearOwnerState();
       await LocalAuthStorage.clearManagerState();
       await LocalAuthStorage.setMechanicRegistered(true);
-    } else if (role == 'owner') {
+    } else if (resolved.role == RoleName.clubOwner) {
       await LocalAuthStorage.clearMechanicState();
       await LocalAuthStorage.clearManagerState();
       await LocalAuthStorage.setOwnerRegistered(true);
-    } else if (role == 'manager') {
+    } else if (resolved.role == RoleName.headMechanic) {
       await LocalAuthStorage.clearMechanicState();
       await LocalAuthStorage.clearOwnerState();
     } else {
@@ -204,21 +147,9 @@ class _LoginScreenState extends State<LoginScreen> {
       await LocalAuthStorage.clearManagerState();
     }
 
-    await LocalAuthStorage.setRegisteredRole(role);
-    return role;
-  }
-
-  String _routeForRole(String? role) {
-    switch (role) {
-      case 'owner':
-        return Routes.profileOwner;
-      case 'manager':
-        return Routes.profileManager;
-      case 'admin':
-        return Routes.profileAdmin;
-      default:
-        return Routes.profileMechanic;
-    }
+    await LocalAuthStorage.setRegisteredRole(resolved.role.name);
+    await LocalAuthStorage.setRegisteredAccountType(resolved.accountType?.name);
+    return resolved;
   }
 
   @override
