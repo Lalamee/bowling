@@ -29,11 +29,12 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
   bool _loadingComponents = false;
   bool _loadingParts = false;
 
+  bool get _canSearchParts => _path.isNotEmpty;
+
   @override
   void initState() {
     super.initState();
     _loadComponents();
-    _runSearch();
   }
 
   @override
@@ -74,15 +75,32 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
     _path.removeLast();
     final parentId = _path.isNotEmpty ? _path.last.componentId : null;
     _loadComponents(parentId: parentId);
-    _runSearch(categoryCode: _path.isNotEmpty ? _path.last.code : null);
+    if (_canSearchParts) {
+      _runSearch(categoryCode: _path.last.code);
+    } else {
+      _resetParts();
+    }
   }
 
   void _onSearchChanged(String value) {
+    if (!_canSearchParts) return;
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 350), _runSearch);
   }
 
+  void _resetParts() {
+    if (!mounted) return;
+    setState(() {
+      _parts = const [];
+      _loadingParts = false;
+    });
+  }
+
   Future<void> _runSearch({String? categoryCode}) async {
+    if (!_canSearchParts) {
+      _resetParts();
+      return;
+    }
     setState(() => _loadingParts = true);
     try {
       final dto = PartsSearchDto(
@@ -137,6 +155,7 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
+                enabled: _canSearchParts,
               ),
               onChanged: _onSearchChanged,
             ),
@@ -195,27 +214,7 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
                     ),
             ),
             const SizedBox(height: 12),
-            Expanded(
-              child: _loadingParts
-                  ? const Center(child: CircularProgressIndicator())
-                  : _parts.isEmpty
-                      ? const Center(child: Text('Запчасти не найдены'))
-                      : ListView.separated(
-                          itemCount: _parts.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final part = _parts[index];
-                            final name = part.commonName ?? part.officialNameRu ?? part.officialNameEn ?? part.catalogNumber;
-                            final availability = part.availableQuantity ?? 0;
-                            return ListTile(
-                              title: Text(name),
-                              subtitle: Text('Кат. № ${part.catalogNumber} · Доступно: $availability'),
-                              trailing: const Icon(Icons.chevron_right),
-                              onTap: () => Navigator.pop(context, part),
-                            );
-                          },
-                        ),
-            ),
+            Expanded(child: _buildPartsSection()),
             CustomButton(
               text: 'Закрыть',
               onPressed: () => Navigator.pop(context),
@@ -252,6 +251,41 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPartsSection() {
+    if (!_canSearchParts) {
+      return const Center(
+        child: Text(
+          'Сначала выберите категорию оборудования',
+          style: TextStyle(color: AppColors.darkGray),
+        ),
+      );
+    }
+
+    if (_loadingParts) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_parts.isEmpty) {
+      return const Center(child: Text('Запчасти не найдены'));
+    }
+
+    return ListView.separated(
+      itemCount: _parts.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (context, index) {
+        final part = _parts[index];
+        final name = part.commonName ?? part.officialNameRu ?? part.officialNameEn ?? part.catalogNumber;
+        final availability = part.availableQuantity ?? 0;
+        return ListTile(
+          title: Text(name),
+          subtitle: Text('Кат. № ${part.catalogNumber} · Доступно: $availability'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.pop(context, part),
+        );
+      },
     );
   }
 }
