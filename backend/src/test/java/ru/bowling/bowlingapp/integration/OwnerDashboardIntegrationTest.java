@@ -119,7 +119,7 @@ class OwnerDashboardIntegrationTest {
                 .laneNumber(1)
                 .createdDate(LocalDateTime.now().minusDays(10))
                 .completedDate(LocalDateTime.now().minusDays(9))
-                .workType(WorkType.REPAIR)
+                .workType(WorkType.CORRECTIVE_MAINTENANCE)
                 .status(WorkLogStatus.COMPLETED)
                 .build());
 

@@ -176,7 +176,7 @@ class AdminCabinetIntegrationTest {
                 .request(request)
                 .partName("Деталь помощи")
                 .helpRequested(true)
-                .status(ru.bowling.bowlingapp.Entity.enums.PartStatus.PENDING)
+                .status(ru.bowling.bowlingapp.Entity.enums.PartStatus.APPROVAL_PENDING)
                 .build());
 
         List<AdminHelpRequestDTO> helpRequests = adminCabinetService.listHelpRequests();
@@ -184,7 +184,7 @@ class AdminCabinetIntegrationTest {
         assertThat(helpRequests.get(0).getRequestId()).isEqualTo(request.getRequestId());
 
         List<AttestationApplicationDTO> attestationList = adminCabinetService.listAttestationApplications();
-        assertThat(attestationList).extracting(AttestationApplicationDTO::getApplicationId).contains(attestation.getApplicationId());
+        assertThat(attestationList).extracting(AttestationApplicationDTO::getId).contains(attestation.getApplicationId());
     }
 }
 

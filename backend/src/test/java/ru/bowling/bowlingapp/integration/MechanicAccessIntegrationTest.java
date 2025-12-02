@@ -193,7 +193,7 @@ class MechanicAccessIntegrationTest {
         WorkLog logA = workLogRepository.save(WorkLog.builder()
                 .club(clubA)
                 .laneNumber(1)
-                .status(WorkLogStatus.NEW)
+                .status(WorkLogStatus.CREATED)
                 .createdDate(LocalDateTime.now())
                 .createdBy(staffUser.getUserId())
                 .build());
@@ -201,7 +201,7 @@ class MechanicAccessIntegrationTest {
         WorkLog logB = workLogRepository.save(WorkLog.builder()
                 .club(clubB)
                 .laneNumber(2)
-                .status(WorkLogStatus.NEW)
+                .status(WorkLogStatus.CREATED)
                 .createdDate(LocalDateTime.now())
                 .createdBy(freeUser.getUserId())
                 .build());
