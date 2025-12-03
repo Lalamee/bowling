@@ -44,8 +44,11 @@ public class EquipmentCategoryService {
             throw new IllegalArgumentException("Expected level " + expectedLevel + " for children of parent " + parentId);
         }
 
-        return equipmentCategoryRepository.findByParent_IdAndIsActiveTrueOrderBySortOrder(parentId).stream()
-                .filter(category -> normalizedBrand == null || normalizedBrand.equalsIgnoreCase(category.getBrand()))
+        List<EquipmentCategory> children = normalizedBrand == null
+                ? equipmentCategoryRepository.findByParent_IdAndIsActiveTrueOrderBySortOrder(parentId)
+                : equipmentCategoryRepository.findByParent_IdAndBrandIgnoreCaseAndIsActiveTrueOrderBySortOrder(parentId, normalizedBrand);
+
+        return children.stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }
@@ -55,8 +58,11 @@ public class EquipmentCategoryService {
             throw new IllegalArgumentException("Root level must be 1 when parentId is not provided");
         }
 
-        return equipmentCategoryRepository.findByParentIsNullAndIsActiveTrueOrderBySortOrder().stream()
-                .filter(category -> normalizedBrand == null || normalizedBrand.equalsIgnoreCase(category.getBrand()))
+        List<EquipmentCategory> roots = normalizedBrand == null
+                ? equipmentCategoryRepository.findByParentIsNullAndIsActiveTrueOrderBySortOrder()
+                : equipmentCategoryRepository.findByParentIsNullAndBrandIgnoreCaseAndIsActiveTrueOrderBySortOrder(normalizedBrand);
+
+        return roots.stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }

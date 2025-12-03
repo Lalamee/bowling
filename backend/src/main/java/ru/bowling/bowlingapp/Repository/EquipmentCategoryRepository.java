@@ -12,7 +12,11 @@ public interface EquipmentCategoryRepository extends JpaRepository<EquipmentCate
 
     List<EquipmentCategory> findByParentIsNullAndIsActiveTrueOrderBySortOrder();
 
+    List<EquipmentCategory> findByParentIsNullAndBrandIgnoreCaseAndIsActiveTrueOrderBySortOrder(String brand);
+
     List<EquipmentCategory> findByParent_IdAndIsActiveTrueOrderBySortOrder(Long parentId);
+
+    List<EquipmentCategory> findByParent_IdAndBrandIgnoreCaseAndIsActiveTrueOrderBySortOrder(Long parentId, String brand);
 
     Optional<EquipmentCategory> findByIdAndIsActiveTrue(Long id);
 }
