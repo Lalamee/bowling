@@ -23,17 +23,18 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
   final _searchController = TextEditingController();
   Timer? _debounce;
 
-  List<_ComponentLevel> _levels = const [];
-  EquipmentComponentDto? _leafSelection;
+  List<EquipmentComponentDto> _currentComponents = const [];
+  final List<EquipmentComponentDto> _path = [];
   List<PartsCatalogResponseDto> _parts = const [];
+  bool _loadingComponents = false;
   bool _loadingParts = false;
 
-  bool get _canSearchParts => _leafSelection != null;
+  bool get _canSearchParts => _path.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
-    _loadComponents(levelIndex: 0);
+    _loadComponents();
   }
 
   @override
@@ -43,17 +44,41 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
     super.dispose();
   }
 
-  Future<void> _loadComponents({int? parentId, required int levelIndex}) async {
-    _setLevelLoading(levelIndex);
+  Future<void> _loadComponents({int? parentId}) async {
+    setState(() => _loadingComponents = true);
     try {
       final items = parentId == null
           ? await _componentRepository.fetchRoots()
           : await _componentRepository.fetchChildren(parentId);
       if (!mounted) return;
-      _applyLoadedLevel(levelIndex, items);
+      setState(() {
+        _currentComponents = items;
+        _loadingComponents = false;
+      });
     } catch (_) {
       if (!mounted) return;
-      _applyLoadedLevel(levelIndex, const []);
+      setState(() {
+        _currentComponents = const [];
+        _loadingComponents = false;
+      });
+    }
+  }
+
+  void _onComponentTap(EquipmentComponentDto component) {
+    _path.add(component);
+    _loadComponents(parentId: component.componentId);
+    _runSearch(categoryCode: component.code);
+  }
+
+  void _onBackLevel() {
+    if (_path.isEmpty) return;
+    _path.removeLast();
+    final parentId = _path.isNotEmpty ? _path.last.componentId : null;
+    _loadComponents(parentId: parentId);
+    if (_canSearchParts) {
+      _runSearch(categoryCode: _path.last.code);
+    } else {
+      _resetParts();
     }
   }
 
@@ -80,7 +105,7 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
     try {
       final dto = PartsSearchDto(
         searchQuery: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
-        categoryCode: categoryCode ?? _leafSelection?.code,
+        categoryCode: categoryCode ?? (_path.isNotEmpty ? _path.last.code : null),
         size: 20,
       );
       final results = await _api.searchParts(dto);
@@ -123,9 +148,71 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
               ],
             ),
             const SizedBox(height: 8),
-            _buildSearchField(),
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Поиск по каталожному номеру или названию',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                enabled: _canSearchParts,
+              ),
+              onChanged: _onSearchChanged,
+            ),
             const SizedBox(height: 12),
-            _buildSelectionSteps(),
+            _buildBreadcrumbs(),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 120,
+              child: _loadingComponents
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _currentComponents.length,
+                      itemBuilder: (context, index) {
+                        final component = _currentComponents[index];
+                        return GestureDetector(
+                          onTap: () => _onComponentTap(component),
+                          child: Container(
+                            width: 180,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.lightGray),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  component.name,
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  component.category ?? '',
+                                  style: const TextStyle(color: AppColors.darkGray, fontSize: 12),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (component.manufacturer != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Text(
+                                      component.manufacturer!,
+                                      style: const TextStyle(color: AppColors.primary, fontSize: 12),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    ),
+            ),
             const SizedBox(height: 12),
             Expanded(child: _buildPartsSection()),
             CustomButton(
@@ -139,11 +226,31 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
   }
 
   Widget _buildBreadcrumbs() {
-    final selected = _levels.where((l) => l.selected != null).map((l) => l.selected!.name).toList();
-    if (selected.isEmpty) return const SizedBox.shrink();
-    return Wrap(
-      spacing: 6,
-      children: selected.map((name) => Chip(label: Text(name, overflow: TextOverflow.ellipsis))).toList(),
+    if (_path.isEmpty) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: const [
+          Text('Выберите категорию оборудования'),
+        ],
+      );
+    }
+    return Row(
+      children: [
+        IconButton(
+          onPressed: _onBackLevel,
+          icon: const Icon(Icons.arrow_back_ios_new, size: 16),
+        ),
+        Expanded(
+          child: Wrap(
+            spacing: 6,
+            children: _path
+                .map((c) => Chip(
+                      label: Text(c.name, overflow: TextOverflow.ellipsis),
+                    ))
+                .toList(),
+          ),
+        ),
+      ],
     );
   }
 
@@ -179,163 +286,6 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
           onTap: () => Navigator.pop(context, part),
         );
       },
-    );
-  }
-
-  Widget _buildSearchField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          controller: _searchController,
-          decoration: InputDecoration(
-            hintText: 'Поиск по каталожному номеру или названию',
-            prefixIcon: const Icon(Icons.search),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            filled: true,
-            enabled: _canSearchParts,
-          ),
-          onChanged: _onSearchChanged,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          _canSearchParts
-              ? 'Введите часть номера или названия, чтобы найти деталь в выбранной ветке.'
-              : 'Сначала выберите бренд и последовательно дочерние категории.',
-          style: const TextStyle(color: AppColors.darkGray, fontSize: 12),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSelectionSteps() {
-    if (_levels.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return Column(
-      children: [
-        ...List.generate(_levels.length, (index) => _buildLevelCard(index)),
-        if (_leafSelection != null) ...[
-          const SizedBox(height: 8),
-          const Text('Категория выбрана, можно искать детали.'),
-        ],
-        const SizedBox(height: 8),
-        _buildBreadcrumbs(),
-      ],
-    );
-  }
-
-  Widget _buildLevelCard(int index) {
-    final level = _levels[index];
-    final title = index == 0 ? 'Шаг 1 — бренд / тип оборудования' : 'Шаг ${index + 1}';
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.lightGray),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          level.loading
-              ? const Center(child: CircularProgressIndicator())
-              : DropdownButtonFormField<EquipmentComponentDto>(
-                  isExpanded: true,
-                  value: level.selected,
-                  hint: const Text('Выберите вариант'),
-                  items: level.options
-                      .map((c) => DropdownMenuItem(
-                            value: c,
-                            child: Text(c.name),
-                          ))
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) _onComponentSelected(index, value);
-                  },
-                ),
-        ],
-      ),
-    );
-  }
-
-  void _onComponentSelected(int levelIndex, EquipmentComponentDto component) {
-    final updatedLevels = List<_ComponentLevel>.from(_levels);
-    updatedLevels[levelIndex] = updatedLevels[levelIndex].copyWith(selected: component);
-    if (updatedLevels.length > levelIndex + 1) {
-      updatedLevels.removeRange(levelIndex + 1, updatedLevels.length);
-    }
-
-    setState(() {
-      _levels = updatedLevels;
-      _leafSelection = null;
-    });
-    _resetParts();
-    _loadComponents(parentId: component.componentId, levelIndex: levelIndex + 1);
-  }
-
-  void _setLevelLoading(int levelIndex) {
-    final updated = List<_ComponentLevel>.from(_levels);
-    if (updated.length <= levelIndex) {
-      updated.add(const _ComponentLevel(options: [], loading: true));
-    } else {
-      updated[levelIndex] = updated[levelIndex].copyWith(loading: true, options: const []);
-    }
-    setState(() => _levels = updated);
-  }
-
-  void _applyLoadedLevel(int levelIndex, List<EquipmentComponentDto> items) {
-    final updated = List<_ComponentLevel>.from(_levels);
-
-    if (items.isEmpty) {
-      if (updated.length > levelIndex) {
-        updated.removeRange(levelIndex, updated.length);
-      }
-      final leaf = updated.isNotEmpty ? updated.last.selected : null;
-      setState(() {
-        _levels = updated;
-        _leafSelection = leaf;
-      });
-      if (leaf != null) {
-        _runSearch(categoryCode: leaf.code);
-      } else {
-        _resetParts();
-      }
-      return;
-    }
-
-    if (updated.length <= levelIndex) {
-      updated.add(_ComponentLevel(options: items));
-    } else {
-      updated[levelIndex] = _ComponentLevel(options: items);
-    }
-
-    setState(() {
-      _levels = updated;
-      _leafSelection = null;
-    });
-    _resetParts();
-  }
-}
-
-class _ComponentLevel {
-  final List<EquipmentComponentDto> options;
-  final EquipmentComponentDto? selected;
-  final bool loading;
-
-  const _ComponentLevel({required this.options, this.selected, this.loading = false});
-
-  _ComponentLevel copyWith({List<EquipmentComponentDto>? options, EquipmentComponentDto? selected, bool? loading}) {
-    return _ComponentLevel(
-      options: options ?? this.options,
-      selected: selected ?? this.selected,
-      loading: loading ?? this.loading,
     );
   }
 }
