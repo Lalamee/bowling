@@ -71,13 +71,12 @@ class EquipmentCategoryControllerIntegrationTest {
     @WithMockUser(roles = "MECHANIC")
     void componentRootLevelReturnsBrand() throws Exception {
         mockMvc.perform(get("/api/equipment/components")
-                        .param("brand", "Brunswick")
-                        .param("level", "1")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].name").value("Brunswick"))
-                .andExpect(jsonPath("$[0].parentId").doesNotExist());
+                .andExpect(jsonPath("$[0].parentId").doesNotExist())
+                .andExpect(jsonPath("$[0].code").value("BRUNSWICK"));
     }
 
     @Test
@@ -128,7 +127,6 @@ class EquipmentCategoryControllerIntegrationTest {
     @WithMockUser(roles = "MECHANIC")
     void componentSecondLevelCategoriesAreScopedByParent() throws Exception {
         mockMvc.perform(get("/api/equipment/components")
-                        .param("brand", "Brunswick")
                         .param("parentId", "1000")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -177,7 +175,6 @@ class EquipmentCategoryControllerIntegrationTest {
     @WithMockUser(roles = "MECHANIC")
     void componentPinsetterChildren() throws Exception {
         mockMvc.perform(get("/api/equipment/components")
-                        .param("brand", "Brunswick")
                         .param("parentId", "1100")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -216,7 +213,6 @@ class EquipmentCategoryControllerIntegrationTest {
     @WithMockUser(roles = "MECHANIC")
     void componentLaneMachineChildren() throws Exception {
         mockMvc.perform(get("/api/equipment/components")
-                        .param("brand", "Brunswick")
                         .param("parentId", "1140")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -242,17 +238,6 @@ class EquipmentCategoryControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("Компоненты: запрос без parentId для глубокого уровня отклоняется")
-    @WithMockUser(roles = "MECHANIC")
-    void componentCannotSkipLevels() throws Exception {
-        mockMvc.perform(get("/api/equipment/components")
-                        .param("brand", "Brunswick")
-                        .param("level", "3")
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
     @DisplayName("Некорректный parentId возвращает пустой список")
     @WithMockUser(roles = "MECHANIC")
     void invalidParentReturnsEmptyList() throws Exception {
@@ -269,7 +254,6 @@ class EquipmentCategoryControllerIntegrationTest {
     @WithMockUser(roles = "MECHANIC")
     void componentInvalidParentReturnsEmptyList() throws Exception {
         mockMvc.perform(get("/api/equipment/components")
-                        .param("brand", "Brunswick")
                         .param("parentId", "999999")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())

@@ -8,6 +8,7 @@ import ru.bowling.bowlingapp.DTO.NotificationEvent;
 import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Entity.enums.WorkLogStatus;
 import ru.bowling.bowlingapp.Entity.enums.WorkType;
+import ru.bowling.bowlingapp.Repository.EquipmentComponentRepository;
 import ru.bowling.bowlingapp.Enum.RoleName;
 import ru.bowling.bowlingapp.Repository.*;
 
@@ -24,7 +25,7 @@ import java.util.stream.Collectors;
 public class OwnerDashboardService {
 
     private final ClubEquipmentRepository clubEquipmentRepository;
-    private final EquipmentCategoryRepository equipmentCategoryRepository;
+    private final EquipmentComponentRepository equipmentComponentRepository;
     private final EquipmentMaintenanceScheduleRepository equipmentMaintenanceScheduleRepository;
     private final WorkLogRepository workLogRepository;
     private final WorkLogPartUsageRepository workLogPartUsageRepository;
@@ -35,8 +36,7 @@ public class OwnerDashboardService {
     @Transactional(readOnly = true)
     public List<TechnicalInfoDTO> getTechnicalInformation(Long userId, Long clubId) {
         Long resolvedClubId = resolveClubForUser(userId, clubId);
-        List<EquipmentComponentDTO> components = equipmentCategoryRepository.findAll().stream()
-                .filter(EquipmentCategory::isActive)
+        List<EquipmentComponentDTO> components = equipmentComponentRepository.findAll().stream()
                 .map(this::toComponentDto)
                 .toList();
 
@@ -174,15 +174,15 @@ public class OwnerDashboardService {
                 .build();
     }
 
-    private EquipmentComponentDTO toComponentDto(EquipmentCategory component) {
+    private EquipmentComponentDTO toComponentDto(EquipmentComponent component) {
         return EquipmentComponentDTO.builder()
-                .componentId(component.getId())
-                .name(component.getNameRu())
-                .manufacturer(component.getBrand())
-                .category(component.getNameEn())
-                .code(null)
-                .notes(null)
-                .parentId(component.getParent() != null ? component.getParent().getId() : null)
+                .componentId(component.getComponentId())
+                .name(component.getName())
+                .manufacturer(component.getManufacturer())
+                .category(component.getCategory())
+                .code(component.getCode())
+                .notes(component.getNotes())
+                .parentId(component.getParent() != null ? component.getParent().getComponentId() : null)
                 .build();
     }
 

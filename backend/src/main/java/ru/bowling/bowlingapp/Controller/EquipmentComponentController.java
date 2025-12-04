@@ -7,9 +7,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import ru.bowling.bowlingapp.DTO.EquipmentCategoryDTO;
 import ru.bowling.bowlingapp.DTO.EquipmentComponentDTO;
-import ru.bowling.bowlingapp.Service.EquipmentCategoryService;
+import ru.bowling.bowlingapp.Service.EquipmentComponentService;
 
 import java.util.List;
 
@@ -18,31 +17,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class EquipmentComponentController {
 
-    private final EquipmentCategoryService equipmentCategoryService;
+    private final EquipmentComponentService equipmentComponentService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('MECHANIC','HEAD_MECHANIC','CLUB_MANAGER','CLUB_OWNER','ADMIN')")
     public ResponseEntity<List<EquipmentComponentDTO>> getComponents(
-            @RequestParam(value = "brand", required = false) String brand,
-            @RequestParam(value = "parentId", required = false) Long parentId,
-            @RequestParam(value = "level", required = false) Integer level) {
+            @RequestParam(value = "parentId", required = false) Long parentId) {
 
-        List<EquipmentComponentDTO> components = equipmentCategoryService.getCategories(brand, parentId, level).stream()
-                .map(this::fromCategory)
-                .toList();
+        List<EquipmentComponentDTO> components = equipmentComponentService.getComponents(parentId);
 
         return ResponseEntity.ok(components);
-    }
-
-    private EquipmentComponentDTO fromCategory(EquipmentCategoryDTO category) {
-        return EquipmentComponentDTO.builder()
-                .componentId(category.getId())
-                .name(category.getNameRu())
-                .manufacturer(category.getBrand())
-                .category(category.getNameEn())
-                .code(null)
-                .notes(null)
-                .parentId(category.getParentId())
-                .build();
     }
 }
