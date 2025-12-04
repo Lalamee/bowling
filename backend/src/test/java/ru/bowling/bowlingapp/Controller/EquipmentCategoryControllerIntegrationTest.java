@@ -8,13 +8,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
-import ru.bowling.bowlingapp.Entity.EquipmentCategory;
-import ru.bowling.bowlingapp.Repository.EquipmentCategoryRepository;
-
-import org.junit.jupiter.api.BeforeEach;
-
-import java.util.List;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.contains;
@@ -27,107 +22,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@Sql(scripts = "/db/test_equipment_hierarchy.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class EquipmentCategoryControllerIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @Autowired
-    private EquipmentCategoryRepository equipmentCategoryRepository;
-
-    @BeforeEach
-    void setUpData() {
-        equipmentCategoryRepository.deleteAll();
-
-        EquipmentCategory brand = equipmentCategoryRepository.save(EquipmentCategory.builder()
-                .id(1000L)
-                .level(1)
-                .brand("Brunswick")
-                .nameRu("Brunswick")
-                .nameEn("Brunswick")
-                .sortOrder(1)
-                .isActive(true)
-                .build());
-
-        EquipmentCategory pinsetters = saveChild(1100L, brand, 2, "Пинсеттеры", "Pinsetter parts", 1);
-        EquipmentCategory scoring = saveChild(1110L, brand, 2, "Скоринг-системы", "Scoring & Management systems", 2);
-        EquipmentCategory returns = saveChild(1120L, brand, 2, "Системы возврата шара", "Ball Returns parts", 3);
-        EquipmentCategory laneParts = saveChild(1130L, brand, 2, "Комплектующие дорожек", "Lane parts", 4);
-        EquipmentCategory laneMachines = saveChild(1140L, brand, 2, "Натричные машины", "Lane Machines", 5);
-        saveChild(1150L, brand, 2, "Мебель, фурнитура", "Furniture & fixtures", 6);
-        saveChild(1160L, brand, 2, "Расходники, про-шоп и уход за дорожками", "Consumables & pro shop", 7);
-        saveChild(1170L, brand, 2, "Прочее", "Miscellaneous", 8);
-        saveChild(1180L, brand, 2, "Шары", "Balls", 9);
-        saveChild(1190L, brand, 2, "Кегли", "Pins", 10);
-        saveChild(1200L, brand, 2, "Прокатная обувь", "Rental shoes", 11);
-        saveChild(1210L, brand, 2, "Средства для ухода за дорожками", "Lane care products", 12);
-        EquipmentCategory electronics = saveChild(1220L, brand, 2, "Электроника", "Electronics", 13);
-        saveChild(1230L, brand, 2, "GS-модели", "GS models", 14);
-        saveChild(1240L, brand, 2, "Механика/кинематика", "Mechanics & kinematics", 15);
-
-        saveChildren(pinsetters, List.of(
-                new ChildSpec(1101L, "Boost ST (стринг-кегли)", "Boost ST (string pins)", 1),
-                new ChildSpec(1102L, "GS NXT", "GS NXT", 2),
-                new ChildSpec(1103L, "GS-X", "GS-X", 3),
-                new ChildSpec(1104L, "GS-98", "GS-98", 4),
-                new ChildSpec(1105L, "GS-96", "GS-96", 5),
-                new ChildSpec(1106L, "GS-92", "GS-92", 6)
-        ));
-
-        saveChildren(scoring, List.of(
-                new ChildSpec(1111L, "Sync Invicta / Sync Spark", "Sync Invicta / Sync Spark", 1),
-                new ChildSpec(1112L, "Sync", "Sync", 2),
-                new ChildSpec(1113L, "Vector Plus", "Vector Plus", 3),
-                new ChildSpec(1114L, "Vector", "Vector", 4),
-                new ChildSpec(1115L, "Frameworx", "Frameworx", 5)
-        ));
-
-        saveChildren(returns, List.of(
-                new ChildSpec(1121L, "Framework Ball Return", "Framework Ball Return", 1),
-                new ChildSpec(1122L, "Center Stage Ball Return", "Center Stage Ball Return", 2)
-        ));
-
-        saveChildren(laneParts, List.of(
-                new ChildSpec(1131L, "Синтетическое покрытие", "Synthetic lane surface", 1),
-                new ChildSpec(1132L, "Бамперы", "Bumpers", 2),
-                new ChildSpec(1133L, "Кеппинги, фолл-линии", "Capping, foul units", 3),
-                new ChildSpec(1134L, "Kickbacks, пиндеки, гаттеры", "Kickbacks, pindecks, gutters", 4),
-                new ChildSpec(1135L, "Деревянная подоснова и прочее", "Wood substructure & other", 5)
-        ));
-
-        saveChildren(laneMachines, List.of(
-                new ChildSpec(1141L, "Phoenix Lite (LT4)", "Phoenix Lite (LT4)", 1),
-                new ChildSpec(1142L, "NEXUS", "NEXUS", 2),
-                new ChildSpec(1143L, "Envoy", "Envoy", 3),
-                new ChildSpec(1144L, "Crossfire", "Crossfire", 4),
-                new ChildSpec(1145L, "Другие (QubicaAMF, Kegel и др.)", "Other (including QubicaAMF, Kegel)", 5)
-        ));
-
-        saveChildren(electronics, List.of(
-                new ChildSpec(1221L, "Silver Box", "Silver Box", 1),
-                new ChildSpec(1222L, "Red Box", "Red Box", 2),
-                new ChildSpec(1223L, "Консолидированная и Nexgen электроника", "Consolidated & Nexgen electronics", 3)
-        ));
-    }
-
-    private EquipmentCategory saveChild(Long id, EquipmentCategory parent, int level, String nameRu, String nameEn, int sortOrder) {
-        return equipmentCategoryRepository.save(EquipmentCategory.builder()
-                .id(id)
-                .parent(parent)
-                .level(level)
-                .brand("Brunswick")
-                .nameRu(nameRu)
-                .nameEn(nameEn)
-                .sortOrder(sortOrder)
-                .isActive(true)
-                .build());
-    }
-
-    private void saveChildren(EquipmentCategory parent, List<ChildSpec> specs) {
-        specs.forEach(spec -> saveChild(spec.id, parent, parent.getLevel() + 1, spec.nameRu, spec.nameEn, spec.sortOrder));
-    }
-
-    private record ChildSpec(Long id, String nameRu, String nameEn, int sortOrder) {}
 
     @Test
     @DisplayName("Корневой уровень возвращает только бренд Brunswick")
@@ -144,17 +43,40 @@ class EquipmentCategoryControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("Другие бренды без записей возвращают пустой список")
+    @WithMockUser(roles = "MECHANIC")
+    void unknownBrandReturnsEmpty() throws Exception {
+        mockMvc.perform(get("/api/equipment/categories")
+                        .param("brand", "QubicaAMF")
+                        .param("level", "1")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", empty()));
+    }
+
+    @Test
+    @DisplayName("Несовпадающий бренд не возвращает потомков")
+    @WithMockUser(roles = "MECHANIC")
+    void mismatchedBrandReturnsEmpty() throws Exception {
+        mockMvc.perform(get("/api/equipment/categories")
+                        .param("brand", "QubicaAMF")
+                        .param("parentId", "1000")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", empty()));
+    }
+
+    @Test
     @DisplayName("Компоненты: корень возвращает только бренд Brunswick")
     @WithMockUser(roles = "MECHANIC")
     void componentRootLevelReturnsBrand() throws Exception {
         mockMvc.perform(get("/api/equipment/components")
-                        .param("brand", "Brunswick")
-                        .param("level", "1")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].name").value("Brunswick"))
-                .andExpect(jsonPath("$[0].parentId").doesNotExist());
+                .andExpect(jsonPath("$[0].parentId").doesNotExist())
+                .andExpect(jsonPath("$[0].code").value("BRUNSWICK"));
     }
 
     @Test
@@ -187,11 +109,24 @@ class EquipmentCategoryControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("Категории сортируются по sort_order")
+    @WithMockUser(roles = "MECHANIC")
+    void categoriesAreSortedBySortOrder() throws Exception {
+        mockMvc.perform(get("/api/equipment/categories")
+                        .param("brand", "Brunswick")
+                        .param("parentId", "1000")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].nameRu").value("Пинсеттеры"))
+                .andExpect(jsonPath("$[1].nameRu").value("Скоринг-системы"))
+                .andExpect(jsonPath("$[2].nameRu").value("Системы возврата шара"));
+    }
+
+    @Test
     @DisplayName("Компоненты: категории бренда отдаются только для выбранного parentId")
     @WithMockUser(roles = "MECHANIC")
     void componentSecondLevelCategoriesAreScopedByParent() throws Exception {
         mockMvc.perform(get("/api/equipment/components")
-                        .param("brand", "Brunswick")
                         .param("parentId", "1000")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -240,7 +175,6 @@ class EquipmentCategoryControllerIntegrationTest {
     @WithMockUser(roles = "MECHANIC")
     void componentPinsetterChildren() throws Exception {
         mockMvc.perform(get("/api/equipment/components")
-                        .param("brand", "Brunswick")
                         .param("parentId", "1100")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -279,7 +213,6 @@ class EquipmentCategoryControllerIntegrationTest {
     @WithMockUser(roles = "MECHANIC")
     void componentLaneMachineChildren() throws Exception {
         mockMvc.perform(get("/api/equipment/components")
-                        .param("brand", "Brunswick")
                         .param("parentId", "1140")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -305,17 +238,6 @@ class EquipmentCategoryControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("Компоненты: запрос без parentId для глубокого уровня отклоняется")
-    @WithMockUser(roles = "MECHANIC")
-    void componentCannotSkipLevels() throws Exception {
-        mockMvc.perform(get("/api/equipment/components")
-                        .param("brand", "Brunswick")
-                        .param("level", "3")
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
     @DisplayName("Некорректный parentId возвращает пустой список")
     @WithMockUser(roles = "MECHANIC")
     void invalidParentReturnsEmptyList() throws Exception {
@@ -332,7 +254,6 @@ class EquipmentCategoryControllerIntegrationTest {
     @WithMockUser(roles = "MECHANIC")
     void componentInvalidParentReturnsEmptyList() throws Exception {
         mockMvc.perform(get("/api/equipment/components")
-                        .param("brand", "Brunswick")
                         .param("parentId", "999999")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
