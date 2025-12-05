@@ -296,15 +296,70 @@ VALUES
 ON CONFLICT DO NOTHING;
 
 -- Service history for maintenance indicators
-WITH mech AS (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79994440102' LIMIT 1)
-INSERT INTO service_history (club_id, mechanic_id, equipment_id, work_description, work_date, status)
-VALUES
-    (1, (SELECT profile_id FROM mech), NULL, 'Плановое ТО', CURRENT_DATE - INTERVAL '60 days', 'COMPLETED'),
-    (2, (SELECT profile_id FROM mech), NULL, 'Замена датчика', CURRENT_DATE - INTERVAL '10 days', 'COMPLETED')
-ON CONFLICT DO NOTHING;
+WITH mech AS (
+    SELECT profile_id FROM mechanic_profiles mp
+    JOIN users u ON u.user_id = mp.user_id
+    WHERE u.phone = '+79994440102'
+    LIMIT 1
+)
+INSERT INTO service_history (
+    club_id,
+    performed_by,
+    equipment_id,
+    description,
+    service_date,
+    service_type,
+    service_notes,
+    created_date
+)
+SELECT 1, (SELECT profile_id FROM mech), NULL, 'Плановое ТО', CURRENT_DATE - INTERVAL '60 days', 'INSPECTION', 'Плановое обслуживание', NOW()
+WHERE NOT EXISTS (
+    SELECT 1 FROM service_history WHERE club_id = 1 AND description = 'Плановое ТО'
+);
 
-INSERT INTO service_history_parts (service_history_id, catalog_id, quantity_used)
-SELECT sh.service_history_id, pc.catalog_id, 1
-FROM service_history sh
-JOIN parts_catalog pc ON pc.catalog_number = 'ZIP-200'
-ON CONFLICT DO NOTHING;
+WITH mech AS (
+    SELECT profile_id FROM mechanic_profiles mp
+    JOIN users u ON u.user_id = mp.user_id
+    WHERE u.phone = '+79994440102'
+    LIMIT 1
+)
+INSERT INTO service_history (
+    club_id,
+    performed_by,
+    equipment_id,
+    description,
+    service_date,
+    service_type,
+    service_notes,
+    created_date
+)
+SELECT 2, (SELECT profile_id FROM mech), NULL, 'Замена датчика', CURRENT_DATE - INTERVAL '10 days', 'REPAIR', 'Замена датчика дорожки', NOW()
+WHERE NOT EXISTS (
+    SELECT 1 FROM service_history WHERE club_id = 2 AND description = 'Замена датчика'
+);
+
+INSERT INTO service_history_parts (
+    service_history_id,
+    part_catalog_id,
+    catalog_number,
+    part_name,
+    quantity,
+    created_date
+)
+SELECT
+    (SELECT service_id FROM service_history WHERE club_id = 2 AND description = 'Замена датчика' LIMIT 1),
+    (SELECT catalog_id FROM parts_catalog WHERE catalog_number = 'ZIP-200' LIMIT 1),
+    'ZIP-200',
+    'Датчик линии',
+    1,
+    NOW()
+WHERE EXISTS (
+    SELECT 1 FROM service_history WHERE club_id = 2 AND description = 'Замена датчика'
+)
+AND NOT EXISTS (
+    SELECT 1 FROM service_history_parts shp
+    WHERE shp.service_history_id = (
+        SELECT service_id FROM service_history WHERE club_id = 2 AND description = 'Замена датчика' LIMIT 1
+    )
+    AND shp.catalog_number = 'ZIP-200'
+);
