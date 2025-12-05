@@ -187,7 +187,7 @@ INSERT INTO attestation_applications (user_id, mechanic_profile_id, club_id, sta
 SELECT u.user_id, mp.profile_id, cm.club_id, s.status, s.comment, s.grade, NOW(), NOW()
 FROM (
       VALUES ('+79995550101', 'APPROVED', 'Утверждено', 'MIDDLE'),
-             ('+79994440101', 'PENDING', 'В обработке', 'JUNIOR'),
+             ('+79994440101', 'IN_REVIEW', 'В обработке', 'JUNIOR'),
              ('+79995550202', 'REJECTED', 'Недостаточно опыта', 'SENIOR')
      ) AS s(phone, status, comment, grade)
 JOIN users u ON u.phone = s.phone
