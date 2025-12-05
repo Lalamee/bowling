@@ -207,9 +207,52 @@ WITH reqs AS (
 )
 INSERT INTO request_parts (request_id, catalog_number, part_name, quantity, status, is_available, catalog_id, warehouse_id, inventory_id, inventory_location, help_requested)
 VALUES
-    ((SELECT request_id FROM reqs LIMIT 1), 'ZIP-100', 'Ролик подачи', 2, 'REQUESTED', true, (SELECT catalog_id FROM parts_catalog WHERE catalog_number='ZIP-100' LIMIT 1), (SELECT warehouse_id FROM club_staff cs JOIN bowling_clubs bc ON cs.club_id = bc.club_id WHERE cs.club_id =1 LIMIT 1), NULL, 'склад клуба', false),
-    ((SELECT request_id FROM reqs OFFSET 1 LIMIT 1), 'ZIP-200', 'Датчик линии', 1, 'REQUESTED', false, (SELECT catalog_id FROM parts_catalog WHERE catalog_number='ZIP-200' LIMIT 1), NULL, NULL, NULL, true),
-    ((SELECT request_id FROM reqs OFFSET 2 LIMIT 1), 'ZIP-300', 'Контроллер', 1, 'REQUESTED', true, (SELECT catalog_id FROM parts_catalog WHERE catalog_number='ZIP-300' LIMIT 1), NULL, NULL, NULL, false)
+    (
+        (SELECT request_id FROM reqs LIMIT 1),
+        'ZIP-100',
+        'Ролик подачи',
+        2,
+        'REQUESTED',
+        true,
+        (SELECT catalog_id FROM parts_catalog WHERE catalog_number = 'ZIP-100' LIMIT 1),
+        (
+            SELECT warehouse_id
+            FROM personal_warehouses pw
+            JOIN mechanic_profiles mp ON pw.mechanic_profile_id = mp.profile_id
+            JOIN club_mechanics cm ON cm.mechanic_profile_id = mp.profile_id
+            WHERE cm.club_id = 1
+            LIMIT 1
+        ),
+        NULL,
+        'склад клуба',
+        false
+    ),
+    (
+        (SELECT request_id FROM reqs OFFSET 1 LIMIT 1),
+        'ZIP-200',
+        'Датчик линии',
+        1,
+        'REQUESTED',
+        false,
+        (SELECT catalog_id FROM parts_catalog WHERE catalog_number = 'ZIP-200' LIMIT 1),
+        NULL,
+        NULL,
+        NULL,
+        true
+    ),
+    (
+        (SELECT request_id FROM reqs OFFSET 2 LIMIT 1),
+        'ZIP-300',
+        'Контроллер',
+        1,
+        'REQUESTED',
+        true,
+        (SELECT catalog_id FROM parts_catalog WHERE catalog_number = 'ZIP-300' LIMIT 1),
+        NULL,
+        NULL,
+        NULL,
+        false
+    )
 ON CONFLICT DO NOTHING;
 
 -- Purchase orders demonstrating full and partial acceptance
