@@ -199,8 +199,8 @@ ON CONFLICT DO NOTHING;
 WITH reqs AS (
     INSERT INTO maintenance_requests (club_id, lane_number, mechanic_id, request_date, status, request_reason, manager_notes)
     VALUES
-        (1, 1, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79994440101' LIMIT 1), NOW(), 'OPEN', 'Плановая проверка', 'Тестовая заявка'),
-        (NULL, 0, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79995550101' LIMIT 1), NOW(), 'OPEN', 'Замена датчика', 'Свободный агент'),
+        (1, 1, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79994440101' LIMIT 1), NOW(), 'NEW', 'Плановая проверка', 'Тестовая заявка'),
+        (NULL, 0, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79995550101' LIMIT 1), NOW(), 'NEW', 'Замена датчика', 'Свободный агент'),
         (2, 3, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79995550202' LIMIT 1), NOW(), 'IN_PROGRESS', 'Требуется контроллер', 'Премиум агент')
     ON CONFLICT DO NOTHING
     RETURNING request_id, club_id
