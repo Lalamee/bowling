@@ -35,11 +35,15 @@ public class PartsService {
 
         @Transactional(readOnly = true)
         public List<PartsCatalogResponseDTO> searchParts(PartsSearchDTO searchDTO) {
-		String query = (searchDTO.getSearchQuery() != null && !searchDTO.getSearchQuery().isBlank())
-				? searchDTO.getSearchQuery().trim() : null;
-                Integer manufacturerId = searchDTO.getManufacturerId() != null ? searchDTO.getManufacturerId().intValue() : null;
+                String query = (searchDTO.getSearchQuery() != null && !searchDTO.getSearchQuery().isBlank())
+                                ? searchDTO.getSearchQuery().trim()
+                                : null;
+                Integer manufacturerId = (searchDTO.getManufacturerId() != null && searchDTO.getManufacturerId() > 0)
+                                ? searchDTO.getManufacturerId().intValue()
+                                : null;
                 Boolean isUnique = searchDTO.getIsUnique();
-                String normalizedCategoryCode = searchDTO.getCategoryCode() != null
+                String normalizedCategoryCode = (searchDTO.getCategoryCode() != null
+                                && !searchDTO.getCategoryCode().trim().isBlank())
                                 ? searchDTO.getCategoryCode().trim()
                                 : null;
                 List<String> categoryCodes = resolveCategoryCodes(normalizedCategoryCode);
@@ -143,9 +147,19 @@ public class PartsService {
                                                 .forEach(child -> queue.add(child.getId()));
                         }
 
-                        return codes;
+                        return normalizeCodesList(codes);
                 } catch (NumberFormatException ignored) {
-                        return List.of(normalizedCategoryCode);
+                        return normalizeCodesList(List.of(normalizedCategoryCode));
                 }
+        }
+
+        private List<String> normalizeCodesList(List<String> codes) {
+                List<String> cleaned = codes.stream()
+                                .filter(code -> code != null && !code.isBlank())
+                                .map(code -> code.trim().toLowerCase())
+                                .distinct()
+                                .toList();
+
+                return cleaned.isEmpty() ? null : cleaned;
         }
 }
