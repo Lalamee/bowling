@@ -212,7 +212,7 @@ VALUES
         'ZIP-100',
         'Ролик подачи',
         2,
-        'REQUESTED',
+        'APPROVAL_PENDING',
         true,
         (SELECT catalog_id FROM parts_catalog WHERE catalog_number = 'ZIP-100' LIMIT 1),
         (
@@ -232,7 +232,7 @@ VALUES
         'ZIP-200',
         'Датчик линии',
         1,
-        'REQUESTED',
+        'APPROVAL_PENDING',
         false,
         (SELECT catalog_id FROM parts_catalog WHERE catalog_number = 'ZIP-200' LIMIT 1),
         NULL,
@@ -245,7 +245,7 @@ VALUES
         'ZIP-300',
         'Контроллер',
         1,
-        'REQUESTED',
+        'APPROVAL_PENDING',
         true,
         (SELECT catalog_id FROM parts_catalog WHERE catalog_number = 'ZIP-300' LIMIT 1),
         NULL,
@@ -277,7 +277,7 @@ SET order_id = (SELECT order_id FROM po),
     accepted_quantity = CASE WHEN rp.catalog_number='ZIP-100' THEN 1 ELSE 0 END,
     acceptance_date = NOW(),
     acceptance_comment = 'Частичная поставка',
-    status = CASE WHEN rp.catalog_number='ZIP-100' THEN 'APPROVED' ELSE 'REJECTED' END
+    status = CASE WHEN rp.catalog_number='ZIP-100' THEN 'ACCEPTED' ELSE 'REJECTED' END
 WHERE rp.request_id = (SELECT request_id FROM req);
 
 -- Supplier reviews including complaint
