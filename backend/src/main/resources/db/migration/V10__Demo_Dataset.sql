@@ -169,13 +169,13 @@ manager_profiles AS (
     RETURNING user_id, club_id
 )
 INSERT INTO club_staff (user_id, club_id, role_id, is_active, assigned_at, info_access_restricted)
-SELECT mp.user_id, mp.club_id, (SELECT role_id FROM role WHERE name = 'HEAD_MECHANIC'), true, NOW(), false
+SELECT mp.user_id, mp.club_id, (SELECT role_id FROM role WHERE name = 'HEAD_MECHANIC' LIMIT 1), true, NOW(), false
 FROM manager_profiles mp
 ON CONFLICT DO NOTHING;
 
 -- Club staff entries for mechanics
 INSERT INTO club_staff (user_id, club_id, role_id, is_active, assigned_at, info_access_restricted)
-SELECT u.user_id, cm.club_id, (SELECT role_id FROM role WHERE name = 'MECHANIC'), true, NOW(), false
+SELECT u.user_id, cm.club_id, (SELECT role_id FROM role WHERE name = 'MECHANIC' LIMIT 1), true, NOW(), false
 FROM users u
 JOIN mechanic_profiles mp ON mp.user_id = u.user_id
 JOIN club_mechanics cm ON cm.mechanic_profile_id = mp.profile_id
@@ -199,17 +199,17 @@ ON CONFLICT DO NOTHING;
 WITH reqs AS (
     INSERT INTO maintenance_requests (club_id, lane_number, mechanic_id, request_date, status, request_reason, manager_notes)
     VALUES
-        (1, 1, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79994440101'), NOW(), 'OPEN', 'Плановая проверка', 'Тестовая заявка'),
-        (NULL, 0, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79995550101'), NOW(), 'OPEN', 'Замена датчика', 'Свободный агент'),
-        (2, 3, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79995550202'), NOW(), 'IN_PROGRESS', 'Требуется контроллер', 'Премиум агент')
+        (1, 1, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79994440101' LIMIT 1), NOW(), 'OPEN', 'Плановая проверка', 'Тестовая заявка'),
+        (NULL, 0, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79995550101' LIMIT 1), NOW(), 'OPEN', 'Замена датчика', 'Свободный агент'),
+        (2, 3, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79995550202' LIMIT 1), NOW(), 'IN_PROGRESS', 'Требуется контроллер', 'Премиум агент')
     ON CONFLICT DO NOTHING
     RETURNING request_id, club_id
 )
 INSERT INTO request_parts (request_id, catalog_number, part_name, quantity, status, is_available, catalog_id, warehouse_id, inventory_id, inventory_location, help_requested)
 VALUES
-    ((SELECT request_id FROM reqs LIMIT 1), 'ZIP-100', 'Ролик подачи', 2, 'REQUESTED', true, (SELECT catalog_id FROM parts_catalog WHERE catalog_number='ZIP-100'), (SELECT warehouse_id FROM club_staff cs JOIN bowling_clubs bc ON cs.club_id = bc.club_id WHERE cs.club_id =1 LIMIT 1), NULL, 'склад клуба', false),
-    ((SELECT request_id FROM reqs OFFSET 1 LIMIT 1), 'ZIP-200', 'Датчик линии', 1, 'REQUESTED', false, (SELECT catalog_id FROM parts_catalog WHERE catalog_number='ZIP-200'), NULL, NULL, NULL, true),
-    ((SELECT request_id FROM reqs OFFSET 2 LIMIT 1), 'ZIP-300', 'Контроллер', 1, 'REQUESTED', true, (SELECT catalog_id FROM parts_catalog WHERE catalog_number='ZIP-300'), NULL, NULL, NULL, false)
+    ((SELECT request_id FROM reqs LIMIT 1), 'ZIP-100', 'Ролик подачи', 2, 'REQUESTED', true, (SELECT catalog_id FROM parts_catalog WHERE catalog_number='ZIP-100' LIMIT 1), (SELECT warehouse_id FROM club_staff cs JOIN bowling_clubs bc ON cs.club_id = bc.club_id WHERE cs.club_id =1 LIMIT 1), NULL, 'склад клуба', false),
+    ((SELECT request_id FROM reqs OFFSET 1 LIMIT 1), 'ZIP-200', 'Датчик линии', 1, 'REQUESTED', false, (SELECT catalog_id FROM parts_catalog WHERE catalog_number='ZIP-200' LIMIT 1), NULL, NULL, NULL, true),
+    ((SELECT request_id FROM reqs OFFSET 2 LIMIT 1), 'ZIP-300', 'Контроллер', 1, 'REQUESTED', true, (SELECT catalog_id FROM parts_catalog WHERE catalog_number='ZIP-300' LIMIT 1), NULL, NULL, NULL, false)
 ON CONFLICT DO NOTHING;
 
 -- Purchase orders demonstrating full and partial acceptance
