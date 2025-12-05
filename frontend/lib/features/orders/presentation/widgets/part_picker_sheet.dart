@@ -106,7 +106,8 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
     try {
       final dto = PartsSearchDto(
         searchQuery: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
-        categoryCode: categoryCode ?? (_path.isNotEmpty ? _path.last.code : null),
+        categoryCode: categoryCode ??
+            (_path.isNotEmpty ? _path.last.code ?? _path.last.id.toString() : null),
         size: 20,
       );
       final results = await _api.searchParts(dto);
