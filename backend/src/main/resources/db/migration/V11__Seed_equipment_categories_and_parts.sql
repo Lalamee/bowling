@@ -99,11 +99,11 @@ INSERT INTO public.equipment_category (id, parent_id, level, brand, name_ru, nam
 ON CONFLICT (id) DO NOTHING;
 
 -- Sample catalog parts bound to category codes so UI search returns data
-INSERT INTO public.parts_catalog (catalog_number, official_name_ru, official_name_en, common_name, description, normal_service_life, is_unique, category_code)
+INSERT INTO public.parts_catalog (catalog_number, official_name_ru, official_name_en, common_name, description, normal_service_life, is_unique, category_code, manufacturer_id)
 VALUES
-    ('GSX-CTRL', 'Контроллер GS-X', 'GS-X Controller', 'Контроллер', 'Блок управления GS-X', 540, false, '1103'),
-    ('GSX-ROLLER', 'Ролик подачи GS-X', 'GS-X Feed Roller', 'Ролик подачи', 'Ролик подачи для пинсеттера GS-X', 365, false, '1103'),
-    ('SILVER-IO', 'Модуль Silver Box I/O', 'Silver Box I/O Module', 'Silver Box I/O', 'Электронный модуль Silver Box', 730, true, '1221'),
-    ('VECTOR-CPU', 'Процессор Vector Plus', 'Vector Plus CPU', 'CPU Vector', 'Главный процессор скоринга Vector Plus', 730, false, '1113'),
-    ('SWITCH-BELT', 'Приводной ремень Switch GS-X', 'Switch GS-X Drive Belt', 'Ремень', 'Ремень привода пинсеттера Switch GS-X', 365, false, '2101')
+    ('GSX-CTRL', 'Контроллер GS-X', 'GS-X Controller', 'Контроллер', 'Блок управления GS-X', 540, false, '1103', (SELECT manufacturer_id FROM manufacturer WHERE lower(name) = lower('Brunswick Bowling') LIMIT 1)),
+    ('GSX-ROLLER', 'Ролик подачи GS-X', 'GS-X Feed Roller', 'Ролик подачи', 'Ролик подачи для пинсеттера GS-X', 365, false, '1103', (SELECT manufacturer_id FROM manufacturer WHERE lower(name) = lower('Brunswick Bowling') LIMIT 1)),
+    ('SILVER-IO', 'Модуль Silver Box I/O', 'Silver Box I/O Module', 'Silver Box I/O', 'Электронный модуль Silver Box', 730, true, '1221', (SELECT manufacturer_id FROM manufacturer WHERE lower(name) = lower('Brunswick Bowling') LIMIT 1)),
+    ('VECTOR-CPU', 'Процессор Vector Plus', 'Vector Plus CPU', 'CPU Vector', 'Главный процессор скоринга Vector Plus', 730, false, '1113', (SELECT manufacturer_id FROM manufacturer WHERE lower(name) = lower('Brunswick Bowling') LIMIT 1)),
+    ('SWITCH-BELT', 'Приводной ремень Switch GS-X', 'Switch GS-X Drive Belt', 'Ремень', 'Ремень привода пинсеттера Switch GS-X', 365, false, '2101', (SELECT manufacturer_id FROM manufacturer WHERE lower(name) = lower('Switch Bowling') LIMIT 1))
 ON CONFLICT DO NOTHING;
