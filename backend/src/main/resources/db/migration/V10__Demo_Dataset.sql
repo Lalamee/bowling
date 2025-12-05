@@ -9,7 +9,7 @@ INSERT INTO account_type (name) VALUES
     ('FREE_MECHANIC_BASIC'),
     ('FREE_MECHANIC_PREMIUM'),
     ('MAIN_ADMIN')
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- Ensure access levels
 INSERT INTO access_level (name) VALUES
@@ -17,7 +17,7 @@ INSERT INTO access_level (name) VALUES
     ('PREMIUM'),
     ('OWNER_MANAGER'),
     ('ADMIN')
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- Ensure roles
 INSERT INTO role (name) VALUES
@@ -25,7 +25,7 @@ INSERT INTO role (name) VALUES
     ('MECHANIC'),
     ('HEAD_MECHANIC'),
     ('CLUB_OWNER')
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- Seed clubs 1-6 if absent
 INSERT INTO bowling_clubs (club_id, name, address, lanes_count, contact_phone, contact_email, is_active, is_verified, created_at, updated_at)
@@ -36,7 +36,7 @@ VALUES
     (4, 'Demo Club 4', 'Новосибирск, ул. Советская, 4', 12, '+73830000004', 'club4@demo.ru', true, true, CURRENT_DATE, CURRENT_DATE),
     (5, 'Demo Club 5', 'Казань, ул. Университетская, 5', 6, '+78430000005', 'club5@demo.ru', true, true, CURRENT_DATE, CURRENT_DATE),
     (6, 'Demo Club 6', 'Краснодар, ул. Северная, 6', 8, '+78610000006', 'club6@demo.ru', true, true, CURRENT_DATE, CURRENT_DATE)
-ON CONFLICT (club_id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- Basic parts catalog for request/warehouse examples
 INSERT INTO parts_catalog (catalog_number, official_name_ru, official_name_en, common_name, description, normal_service_life, is_unique, category_code)
@@ -55,7 +55,7 @@ WITH role_admin AS (
     INSERT INTO users (password_hash, phone, role_id, registration_date, is_active, is_verified, account_type_id, last_modified)
     SELECT '$2a$10$XURPShQNCsLjp1Qc2H4pzO8VzQ1UVlF4EwJ5J8d8X5gX5zJ5r5V6e', '+79990000000', role_id, CURRENT_DATE, true, true, account_type_id, NOW()
     FROM role_admin, acct_admin
-    ON CONFLICT (phone) DO NOTHING
+    ON CONFLICT DO NOTHING
     RETURNING user_id
 )
 INSERT INTO administrator_profiles (user_id, full_name, contact_phone, contact_email, is_data_verified, created_at, updated_at)
@@ -68,15 +68,15 @@ WITH role_mech AS (SELECT role_id FROM role WHERE name = 'MECHANIC' LIMIT 1),
      free_basic_user AS (
          INSERT INTO users (password_hash, phone, role_id, registration_date, is_active, is_verified, account_type_id, last_modified)
          SELECT '$2a$10$XURPShQNCsLjp1Qc2H4pzO8VzQ1UVlF4EwJ5J8d8X5gX5zJ5r5V6e', '+79995550101', role_id, CURRENT_DATE, true, true, account_type_id, NOW()
-         FROM role_mech, acct_free_basic
-         ON CONFLICT (phone) DO NOTHING
-         RETURNING user_id
+    FROM role_mech, acct_free_basic
+    ON CONFLICT DO NOTHING
+    RETURNING user_id
      ),
      free_basic_profile AS (
          INSERT INTO mechanic_profiles (user_id, full_name, birth_date, total_experience_years, bowling_experience_years, is_entrepreneur, skills, advantages, region, is_data_verified, verification_date, rating, created_at, updated_at)
          SELECT user_id, 'Свободный Базовый', DATE '1990-02-02', 5, 3, true, 'обслуживание дорожек', 'быстрая диагностика', 'Москва', true, CURRENT_DATE, 4.6, CURRENT_DATE, CURRENT_DATE
          FROM free_basic_user
-         ON CONFLICT (user_id) DO NOTHING
+         ON CONFLICT DO NOTHING
          RETURNING profile_id
      )
 INSERT INTO personal_warehouses (name, location, is_active, created_at, updated_at, mechanic_profile_id)
@@ -91,14 +91,14 @@ WITH role_mech AS (SELECT role_id FROM role WHERE name = 'MECHANIC' LIMIT 1),
          INSERT INTO users (password_hash, phone, role_id, registration_date, is_active, is_verified, account_type_id, last_modified)
          SELECT '$2a$10$XURPShQNCsLjp1Qc2H4pzO8VzQ1UVlF4EwJ5J8d8X5gX5zJ5r5V6e', '+79995550202', role_id, CURRENT_DATE, true, true, account_type_id, NOW()
          FROM role_mech, acct_free_premium
-         ON CONFLICT (phone) DO NOTHING
+         ON CONFLICT DO NOTHING
          RETURNING user_id
      ),
      free_premium_profile AS (
          INSERT INTO mechanic_profiles (user_id, full_name, birth_date, total_experience_years, bowling_experience_years, is_entrepreneur, skills, advantages, region, is_data_verified, verification_date, rating, created_at, updated_at)
          SELECT user_id, 'Свободный Премиум', DATE '1988-05-05', 8, 6, true, 'диагностика, настройка', 'расширенный опыт', 'Санкт-Петербург', true, CURRENT_DATE, 4.9, CURRENT_DATE, CURRENT_DATE
          FROM free_premium_user
-         ON CONFLICT (user_id) DO NOTHING
+         ON CONFLICT DO NOTHING
          RETURNING profile_id
      ),
      premium_warehouse AS (
@@ -126,7 +126,7 @@ VALUES
     ('$2a$10$XURPShQNCsLjp1Qc2H4pzO8VzQ1UVlF4EwJ5J8d8X5gX5zJ5r5V6e', '+79994440103', (SELECT role_id FROM role_mech), CURRENT_DATE, true, true, (SELECT account_type_id FROM acct_ind), NOW()),
     ('$2a$10$XURPShQNCsLjp1Qc2H4pzO8VzQ1UVlF4EwJ5J8d8X5gX5zJ5r5V6e', '+79994440201', (SELECT role_id FROM role_head), CURRENT_DATE, true, true, (SELECT account_type_id FROM acct_mgr), NOW()),
     ('$2a$10$XURPShQNCsLjp1Qc2H4pzO8VzQ1UVlF4EwJ5J8d8X5gX5zJ5r5V6e', '+79994440202', (SELECT role_id FROM role_head), CURRENT_DATE, true, true, (SELECT account_type_id FROM acct_mgr), NOW())
-ON CONFLICT (phone) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- Mechanic profiles for club staff
 WITH mech_users AS (
@@ -140,7 +140,7 @@ prof AS (
            CASE WHEN rn = 1 THEN 'Клубный механик 1' WHEN rn = 2 THEN 'Клубный механик 2' ELSE 'Клубный механик 3' END,
            DATE '1991-01-01', 4 + rn, 2 + rn, false, 'Регион ' || rn, true, CURRENT_DATE, 4.0 + rn * 0.1, CURRENT_DATE, CURRENT_DATE
     FROM mech_users
-    ON CONFLICT (user_id) DO NOTHING
+    ON CONFLICT DO NOTHING
     RETURNING profile_id, rn
 )
 INSERT INTO club_mechanics (mechanic_profile_id, club_id)
@@ -164,7 +164,7 @@ manager_profiles AS (
            CASE rn WHEN 1 THEN 'manager4@demo.ru' ELSE 'manager5@demo.ru' END,
            true, NOW(), NOW()
     FROM mgr_users
-    ON CONFLICT (user_id) DO NOTHING
+    ON CONFLICT DO NOTHING
     RETURNING user_id, club_id
 )
 INSERT INTO club_staff (user_id, club_id, role_id, is_active, assigned_at, info_access_restricted)
