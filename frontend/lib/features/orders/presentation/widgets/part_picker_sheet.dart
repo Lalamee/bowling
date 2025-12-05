@@ -28,6 +28,7 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
   List<PartsCatalogResponseDto> _parts = const [];
   bool _loadingComponents = false;
   bool _loadingParts = false;
+  String? _selectedBrand;
 
   bool get _canSearchParts => _path.isNotEmpty && _currentCategories.isEmpty;
 
@@ -44,12 +45,15 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
     super.dispose();
   }
 
-  Future<void> _loadCategories({int? parentId, String? brand}) async {
+  Future<void> _loadCategories({int? parentId}) async {
     setState(() => _loadingComponents = true);
     try {
       final items = parentId == null
-          ? await _categoryRepository.fetchRoots(brand: brand)
-          : await _categoryRepository.fetchChildren(parentId: parentId, brand: brand);
+          ? await _categoryRepository.fetchRoots()
+          : await _categoryRepository.fetchChildren(
+              parentId: parentId,
+              brand: _selectedBrand,
+            );
       if (!mounted) return;
       setState(() {
         _currentCategories = items;
@@ -65,19 +69,23 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
   }
 
   Future<void> _onCategoryTap(EquipmentCategoryDto category) async {
+    if (category.level == 1) {
+      _selectedBrand = category.brand;
+    }
     _path.add(category);
-    await _loadCategories(parentId: category.id, brand: category.brand);
-    _runSearch(categoryCode: category.id.toString());
+    await _loadCategories(parentId: category.id);
+    _runSearch(categoryCode: category.code ?? category.id.toString());
   }
 
   Future<void> _onBackLevel() async {
     if (_path.isEmpty) return;
     _path.removeLast();
+    _selectedBrand = _path.isNotEmpty ? _path.first.brand : null;
     final parentId = _path.isNotEmpty ? _path.last.id : null;
-    final brand = _path.isNotEmpty ? _path.last.brand : null;
-    await _loadCategories(parentId: parentId, brand: brand);
+    await _loadCategories(parentId: parentId);
     if (_canSearchParts) {
-      _runSearch(categoryCode: _path.last.id.toString());
+      final last = _path.last;
+      _runSearch(categoryCode: last.code ?? last.id.toString());
     } else {
       _resetParts();
     }
