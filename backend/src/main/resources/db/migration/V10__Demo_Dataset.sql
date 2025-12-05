@@ -259,7 +259,7 @@ ON CONFLICT DO NOTHING;
 WITH supp AS (
     INSERT INTO suppliers (inn, legal_name, contact_person, contact_phone, contact_email, rating, is_verified, created_at, updated_at)
     VALUES ('7700000001', 'ООО Поставщик 1', 'Иван', '+74950001111', 'supply1@demo.ru', 4.5, true, NOW(), NOW())
-    ON CONFLICT (inn) DO UPDATE SET legal_name = EXCLUDED.legal_name
+    ON CONFLICT DO NOTHING
     RETURNING supplier_id
 ),
 req AS (
