@@ -12,10 +12,13 @@ import ru.bowling.bowlingapp.DTO.PartsSearchDTO;
 import ru.bowling.bowlingapp.Entity.PartsCatalog;
 import ru.bowling.bowlingapp.Entity.WarehouseInventory;
 import ru.bowling.bowlingapp.Entity.enums.AvailabilityStatus;
+import ru.bowling.bowlingapp.Repository.EquipmentCategoryRepository;
 import ru.bowling.bowlingapp.Repository.PartImageRepository;
 import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
 import ru.bowling.bowlingapp.Repository.WarehouseInventoryRepository;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,20 +31,22 @@ public class PartsService {
         private final PartsCatalogRepository partsCatalogRepository;
         private final WarehouseInventoryRepository warehouseInventoryRepository;
         private final PartImageRepository partImageRepository;
+        private final EquipmentCategoryRepository equipmentCategoryRepository;
 
-	@Transactional(readOnly = true)
-	public List<PartsCatalogResponseDTO> searchParts(PartsSearchDTO searchDTO) {
+        @Transactional(readOnly = true)
+        public List<PartsCatalogResponseDTO> searchParts(PartsSearchDTO searchDTO) {
 		String query = (searchDTO.getSearchQuery() != null && !searchDTO.getSearchQuery().isBlank())
 				? searchDTO.getSearchQuery().trim() : null;
-		Integer manufacturerId = searchDTO.getManufacturerId() != null ? searchDTO.getManufacturerId().intValue() : null;
+                Integer manufacturerId = searchDTO.getManufacturerId() != null ? searchDTO.getManufacturerId().intValue() : null;
                 Boolean isUnique = searchDTO.getIsUnique();
                 String normalizedCategoryCode = searchDTO.getCategoryCode() != null
                                 ? searchDTO.getCategoryCode().trim()
                                 : null;
-		Sort sort = Sort.by(Sort.Direction.fromString(searchDTO.getSortDirection()), searchDTO.getSortBy());
-		Pageable pageable = PageRequest.of(searchDTO.getPage(), searchDTO.getSize(), sort);
+                List<String> categoryCodes = resolveCategoryCodes(normalizedCategoryCode);
+                Sort sort = Sort.by(Sort.Direction.fromString(searchDTO.getSortDirection()), searchDTO.getSortBy());
+                Pageable pageable = PageRequest.of(searchDTO.getPage(), searchDTO.getSize(), sort);
 
-                Page<PartsCatalog> page = partsCatalogRepository.search(query, manufacturerId, isUnique, normalizedCategoryCode, pageable);
+                Page<PartsCatalog> page = partsCatalogRepository.search(query, manufacturerId, isUnique, categoryCodes, pageable);
 		List<PartsCatalog> parts = page.getContent();
 		Map<Integer, Integer> totals = warehouseInventoryRepository
 				.sumQuantitiesByCatalogIds(parts.stream().map(p -> p.getCatalogId().intValue()).toList())
@@ -86,7 +91,7 @@ public class PartsService {
 		return convertCommon(part, totalQuantity, availabilityStatus);
 	}
 
-	private PartsCatalogResponseDTO convertCommon(PartsCatalog part, int totalQuantity, AvailabilityStatus availabilityStatus) {
+        private PartsCatalogResponseDTO convertCommon(PartsCatalog part, int totalQuantity, AvailabilityStatus availabilityStatus) {
                 return PartsCatalogResponseDTO.builder()
                                 .catalogId(part.getCatalogId())
                                 .manufacturerId(part.getManufacturer() != null ? part.getManufacturer().getManufacturerId().longValue() : null)
@@ -117,5 +122,30 @@ public class PartsService {
                 return partImageRepository.findFirstByCatalogId(catalogId)
                                 .map(image -> image.getImageUrl())
                                 .orElse(null);
+        }
+
+        private List<String> resolveCategoryCodes(String normalizedCategoryCode) {
+                if (normalizedCategoryCode == null || normalizedCategoryCode.isBlank()) {
+                        return null;
+                }
+
+                try {
+                        Long rootId = Long.parseLong(normalizedCategoryCode);
+                        List<String> codes = new ArrayList<>();
+                        ArrayDeque<Long> queue = new ArrayDeque<>();
+                        queue.add(rootId);
+
+                        while (!queue.isEmpty()) {
+                                Long currentId = queue.poll();
+                                codes.add(currentId.toString());
+
+                                equipmentCategoryRepository.findByParent_IdAndIsActiveTrueOrderBySortOrder(currentId)
+                                                .forEach(child -> queue.add(child.getId()));
+                        }
+
+                        return codes;
+                } catch (NumberFormatException ignored) {
+                        return List.of(normalizedCategoryCode);
+                }
         }
 }
