@@ -30,7 +30,7 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
   bool _loadingParts = false;
   String? _selectedBrand;
 
-  bool get _canSearchParts => _path.isNotEmpty && _currentCategories.isEmpty;
+  bool get _canSearchParts => _path.isNotEmpty;
 
   @override
   void initState() {
@@ -106,10 +106,6 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
   }
 
   Future<void> _runSearch({String? categoryCode}) async {
-    if (!_canSearchParts) {
-      _resetParts();
-      return;
-    }
     setState(() => _loadingParts = true);
     try {
       final dto = PartsSearchDto(
