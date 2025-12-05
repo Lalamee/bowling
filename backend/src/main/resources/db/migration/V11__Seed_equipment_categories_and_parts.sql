@@ -11,15 +11,16 @@ WHERE id IN (1241, 1231, 1223, 1222, 1221, 1211, 1201, 1191, 1181, 1171, 1161, 1
              1240, 1230, 1220, 1210, 1200, 1190, 1180, 1170, 1160, 1150, 1140, 1130,
              1120, 1110, 1100, 2101, 2100, 2000, 1000);
 
--- Ensure manufacturers exist for sample parts
-INSERT INTO manufacturer (name, contact_person, phone, email, address)
-SELECT 'Brunswick Bowling', 'John Smith', '+18001234567', 'sales@brunswickbowling.com', '123 Bowling St, USA'
+-- The manufacturer table currently stores only a unique name column, so keep inserts
+-- minimal to avoid referencing non-existent fields such as contact_person.
+INSERT INTO manufacturer (name)
+SELECT 'Brunswick Bowling'
 WHERE NOT EXISTS (
     SELECT 1 FROM manufacturer WHERE lower(name) = lower('Brunswick Bowling')
 );
 
-INSERT INTO manufacturer (name, contact_person, phone, email, address)
-SELECT 'Switch Bowling', 'Support', '+39000000000', 'info@switchbowling.com', 'Via Roma, 1, Italy'
+INSERT INTO manufacturer (name)
+SELECT 'Switch Bowling'
 WHERE NOT EXISTS (
     SELECT 1 FROM manufacturer WHERE lower(name) = lower('Switch Bowling')
 );
