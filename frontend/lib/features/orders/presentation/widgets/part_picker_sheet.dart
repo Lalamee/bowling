@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../api/api_service.dart';
-import '../../../../core/repositories/equipment_component_repository.dart';
+import '../../../../core/repositories/equipment_category_repository.dart';
 import '../../../../core/theme/colors.dart';
-import '../../../../models/equipment_component_dto.dart';
+import '../../../../models/equipment_category_dto.dart';
 import '../../../../models/parts_catalog_response_dto.dart';
 import '../../../../models/parts_search_dto.dart';
 import '../../../../shared/widgets/buttons/custom_button.dart';
@@ -18,23 +18,23 @@ class PartPickerSheet extends StatefulWidget {
 }
 
 class _PartPickerSheetState extends State<PartPickerSheet> {
-  final _componentRepository = EquipmentComponentRepository();
+  final _categoryRepository = EquipmentCategoryRepository();
   final _api = ApiService();
   final _searchController = TextEditingController();
   Timer? _debounce;
 
-  List<EquipmentComponentDto> _currentComponents = const [];
-  final List<EquipmentComponentDto> _path = [];
+  List<EquipmentCategoryDto> _currentCategories = const [];
+  final List<EquipmentCategoryDto> _path = [];
   List<PartsCatalogResponseDto> _parts = const [];
   bool _loadingComponents = false;
   bool _loadingParts = false;
 
-  bool get _canSearchParts => _path.isNotEmpty;
+  bool get _canSearchParts => _path.isNotEmpty && _currentCategories.isEmpty;
 
   @override
   void initState() {
     super.initState();
-    _loadComponents();
+    _loadCategories();
   }
 
   @override
@@ -44,39 +44,40 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
     super.dispose();
   }
 
-  Future<void> _loadComponents({int? parentId}) async {
+  Future<void> _loadCategories({int? parentId, String? brand}) async {
     setState(() => _loadingComponents = true);
     try {
       final items = parentId == null
-          ? await _componentRepository.fetchRoots()
-          : await _componentRepository.fetchChildren(parentId);
+          ? await _categoryRepository.fetchRoots(brand: brand)
+          : await _categoryRepository.fetchChildren(parentId: parentId, brand: brand);
       if (!mounted) return;
       setState(() {
-        _currentComponents = items;
+        _currentCategories = items;
         _loadingComponents = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _currentComponents = const [];
+        _currentCategories = const [];
         _loadingComponents = false;
       });
     }
   }
 
-  void _onComponentTap(EquipmentComponentDto component) {
-    _path.add(component);
-    _loadComponents(parentId: component.componentId);
-    _runSearch(categoryCode: component.code);
+  Future<void> _onCategoryTap(EquipmentCategoryDto category) async {
+    _path.add(category);
+    await _loadCategories(parentId: category.id, brand: category.brand);
+    _runSearch(categoryCode: category.id.toString());
   }
 
-  void _onBackLevel() {
+  Future<void> _onBackLevel() async {
     if (_path.isEmpty) return;
     _path.removeLast();
-    final parentId = _path.isNotEmpty ? _path.last.componentId : null;
-    _loadComponents(parentId: parentId);
+    final parentId = _path.isNotEmpty ? _path.last.id : null;
+    final brand = _path.isNotEmpty ? _path.last.brand : null;
+    await _loadCategories(parentId: parentId, brand: brand);
     if (_canSearchParts) {
-      _runSearch(categoryCode: _path.last.code);
+      _runSearch(categoryCode: _path.last.id.toString());
     } else {
       _resetParts();
     }
@@ -168,11 +169,11 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
                   ? const Center(child: CircularProgressIndicator())
                   : ListView.separated(
                       scrollDirection: Axis.horizontal,
-                      itemCount: _currentComponents.length,
+                      itemCount: _currentCategories.length,
                       itemBuilder: (context, index) {
-                        final component = _currentComponents[index];
+                        final category = _currentCategories[index];
                         return GestureDetector(
-                          onTap: () => _onComponentTap(component),
+                          onTap: () => _onCategoryTap(category),
                           child: Container(
                             width: 180,
                             padding: const EdgeInsets.all(12),
@@ -185,26 +186,18 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  component.name,
+                                  category.displayName,
                                   style: const TextStyle(fontWeight: FontWeight.w600),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  component.category ?? '',
+                                  category.brand,
                                   style: const TextStyle(color: AppColors.darkGray, fontSize: 12),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                if (component.manufacturer != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 6),
-                                    child: Text(
-                                      component.manufacturer!,
-                                      style: const TextStyle(color: AppColors.primary, fontSize: 12),
-                                    ),
-                                  ),
                               ],
                             ),
                           ),
@@ -245,7 +238,7 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
             spacing: 6,
             children: _path
                 .map((c) => Chip(
-                      label: Text(c.name, overflow: TextOverflow.ellipsis),
+                      label: Text(c.displayName, overflow: TextOverflow.ellipsis),
                     ))
                 .toList(),
           ),
