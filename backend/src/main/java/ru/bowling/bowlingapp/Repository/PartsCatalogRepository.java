@@ -27,13 +27,13 @@ public interface PartsCatalogRepository extends JpaRepository<PartsCatalog, Long
 	List<PartsCatalog> findByCatalogNumberContainingIgnoreCase(String catalogNumber);
 
         @Query("select p from PartsCatalog p left join p.manufacturer m " +
-                        "where (:q is null or lower(p.officialNameRu) like lower(concat('%', :q, '%')) " +
-                        "or lower(p.officialNameEn) like lower(concat('%', :q, '%')) " +
-                        "or lower(p.commonName) like lower(concat('%', :q, '%')) " +
-                        "or lower(p.catalogNumber) like lower(concat('%', :q, '%'))) " +
+                        "where (:q is null or lower(cast(p.officialNameRu as string)) like lower(concat('%', :q, '%')) " +
+                        "or lower(cast(p.officialNameEn as string)) like lower(concat('%', :q, '%')) " +
+                        "or lower(cast(p.commonName as string)) like lower(concat('%', :q, '%')) " +
+                        "or lower(cast(p.catalogNumber as string)) like lower(concat('%', :q, '%'))) " +
                         "and (:manufacturerId is null or m.manufacturerId = :manufacturerId) " +
                         "and (:isUnique is null or p.isUnique = :isUnique) " +
-                        "and (:categoryCodes is null or lower(trim(p.categoryCode)) in :categoryCodes)")
+                        "and (:categoryCodes is null or lower(cast(trim(p.categoryCode) as string)) in :categoryCodes)")
         Page<PartsCatalog> search(
                 @Param("q") String q,
                 @Param("manufacturerId") Integer manufacturerId,
@@ -43,15 +43,15 @@ public interface PartsCatalogRepository extends JpaRepository<PartsCatalog, Long
         );
 
         @Query("select p from PartsCatalog p left join p.manufacturer m " +
-                        "where lower(p.officialNameRu) like lower(concat('%', :query, '%')) " +
-                        "or lower(p.officialNameEn) like lower(concat('%', :query, '%')) " +
-                        "or lower(p.commonName) like lower(concat('%', :query, '%')) " +
-                        "or lower(p.catalogNumber) like lower(concat('%', :query, '%'))")
+                        "where lower(cast(p.officialNameRu as string)) like lower(concat('%', :query, '%')) " +
+                        "or lower(cast(p.officialNameEn as string)) like lower(concat('%', :query, '%')) " +
+                        "or lower(cast(p.commonName as string)) like lower(concat('%', :query, '%')) " +
+                        "or lower(cast(p.catalogNumber as string)) like lower(concat('%', :query, '%'))")
         List<PartsCatalog> searchByNameOrNumber(@Param("query") String query);
 
         @Query("select p from PartsCatalog p " +
-                        "where lower(p.commonName) = lower(:name) " +
-                        "or lower(p.officialNameRu) = lower(:name) " +
-                        "or lower(p.officialNameEn) = lower(:name)")
+                        "where lower(cast(p.commonName as string)) = lower(:name) " +
+                        "or lower(cast(p.officialNameRu as string)) = lower(:name) " +
+                        "or lower(cast(p.officialNameEn as string)) = lower(:name)")
         List<PartsCatalog> findByAnyNameIgnoreCase(@Param("name") String name);
 }
