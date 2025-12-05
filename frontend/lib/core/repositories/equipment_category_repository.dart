@@ -8,7 +8,10 @@ class EquipmentCategoryRepository {
     return _api.getEquipmentCategories(brand: brand, level: 1);
   }
 
-  Future<List<EquipmentCategoryDto>> fetchChildren({required int parentId, String? brand}) {
-    return _api.getEquipmentCategories(brand: brand, parentId: parentId);
+  Future<List<EquipmentCategoryDto>> fetchChildren({
+    required int parentId,
+    String? brand,
+  }) {
+    return _api.getEquipmentCategories(parentId: parentId, brand: brand);
   }
 }
