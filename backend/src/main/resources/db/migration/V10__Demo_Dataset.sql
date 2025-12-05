@@ -282,11 +282,17 @@ WHERE rp.request_id = (SELECT request_id FROM req);
 
 -- Supplier reviews including complaint
 WITH po AS (SELECT order_id, supplier_id FROM purchase_orders ORDER BY order_id DESC LIMIT 1),
-     reviewer AS (SELECT user_id, club_id FROM users u LEFT JOIN club_staff cs ON cs.user_id = u.user_id WHERE u.phone = '+79994440201' LIMIT 1)
+     reviewer AS (
+         SELECT u.user_id AS reviewer_user_id, cs.club_id
+         FROM users u
+         LEFT JOIN club_staff cs ON cs.user_id = u.user_id
+         WHERE u.phone = '+79994440201'
+         LIMIT 1
+     )
 INSERT INTO supplier_reviews (supplier_id, club_id, user_id, order_id, rating, comment, review_date, is_complaint, complaint_status, complaint_title, complaint_resolved, resolution_notes)
 VALUES
-    ((SELECT supplier_id FROM po), (SELECT club_id FROM reviewer), (SELECT user_id FROM reviewer), (SELECT order_id FROM po), 5, 'Все ок', NOW(), false, NULL, NULL, false, NULL),
-    ((SELECT supplier_id FROM po), (SELECT club_id FROM reviewer), (SELECT user_id FROM reviewer), (SELECT order_id FROM po), 2, 'Недопоставка', NOW(), true, 'IN_PROGRESS', 'Претензия по количеству', false, 'Ожидает разбирательства')
+    ((SELECT supplier_id FROM po), (SELECT club_id FROM reviewer), (SELECT reviewer_user_id FROM reviewer), (SELECT order_id FROM po), 5, 'Все ок', NOW(), false, NULL, NULL, false, NULL),
+    ((SELECT supplier_id FROM po), (SELECT club_id FROM reviewer), (SELECT reviewer_user_id FROM reviewer), (SELECT order_id FROM po), 2, 'Недопоставка', NOW(), true, 'IN_PROGRESS', 'Претензия по количеству', false, 'Ожидает разбирательства')
 ON CONFLICT DO NOTHING;
 
 -- Service history for maintenance indicators
