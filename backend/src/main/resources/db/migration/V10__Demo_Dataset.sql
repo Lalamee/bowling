@@ -141,12 +141,13 @@ prof AS (
            DATE '1991-01-01', 4 + rn, 2 + rn, false, 'Регион ' || rn, true, CURRENT_DATE, 4.0 + rn * 0.1, CURRENT_DATE, CURRENT_DATE
     FROM mech_users
     ON CONFLICT DO NOTHING
-    RETURNING profile_id, rn
+    RETURNING profile_id, user_id
 )
 INSERT INTO club_mechanics (mechanic_profile_id, club_id)
-SELECT profile_id,
-       CASE rn WHEN 1 THEN 1 WHEN 2 THEN 2 ELSE 3 END
-FROM prof
+SELECT p.profile_id,
+       CASE mu.rn WHEN 1 THEN 1 WHEN 2 THEN 2 ELSE 3 END
+FROM prof p
+JOIN mech_users mu ON mu.user_id = p.user_id
 ON CONFLICT DO NOTHING;
 
 -- Manager profiles bound to clubs
