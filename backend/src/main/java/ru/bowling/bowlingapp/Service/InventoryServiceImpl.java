@@ -115,8 +115,10 @@ public class InventoryServiceImpl implements InventoryService {
         List<PartsCatalog> parts = partsCatalogRepository.searchByNameOrNumber(normalizedQuery);
         if (categoryCodeFilter != null) {
             parts = parts.stream()
-                    .filter(part -> categoryCodeFilter.equalsIgnoreCase(
-                            normalizeCategoryCode(part.getCategoryCode())))
+                    .filter(part -> {
+                        String normalizedPartCode = normalizeCategoryCode(part.getCategoryCode());
+                        return normalizedPartCode != null && normalizedPartCode.startsWith(categoryCodeFilter);
+                    })
                     .collect(Collectors.toList());
         }
         if (parts.isEmpty()) {
