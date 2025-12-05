@@ -34,11 +34,14 @@ public class PartsService {
 		String query = (searchDTO.getSearchQuery() != null && !searchDTO.getSearchQuery().isBlank())
 				? searchDTO.getSearchQuery().trim() : null;
 		Integer manufacturerId = searchDTO.getManufacturerId() != null ? searchDTO.getManufacturerId().intValue() : null;
-		Boolean isUnique = searchDTO.getIsUnique();
+                Boolean isUnique = searchDTO.getIsUnique();
+                String normalizedCategoryCode = searchDTO.getCategoryCode() != null
+                                ? searchDTO.getCategoryCode().trim()
+                                : null;
 		Sort sort = Sort.by(Sort.Direction.fromString(searchDTO.getSortDirection()), searchDTO.getSortBy());
 		Pageable pageable = PageRequest.of(searchDTO.getPage(), searchDTO.getSize(), sort);
 
-                Page<PartsCatalog> page = partsCatalogRepository.search(query, manufacturerId, isUnique, searchDTO.getCategoryCode(), pageable);
+                Page<PartsCatalog> page = partsCatalogRepository.search(query, manufacturerId, isUnique, normalizedCategoryCode, pageable);
 		List<PartsCatalog> parts = page.getContent();
 		Map<Integer, Integer> totals = warehouseInventoryRepository
 				.sumQuantitiesByCatalogIds(parts.stream().map(p -> p.getCatalogId().intValue()).toList())
