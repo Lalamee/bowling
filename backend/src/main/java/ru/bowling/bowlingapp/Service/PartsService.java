@@ -39,7 +39,8 @@ public class PartsService {
 				? searchDTO.getSearchQuery().trim() : null;
                 Integer manufacturerId = searchDTO.getManufacturerId() != null ? searchDTO.getManufacturerId().intValue() : null;
                 Boolean isUnique = searchDTO.getIsUnique();
-                String normalizedCategoryCode = searchDTO.getCategoryCode() != null
+                String normalizedCategoryCode = (searchDTO.getCategoryCode() != null
+                                && !searchDTO.getCategoryCode().trim().isBlank())
                                 ? searchDTO.getCategoryCode().trim()
                                 : null;
                 List<String> categoryCodes = resolveCategoryCodes(normalizedCategoryCode);
