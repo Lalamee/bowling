@@ -24,6 +24,7 @@ import '../models/issue_request_dto.dart';
 import '../models/stock_issue_decision_dto.dart';
 import '../models/close_request_dto.dart';
 import '../models/equipment_component_dto.dart';
+import '../models/equipment_category_dto.dart';
 import '../models/club_summary_dto.dart';
 import '../models/purchase_order_summary_dto.dart';
 import '../models/purchase_order_detail_dto.dart';
@@ -444,6 +445,23 @@ class ApiService {
     final response = await _dio.post('/api/parts/search', data: searchDto.toJson());
     return (response.data as List)
         .map((e) => PartsCatalogResponseDto.fromJson(e))
+        .toList();
+  }
+
+  /// GET /api/equipment/categories - Получение иерархии категорий оборудования
+  Future<List<EquipmentCategoryDto>> getEquipmentCategories({
+    String? brand,
+    int? parentId,
+    int? level,
+  }) async {
+    final response = await _dio.get('/api/equipment/categories', queryParameters: {
+      if (brand != null) 'brand': brand,
+      if (parentId != null) 'parentId': parentId,
+      if (level != null) 'level': level,
+    });
+
+    return (response.data as List)
+        .map((e) => EquipmentCategoryDto.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
   }
 
