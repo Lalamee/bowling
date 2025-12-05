@@ -9,7 +9,7 @@ INSERT INTO account_type (name) VALUES
     ('FREE_MECHANIC_BASIC'),
     ('FREE_MECHANIC_PREMIUM'),
     ('MAIN_ADMIN')
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- Ensure access levels
 INSERT INTO access_level (name) VALUES
@@ -17,7 +17,7 @@ INSERT INTO access_level (name) VALUES
     ('PREMIUM'),
     ('OWNER_MANAGER'),
     ('ADMIN')
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- Ensure roles
 INSERT INTO role (name) VALUES
@@ -25,7 +25,7 @@ INSERT INTO role (name) VALUES
     ('MECHANIC'),
     ('HEAD_MECHANIC'),
     ('CLUB_OWNER')
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- Seed clubs 1-6 if absent
 INSERT INTO bowling_clubs (club_id, name, address, lanes_count, contact_phone, contact_email, is_active, is_verified, created_at, updated_at)
@@ -36,7 +36,7 @@ VALUES
     (4, 'Demo Club 4', 'Новосибирск, ул. Советская, 4', 12, '+73830000004', 'club4@demo.ru', true, true, CURRENT_DATE, CURRENT_DATE),
     (5, 'Demo Club 5', 'Казань, ул. Университетская, 5', 6, '+78430000005', 'club5@demo.ru', true, true, CURRENT_DATE, CURRENT_DATE),
     (6, 'Demo Club 6', 'Краснодар, ул. Северная, 6', 8, '+78610000006', 'club6@demo.ru', true, true, CURRENT_DATE, CURRENT_DATE)
-ON CONFLICT (club_id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- Basic parts catalog for request/warehouse examples
 INSERT INTO parts_catalog (catalog_number, official_name_ru, official_name_en, common_name, description, normal_service_life, is_unique, category_code)
@@ -55,7 +55,7 @@ WITH role_admin AS (
     INSERT INTO users (password_hash, phone, role_id, registration_date, is_active, is_verified, account_type_id, last_modified)
     SELECT '$2a$10$XURPShQNCsLjp1Qc2H4pzO8VzQ1UVlF4EwJ5J8d8X5gX5zJ5r5V6e', '+79990000000', role_id, CURRENT_DATE, true, true, account_type_id, NOW()
     FROM role_admin, acct_admin
-    ON CONFLICT (phone) DO NOTHING
+    ON CONFLICT DO NOTHING
     RETURNING user_id
 )
 INSERT INTO administrator_profiles (user_id, full_name, contact_phone, contact_email, is_data_verified, created_at, updated_at)
@@ -68,15 +68,15 @@ WITH role_mech AS (SELECT role_id FROM role WHERE name = 'MECHANIC' LIMIT 1),
      free_basic_user AS (
          INSERT INTO users (password_hash, phone, role_id, registration_date, is_active, is_verified, account_type_id, last_modified)
          SELECT '$2a$10$XURPShQNCsLjp1Qc2H4pzO8VzQ1UVlF4EwJ5J8d8X5gX5zJ5r5V6e', '+79995550101', role_id, CURRENT_DATE, true, true, account_type_id, NOW()
-         FROM role_mech, acct_free_basic
-         ON CONFLICT (phone) DO NOTHING
-         RETURNING user_id
+    FROM role_mech, acct_free_basic
+    ON CONFLICT DO NOTHING
+    RETURNING user_id
      ),
      free_basic_profile AS (
          INSERT INTO mechanic_profiles (user_id, full_name, birth_date, total_experience_years, bowling_experience_years, is_entrepreneur, skills, advantages, region, is_data_verified, verification_date, rating, created_at, updated_at)
          SELECT user_id, 'Свободный Базовый', DATE '1990-02-02', 5, 3, true, 'обслуживание дорожек', 'быстрая диагностика', 'Москва', true, CURRENT_DATE, 4.6, CURRENT_DATE, CURRENT_DATE
          FROM free_basic_user
-         ON CONFLICT (user_id) DO NOTHING
+         ON CONFLICT DO NOTHING
          RETURNING profile_id
      )
 INSERT INTO personal_warehouses (name, location, is_active, created_at, updated_at, mechanic_profile_id)
@@ -91,14 +91,14 @@ WITH role_mech AS (SELECT role_id FROM role WHERE name = 'MECHANIC' LIMIT 1),
          INSERT INTO users (password_hash, phone, role_id, registration_date, is_active, is_verified, account_type_id, last_modified)
          SELECT '$2a$10$XURPShQNCsLjp1Qc2H4pzO8VzQ1UVlF4EwJ5J8d8X5gX5zJ5r5V6e', '+79995550202', role_id, CURRENT_DATE, true, true, account_type_id, NOW()
          FROM role_mech, acct_free_premium
-         ON CONFLICT (phone) DO NOTHING
+         ON CONFLICT DO NOTHING
          RETURNING user_id
      ),
      free_premium_profile AS (
          INSERT INTO mechanic_profiles (user_id, full_name, birth_date, total_experience_years, bowling_experience_years, is_entrepreneur, skills, advantages, region, is_data_verified, verification_date, rating, created_at, updated_at)
          SELECT user_id, 'Свободный Премиум', DATE '1988-05-05', 8, 6, true, 'диагностика, настройка', 'расширенный опыт', 'Санкт-Петербург', true, CURRENT_DATE, 4.9, CURRENT_DATE, CURRENT_DATE
          FROM free_premium_user
-         ON CONFLICT (user_id) DO NOTHING
+         ON CONFLICT DO NOTHING
          RETURNING profile_id
      ),
      premium_warehouse AS (
@@ -126,7 +126,7 @@ VALUES
     ('$2a$10$XURPShQNCsLjp1Qc2H4pzO8VzQ1UVlF4EwJ5J8d8X5gX5zJ5r5V6e', '+79994440103', (SELECT role_id FROM role_mech), CURRENT_DATE, true, true, (SELECT account_type_id FROM acct_ind), NOW()),
     ('$2a$10$XURPShQNCsLjp1Qc2H4pzO8VzQ1UVlF4EwJ5J8d8X5gX5zJ5r5V6e', '+79994440201', (SELECT role_id FROM role_head), CURRENT_DATE, true, true, (SELECT account_type_id FROM acct_mgr), NOW()),
     ('$2a$10$XURPShQNCsLjp1Qc2H4pzO8VzQ1UVlF4EwJ5J8d8X5gX5zJ5r5V6e', '+79994440202', (SELECT role_id FROM role_head), CURRENT_DATE, true, true, (SELECT account_type_id FROM acct_mgr), NOW())
-ON CONFLICT (phone) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- Mechanic profiles for club staff
 WITH mech_users AS (
@@ -140,13 +140,14 @@ prof AS (
            CASE WHEN rn = 1 THEN 'Клубный механик 1' WHEN rn = 2 THEN 'Клубный механик 2' ELSE 'Клубный механик 3' END,
            DATE '1991-01-01', 4 + rn, 2 + rn, false, 'Регион ' || rn, true, CURRENT_DATE, 4.0 + rn * 0.1, CURRENT_DATE, CURRENT_DATE
     FROM mech_users
-    ON CONFLICT (user_id) DO NOTHING
-    RETURNING profile_id, rn
+    ON CONFLICT DO NOTHING
+    RETURNING profile_id, user_id
 )
 INSERT INTO club_mechanics (mechanic_profile_id, club_id)
-SELECT profile_id,
-       CASE rn WHEN 1 THEN 1 WHEN 2 THEN 2 ELSE 3 END
-FROM prof
+SELECT p.profile_id,
+       CASE mu.rn WHEN 1 THEN 1 WHEN 2 THEN 2 ELSE 3 END
+FROM prof p
+JOIN mech_users mu ON mu.user_id = p.user_id
 ON CONFLICT DO NOTHING;
 
 -- Manager profiles bound to clubs
@@ -164,17 +165,17 @@ manager_profiles AS (
            CASE rn WHEN 1 THEN 'manager4@demo.ru' ELSE 'manager5@demo.ru' END,
            true, NOW(), NOW()
     FROM mgr_users
-    ON CONFLICT (user_id) DO NOTHING
+    ON CONFLICT DO NOTHING
     RETURNING user_id, club_id
 )
 INSERT INTO club_staff (user_id, club_id, role_id, is_active, assigned_at, info_access_restricted)
-SELECT mp.user_id, mp.club_id, (SELECT role_id FROM role WHERE name = 'HEAD_MECHANIC'), true, NOW(), false
+SELECT mp.user_id, mp.club_id, (SELECT role_id FROM role WHERE name = 'HEAD_MECHANIC' LIMIT 1), true, NOW(), false
 FROM manager_profiles mp
 ON CONFLICT DO NOTHING;
 
 -- Club staff entries for mechanics
 INSERT INTO club_staff (user_id, club_id, role_id, is_active, assigned_at, info_access_restricted)
-SELECT u.user_id, cm.club_id, (SELECT role_id FROM role WHERE name = 'MECHANIC'), true, NOW(), false
+SELECT u.user_id, cm.club_id, (SELECT role_id FROM role WHERE name = 'MECHANIC' LIMIT 1), true, NOW(), false
 FROM users u
 JOIN mechanic_profiles mp ON mp.user_id = u.user_id
 JOIN club_mechanics cm ON cm.mechanic_profile_id = mp.profile_id
@@ -186,7 +187,7 @@ INSERT INTO attestation_applications (user_id, mechanic_profile_id, club_id, sta
 SELECT u.user_id, mp.profile_id, cm.club_id, s.status, s.comment, s.grade, NOW(), NOW()
 FROM (
       VALUES ('+79995550101', 'APPROVED', 'Утверждено', 'MIDDLE'),
-             ('+79994440101', 'PENDING', 'В обработке', 'JUNIOR'),
+             ('+79994440101', 'IN_REVIEW', 'В обработке', 'JUNIOR'),
              ('+79995550202', 'REJECTED', 'Недостаточно опыта', 'SENIOR')
      ) AS s(phone, status, comment, grade)
 JOIN users u ON u.phone = s.phone
@@ -198,24 +199,67 @@ ON CONFLICT DO NOTHING;
 WITH reqs AS (
     INSERT INTO maintenance_requests (club_id, lane_number, mechanic_id, request_date, status, request_reason, manager_notes)
     VALUES
-        (1, 1, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79994440101'), NOW(), 'OPEN', 'Плановая проверка', 'Тестовая заявка'),
-        (NULL, 0, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79995550101'), NOW(), 'OPEN', 'Замена датчика', 'Свободный агент'),
-        (2, 3, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79995550202'), NOW(), 'IN_PROGRESS', 'Требуется контроллер', 'Премиум агент')
+        (1, 1, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79994440101' LIMIT 1), NOW(), 'NEW', 'Плановая проверка', 'Тестовая заявка'),
+        (NULL, 0, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79995550101' LIMIT 1), NOW(), 'NEW', 'Замена датчика', 'Свободный агент'),
+        (2, 3, (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79995550202' LIMIT 1), NOW(), 'IN_PROGRESS', 'Требуется контроллер', 'Премиум агент')
     ON CONFLICT DO NOTHING
     RETURNING request_id, club_id
 )
 INSERT INTO request_parts (request_id, catalog_number, part_name, quantity, status, is_available, catalog_id, warehouse_id, inventory_id, inventory_location, help_requested)
 VALUES
-    ((SELECT request_id FROM reqs LIMIT 1), 'ZIP-100', 'Ролик подачи', 2, 'REQUESTED', true, (SELECT catalog_id FROM parts_catalog WHERE catalog_number='ZIP-100'), (SELECT warehouse_id FROM club_staff cs JOIN bowling_clubs bc ON cs.club_id = bc.club_id WHERE cs.club_id =1 LIMIT 1), NULL, 'склад клуба', false),
-    ((SELECT request_id FROM reqs OFFSET 1 LIMIT 1), 'ZIP-200', 'Датчик линии', 1, 'REQUESTED', false, (SELECT catalog_id FROM parts_catalog WHERE catalog_number='ZIP-200'), NULL, NULL, NULL, true),
-    ((SELECT request_id FROM reqs OFFSET 2 LIMIT 1), 'ZIP-300', 'Контроллер', 1, 'REQUESTED', true, (SELECT catalog_id FROM parts_catalog WHERE catalog_number='ZIP-300'), NULL, NULL, NULL, false)
+    (
+        (SELECT request_id FROM reqs LIMIT 1),
+        'ZIP-100',
+        'Ролик подачи',
+        2,
+        'APPROVAL_PENDING',
+        true,
+        (SELECT catalog_id FROM parts_catalog WHERE catalog_number = 'ZIP-100' LIMIT 1),
+        (
+            SELECT warehouse_id
+            FROM personal_warehouses pw
+            JOIN mechanic_profiles mp ON pw.mechanic_profile_id = mp.profile_id
+            JOIN club_mechanics cm ON cm.mechanic_profile_id = mp.profile_id
+            WHERE cm.club_id = 1
+            LIMIT 1
+        ),
+        NULL,
+        'склад клуба',
+        false
+    ),
+    (
+        (SELECT request_id FROM reqs OFFSET 1 LIMIT 1),
+        'ZIP-200',
+        'Датчик линии',
+        1,
+        'APPROVAL_PENDING',
+        false,
+        (SELECT catalog_id FROM parts_catalog WHERE catalog_number = 'ZIP-200' LIMIT 1),
+        NULL,
+        NULL,
+        NULL,
+        true
+    ),
+    (
+        (SELECT request_id FROM reqs OFFSET 2 LIMIT 1),
+        'ZIP-300',
+        'Контроллер',
+        1,
+        'APPROVAL_PENDING',
+        true,
+        (SELECT catalog_id FROM parts_catalog WHERE catalog_number = 'ZIP-300' LIMIT 1),
+        NULL,
+        NULL,
+        NULL,
+        false
+    )
 ON CONFLICT DO NOTHING;
 
 -- Purchase orders demonstrating full and partial acceptance
 WITH supp AS (
     INSERT INTO suppliers (inn, legal_name, contact_person, contact_phone, contact_email, rating, is_verified, created_at, updated_at)
     VALUES ('7700000001', 'ООО Поставщик 1', 'Иван', '+74950001111', 'supply1@demo.ru', 4.5, true, NOW(), NOW())
-    ON CONFLICT (inn) DO UPDATE SET legal_name = EXCLUDED.legal_name
+    ON CONFLICT DO NOTHING
     RETURNING supplier_id
 ),
 req AS (
@@ -223,7 +267,7 @@ req AS (
 ),
 po AS (
     INSERT INTO purchase_orders (supplier_id, request_id, status, order_date, expected_delivery_date, actual_delivery_date)
-    SELECT supplier_id, request_id, 'PARTIAL_ACCEPTANCE', NOW(), NOW() + INTERVAL '5 days', NOW()
+    SELECT supplier_id, request_id, 'PARTIALLY_COMPLETED', NOW(), NOW() + INTERVAL '5 days', NOW()
     FROM supp, req
     ON CONFLICT DO NOTHING
     RETURNING order_id
@@ -233,28 +277,89 @@ SET order_id = (SELECT order_id FROM po),
     accepted_quantity = CASE WHEN rp.catalog_number='ZIP-100' THEN 1 ELSE 0 END,
     acceptance_date = NOW(),
     acceptance_comment = 'Частичная поставка',
-    status = CASE WHEN rp.catalog_number='ZIP-100' THEN 'APPROVED' ELSE 'REJECTED' END
+    status = CASE WHEN rp.catalog_number='ZIP-100' THEN 'ACCEPTED' ELSE 'REJECTED' END
 WHERE rp.request_id = (SELECT request_id FROM req);
 
 -- Supplier reviews including complaint
 WITH po AS (SELECT order_id, supplier_id FROM purchase_orders ORDER BY order_id DESC LIMIT 1),
-     reviewer AS (SELECT user_id, club_id FROM users u LEFT JOIN club_staff cs ON cs.user_id = u.user_id WHERE u.phone = '+79994440201' LIMIT 1)
+     reviewer AS (
+         SELECT u.user_id AS reviewer_user_id, cs.club_id
+         FROM users u
+         LEFT JOIN club_staff cs ON cs.user_id = u.user_id
+         WHERE u.phone = '+79994440201'
+         LIMIT 1
+     )
 INSERT INTO supplier_reviews (supplier_id, club_id, user_id, order_id, rating, comment, review_date, is_complaint, complaint_status, complaint_title, complaint_resolved, resolution_notes)
 VALUES
-    ((SELECT supplier_id FROM po), (SELECT club_id FROM reviewer), (SELECT user_id FROM reviewer), (SELECT order_id FROM po), 5, 'Все ок', NOW(), false, NULL, NULL, false, NULL),
-    ((SELECT supplier_id FROM po), (SELECT club_id FROM reviewer), (SELECT user_id FROM reviewer), (SELECT order_id FROM po), 2, 'Недопоставка', NOW(), true, 'OPEN', 'Претензия по количеству', false, 'Ожидает разбирательства')
+    ((SELECT supplier_id FROM po), (SELECT club_id FROM reviewer), (SELECT reviewer_user_id FROM reviewer), (SELECT order_id FROM po), 5, 'Все ок', NOW(), false, NULL, NULL, false, NULL),
+    ((SELECT supplier_id FROM po), (SELECT club_id FROM reviewer), (SELECT reviewer_user_id FROM reviewer), (SELECT order_id FROM po), 2, 'Недопоставка', NOW(), true, 'IN_PROGRESS', 'Претензия по количеству', false, 'Ожидает разбирательства')
 ON CONFLICT DO NOTHING;
 
 -- Service history for maintenance indicators
-WITH mech AS (SELECT profile_id FROM mechanic_profiles mp JOIN users u ON u.user_id = mp.user_id WHERE u.phone = '+79994440102' LIMIT 1)
-INSERT INTO service_history (club_id, mechanic_id, equipment_id, work_description, work_date, status)
-VALUES
-    (1, (SELECT profile_id FROM mech), NULL, 'Плановое ТО', CURRENT_DATE - INTERVAL '60 days', 'COMPLETED'),
-    (2, (SELECT profile_id FROM mech), NULL, 'Замена датчика', CURRENT_DATE - INTERVAL '10 days', 'COMPLETED')
-ON CONFLICT DO NOTHING;
+WITH mech AS (
+    SELECT profile_id FROM mechanic_profiles mp
+    JOIN users u ON u.user_id = mp.user_id
+    WHERE u.phone = '+79994440102'
+    LIMIT 1
+)
+INSERT INTO service_history (
+    club_id,
+    performed_by,
+    equipment_id,
+    description,
+    service_date,
+    service_type,
+    service_notes,
+    created_date
+)
+SELECT 1, (SELECT profile_id FROM mech), NULL, 'Плановое ТО', CURRENT_DATE - INTERVAL '60 days', 'INSPECTION', 'Плановое обслуживание', NOW()
+WHERE NOT EXISTS (
+    SELECT 1 FROM service_history WHERE club_id = 1 AND description = 'Плановое ТО'
+);
 
-INSERT INTO service_history_parts (service_history_id, catalog_id, quantity_used)
-SELECT sh.service_history_id, pc.catalog_id, 1
-FROM service_history sh
-JOIN parts_catalog pc ON pc.catalog_number = 'ZIP-200'
-ON CONFLICT DO NOTHING;
+WITH mech AS (
+    SELECT profile_id FROM mechanic_profiles mp
+    JOIN users u ON u.user_id = mp.user_id
+    WHERE u.phone = '+79994440102'
+    LIMIT 1
+)
+INSERT INTO service_history (
+    club_id,
+    performed_by,
+    equipment_id,
+    description,
+    service_date,
+    service_type,
+    service_notes,
+    created_date
+)
+SELECT 2, (SELECT profile_id FROM mech), NULL, 'Замена датчика', CURRENT_DATE - INTERVAL '10 days', 'REPAIR', 'Замена датчика дорожки', NOW()
+WHERE NOT EXISTS (
+    SELECT 1 FROM service_history WHERE club_id = 2 AND description = 'Замена датчика'
+);
+
+INSERT INTO service_history_parts (
+    service_history_id,
+    part_catalog_id,
+    catalog_number,
+    part_name,
+    quantity,
+    created_date
+)
+SELECT
+    (SELECT service_id FROM service_history WHERE club_id = 2 AND description = 'Замена датчика' LIMIT 1),
+    (SELECT catalog_id FROM parts_catalog WHERE catalog_number = 'ZIP-200' LIMIT 1),
+    'ZIP-200',
+    'Датчик линии',
+    1,
+    NOW()
+WHERE EXISTS (
+    SELECT 1 FROM service_history WHERE club_id = 2 AND description = 'Замена датчика'
+)
+AND NOT EXISTS (
+    SELECT 1 FROM service_history_parts shp
+    WHERE shp.service_history_id = (
+        SELECT service_id FROM service_history WHERE club_id = 2 AND description = 'Замена датчика' LIMIT 1
+    )
+    AND shp.catalog_number = 'ZIP-200'
+);
