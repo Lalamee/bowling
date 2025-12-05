@@ -267,7 +267,7 @@ req AS (
 ),
 po AS (
     INSERT INTO purchase_orders (supplier_id, request_id, status, order_date, expected_delivery_date, actual_delivery_date)
-    SELECT supplier_id, request_id, 'PARTIAL_ACCEPTANCE', NOW(), NOW() + INTERVAL '5 days', NOW()
+    SELECT supplier_id, request_id, 'PARTIALLY_COMPLETED', NOW(), NOW() + INTERVAL '5 days', NOW()
     FROM supp, req
     ON CONFLICT DO NOTHING
     RETURNING order_id
@@ -286,7 +286,7 @@ WITH po AS (SELECT order_id, supplier_id FROM purchase_orders ORDER BY order_id 
 INSERT INTO supplier_reviews (supplier_id, club_id, user_id, order_id, rating, comment, review_date, is_complaint, complaint_status, complaint_title, complaint_resolved, resolution_notes)
 VALUES
     ((SELECT supplier_id FROM po), (SELECT club_id FROM reviewer), (SELECT user_id FROM reviewer), (SELECT order_id FROM po), 5, 'Все ок', NOW(), false, NULL, NULL, false, NULL),
-    ((SELECT supplier_id FROM po), (SELECT club_id FROM reviewer), (SELECT user_id FROM reviewer), (SELECT order_id FROM po), 2, 'Недопоставка', NOW(), true, 'OPEN', 'Претензия по количеству', false, 'Ожидает разбирательства')
+    ((SELECT supplier_id FROM po), (SELECT club_id FROM reviewer), (SELECT user_id FROM reviewer), (SELECT order_id FROM po), 2, 'Недопоставка', NOW(), true, 'IN_PROGRESS', 'Претензия по количеству', false, 'Ожидает разбирательства')
 ON CONFLICT DO NOTHING;
 
 -- Service history for maintenance indicators
