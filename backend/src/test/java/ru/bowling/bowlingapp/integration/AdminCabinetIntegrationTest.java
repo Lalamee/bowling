@@ -116,7 +116,7 @@ class AdminCabinetIntegrationTest {
         AttestationApplication attestation = attestationApplicationRepository.save(AttestationApplication.builder()
                 .user(mechanicUser)
                 .mechanicProfile(profile)
-                .status(AttestationStatus.NEW)
+                .status(AttestationStatus.PENDING)
                 .comment("Новая заявка на проверку")
                 .submittedAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
