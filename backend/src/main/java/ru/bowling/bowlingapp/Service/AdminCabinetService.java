@@ -143,10 +143,19 @@ public class AdminCabinetService {
         user.setLastModified(LocalDateTime.now());
 
         boolean restricted = update.getAccessLevelName() != null && !update.getAccessLevelName().equalsIgnoreCase("PREMIUM");
-        clubStaffRepository.findByUserUserIdAndIsActiveTrue(userId).forEach(staff -> {
-            staff.setInfoAccessRestricted(restricted);
-            clubStaffRepository.save(staff);
-        });
+        if (target == AccountTypeName.FREE_MECHANIC_BASIC || target == AccountTypeName.FREE_MECHANIC_PREMIUM) {
+            Optional.ofNullable(user.getMechanicProfile()).ifPresent(profile -> profile.setClubs(new ArrayList<>()));
+            clubStaffRepository.findByUserUserId(userId).forEach(staff -> {
+                staff.setIsActive(false);
+                staff.setInfoAccessRestricted(restricted);
+                clubStaffRepository.save(staff);
+            });
+        } else {
+            clubStaffRepository.findByUserUserIdAndIsActiveTrue(userId).forEach(staff -> {
+                staff.setInfoAccessRestricted(restricted);
+                clubStaffRepository.save(staff);
+            });
+        }
 
         userRepository.save(user);
         return mapUserToRegistration(user);
@@ -164,6 +173,13 @@ public class AdminCabinetService {
         BowlingClub club = bowlingClubRepository.findById(request.getClubId())
                 .orElseThrow(() -> new IllegalArgumentException("Club not found"));
         Long clubId = club.getClubId();
+
+        AccountTypeName accountType = user.getAccountType() != null
+                ? AccountTypeName.from(user.getAccountType().getName())
+                : AccountTypeName.INDIVIDUAL;
+        if (accountType == AccountTypeName.FREE_MECHANIC_BASIC || accountType == AccountTypeName.FREE_MECHANIC_PREMIUM) {
+            throw new IllegalStateException("Free mechanics cannot be attached to clubs through staff links");
+        }
 
         List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs()).orElseGet(ArrayList::new);
         if (request.isAttach()) {
