@@ -37,6 +37,8 @@ public class AdminCabinetService {
     private final ClubStaffRepository clubStaffRepository;
     private final BowlingClubRepository bowlingClubRepository;
     private final PersonalWarehouseRepository personalWarehouseRepository;
+    private final NotificationService notificationService;
+    private final AttestationService attestationService;
 
     @Transactional(readOnly = true)
     public List<AdminRegistrationApplicationDTO> listRegistrationApplications() {
@@ -209,6 +211,11 @@ public class AdminCabinetService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
+    public AttestationApplicationDTO decideAttestation(Long applicationId, AttestationDecisionDTO decision) {
+        return attestationService.updateStatus(applicationId, decision);
+    }
+
     @Transactional(readOnly = true)
     public List<AdminComplaintDTO> listSupplierComplaints() {
         return supplierReviewRepository.findAll().stream()
@@ -245,6 +252,89 @@ public class AdminCabinetService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<AdminMechanicStatusChangeDTO> listMechanicStatusChanges() {
+        return clubStaffRepository.findAll().stream()
+                .filter(staff -> staff.getUser() != null && staff.getUser().getRole() != null
+                        && RoleName.from(staff.getUser().getRole().getName()) == RoleName.MECHANIC)
+                .map(this::toStatusChangeDto)
+                .filter(dto -> Boolean.FALSE.equals(dto.getIsActive()) || Boolean.TRUE.equals(dto.getInfoAccessRestricted()))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public AdminMechanicStatusChangeDTO updateMechanicStaffStatus(Long staffId, AdminStaffStatusUpdateDTO update) {
+        ClubStaff staff = clubStaffRepository.findById(staffId)
+                .orElseThrow(() -> new IllegalArgumentException("Staff record not found"));
+        if (update.getActive() != null) {
+            staff.setIsActive(update.getActive());
+        }
+        if (update.getInfoAccessRestricted() != null) {
+            staff.setInfoAccessRestricted(update.getInfoAccessRestricted());
+        }
+        return toStatusChangeDto(clubStaffRepository.save(staff));
+    }
+
+    @Transactional
+    public AdminRegistrationApplicationDTO convertMechanicAccount(Long userId, AdminMechanicAccountChangeDTO change) {
+        if (change == null || change.getAccountTypeName() == null) {
+            throw new IllegalArgumentException("Account type is required");
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        if (user.getRole() == null || RoleName.from(user.getRole().getName()) != RoleName.MECHANIC) {
+            throw new IllegalArgumentException("User is not a mechanic");
+        }
+
+        AccountTypeName target = AccountTypeName.from(change.getAccountTypeName());
+        AccountType accountType = accountTypeRepository.findByNameIgnoreCase(target.name())
+                .orElseThrow(() -> new IllegalStateException("Account type not configured: " + target.name()));
+
+        user.setAccountType(accountType);
+        user.setLastModified(LocalDateTime.now());
+
+        boolean restricted = isRestricted(change.getAccessLevelName());
+        if (target == AccountTypeName.FREE_MECHANIC_BASIC || target == AccountTypeName.FREE_MECHANIC_PREMIUM) {
+            Optional.ofNullable(user.getMechanicProfile()).ifPresent(profile -> profile.setClubs(new ArrayList<>()));
+            clubStaffRepository.findByUserUserId(userId).forEach(staff -> {
+                staff.setIsActive(false);
+                staff.setInfoAccessRestricted(true);
+                clubStaffRepository.save(staff);
+            });
+            ensurePersonalWarehouse(user.getMechanicProfile());
+        } else {
+            if (Boolean.TRUE.equals(change.getAttachToClub())) {
+                if (change.getClubId() == null) {
+                    throw new IllegalArgumentException("Club id is required when attaching mechanic to club account");
+                }
+                BowlingClub club = bowlingClubRepository.findById(change.getClubId())
+                        .orElseThrow(() -> new IllegalArgumentException("Club not found"));
+                if (user.getMechanicProfile() != null) {
+                    List<BowlingClub> clubs = Optional.ofNullable(user.getMechanicProfile().getClubs())
+                            .orElseGet(ArrayList::new);
+                    if (clubs.stream().noneMatch(c -> Objects.equals(c.getClubId(), club.getClubId()))) {
+                        clubs.add(club);
+                        user.getMechanicProfile().setClubs(clubs);
+                    }
+                }
+                upsertStaff(user, club);
+            }
+            clubStaffRepository.findByUserUserId(userId).forEach(staff -> {
+                staff.setInfoAccessRestricted(restricted);
+                clubStaffRepository.save(staff);
+            });
+        }
+        userRepository.save(user);
+        return mapUserToRegistration(user);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminAppealDTO> listAdministrativeAppeals() {
+        return notificationService.getNotificationsForRole(RoleName.ADMIN).stream()
+                .map(this::toAppealDto)
+                .collect(Collectors.toList());
+    }
+
     private AdminHelpRequestDTO toHelpDto(RequestPart part) {
         MaintenanceRequest request = part.getRequest();
         return AdminHelpRequestDTO.builder()
@@ -256,6 +346,36 @@ public class AdminCabinetService {
                 .helpRequested(part.getHelpRequested())
                 .partStatus(part.getStatus() != null ? part.getStatus().name() : null)
                 .managerNotes(request != null ? request.getManagerNotes() : null)
+                .build();
+    }
+
+    private AdminMechanicStatusChangeDTO toStatusChangeDto(ClubStaff staff) {
+        User user = staff.getUser();
+        MechanicProfile profile = user != null ? user.getMechanicProfile() : null;
+        BowlingClub club = staff.getClub();
+        return AdminMechanicStatusChangeDTO.builder()
+                .staffId(staff.getStaffId())
+                .userId(user != null ? user.getUserId() : null)
+                .mechanicProfileId(profile != null ? profile.getProfileId() : null)
+                .clubId(club != null ? club.getClubId() : null)
+                .clubName(club != null ? club.getName() : null)
+                .role(staff.getRole() != null ? staff.getRole().getName() : null)
+                .isActive(staff.getIsActive())
+                .infoAccessRestricted(staff.getInfoAccessRestricted())
+                .build();
+    }
+
+    private AdminAppealDTO toAppealDto(NotificationEvent event) {
+        return AdminAppealDTO.builder()
+                .id(event.getId() != null ? event.getId().toString() : null)
+                .type(event.getType() != null ? event.getType().name() : null)
+                .message(event.getMessage())
+                .requestId(event.getRequestId())
+                .mechanicId(event.getMechanicId())
+                .clubId(event.getClubId())
+                .partIds(event.getPartIds())
+                .payload(event.getPayload())
+                .createdAt(event.getCreatedAt())
                 .build();
     }
 
@@ -370,6 +490,10 @@ public class AdminCabinetService {
             return user.getOwnerProfile().getClubs().get(0);
         }
         return null;
+    }
+
+    private boolean isRestricted(String accessLevelName) {
+        return accessLevelName != null && !accessLevelName.equalsIgnoreCase("PREMIUM");
     }
 
     private void ensurePersonalWarehouse(MechanicProfile profile) {
