@@ -70,7 +70,7 @@ class FreeMechanicRegistrationFlowTest {
                 .build();
 
         var application = applicationService.submitApplication(request);
-        assertThat(application.getStatus()).isEqualTo(AttestationStatus.NEW);
+        assertThat(application.getStatus()).isEqualTo(AttestationStatus.PENDING);
         assertThat(application.getAccountType()).isEqualTo(AccountTypeName.FREE_MECHANIC_BASIC.name());
 
         MechanicApplicationDecisionDTO decision = MechanicApplicationDecisionDTO.builder()

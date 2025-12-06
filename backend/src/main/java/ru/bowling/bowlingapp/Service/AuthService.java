@@ -818,7 +818,7 @@ public class AuthService implements UserDetailsService {
         AttestationApplication application = AttestationApplication.builder()
                 .user(user)
                 .mechanicProfile(mechanicProfile)
-                .status(AttestationStatus.NEW)
+                .status(AttestationStatus.PENDING)
                 .comment("Регистрация свободного механика ожидает подтверждения администрацией и выбора аккаунта (Базовый/Премиум)")
                 .submittedAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
