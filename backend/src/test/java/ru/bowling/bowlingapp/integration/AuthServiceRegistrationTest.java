@@ -99,6 +99,7 @@ class AuthServiceRegistrationTest {
 
         MechanicProfile profile = saved.getMechanicProfile();
         assertThat(profile).isNotNull();
+        assertThat(profile.getIsEntrepreneur()).isTrue();
         assertThat(profile.getRegion()).isEqualTo("Москва");
         assertThat(profile.getClubs()).isEmpty();
 

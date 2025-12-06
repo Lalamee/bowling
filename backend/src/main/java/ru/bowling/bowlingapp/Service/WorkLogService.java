@@ -14,6 +14,7 @@ import ru.bowling.bowlingapp.DTO.WorkLogSearchDTO;
 import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Entity.enums.WorkLogStatus;
 import ru.bowling.bowlingapp.Entity.enums.WorkType;
+import ru.bowling.bowlingapp.Enum.AccountTypeName;
 import ru.bowling.bowlingapp.Repository.*;
 import ru.bowling.bowlingapp.Repository.BowlingClubRepository;
 import ru.bowling.bowlingapp.Repository.ClubEquipmentRepository;
@@ -76,6 +77,9 @@ public class WorkLogService {
         User viewer = userId != null ? userRepository.findById(userId).orElse(null) : null;
         String viewerRole = viewer != null && viewer.getRole() != null ? viewer.getRole().getName() : null;
         boolean isAdmin = "ADMIN".equalsIgnoreCase(viewerRole);
+        AccountTypeName accountType = viewer != null && viewer.getAccountType() != null
+                ? AccountTypeName.from(viewer.getAccountType().getName())
+                : null;
         List<Long> accessibleClubIds = viewer != null ? userClubAccessService.resolveAccessibleClubIds(viewer) : List.of();
 
         if (!isAdmin && accessibleClubIds.isEmpty()) {
@@ -105,6 +109,9 @@ public class WorkLogService {
                         || isActiveStatus(log.getStatus()))
                 .filter(log -> criteria.getIncludeManualEdits() == null || criteria.getIncludeManualEdits()
                         || Boolean.FALSE.equals(log.getIsManualEdit()))
+                .filter(log -> !isFreeBasicMechanicRestricted(viewerRole, accountType)
+                        || (log.getMechanic() != null && log.getMechanic().getUser() != null
+                        && Objects.equals(log.getMechanic().getUser().getUserId(), userId)))
                 .filter(log -> criteria.getKeyword() == null || criteria.getKeyword().isBlank()
                         || containsKeyword(log, criteria.getKeyword()))
                 .filter(log -> userId == null || Objects.equals(log.getCreatedBy(), userId)
@@ -143,6 +150,13 @@ public class WorkLogService {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, criteria.getSortBy()));
         return new PageImpl<>(pageContent, pageable, filtered.size());
+    }
+
+    private boolean isFreeBasicMechanicRestricted(String viewerRole, AccountTypeName accountType) {
+        if (viewerRole == null || accountType == null) {
+            return false;
+        }
+        return "MECHANIC".equalsIgnoreCase(viewerRole) && accountType == AccountTypeName.FREE_MECHANIC_BASIC;
     }
 
     private boolean matchesStatus(String requestedStatus, WorkLogStatus actualStatus) {
