@@ -35,6 +35,15 @@ class PersonalWarehouseAvailabilityTest {
     private PartsCatalogRepository partsCatalogRepository;
 
     @Autowired
+    private AccountTypeRepository accountTypeRepository;
+
+    @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
+    private ClubStaffRepository clubStaffRepository;
+
+    @Autowired
     private PersonalWarehouseRepository personalWarehouseRepository;
 
     @Autowired
@@ -50,12 +59,24 @@ class PersonalWarehouseAvailabilityTest {
                 .createdAt(LocalDate.now())
                 .build());
 
+        AccountType freePremium = accountTypeRepository.save(AccountType.builder()
+                .name("FREE_MECHANIC_PREMIUM")
+                .build());
+
+        Role mechanicRole = roleRepository.findByNameIgnoreCase("MECHANIC")
+                .orElseGet(() -> roleRepository.save(Role.builder()
+                        .name("MECHANIC")
+                        .description("Механик")
+                        .build()));
+
         User mechanicUser = User.builder()
                 .phone("+70000000001")
                 .passwordHash("pwd")
                 .registrationDate(LocalDate.now())
                 .isActive(true)
                 .isVerified(true)
+                .accountType(freePremium)
+                .role(mechanicRole)
                 .build();
 
         MechanicProfile mechanicProfile = MechanicProfile.builder()
@@ -67,6 +88,14 @@ class PersonalWarehouseAvailabilityTest {
                 .clubs(List.of(club))
                 .build();
         mechanicUser.setMechanicProfile(mechanicProfile);
+
+        clubStaffRepository.save(ClubStaff.builder()
+                .club(club)
+                .user(mechanicUser)
+                .role(mechanicRole)
+                .assignedAt(LocalDateTime.now())
+                .isActive(true)
+                .build());
 
         mechanicProfileRepository.save(mechanicProfile);
 
