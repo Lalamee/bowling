@@ -73,12 +73,14 @@ public class MechanicDirectoryService {
 
         return profiles.stream()
                 .filter(profile -> Boolean.TRUE.equals(profile.getIsDataVerified()))
+                .filter(profile -> Boolean.TRUE.equals(profile.getIsCertified()))
                 .filter(profile -> approvedGrades.containsKey(profile.getProfileId()))
                 .filter(profile -> specializationId == null || Objects.equals(profile.getSpecializationId(), specializationId))
                 .filter(profile -> matchesRegion(profile, normalizedRegion))
                 .filter(profile -> minRating == null || (profile.getRating() != null && profile.getRating() >= minRating))
                 .filter(profile -> grade == null || grade.equals(approvedGrades.get(profile.getProfileId())))
-                .map(profile -> toSpecialistCard(profile, approvedGrades.get(profile.getProfileId())))
+                .map(profile -> toSpecialistCard(profile, Optional.ofNullable(profile.getCertifiedGrade())
+                        .orElse(approvedGrades.get(profile.getProfileId()))))
                 .sorted(Comparator.comparing(SpecialistCardDTO::getFullName, Comparator.nullsLast(String::compareToIgnoreCase)))
                 .collect(Collectors.toList());
     }
@@ -347,14 +349,14 @@ public class MechanicDirectoryService {
 
     private AttestationStatus resolveAttestationStatus(MechanicProfile profile) {
         if (profile == null || profile.getProfileId() == null) {
-            return AttestationStatus.NEW;
+            return AttestationStatus.PENDING;
         }
         return attestationApplicationRepository
                 .findFirstByMechanicProfile_ProfileIdOrderByUpdatedAtDesc(profile.getProfileId())
                 .map(AttestationApplication::getStatus)
-                .orElseGet(() -> Boolean.TRUE.equals(profile.getIsDataVerified())
+                .orElseGet(() -> Boolean.TRUE.equals(profile.getIsCertified())
                         ? AttestationStatus.APPROVED
-                        : AttestationStatus.NEW);
+                        : AttestationStatus.PENDING);
     }
 
     private AttestationApplication selectLatestByUpdate(AttestationApplication left, AttestationApplication right) {
