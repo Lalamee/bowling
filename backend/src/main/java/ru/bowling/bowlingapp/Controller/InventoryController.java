@@ -45,6 +45,7 @@ public class InventoryController {
                                                      @RequestParam(required = false) Long clubId,
                                                      @RequestParam(required = false) String availability,
                                                      @RequestParam(required = false, name = "category") String categoryCode,
+                                                     @RequestParam(required = false, name = "componentId") Long componentId,
                                                      @AuthenticationPrincipal UserPrincipal userPrincipal) {
         List<WarehouseSummaryDto> accessible = requireAccessibleWarehouses(userPrincipal);
         Set<Integer> allowedWarehouseIds = extractWarehouseIds(accessible);
@@ -56,7 +57,27 @@ public class InventoryController {
                 .warehouseId(requestedWarehouseId)
                 .clubId(clubId)
                 .categoryCode(categoryCode)
+                .componentId(componentId)
                 .availability(InventoryAvailabilityFilter.fromString(availability))
+                .allowedWarehouseIds(allowedWarehouseIds)
+                .build();
+        return ResponseEntity.ok(inventoryService.searchParts(request));
+    }
+
+    @GetMapping("/warehouses/{id}/items")
+    public ResponseEntity<List<PartDto>> getWarehouseInventory(@PathVariable("id") Integer warehouseId,
+                                                               @RequestParam(required = false) String query,
+                                                               @RequestParam(required = false, name = "category") String categoryCode,
+                                                               @RequestParam(required = false, name = "componentId") Long componentId,
+                                                               @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        Set<Integer> allowedWarehouseIds = extractWarehouseIds(requireAccessibleWarehouses(userPrincipal));
+        assertWarehouseAccess(allowedWarehouseIds, warehouseId);
+
+        InventorySearchRequest request = InventorySearchRequest.builder()
+                .warehouseId(warehouseId)
+                .categoryCode(categoryCode)
+                .componentId(componentId)
+                .query(query)
                 .allowedWarehouseIds(allowedWarehouseIds)
                 .build();
         return ResponseEntity.ok(inventoryService.searchParts(request));
