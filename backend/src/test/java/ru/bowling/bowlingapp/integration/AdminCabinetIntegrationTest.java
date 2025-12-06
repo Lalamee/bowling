@@ -14,6 +14,8 @@ import ru.bowling.bowlingapp.Enum.AccountTypeName;
 import ru.bowling.bowlingapp.Enum.RoleName;
 import ru.bowling.bowlingapp.Repository.*;
 import ru.bowling.bowlingapp.Service.AdminCabinetService;
+import ru.bowling.bowlingapp.Service.NotificationService;
+import ru.bowling.bowlingapp.Entity.enums.MechanicGrade;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -60,10 +62,13 @@ class AdminCabinetIntegrationTest {
 
     @Autowired
     private AttestationApplicationRepository attestationApplicationRepository;
+    @Autowired
+    private NotificationService notificationService;
 
     private Role mechanicRole;
     private AccountType freeBasic;
     private AccountType freePremium;
+    private AccountType clubIndividual;
 
     @BeforeEach
     void setup() {
@@ -85,10 +90,11 @@ class AdminCabinetIntegrationTest {
 
         freeBasic = accountTypeRepository.save(AccountType.builder().name(AccountTypeName.FREE_MECHANIC_BASIC.name()).build());
         freePremium = accountTypeRepository.save(AccountType.builder().name(AccountTypeName.FREE_MECHANIC_PREMIUM.name()).build());
-        accountTypeRepository.save(AccountType.builder().name(AccountTypeName.INDIVIDUAL.name()).build());
+        clubIndividual = accountTypeRepository.save(AccountType.builder().name(AccountTypeName.INDIVIDUAL.name()).build());
         accountTypeRepository.save(AccountType.builder().name(AccountTypeName.CLUB_MANAGER.name()).build());
         accountTypeRepository.save(AccountType.builder().name(AccountTypeName.CLUB_OWNER.name()).build());
         accountTypeRepository.save(AccountType.builder().name(AccountTypeName.MAIN_ADMIN.name()).build());
+        notificationService.clearNotifications();
     }
 
     @Test
@@ -116,7 +122,7 @@ class AdminCabinetIntegrationTest {
         AttestationApplication attestation = attestationApplicationRepository.save(AttestationApplication.builder()
                 .user(mechanicUser)
                 .mechanicProfile(profile)
-                .status(AttestationStatus.NEW)
+                .status(AttestationStatus.PENDING)
                 .comment("Новая заявка на проверку")
                 .submittedAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -142,10 +148,37 @@ class AdminCabinetIntegrationTest {
                 .createdAt(LocalDate.now())
                 .build());
 
+        AdminRegistrationApplicationDTO converted = adminCabinetService.convertMechanicAccount(mechanicUser.getUserId(),
+                AdminMechanicAccountChangeDTO.builder()
+                        .accountTypeName(clubIndividual.getName())
+                        .clubId(club.getClubId())
+                        .attachToClub(true)
+                        .accessLevelName("PREMIUM")
+                        .build());
+        assertThat(converted.getAccountType()).isEqualTo(AccountTypeName.INDIVIDUAL.name());
+        assertThat(clubStaffRepository.existsByClubAndUserAndIsActiveTrue(club, mechanicUser)).isTrue();
+
         AdminRegistrationApplicationDTO linked = adminCabinetService.changeMechanicClubLink(profile.getProfileId(),
                 MechanicClubLinkRequestDTO.builder().clubId(club.getClubId()).attach(true).build());
         assertThat(linked.getClubId()).isEqualTo(club.getClubId());
         assertThat(clubStaffRepository.existsByClubAndUserAndIsActiveTrue(club, mechanicUser)).isTrue();
+
+        ClubStaff restrictedStaff = clubStaffRepository.save(ClubStaff.builder()
+                .club(club)
+                .user(mechanicUser)
+                .role(mechanicRole)
+                .assignedAt(LocalDateTime.now())
+                .isActive(false)
+                .infoAccessRestricted(true)
+                .build());
+
+        List<AdminMechanicStatusChangeDTO> statusRequests = adminCabinetService.listMechanicStatusChanges();
+        assertThat(statusRequests).extracting(AdminMechanicStatusChangeDTO::getStaffId).contains(restrictedStaff.getStaffId());
+
+        AdminMechanicStatusChangeDTO activated = adminCabinetService.updateMechanicStaffStatus(restrictedStaff.getStaffId(),
+                AdminStaffStatusUpdateDTO.builder().active(true).infoAccessRestricted(false).build());
+        assertThat(activated.getIsActive()).isTrue();
+        assertThat(activated.getInfoAccessRestricted()).isFalse();
 
         SupplierReview review = supplierReviewRepository.save(SupplierReview.builder()
                 .supplierId(1L)
@@ -183,8 +216,23 @@ class AdminCabinetIntegrationTest {
         assertThat(helpRequests).hasSize(1);
         assertThat(helpRequests.get(0).getRequestId()).isEqualTo(request.getRequestId());
 
+        notificationService.notifyHelpRequested(request, requestPartRepository.findAll(), "Не хватает инструмента");
+        List<AdminAppealDTO> appeals = adminCabinetService.listAdministrativeAppeals();
+        assertThat(appeals).isNotEmpty();
+        assertThat(appeals.get(0).getMessage()).contains("Механик не может выполнить работы самостоятельно");
+
         List<AttestationApplicationDTO> attestationList = adminCabinetService.listAttestationApplications();
         assertThat(attestationList).extracting(AttestationApplicationDTO::getId).contains(attestation.getApplicationId());
+
+        AttestationApplicationDTO approvedAttestation = adminCabinetService.decideAttestation(attestation.getApplicationId(),
+                AttestationDecisionDTO.builder()
+                        .status(ru.bowling.bowlingapp.Entity.enums.AttestationDecisionStatus.APPROVED)
+                        .approvedGrade(MechanicGrade.SENIOR)
+                        .comment("Повышаем грейд")
+                        .build());
+        assertThat(approvedAttestation.getStatus()).isEqualTo(ru.bowling.bowlingapp.Entity.enums.AttestationDecisionStatus.APPROVED);
+        assertThat(mechanicProfileRepository.findById(profile.getProfileId()).orElseThrow().getCertifiedGrade())
+                .isEqualTo(MechanicGrade.SENIOR);
     }
 }
 

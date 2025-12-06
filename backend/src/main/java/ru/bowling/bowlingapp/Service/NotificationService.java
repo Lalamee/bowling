@@ -57,38 +57,57 @@ public class NotificationService {
             String reason
     ) {
         String message = "Механик не может выполнить работы самостоятельно (запрос помощи)";
-        NotificationEvent event = buildBaseEvent(NotificationEventType.MECHANIC_HELP_REQUESTED, request, parts, reason, Set.of(RoleName.ADMIN, RoleName.HEAD_MECHANIC, RoleName.CLUB_OWNER, RoleName.MECHANIC));
+        NotificationEvent event = buildBaseEvent(
+                NotificationEventType.MECHANIC_HELP_REQUESTED,
+                message,
+                request,
+                parts,
+                reason,
+                Set.of(RoleName.ADMIN, RoleName.HEAD_MECHANIC, RoleName.CLUB_OWNER, RoleName.MECHANIC)
+        );
         notifications.add(event);
         log.info("NOTIFICATION: {}. Request #{}, parts={}, reason={}", message, request != null ? request.getRequestId() : null, partIds(parts), reason);
         return event;
     }
 
     public NotificationEvent notifyHelpConfirmed(MaintenanceRequest request, List<RequestPart> parts, String comment) {
-        NotificationEvent event = buildBaseEvent(NotificationEventType.MECHANIC_HELP_CONFIRMED, request, parts, comment, Set.of(RoleName.MECHANIC, RoleName.ADMIN, RoleName.HEAD_MECHANIC));
+        NotificationEvent event = buildBaseEvent(
+                NotificationEventType.MECHANIC_HELP_CONFIRMED,
+                "Запрос помощи подтвержден",
+                request,
+                parts,
+                comment,
+                Set.of(RoleName.MECHANIC, RoleName.ADMIN, RoleName.HEAD_MECHANIC, RoleName.CLUB_OWNER)
+        );
         notifications.add(event);
         log.info("NOTIFICATION: Запрос помощи подтвержден по заявке #{}: {}", request != null ? request.getRequestId() : null, comment);
         return event;
     }
 
     public NotificationEvent notifyHelpDeclined(MaintenanceRequest request, List<RequestPart> parts, String comment) {
-        NotificationEvent event = buildBaseEvent(NotificationEventType.MECHANIC_HELP_DECLINED, request, parts, comment, Set.of(RoleName.MECHANIC, RoleName.ADMIN, RoleName.HEAD_MECHANIC));
+        NotificationEvent event = buildBaseEvent(
+                NotificationEventType.MECHANIC_HELP_DECLINED,
+                "Запрос помощи отклонен",
+                request,
+                parts,
+                comment,
+                Set.of(RoleName.MECHANIC, RoleName.ADMIN, RoleName.HEAD_MECHANIC, RoleName.CLUB_OWNER)
+        );
         notifications.add(event);
         log.info("NOTIFICATION: Запрос помощи отклонен по заявке #{}: {}", request != null ? request.getRequestId() : null, comment);
         return event;
     }
 
     public NotificationEvent notifyHelpReassigned(MaintenanceRequest request, List<RequestPart> parts, Long newMechanicId, String comment) {
-        NotificationEvent event = NotificationEvent.builder()
-                .id(UUID.randomUUID())
-                .type(NotificationEventType.MECHANIC_HELP_REASSIGNED)
-                .message("Назначен другой специалист для заявки")
-                .requestId(request != null ? request.getRequestId() : null)
+        NotificationEvent event = buildBaseEvent(
+                NotificationEventType.MECHANIC_HELP_REASSIGNED,
+                "Назначен другой специалист для заявки",
+                request,
+                parts,
+                comment,
+                Set.of(RoleName.MECHANIC, RoleName.ADMIN, RoleName.HEAD_MECHANIC, RoleName.CLUB_OWNER)
+        ).toBuilder()
                 .mechanicId(newMechanicId)
-                .partIds(partIds(parts))
-                .payload(comment)
-                .createdAt(LocalDateTime.now())
-                .clubId(request != null && request.getClub() != null ? request.getClub().getClubId() : null)
-                .audiences(Set.of(RoleName.MECHANIC, RoleName.ADMIN, RoleName.HEAD_MECHANIC))
                 .build();
         notifications.add(event);
         log.info("NOTIFICATION: Заявка #{} переназначена другому механику {}: {}", request != null ? request.getRequestId() : null, newMechanicId, comment);
@@ -96,6 +115,7 @@ public class NotificationService {
     }
 
     private NotificationEvent buildBaseEvent(NotificationEventType type,
+                                             String message,
                                              MaintenanceRequest request,
                                              List<RequestPart> parts,
                                              String payload,
@@ -103,7 +123,7 @@ public class NotificationService {
         return NotificationEvent.builder()
                 .id(UUID.randomUUID())
                 .type(type)
-                .message("Механик не может выполнить работы самостоятельно (запрос помощи)")
+                .message(message)
                 .requestId(request != null ? request.getRequestId() : null)
                 .mechanicId(request != null && request.getMechanic() != null ? request.getMechanic().getProfileId() : null)
                 .clubId(request != null && request.getClub() != null ? request.getClub().getClubId() : null)
