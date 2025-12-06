@@ -36,6 +36,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/",
                                 "/api/auth/register",
+                                "/api/auth/free-mechanics/apply",
                                 "/api/auth/login",
                                 "/api/auth/refresh",
                                 "/api/public/**",

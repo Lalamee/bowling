@@ -95,7 +95,7 @@ public class FreeMechanicApplicationService {
                 .user(user)
                 .mechanicProfile(profile)
                 .status(AttestationStatus.NEW)
-                .comment("Заявка свободного механика ожидает проверки администрацией")
+                .comment("Заявка свободного механика ожидает подтверждения администрацией и выбора аккаунта (Базовый/Премиум)")
                 .submittedAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
