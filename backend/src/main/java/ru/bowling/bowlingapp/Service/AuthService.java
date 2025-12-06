@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.DTO.*;
 import ru.bowling.bowlingapp.Entity.*;
+import ru.bowling.bowlingapp.Entity.enums.AttestationStatus;
 import ru.bowling.bowlingapp.Enum.AccountTypeName;
 import ru.bowling.bowlingapp.Enum.RoleName;
 import ru.bowling.bowlingapp.Repository.*;
@@ -35,6 +36,7 @@ public class AuthService implements UserDetailsService {
     private final ManagerProfileRepository managerProfileRepository;
     private final AdministratorProfileRepository administratorProfileRepository;
     private final ClubWarehouseService clubWarehouseService;
+    private final AttestationApplicationRepository attestationApplicationRepository;
 
     private static final Pattern RUSSIAN_PHONE_PATTERN = Pattern.compile("^\\+7\\d{10}$");
 
@@ -236,6 +238,9 @@ public class AuthService implements UserDetailsService {
 
         if (mechanicProfile != null) {
             mechanicProfileRepository.save(mechanicProfile);
+            if (isFreeMechanic(accountTypeName)) {
+                createFreeMechanicApplication(user, mechanicProfile);
+            }
         }
 
         if (managerProfile != null) {
@@ -349,9 +354,6 @@ public class AuthService implements UserDetailsService {
             }
             if (isFreeMechanic(accountTypeName) && mechanicDto.getClubId() != null) {
                 throw new IllegalArgumentException("Free mechanics cannot be attached to a club during registration");
-            }
-            if (isFreeMechanic(accountTypeName) && mechanicDto.getIsEntrepreneur() == null) {
-                throw new IllegalArgumentException("Self-employment flag is required for free mechanics");
             }
         } else if (isManagerAccount(accountTypeName)) {
             if (managerDto == null) {
@@ -786,6 +788,23 @@ public class AuthService implements UserDetailsService {
             return false;
         }
         return true;
+    }
+
+    private void createFreeMechanicApplication(User user, MechanicProfile mechanicProfile) {
+        if (user == null || mechanicProfile == null) {
+            return;
+        }
+
+        AttestationApplication application = AttestationApplication.builder()
+                .user(user)
+                .mechanicProfile(mechanicProfile)
+                .status(AttestationStatus.NEW)
+                .comment("Регистрация свободного механика ожидает подтверждения администрацией и выбора аккаунта (Базовый/Премиум)")
+                .submittedAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        attestationApplicationRepository.save(application);
     }
 
     private void attachClubToOwner(OwnerProfile ownerProfile, OwnerProfileDTO ownerDto, BowlingClubDTO clubDto) {

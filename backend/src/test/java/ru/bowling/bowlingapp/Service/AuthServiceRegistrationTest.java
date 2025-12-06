@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.DTO.*;
 import ru.bowling.bowlingapp.Entity.*;
+import ru.bowling.bowlingapp.Entity.enums.AttestationStatus;
 import ru.bowling.bowlingapp.Repository.*;
 
 import java.time.LocalDate;
@@ -48,8 +49,12 @@ class AuthServiceRegistrationTest {
     @Autowired
     private AdministratorProfileRepository administratorProfileRepository;
 
+    @Autowired
+    private AttestationApplicationRepository attestationApplicationRepository;
+
     @BeforeEach
     void setUp() {
+        attestationApplicationRepository.deleteAll();
         clubStaffRepository.deleteAll();
         mechanicProfileRepository.deleteAll();
         managerProfileRepository.deleteAll();
@@ -103,6 +108,12 @@ class AuthServiceRegistrationTest {
         assertThat(saved.getMechanicProfile()).isNotNull();
         assertThat(saved.getMechanicProfile().getClubs()).isEmpty();
         assertThat(clubStaffRepository.findAll()).isEmpty();
+
+        AttestationApplication application = attestationApplicationRepository
+                .findFirstByMechanicProfile_ProfileIdOrderByUpdatedAtDesc(saved.getMechanicProfile().getProfileId())
+                .orElseThrow();
+        assertThat(application.getStatus()).isEqualTo(AttestationStatus.NEW);
+        assertThat(application.getComment()).containsIgnoringCase("Премиум").containsIgnoringCase("Базовый");
     }
 
     @Test
