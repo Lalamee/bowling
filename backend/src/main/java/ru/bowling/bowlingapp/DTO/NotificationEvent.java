@@ -10,7 +10,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Value
-@Builder
+@Builder(toBuilder = true)
 public class NotificationEvent {
     UUID id;
     NotificationEventType type;
