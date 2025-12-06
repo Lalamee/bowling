@@ -420,38 +420,48 @@ public class MaintenanceRequestService {
                 return "неизвестная запчасть";
         }
 
-        private void autoAssignAvailability(RequestPart part, MaintenanceRequest request) {
-                if (part == null || request == null) {
-                        return;
-                }
+    private void autoAssignAvailability(RequestPart part, MaintenanceRequest request) {
+        if (part == null || request == null) {
+            return;
+        }
 
-                Long resolvedCatalogId = part.getCatalogId();
-                if (resolvedCatalogId == null && part.getCatalogNumber() != null) {
-                        partsCatalogRepository.findByCatalogNumber(part.getCatalogNumber())
-                                        .map(PartsCatalog::getCatalogId)
-                                        .ifPresent(part::setCatalogId);
-                        resolvedCatalogId = part.getCatalogId();
-                }
-                if (resolvedCatalogId == null) {
-                        part.setIsAvailable(false);
-                        return;
-                }
+        Long resolvedCatalogId = part.getCatalogId();
+        if (resolvedCatalogId == null && part.getCatalogNumber() != null) {
+            partsCatalogRepository.findByCatalogNumber(part.getCatalogNumber())
+                            .map(PartsCatalog::getCatalogId)
+                            .ifPresent(part::setCatalogId);
+            resolvedCatalogId = part.getCatalogId();
+        }
+        if (resolvedCatalogId == null) {
+            part.setIsAvailable(false);
+            return;
+        }
 
-                List<Integer> candidateWarehouses = new ArrayList<>();
-                MechanicProfile mechanic = request.getMechanic();
-                if (mechanic != null && mechanic.getProfileId() != null) {
-                        personalWarehouseRepository.findByMechanicProfile_ProfileIdAndIsActiveTrue(mechanic.getProfileId())
-                                        .forEach(wh -> candidateWarehouses.add(wh.getWarehouseId()));
-                }
+        List<Integer> candidateWarehouses = new ArrayList<>();
+        MechanicProfile mechanic = request.getMechanic();
+        AccountTypeName accountTypeName = resolveAccountType(mechanic);
+        boolean freeMechanic = accountTypeName == AccountTypeName.FREE_MECHANIC_BASIC
+                || accountTypeName == AccountTypeName.FREE_MECHANIC_PREMIUM;
 
-                if (request.getClub() != null && request.getClub().getClubId() != null) {
-                        candidateWarehouses.add(Math.toIntExact(request.getClub().getClubId()));
-                }
+        if (freeMechanic) {
+            if (mechanic != null && mechanic.getProfileId() != null) {
+                personalWarehouseRepository.findByMechanicProfile_ProfileIdAndIsActiveTrue(mechanic.getProfileId())
+                        .forEach(wh -> candidateWarehouses.add(wh.getWarehouseId()));
+            }
+        } else {
+            if (request.getClub() != null && request.getClub().getClubId() != null) {
+                candidateWarehouses.add(Math.toIntExact(request.getClub().getClubId()));
+            }
+            if (mechanic != null && mechanic.getProfileId() != null) {
+                personalWarehouseRepository.findByMechanicProfile_ProfileIdAndIsActiveTrue(mechanic.getProfileId())
+                        .forEach(wh -> candidateWarehouses.add(wh.getWarehouseId()));
+            }
+        }
 
-                for (Integer warehouseId : candidateWarehouses) {
-                        WarehouseInventory inventory = warehouseInventoryRepository
-                                        .findFirstByWarehouseIdAndCatalogId(warehouseId, resolvedCatalogId.intValue());
-                        if (inventory == null) {
+        for (Integer warehouseId : candidateWarehouses) {
+            WarehouseInventory inventory = warehouseInventoryRepository
+                            .findFirstByWarehouseIdAndCatalogId(warehouseId, resolvedCatalogId.intValue());
+            if (inventory == null) {
                                 continue;
                         }
                         int available = Optional.ofNullable(inventory.getQuantity()).orElse(0)
@@ -467,8 +477,16 @@ public class MaintenanceRequestService {
                         }
                 }
 
-                part.setIsAvailable(false);
+        part.setIsAvailable(false);
+    }
+
+    private AccountTypeName resolveAccountType(MechanicProfile mechanic) {
+        if (mechanic == null || mechanic.getUser() == null || mechanic.getUser().getAccountType() == null
+                || mechanic.getUser().getAccountType().getName() == null) {
+            return null;
         }
+        return AccountTypeName.from(mechanic.getUser().getAccountType().getName());
+    }
 
         private String joinLocation(WarehouseInventory inventory) {
                 if (inventory == null) {
