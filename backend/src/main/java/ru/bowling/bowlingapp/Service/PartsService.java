@@ -47,20 +47,44 @@ public class PartsService {
                                 ? searchDTO.getCategoryCode().trim()
                                 : null;
                 List<String> categoryCodes = resolveCategoryCodes(normalizedCategoryCode);
-                Sort sort = Sort.by(Sort.Direction.fromString(searchDTO.getSortDirection()), searchDTO.getSortBy());
-                Pageable pageable = PageRequest.of(searchDTO.getPage(), searchDTO.getSize(), sort);
+                String sortBy = (searchDTO.getSortBy() != null && !searchDTO.getSortBy().isBlank())
+                                ? searchDTO.getSortBy()
+                                : "catalogId";
+                String sortDirection = (searchDTO.getSortDirection() != null && !searchDTO.getSortDirection().isBlank())
+                                ? searchDTO.getSortDirection()
+                                : "ASC";
+                int pageNumber = (searchDTO.getPage() != null && searchDTO.getPage() >= 0)
+                                ? searchDTO.getPage()
+                                : 0;
+                int size = (searchDTO.getSize() != null && searchDTO.getSize() > 0)
+                                ? searchDTO.getSize()
+                                : 20;
 
-                Page<PartsCatalog> page = partsCatalogRepository.search(query, manufacturerId, isUnique, categoryCodes, pageable);
-		List<PartsCatalog> parts = page.getContent();
-		Map<Integer, Integer> totals = warehouseInventoryRepository
-				.sumQuantitiesByCatalogIds(parts.stream().map(p -> p.getCatalogId().intValue()).toList())
-				.stream().collect(Collectors.toMap(
-					row -> (Integer) row[0],
-					row -> ((Number) row[1]).intValue()
-				));
-		return parts.stream().map(p -> convertToResponseDTO(p, totals.getOrDefault(p.getCatalogId().intValue(), 0)))
-				.collect(Collectors.toList());
-	}
+                Sort.Direction direction;
+                try {
+                        direction = Sort.Direction.fromString(sortDirection);
+                } catch (Exception ignored) {
+                        direction = Sort.Direction.ASC;
+                }
+
+                Sort sort = Sort.by(direction, sortBy);
+                Pageable pageable = PageRequest.of(pageNumber, size, sort);
+
+                Page<PartsCatalog> pageResult = partsCatalogRepository.search(query, manufacturerId, isUnique, categoryCodes, pageable);
+                List<PartsCatalog> parts = pageResult.getContent();
+                if (parts.isEmpty()) {
+                        return List.of();
+                }
+
+                Map<Integer, Integer> totals = warehouseInventoryRepository
+                                .sumQuantitiesByCatalogIds(parts.stream().map(p -> p.getCatalogId().intValue()).toList())
+                                .stream().collect(Collectors.toMap(
+                                        row -> (Integer) row[0],
+                                        row -> ((Number) row[1]).intValue()
+                                ));
+                return parts.stream().map(p -> convertToResponseDTO(p, totals.getOrDefault(p.getCatalogId().intValue(), 0)))
+                                .collect(Collectors.toList());
+        }
 
 	@Transactional(readOnly = true)
 	public Optional<PartsCatalogResponseDTO> getPartByCatalogNumber(String catalogNumber) {
