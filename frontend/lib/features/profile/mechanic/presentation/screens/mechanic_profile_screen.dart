@@ -11,6 +11,8 @@ import '../../../../../core/utils/bottom_nav.dart';
 import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../../shared/widgets/tiles/profile_tile.dart';
 import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
+import '../../../../orders/notifications/notifications_badge_controller.dart';
+import '../../../../orders/notifications/notifications_page.dart';
 import '../../domain/mechanic_profile.dart';
 import 'edit_mechanic_profile_screen.dart';
 
@@ -36,6 +38,8 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   String? _applicationStatus;
   String? _applicationComment;
   String? _applicationAccountType;
+  final NotificationsBadgeController _notificationsController = NotificationsBadgeController();
+  int _notificationsCount = 0;
 
   @override
   void initState() {
@@ -52,7 +56,22 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     );
     _loadLocalProfile();
     _resolveLocalRole();
+    _notificationsController.addListener(_handleNotificationsUpdate);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _notificationsController.removeListener(_handleNotificationsUpdate);
+    _notificationsController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleNotificationsUpdate() async {
+    if (!mounted) return;
+    setState(() {
+      _notificationsCount = _notificationsController.badgeCount;
+    });
   }
 
   Future<void> _resolveLocalRole() async {
@@ -96,6 +115,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   }
 
   Future<void> _load() async {
+    await _notificationsController.ensureInitialized(NotificationScope.mechanic);
     try {
       if (mounted) {
         setState(() {
@@ -696,6 +716,20 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                     ),
                     const SizedBox(height: 10),
                     ProfileTile(icon: Icons.history_rounded, text: 'История заказов', onTap: () => Navigator.pushNamed(context, Routes.ordersPersonalHistory)),
+                    const SizedBox(height: 10),
+                    ProfileTile(
+                      icon: Icons.notifications_active_outlined,
+                      text: 'Оповещения',
+                      badgeCount: _notificationsCount,
+                      onTap: () async {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage()));
+                        if (mounted) {
+                          setState(() {
+                            _notificationsCount = _notificationsController.badgeCount;
+                          });
+                        }
+                      },
+                    ),
                     const SizedBox(height: 10),
                     ProfileTile(icon: Icons.star_border_rounded, text: 'Избранные заказы/детали', onTap: () {}),
                     const SizedBox(height: 10),

@@ -12,6 +12,7 @@ public class EquipmentCategoryDTO {
     String brand;
     String nameRu;
     String nameEn;
+    String code;
     Integer sortOrder;
     boolean active;
 }
