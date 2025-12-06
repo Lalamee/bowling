@@ -12,6 +12,8 @@ void main() {
     DateTime? lastChecked,
     String? description,
     List<int> nodePath = const [],
+    String? location,
+    String? notes,
   }) {
     return PartDto(
       inventoryId: number.hashCode,
@@ -24,6 +26,8 @@ void main() {
       lastChecked: lastChecked,
       description: description,
       equipmentNodePath: nodePath,
+      location: location,
+      notes: notes,
     );
   }
 
@@ -57,5 +61,18 @@ void main() {
 
     final expired = PersonalInventoryFilter.apply(parts, onlyExpiredCheck: true);
     expect(expired.map((e) => e.catalogNumber), ['A2', 'A3']);
+  });
+
+  test('matches notes and location in search', () {
+    final parts = [
+      buildPart(number: 'B1', name: 'Кабель', qty: 2, reserved: 0, location: 'Стеллаж 1', notes: 'для турнира'),
+      buildPart(number: 'B2', name: 'Датчик', qty: 1, reserved: 1),
+    ];
+
+    final noteHit = PersonalInventoryFilter.apply(parts, query: 'турнира');
+    expect(noteHit.single.catalogNumber, 'B1');
+
+    final locationHit = PersonalInventoryFilter.apply(parts, query: 'стеллаж');
+    expect(locationHit.single.catalogNumber, 'B1');
   });
 }
