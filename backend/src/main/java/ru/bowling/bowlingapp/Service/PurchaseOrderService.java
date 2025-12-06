@@ -142,7 +142,8 @@ public class PurchaseOrderService {
                         (left, right) -> right));
 
         LocalDateTime acceptanceMoment = LocalDateTime.now();
-        int acceptedPositions = 0;
+        int fullyAcceptedPositions = 0;
+        int partiallyAcceptedPositions = 0;
         int rejectedPositions = 0;
 
         List<RequestPart> parts = Optional.ofNullable(order.getOrderedParts()).orElseGet(List::of);
@@ -161,30 +162,48 @@ public class PurchaseOrderService {
                 continue;
             }
             int orderedQuantity = Optional.ofNullable(part.getQuantity()).orElse(0);
-            int acceptedQuantity = Math.max(0, Math.min(orderedQuantity,
-                    Optional.ofNullable(acceptance.getAcceptedQuantity()).orElse(orderedQuantity)));
+            int requestedAccepted = Optional.ofNullable(acceptance.getAcceptedQuantity()).orElse(orderedQuantity);
+            int acceptedQuantity = Math.max(0, Math.min(orderedQuantity, requestedAccepted));
+
+            if ((targetStatus == PartStatus.PARTIALLY_ACCEPTED || targetStatus == PartStatus.REJECTED)
+                    && (acceptance.getComment() == null || acceptance.getComment().isBlank())) {
+                throw new IllegalArgumentException("Comment is required for partial acceptance or rejection");
+            }
+            if (targetStatus == PartStatus.ACCEPTED && acceptedQuantity <= 0) {
+                throw new IllegalArgumentException("Accepted quantity must be positive for accepted parts");
+            }
+            if (targetStatus == PartStatus.ACCEPTED && acceptedQuantity < orderedQuantity) {
+                targetStatus = PartStatus.PARTIALLY_ACCEPTED;
+            }
+            if (targetStatus == PartStatus.PARTIALLY_ACCEPTED && acceptedQuantity >= orderedQuantity) {
+                targetStatus = PartStatus.ACCEPTED;
+            }
 
             part.setStatus(targetStatus);
             part.setAcceptedQuantity(targetStatus == PartStatus.REJECTED ? 0 : acceptedQuantity);
             part.setAcceptanceComment(acceptance.getComment());
             part.setSupplierId(resolvedSupplier != null ? resolvedSupplier.getSupplierId() : part.getSupplierId());
+            part.setAcceptanceDate(acceptanceMoment);
             if (targetStatus == PartStatus.REJECTED) {
                 part.setRejectionReason(acceptance.getComment());
+                part.setIsAvailable(Boolean.FALSE);
                 rejectedPositions++;
+            } else if (targetStatus == PartStatus.PARTIALLY_ACCEPTED) {
+                partiallyAcceptedPositions++;
             } else {
-                acceptedPositions++;
+                fullyAcceptedPositions++;
             }
-            part.setAcceptanceDate(acceptanceMoment);
         }
 
-        if (acceptedPositions == 0 && rejectedPositions == 0) {
+        if (fullyAcceptedPositions == 0 && rejectedPositions == 0 && partiallyAcceptedPositions == 0) {
             throw new IllegalArgumentException("Acceptance payload does not match order parts");
         }
 
         PurchaseOrderStatus resultingStatus;
-        if (rejectedPositions > 0 && acceptedPositions == 0) {
+        boolean hasPartial = partiallyAcceptedPositions > 0 || rejectedPositions > 0;
+        if (rejectedPositions > 0 && fullyAcceptedPositions == 0 && partiallyAcceptedPositions == 0) {
             resultingStatus = PurchaseOrderStatus.REJECTED;
-        } else if (acceptedPositions > 0 && rejectedPositions > 0) {
+        } else if (hasPartial) {
             resultingStatus = PurchaseOrderStatus.PARTIALLY_COMPLETED;
         } else {
             resultingStatus = PurchaseOrderStatus.COMPLETED;
@@ -519,13 +538,23 @@ public class PurchaseOrderService {
             return;
         }
         List<SupplierReview> reviews = supplierReviewRepository.findBySupplierId(supplierId);
+        long unresolvedComplaints = reviews.stream()
+                .filter(review -> Boolean.TRUE.equals(review.getIsComplaint()))
+                .filter(review -> !Boolean.TRUE.equals(review.getComplaintResolved()))
+                .count();
         double average = reviews.stream()
+                .filter(review -> !Boolean.TRUE.equals(review.getIsComplaint()))
                 .map(SupplierReview::getRating)
                 .filter(Objects::nonNull)
                 .mapToInt(Integer::intValue)
                 .average()
                 .orElse(0.0);
-        supplier.setRating(average > 0 ? average : null);
+        if (average == 0.0 && unresolvedComplaints == 0) {
+            supplier.setRating(null);
+        } else {
+            double adjusted = Math.max(0.0, Math.min(5.0, average - unresolvedComplaints * 0.5));
+            supplier.setRating(adjusted);
+        }
         supplier.setUpdatedAt(LocalDateTime.now());
         supplierRepository.save(supplier);
     }

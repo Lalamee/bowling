@@ -2,6 +2,7 @@ package ru.bowling.bowlingapp.Entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import ru.bowling.bowlingapp.Entity.enums.MechanicGrade;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -62,6 +63,13 @@ public class MechanicProfile {
 
     @Column(name = "verification_date")
     private LocalDate verificationDate;
+
+    @Column(name = "is_certified")
+    private Boolean isCertified;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "certified_grade")
+    private MechanicGrade certifiedGrade;
 
     @Column(name = "rating")
     private Double rating;

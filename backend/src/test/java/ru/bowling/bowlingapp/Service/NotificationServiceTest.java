@@ -43,6 +43,9 @@ class NotificationServiceTest {
         assertThat(notificationService.getNotificationsForRole(RoleName.ADMIN))
                 .extracting(NotificationEvent::getType)
                 .contains(event.getType());
+        assertThat(notificationService.getNotificationsForRole(RoleName.CLUB_OWNER))
+                .extracting(NotificationEvent::getMessage)
+                .contains("Механик не может выполнить работы самостоятельно (запрос помощи)");
         assertThat(notificationService.getNotificationsForRole(RoleName.MECHANIC))
                 .extracting(NotificationEvent::getRequestId)
                 .contains(10L);
@@ -65,5 +68,8 @@ class NotificationServiceTest {
 
         assertThat(types).contains(ru.bowling.bowlingapp.DTO.NotificationEventType.MECHANIC_HELP_CONFIRMED);
         assertThat(types).contains(ru.bowling.bowlingapp.DTO.NotificationEventType.MECHANIC_HELP_DECLINED);
+        assertThat(notificationService.getNotificationsForRole(RoleName.CLUB_OWNER))
+                .extracting(NotificationEvent::getMessage)
+                .contains("Запрос помощи подтвержден");
     }
 }

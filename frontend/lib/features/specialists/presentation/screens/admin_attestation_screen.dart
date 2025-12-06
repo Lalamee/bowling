@@ -247,9 +247,12 @@ class _AdminAttestationScreenState extends State<AdminAttestationScreen> {
 
   Widget _buildTile(AttestationApplication app) {
     final subtitle = <String>[];
-    if (app.requestedGrade != null) subtitle.add('Грейд: ${app.requestedGrade!.toApiValue()}');
+    final resolvedGrade = app.approvedGrade ?? app.requestedGrade;
+    final region = app.mechanicProfileId != null ? _profileRegions[app.mechanicProfileId!] : null;
+    if (resolvedGrade != null) subtitle.add('Грейд: ${resolvedGrade.toApiValue()}');
     if (app.submittedAt != null) subtitle.add('Подача: ${app.submittedAt!.toLocal().toString().split('.').first}');
     if (app.comment != null && app.comment!.isNotEmpty) subtitle.add('Комментарий: ${app.comment}');
+    if (region != null) subtitle.add('Регион: $region');
 
     return Card(
       child: ListTile(
@@ -278,6 +281,37 @@ class _AdminAttestationScreenState extends State<AdminAttestationScreen> {
             ),
           ],
         ),
+        onTap: () => _showDetails(app, region: region, resolvedGrade: resolvedGrade),
+      ),
+    );
+  }
+
+  void _showDetails(AttestationApplication app, {String? region, MechanicGrade? resolvedGrade}) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Заявка #${app.id ?? '—'}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (app.status != null) Text('Статус: ${app.status!.toApiValue()}'),
+            if (resolvedGrade != null) Text('Грейд: ${resolvedGrade.toApiValue()}'),
+            if (region != null) Text('Регион: $region'),
+            if (app.comment != null && app.comment!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('Комментарий: ${app.comment}'),
+              ),
+            if (app.submittedAt != null)
+              Text('Подано: ${app.submittedAt!.toLocal().toString().split('.').first}'),
+            if (app.updatedAt != null)
+              Text('Обновлено: ${app.updatedAt!.toLocal().toString().split('.').first}'),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть')),
+        ],
       ),
     );
   }
