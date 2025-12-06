@@ -17,6 +17,7 @@ public class PartsSearchDTO {
     private Boolean isUnique;
     private String equipmentType;
     private String categoryCode;
+    private Long componentId;
     
     @Builder.Default
     private Integer page = 0;

@@ -11,9 +11,15 @@ import java.util.List;
 public class TechnicalInfoDTO {
     Long equipmentId;
     String model;
+    String serialNumber;
+    String equipmentType;
+    String manufacturer;
     Integer productionYear;
     Integer lanesCount;
     Integer conditionPercentage;
+    LocalDate purchaseDate;
+    LocalDate warrantyUntil;
+    String status;
     LocalDate lastMaintenanceDate;
     LocalDate nextMaintenanceDate;
     List<EquipmentComponentDTO> components;

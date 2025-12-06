@@ -115,6 +115,9 @@ class HelpRequestFlowIntegrationTest {
         assertThat(notificationService.getNotificationsForRole(RoleName.ADMIN))
                 .extracting(NotificationEvent::getType)
                 .contains(ru.bowling.bowlingapp.DTO.NotificationEventType.MECHANIC_HELP_REQUESTED);
+        assertThat(notificationService.getNotificationsForRole(RoleName.HEAD_MECHANIC))
+                .filteredOn(event -> event.getType() == ru.bowling.bowlingapp.DTO.NotificationEventType.MECHANIC_HELP_REQUESTED)
+                .anyMatch(event -> event.getClubId() != null && event.getClubId().equals(club.getClubId()));
 
         HelpResponseDTO responseDTO = new HelpResponseDTO();
         responseDTO.setPartIds(helpRequestDTO.getPartIds());
@@ -129,5 +132,8 @@ class HelpRequestFlowIntegrationTest {
         assertThat(notificationService.getNotificationsForRole(RoleName.MECHANIC))
                 .extracting(NotificationEvent::getType)
                 .contains(ru.bowling.bowlingapp.DTO.NotificationEventType.MECHANIC_HELP_CONFIRMED);
+        assertThat(notificationService.getNotificationsForRole(RoleName.CLUB_OWNER))
+                .extracting(NotificationEvent::getMessage)
+                .contains("Запрос помощи подтвержден");
     }
 }
