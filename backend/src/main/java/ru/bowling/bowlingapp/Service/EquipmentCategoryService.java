@@ -82,6 +82,7 @@ public class EquipmentCategoryService {
                 .brand(category.getBrand())
                 .nameRu(category.getNameRu())
                 .nameEn(category.getNameEn())
+                .code(category.getId() != null ? category.getId().toString() : null)
                 .sortOrder(category.getSortOrder())
                 .active(category.isActive())
                 .build();
