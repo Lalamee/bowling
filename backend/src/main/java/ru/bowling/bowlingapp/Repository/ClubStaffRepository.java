@@ -15,4 +15,6 @@ public interface ClubStaffRepository extends JpaRepository<ClubStaff, Long> {
     boolean existsByClubClubIdAndUserUserIdAndIsActiveTrue(Long clubId, Long userId);
 
     List<ClubStaff> findByUserUserIdAndIsActiveTrue(Long userId);
+
+    List<ClubStaff> findByUserUserId(Long userId);
 }

@@ -91,7 +91,7 @@ class FreeMechanicApplicationServiceTest {
 
         FreeMechanicApplicationResponseDTO response = freeMechanicApplicationService.submitApplication(request);
 
-        assertThat(response.getStatus()).isEqualTo(AttestationStatus.NEW);
+        assertThat(response.getStatus()).isEqualTo(AttestationStatus.PENDING);
         assertThat(response.getApplicationId()).isNotNull();
         User createdUser = userRepository.findByPhone("+79995550001").orElseThrow();
         assertThat(createdUser.getIsActive()).isFalse();

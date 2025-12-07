@@ -42,6 +42,10 @@ import '../models/admin_registration_application_dto.dart';
 import '../models/admin_account_update_dto.dart';
 import '../models/mechanic_club_link_request_dto.dart';
 import '../models/admin_complaint_dto.dart';
+import '../models/admin_appeal_dto.dart';
+import '../models/admin_mechanic_status_change_dto.dart';
+import '../models/admin_staff_status_update_dto.dart';
+import '../models/admin_mechanic_account_change_dto.dart';
 
 /// Типизированный API сервис для взаимодействия с backend
 class ApiService {
@@ -275,6 +279,14 @@ class ApiService {
         .toList();
   }
 
+  /// GET /api/admin/appeals - обращения и оповещения для Администрации
+  Future<List<AdminAppealDto>> listAdminAppeals() async {
+    final response = await _dio.get('/api/admin/appeals');
+    return (response.data as List)
+        .map((e) => AdminAppealDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
   /// POST /api/admin/registrations/{userId}/approve - утверждение регистрации
   Future<AdminRegistrationApplicationDto> approveRegistration(int userId) async {
     final response = await _dio.post('/api/admin/registrations/$userId/approve');
@@ -298,6 +310,18 @@ class ApiService {
     final response = await _dio.patch(
       '/api/admin/free-mechanics/$userId/account',
       data: request.toJson(),
+    );
+    return AdminRegistrationApplicationDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  /// PATCH /api/admin/mechanics/{userId}/account - перевод между клубным/свободным форматами
+  Future<AdminRegistrationApplicationDto> convertMechanicAccount(
+    int userId,
+    AdminMechanicAccountChangeDto change,
+  ) async {
+    final response = await _dio.patch(
+      '/api/admin/mechanics/$userId/account',
+      data: change.toJson(),
     );
     return AdminRegistrationApplicationDto.fromJson(Map<String, dynamic>.from(response.data as Map));
   }
@@ -370,6 +394,23 @@ class ApiService {
     return (response.data as List)
         .map((e) => PurchaseOrderSummaryDto.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
+  }
+
+  /// GET /api/admin/staff/status-requests - заявки на изменение статуса/доступа механиков
+  Future<List<AdminMechanicStatusChangeDto>> listMechanicStatusChanges() async {
+    final response = await _dio.get('/api/admin/staff/status-requests');
+    return (response.data as List)
+        .map((e) => AdminMechanicStatusChangeDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  /// PATCH /api/admin/staff/{staffId}/status - изменить активность/доступ к данным
+  Future<AdminMechanicStatusChangeDto> updateMechanicStatus({required int staffId, required AdminStaffStatusUpdateDto update}) async {
+    final response = await _dio.patch(
+      '/api/admin/staff/$staffId/status',
+      data: update.toJson(),
+    );
+    return AdminMechanicStatusChangeDto.fromJson(Map<String, dynamic>.from(response.data as Map));
   }
 
   Future<PurchaseOrderDetailDto> getPurchaseOrder(int orderId) async {

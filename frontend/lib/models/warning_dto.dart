@@ -15,6 +15,13 @@ class WarningDto {
     this.dueDate,
   });
 
+  bool get isCritical =>
+      type.toUpperCase().contains('CRITICAL') ||
+      type.toUpperCase().contains('OVERDUE') ||
+      type.toUpperCase().contains('EXCEEDED');
+
+  bool get isUpcoming => type.toUpperCase().contains('DUE');
+
   factory WarningDto.fromJson(Map<String, dynamic> json) {
     DateTime? _parseDate(dynamic value) =>
         (value is String && value.isNotEmpty) ? DateTime.tryParse(value) : null;

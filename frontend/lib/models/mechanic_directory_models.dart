@@ -174,6 +174,7 @@ class AttestationApplication {
   final AttestationDecisionStatus? status;
   final String? comment;
   final MechanicGrade? requestedGrade;
+  final MechanicGrade? approvedGrade;
   final DateTime? submittedAt;
   final DateTime? updatedAt;
 
@@ -185,6 +186,7 @@ class AttestationApplication {
     this.status,
     this.comment,
     this.requestedGrade,
+    this.approvedGrade,
     this.submittedAt,
     this.updatedAt,
   });
@@ -203,6 +205,8 @@ class AttestationApplication {
       status: AttestationDecisionStatus.fromString(json['status'] as String?),
       comment: json['comment'] as String?,
       requestedGrade: MechanicGrade.fromString(json['requestedGrade'] as String?),
+      approvedGrade: MechanicGrade.fromString(json['approvedGrade'] as String?) ??
+          MechanicGrade.fromString(json['resolvedGrade'] as String?),
       submittedAt: parseDate(json['submittedAt']),
       updatedAt: parseDate(json['updatedAt']),
     );
@@ -217,6 +221,7 @@ class AttestationApplication {
       'status': status?.toApiValue(),
       'comment': comment,
       'requestedGrade': requestedGrade?.toApiValue(),
+      'approvedGrade': approvedGrade?.toApiValue(),
       'submittedAt': submittedAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
     };
