@@ -18,6 +18,7 @@ public class InventorySearchRequest {
     private Integer warehouseId;
     private Long clubId; // временная поддержка для старых вызовов, дублирует warehouseId
     private String categoryCode;
+    private Long componentId;
     private InventoryAvailabilityFilter availability;
     private Set<Integer> allowedWarehouseIds;
 }

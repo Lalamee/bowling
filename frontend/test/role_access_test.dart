@@ -35,6 +35,14 @@ void main() {
       expect(ctx.allows(AccessSection.adminCabinet), isTrue);
       expect(ctx.allows(AccessSection.serviceJournal), isTrue);
     });
+
+    test('admin without MAIN_ADMIN account type is limited to notifications', () {
+      final ctx = RoleAccessMatrix.resolve(RoleName.admin, AccountTypeName.individual);
+      expect(ctx.homeRoute, Routes.profileMechanic);
+      expect(ctx.allows(AccessSection.adminCabinet), isFalse);
+      expect(ctx.allows(AccessSection.notifications), isTrue);
+      expect(ctx.allowedSections.length, 1);
+    });
   });
 
   group('RoleContextResolver', () {

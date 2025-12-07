@@ -29,6 +29,10 @@ public class ClubEquipment {
     @JoinColumn(name = "manufacturer_id")
     private Manufacturer manufacturer;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "equipment_type_id")
+    private EquipmentType equipmentType;
+
     @Column(name = "other_manufacturer_name")
     private String otherManufacturerName;
 
@@ -37,6 +41,18 @@ public class ClubEquipment {
 
     @Column(name = "model")
     private String model;
+
+    @Column(name = "serial_number")
+    private String serialNumber;
+
+    @Column(name = "purchase_date")
+    private LocalDate purchaseDate;
+
+    @Column(name = "warranty_until")
+    private LocalDate warrantyUntil;
+
+    @Column(name = "status")
+    private String status;
 
     @Column(name = "production_year")
     private Integer productionYear;

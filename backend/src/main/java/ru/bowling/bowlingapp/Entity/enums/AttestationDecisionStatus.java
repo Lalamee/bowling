@@ -16,13 +16,13 @@ public enum AttestationDecisionStatus {
         return switch (status) {
             case APPROVED -> APPROVED;
             case REJECTED -> REJECTED;
-            case NEW, IN_REVIEW -> PENDING;
+            case PENDING -> PENDING;
         };
     }
 
     public AttestationStatus toEntityStatus() {
         return switch (this) {
-            case PENDING -> AttestationStatus.IN_REVIEW;
+            case PENDING -> AttestationStatus.PENDING;
             case APPROVED -> AttestationStatus.APPROVED;
             case REJECTED -> AttestationStatus.REJECTED;
         };
