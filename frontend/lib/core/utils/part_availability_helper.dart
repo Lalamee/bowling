@@ -24,23 +24,26 @@ class PartAvailabilityHelper {
     List<PartDto> inventory, {
     Map<int, WarehouseSummaryDto>? warehouses,
   }) {
+    final safeInventory = inventory.whereType<PartDto>().toList();
     PartDto findMatch() {
       final normalizedCatalog = request.catalogNumber.trim().toLowerCase();
-      for (final part in inventory) {
-        if (part.catalogNumber.trim().toLowerCase() == normalizedCatalog) {
-          return part;
-        }
-        if (request.catalogId != null && part.catalogId == request.catalogId) {
+      for (final part in safeInventory) {
+        final catalogMatch = part.catalogNumber.trim().toLowerCase() == normalizedCatalog;
+        final idMatch = request.catalogId != null && part.catalogId == request.catalogId;
+        if (catalogMatch || idMatch) {
           return part;
         }
       }
-      return inventory.isNotEmpty
-          ? inventory.first
-          : PartDto(
-              inventoryId: 0,
-              catalogId: request.catalogId ?? 0,
-              catalogNumber: request.catalogNumber,
-            );
+
+      if (safeInventory.isNotEmpty) {
+        return safeInventory.first;
+      }
+
+      return PartDto(
+        inventoryId: 0,
+        catalogId: request.catalogId ?? 0,
+        catalogNumber: request.catalogNumber,
+      );
     }
 
     final match = findMatch();
