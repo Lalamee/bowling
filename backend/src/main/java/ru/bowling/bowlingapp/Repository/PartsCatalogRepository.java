@@ -46,8 +46,9 @@ public interface PartsCatalogRepository extends JpaRepository<PartsCatalog, Long
                         "where lower(cast(p.officialNameRu as string)) like lower(concat('%', :query, '%')) " +
                         "or lower(cast(p.officialNameEn as string)) like lower(concat('%', :query, '%')) " +
                         "or lower(cast(p.commonName as string)) like lower(concat('%', :query, '%')) " +
-                        "or lower(cast(p.catalogNumber as string)) like lower(concat('%', :query, '%'))")
-        List<PartsCatalog> searchByNameOrNumber(@Param("query") String query);
+                        "or lower(cast(p.catalogNumber as string)) like lower(concat('%', :query, '%')) " +
+                        "or lower(cast(p.description as string)) like lower(concat('%', :query, '%'))")
+        List<PartsCatalog> searchByNameOrNumberOrDescription(@Param("query") String query);
 
         @Query("select p from PartsCatalog p " +
                         "where lower(cast(p.commonName as string)) = lower(:name) " +

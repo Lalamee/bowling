@@ -54,7 +54,7 @@ public class AttestationService {
                 .club(resolveClub(dto.getClubId()))
                 .requestedGrade(dto.getRequestedGrade())
                 .comment(dto.getComment())
-                .status(AttestationStatus.IN_REVIEW)
+                .status(AttestationStatus.PENDING)
                 .submittedAt(now)
                 .updatedAt(now)
                 .build();
@@ -166,13 +166,17 @@ public class AttestationService {
 
     private void markApproved(AttestationApplication application, ru.bowling.bowlingapp.Entity.enums.MechanicGrade approvedGrade) {
         application.setStatus(AttestationStatus.APPROVED);
-        if (approvedGrade != null) {
-            application.setRequestedGrade(approvedGrade);
-        }
+        ru.bowling.bowlingapp.Entity.enums.MechanicGrade resolvedGrade = approvedGrade != null
+                ? approvedGrade
+                : application.getRequestedGrade();
+        application.setRequestedGrade(resolvedGrade);
+
         MechanicProfile profile = application.getMechanicProfile();
         if (profile != null) {
             profile.setIsDataVerified(true);
             profile.setVerificationDate(java.time.LocalDate.now());
+            profile.setIsCertified(true);
+            profile.setCertifiedGrade(resolvedGrade);
             profile.setUpdatedAt(java.time.LocalDate.now());
             mechanicProfileRepository.save(profile);
         }

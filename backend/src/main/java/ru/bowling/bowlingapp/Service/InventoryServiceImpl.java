@@ -12,6 +12,7 @@ import ru.bowling.bowlingapp.DTO.ReservationRequestDto;
 import ru.bowling.bowlingapp.DTO.WarehouseMovementDto;
 import ru.bowling.bowlingapp.DTO.WarehouseSummaryDto;
 import ru.bowling.bowlingapp.Entity.BowlingClub;
+import ru.bowling.bowlingapp.Entity.EquipmentComponent;
 import ru.bowling.bowlingapp.Entity.ManagerProfile;
 import ru.bowling.bowlingapp.Entity.MechanicProfile;
 import ru.bowling.bowlingapp.Entity.OwnerProfile;
@@ -24,6 +25,7 @@ import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
 import ru.bowling.bowlingapp.Repository.PersonalWarehouseRepository;
 import ru.bowling.bowlingapp.Repository.PartImageRepository;
 import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
+import ru.bowling.bowlingapp.Repository.EquipmentComponentRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
 import ru.bowling.bowlingapp.Repository.WarehouseInventoryRepository;
 import ru.bowling.bowlingapp.Repository.projection.WarehouseAggregateProjection;
@@ -70,13 +72,18 @@ public class InventoryServiceImpl implements InventoryService {
     @Autowired
     private PersonalWarehouseRepository personalWarehouseRepository;
 
+    @Autowired
+    private EquipmentComponentRepository equipmentComponentRepository;
+
     @Override
     @Transactional(readOnly = true)
     public List<PartDto> searchParts(InventorySearchRequest request) {
         String normalizedQuery = request != null && request.getQuery() != null ? request.getQuery().trim() : "";
         Integer warehouseIdFilter = resolveWarehouseId(request);
         InventoryAvailabilityFilter availabilityFilter = request != null ? request.getAvailability() : null;
-        String categoryCodeFilter = normalizeCategoryCode(request != null ? request.getCategoryCode() : null);
+        String normalizedCategoryCode = normalizeCategoryCode(request != null ? request.getCategoryCode() : null);
+        String componentCategoryCode = resolveComponentCategory(request != null ? request.getComponentId() : null);
+        final String categoryCodeFilter = componentCategoryCode != null ? componentCategoryCode : normalizedCategoryCode;
         Set<Integer> allowedWarehouses = normalizeAllowedWarehouses(
                 request != null ? request.getAllowedWarehouseIds() : null);
 
@@ -112,7 +119,7 @@ public class InventoryServiceImpl implements InventoryService {
                     .collect(Collectors.toList());
         }
 
-        List<PartsCatalog> parts = partsCatalogRepository.searchByNameOrNumber(normalizedQuery);
+        List<PartsCatalog> parts = partsCatalogRepository.searchByNameOrNumberOrDescription(normalizedQuery);
         if (categoryCodeFilter != null) {
             parts = parts.stream()
                     .filter(part -> {
@@ -175,6 +182,7 @@ public class InventoryServiceImpl implements InventoryService {
                             .orElseGet(() -> resolvePlacementStatus(inventory)))
                     .unique(Boolean.TRUE.equals(inventory.getIsUnique()))
                     .lastChecked(inventory.getLastChecked())
+                    .notes(inventory.getNotes())
                     .imageUrl(resolveImageUrl(part))
                     .diagramUrl(null)
                     .equipmentNodeId(null)
@@ -573,6 +581,7 @@ public class InventoryServiceImpl implements InventoryService {
                 .warehouseId(inventory.getWarehouseId())
                 .unique(Boolean.TRUE.equals(inventory.getIsUnique()))
                 .lastChecked(inventory.getLastChecked())
+                .notes(inventory.getNotes())
                 .imageUrl(resolveImageUrl(part))
                 .diagramUrl(null)
                 .equipmentNodeId(null)
@@ -665,5 +674,17 @@ public class InventoryServiceImpl implements InventoryService {
             return null;
         }
         return trimmed.toUpperCase(Locale.ROOT);
+    }
+
+    private String resolveComponentCategory(Long componentId) {
+        if (componentId == null) {
+            return null;
+        }
+        EquipmentComponent component = equipmentComponentRepository.findById(componentId)
+                .orElse(null);
+        if (component == null || component.getCode() == null || component.getCode().isBlank()) {
+            return null;
+        }
+        return normalizeCategoryCode(component.getCode());
     }
 }

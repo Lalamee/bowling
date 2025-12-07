@@ -5,10 +5,14 @@ import 'package:flutter/material.dart';
 import '../../../../../core/repositories/admin_mechanics_repository.dart';
 import '../../../../../core/repositories/admin_users_repository.dart';
 import '../../../../../core/repositories/admin_cabinet_repository.dart';
+import '../../../../../core/repositories/clubs_repository.dart';
 import '../../../../../core/routing/routes.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/utils/net_ui.dart';
 import '../../../../../models/mechanic_club_link_request_dto.dart';
+import '../../../../../models/admin_mechanic_status_change_dto.dart';
+import '../../../../../models/admin_staff_status_update_dto.dart';
+import '../../../../../models/admin_mechanic_account_change_dto.dart';
 
 class AdminMechanicsScreen extends StatefulWidget {
   const AdminMechanicsScreen({super.key});
@@ -21,11 +25,14 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
   final AdminMechanicsRepository _mechanicsRepository = AdminMechanicsRepository();
   final AdminUsersRepository _usersRepository = AdminUsersRepository();
   final AdminCabinetRepository _cabinetRepository = AdminCabinetRepository();
+  final ClubsRepository _clubsRepository = ClubsRepository();
 
   bool _isLoading = true;
   bool _hasError = false;
   List<_PendingMechanic> _pending = [];
   List<_ClubMechanicsSection> _sections = [];
+  List<AdminMechanicStatusChangeDto> _statusRequests = [];
+  List<_ClubOption> _clubOptions = [];
 
   @override
   void initState() {
@@ -43,6 +50,8 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       }
 
       final overview = await _mechanicsRepository.getOverview();
+      final statusRequests = await _cabinetRepository.listMechanicStatusChanges();
+      final clubs = await _clubsRepository.getClubs();
       if (!mounted) return;
 
       final pending = overview.pending.map(_mapPending).where((m) => m.userId != null).toList();
@@ -52,6 +61,10 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       setState(() {
         _pending = pending;
         _sections = sections;
+        _statusRequests = statusRequests;
+        _clubOptions = clubs
+            .map((c) => _ClubOption(id: c.id, name: c.name ?? 'Клуб ${c.id}'))
+            .toList();
         _isLoading = false;
         _hasError = false;
       });
@@ -185,6 +198,25 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     }
   }
 
+  Future<void> _updateStatusRequest(AdminMechanicStatusChangeDto request,
+      {required bool active, required bool restricted}) async {
+    if (request.staffId == null) return;
+    try {
+      final updated = await _cabinetRepository.updateMechanicStatus(
+        staffId: request.staffId!,
+        update: AdminStaffStatusUpdateDto(active: active, infoAccessRestricted: restricted),
+      );
+      if (!mounted) return;
+      setState(() {
+        _statusRequests = _statusRequests.map((r) => r.staffId == updated.staffId ? updated : r).toList();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Статус обновлён')));
+    } catch (e) {
+      if (!mounted) return;
+      showApiError(context, e);
+    }
+  }
+
   Future<void> _detachFromClub(_MechanicInfo mechanic, int? clubId) async {
     if (mechanic.profileId == null) return;
     final confirmed = await showDialog<bool>(
@@ -208,6 +240,111 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       await _loadData();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Механик отвязан')));
+    } catch (e) {
+      if (!mounted) return;
+      showApiError(context, e);
+    }
+  }
+
+  Future<void> _attachToClub(_MechanicInfo mechanic) async {
+    if (mechanic.profileId == null) return;
+    int? selected = _clubOptions.isNotEmpty ? _clubOptions.first.id : null;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Назначить клуб'),
+        content: DropdownButtonFormField<int?>(
+          value: selected,
+          decoration: const InputDecoration(labelText: 'Клуб'),
+          items: _clubOptions
+              .map((c) => DropdownMenuItem<int?>(
+                    value: c.id,
+                    child: Text(c.name ?? 'Клуб ${c.id}'),
+                  ))
+              .toList(),
+          onChanged: (v) => selected = v,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Сохранить')),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    try {
+      await _cabinetRepository.changeMechanicClubLink(
+        mechanic.profileId!,
+        MechanicClubLinkRequestDto(clubId: selected, attach: true),
+      );
+      await _loadData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Механик назначен в клуб')));
+    } catch (e) {
+      if (!mounted) return;
+      showApiError(context, e);
+    }
+  }
+
+  Future<void> _convertToFree(_MechanicInfo mechanic) async {
+    if (mechanic.userId == null) return;
+    String? account = 'FREE_MECHANIC_BASIC';
+    String? access = 'BASIC';
+    final formKey = GlobalKey<FormState>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Перевод в свободные агенты'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String?>(
+                value: account,
+                decoration: const InputDecoration(labelText: 'Тип аккаунта'),
+                items: const [
+                  DropdownMenuItem(value: 'FREE_MECHANIC_BASIC', child: Text('FREE_MECHANIC_BASIC')),
+                  DropdownMenuItem(value: 'FREE_MECHANIC_PREMIUM', child: Text('FREE_MECHANIC_PREMIUM')),
+                ],
+                onChanged: (v) => account = v,
+                validator: (v) => v == null ? 'Укажите тип' : null,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String?>(
+                value: access,
+                decoration: const InputDecoration(labelText: 'Уровень доступа'),
+                items: const [
+                  DropdownMenuItem(value: 'PREMIUM', child: Text('PREMIUM')),
+                  DropdownMenuItem(value: 'BASIC', child: Text('BASIC')),
+                ],
+                onChanged: (v) => access = v,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
+          FilledButton(
+            onPressed: () {
+              if (!formKey.currentState!.validate()) return;
+              Navigator.of(ctx).pop(true);
+            },
+            child: const Text('Перевести'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    try {
+      await _cabinetRepository.convertMechanicAccount(
+        mechanic.userId!,
+        AdminMechanicAccountChangeDto(accountTypeName: account, accessLevelName: access, attachToClub: false),
+      );
+      await _loadData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Переведён в свободные агенты')));
     } catch (e) {
       if (!mounted) return;
       showApiError(context, e);
@@ -273,6 +410,10 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         children: [
+          if (_statusRequests.isNotEmpty) ...[
+            _buildStatusRequests(),
+            const SizedBox(height: 16),
+          ],
           if (_pending.isNotEmpty) ...[
             _buildPendingSection(),
             const SizedBox(height: 16),
@@ -309,6 +450,82 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
           for (var i = 0; i < _pending.length; i++) ...[
             if (i > 0) const SizedBox(height: 12),
             _buildPendingTile(_pending[i], i),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _statusTile(AdminMechanicStatusChangeDto request) {
+    final title = request.clubName ?? 'Клуб ${request.clubId ?? '-'}';
+    bool active = request.isActive ?? true;
+    bool restricted = request.infoAccessRestricted ?? false;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.lightGray),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          Text('Статус сотрудника: ${request.role ?? '—'}'),
+          Row(
+            children: [
+              Expanded(
+                child: SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  value: active,
+                  title: const Text('Активен'),
+                  onChanged: (v) => active = v,
+                ),
+              ),
+              Expanded(
+                child: SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  value: restricted,
+                  title: const Text('Доступ ограничен'),
+                  onChanged: (v) => restricted = v,
+                ),
+              ),
+            ],
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              onPressed: request.staffId == null
+                  ? null
+                  : () => _updateStatusRequest(request, active: active, restricted: restricted),
+              child: const Text('Сохранить'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusRequests() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.primary.withOpacity(0.4)),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Статус доступа механиков',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
+          ),
+          const SizedBox(height: 10),
+          for (final req in _statusRequests) ...[
+            _statusTile(req),
+            const SizedBox(height: 10),
           ],
         ],
       ),
@@ -536,6 +753,18 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
                 icon: const Icon(Icons.link_off),
                 label: const Text('Убрать из клуба'),
               ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: mechanic.profileId == null ? null : () => _attachToClub(mechanic),
+                icon: const Icon(Icons.add_business),
+                label: const Text('Назначить клуб'),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: mechanic.userId == null ? null : () => _convertToFree(mechanic),
+                icon: const Icon(Icons.swap_horiz),
+                label: const Text('В свободные'),
+              ),
             ],
           ),
         ],
@@ -645,4 +874,11 @@ class _MechanicInfo {
     this.isVerified,
     this.isDataVerified,
   });
+}
+
+class _ClubOption {
+  final int? id;
+  final String? name;
+
+  _ClubOption({required this.id, required this.name});
 }

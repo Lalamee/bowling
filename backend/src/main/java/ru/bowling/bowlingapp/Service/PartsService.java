@@ -13,6 +13,7 @@ import ru.bowling.bowlingapp.Entity.PartsCatalog;
 import ru.bowling.bowlingapp.Entity.WarehouseInventory;
 import ru.bowling.bowlingapp.Entity.enums.AvailabilityStatus;
 import ru.bowling.bowlingapp.Repository.EquipmentCategoryRepository;
+import ru.bowling.bowlingapp.Repository.EquipmentComponentRepository;
 import ru.bowling.bowlingapp.Repository.PartImageRepository;
 import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
 import ru.bowling.bowlingapp.Repository.WarehouseInventoryRepository;
@@ -32,11 +33,15 @@ public class PartsService {
         private final WarehouseInventoryRepository warehouseInventoryRepository;
         private final PartImageRepository partImageRepository;
         private final EquipmentCategoryRepository equipmentCategoryRepository;
+        private final EquipmentComponentRepository equipmentComponentRepository;
 
         @Transactional(readOnly = true)
         public List<PartsCatalogResponseDTO> searchParts(PartsSearchDTO searchDTO) {
                 String query = (searchDTO.getSearchQuery() != null && !searchDTO.getSearchQuery().isBlank())
                                 ? searchDTO.getSearchQuery().trim()
+                                : null;
+                String catalogNumberFilter = (searchDTO.getCatalogNumber() != null && !searchDTO.getCatalogNumber().isBlank())
+                                ? searchDTO.getCatalogNumber().trim()
                                 : null;
                 Integer manufacturerId = (searchDTO.getManufacturerId() != null && searchDTO.getManufacturerId() > 0)
                                 ? searchDTO.getManufacturerId().intValue()
@@ -46,16 +51,28 @@ public class PartsService {
                                 && !searchDTO.getCategoryCode().trim().isBlank())
                                 ? searchDTO.getCategoryCode().trim()
                                 : null;
-                List<String> categoryCodes = resolveCategoryCodes(normalizedCategoryCode);
+                String componentRootCode = resolveComponentCode(searchDTO.getComponentId());
+                List<String> categoryCodes = resolveCategoryCodes(componentRootCode != null ? componentRootCode
+                                : normalizedCategoryCode);
                 Sort sort = Sort.by(Sort.Direction.fromString(searchDTO.getSortDirection()), searchDTO.getSortBy());
                 Pageable pageable = PageRequest.of(searchDTO.getPage(), searchDTO.getSize(), sort);
 
                 Page<PartsCatalog> page = partsCatalogRepository.search(query, manufacturerId, isUnique, categoryCodes, pageable);
-		List<PartsCatalog> parts = page.getContent();
-		Map<Integer, Integer> totals = warehouseInventoryRepository
-				.sumQuantitiesByCatalogIds(parts.stream().map(p -> p.getCatalogId().intValue()).toList())
-				.stream().collect(Collectors.toMap(
-					row -> (Integer) row[0],
+                List<PartsCatalog> parts = page.getContent();
+                if (catalogNumberFilter != null) {
+                        String loweredFilter = catalogNumberFilter.toLowerCase();
+                        parts = parts.stream()
+                                        .filter(part -> part.getCatalogNumber() != null
+                                                        && part.getCatalogNumber().toLowerCase().contains(loweredFilter))
+                                        .toList();
+                }
+                if (query == null && catalogNumberFilter != null && parts.isEmpty()) {
+                        parts = partsCatalogRepository.findByCatalogNumberContainingIgnoreCase(catalogNumberFilter);
+                }
+                Map<Integer, Integer> totals = warehouseInventoryRepository
+                                .sumQuantitiesByCatalogIds(parts.stream().map(p -> p.getCatalogId().intValue()).toList())
+                                .stream().collect(Collectors.toMap(
+                                        row -> (Integer) row[0],
 					row -> ((Number) row[1]).intValue()
 				));
 		return parts.stream().map(p -> convertToResponseDTO(p, totals.getOrDefault(p.getCatalogId().intValue(), 0)))
@@ -161,5 +178,14 @@ public class PartsService {
                                 .toList();
 
                 return cleaned.isEmpty() ? null : cleaned;
+        }
+
+        private String resolveComponentCode(Long componentId) {
+                if (componentId == null) {
+                        return null;
+                }
+                return equipmentComponentRepository.findById(componentId)
+                                .map(component -> component.getCode() != null ? component.getCode().trim() : null)
+                                .orElse(null);
         }
 }

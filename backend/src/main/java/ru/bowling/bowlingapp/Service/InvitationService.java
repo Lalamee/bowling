@@ -4,8 +4,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.Entity.*;
+import ru.bowling.bowlingapp.Enum.AccountTypeName;
 import ru.bowling.bowlingapp.Repository.BowlingClubRepository;
 import ru.bowling.bowlingapp.Repository.ClubInvitationRepository;
+import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
 
 @Service
@@ -15,6 +17,7 @@ public class InvitationService {
     private final ClubInvitationRepository invitationRepository;
     private final BowlingClubRepository bowlingClubRepository;
     private final UserRepository userRepository;
+    private final ClubStaffRepository clubStaffRepository;
 
     @Transactional
     public void inviteMechanic(Long clubId, Long mechanicId) {
@@ -41,7 +44,27 @@ public class InvitationService {
         MechanicProfile mechanicProfile = mechanicUser.getMechanicProfile();
         BowlingClub club = (BowlingClub) invitation.getClub();
 
-        mechanicProfile.getClubs().add(club);
+        AccountTypeName accountType = mechanicUser.getAccountType() != null
+                ? AccountTypeName.from(mechanicUser.getAccountType().getName())
+                : AccountTypeName.INDIVIDUAL;
+
+        if (accountType == AccountTypeName.INDIVIDUAL) {
+            if (mechanicProfile.getClubs() == null) {
+                mechanicProfile.setClubs(new java.util.ArrayList<>());
+            }
+            if (mechanicProfile.getClubs().stream().noneMatch(c -> c.getClubId().equals(club.getClubId()))) {
+                mechanicProfile.getClubs().add(club);
+            }
+            clubStaffRepository.findByClubAndUser(club, mechanicUser)
+                    .orElseGet(() -> clubStaffRepository.save(ClubStaff.builder()
+                            .club(club)
+                            .user(mechanicUser)
+                            .role(mechanicUser.getRole())
+                            .isActive(Boolean.TRUE)
+                            .assignedAt(java.time.LocalDateTime.now())
+                            .infoAccessRestricted(Boolean.FALSE)
+                            .build()));
+        }
 
         invitationRepository.save(invitation);
     }

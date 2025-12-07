@@ -3,10 +3,13 @@ import 'package:intl/intl.dart';
 
 import '../../../core/repositories/user_repository.dart';
 import '../../../core/repositories/specialists_repository.dart';
+import '../../../core/repositories/notifications_repository.dart';
 import '../../../core/services/authz/acl.dart';
 import '../../../core/services/local_auth_storage.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/utils/net_ui.dart';
+import '../../../core/utils/user_club_resolver.dart';
+import '../../../core/models/user_club.dart';
 import '../../../models/maintenance_request_response_dto.dart';
 import '../../../models/mechanic_directory_models.dart';
 import '../notifications/notifications_badge_controller.dart';
@@ -22,6 +25,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   final _badgeController = NotificationsBadgeController();
   final _userRepository = UserRepository();
   final _specialistsRepository = SpecialistsRepository();
+  final _notificationsRepository = NotificationsRepository();
   final _dateFormatter = DateFormat('dd.MM.yyyy HH:mm');
 
   UserAccessScope? _scope;
@@ -31,6 +35,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   bool _isMechanic = false;
   bool _isFreeMechanic = false;
   List<_MechanicEvent> _mechanicEvents = const [];
+  List<UserClub> _clubAccesses = const [];
 
   @override
   void initState() {
@@ -46,12 +51,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
     try {
       final me = await _userRepository.me();
       final scope = await UserAccessScope.fromProfile(me);
+      final clubs = resolveUserClubs(me);
       await _badgeController.ensureInitialized(scope);
       List<_MechanicEvent> mechanicEvents = _mechanicEvents;
       bool isMechanic = scope.role == 'mechanic';
       bool isFreeMechanic = scope.isFreeMechanic;
       if (isMechanic) {
-        mechanicEvents = await _loadMechanicEvents(scope);
+        mechanicEvents = await _loadMechanicEvents(scope, clubs);
       }
       if (!mounted) return;
       setState(() {
@@ -59,6 +65,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         _isMechanic = isMechanic;
         _isFreeMechanic = isFreeMechanic;
         _mechanicEvents = mechanicEvents;
+        _clubAccesses = clubs;
         _loading = false;
       });
     } catch (e) {
@@ -74,7 +81,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Future<void> _refresh() async {
     await _badgeController.refresh();
     if (_scope != null && _scope!.role == 'mechanic') {
-      _mechanicEvents = await _loadMechanicEvents(_scope!);
+      _mechanicEvents = await _loadMechanicEvents(_scope!, _clubAccesses);
     }
     if (mounted) {
       setState(() {});
@@ -228,7 +235,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     );
   }
 
-  Future<List<_MechanicEvent>> _loadMechanicEvents(UserAccessScope scope) async {
+  Future<List<_MechanicEvent>> _loadMechanicEvents(UserAccessScope scope, List<UserClub> clubs) async {
     try {
       setState(() => _loadingMechanicEvents = true);
       final events = <_MechanicEvent>[];
@@ -247,22 +254,76 @@ class _NotificationsPageState extends State<NotificationsPage> {
         }
       }
 
-      final registration = await LocalAuthStorage.loadMechanicApplication();
-      if (registration != null) {
-        final status = registration['status']?.toString();
-        final comment = registration['comment']?.toString();
-        final accountType = registration['accountType']?.toString();
-        if (status != null && status.isNotEmpty) {
+      if (scope.isFreeMechanic) {
+        final registration = await LocalAuthStorage.loadMechanicApplication();
+        if (registration != null) {
+          final status = registration['status']?.toString();
+          final comment = registration['comment']?.toString();
+          final accountType = registration['accountType']?.toString();
+          if (status != null && status.isNotEmpty) {
+            events.add(_MechanicEvent(
+              title: 'Регистрация: $status',
+              description: comment?.isNotEmpty == true
+                  ? comment
+                  : (accountType != null && accountType.isNotEmpty
+                      ? 'Тип аккаунта: $accountType'
+                      : 'Заявка на регистрацию обработана'),
+              createdAt: DateTime.now(),
+            ));
+          }
+        }
+      }
+
+      final notifications = await _notificationsRepository.fetchNotifications(role: scope.role);
+      final accessibleClubs = scope.accessibleClubIds;
+      for (final event in notifications) {
+        if (event.clubId != null && accessibleClubs.isNotEmpty && !accessibleClubs.contains(event.clubId!)) {
+          continue;
+        }
+        if (event.mechanicId != null && scope.mechanicProfileId != null && event.mechanicId != scope.mechanicProfileId) {
+          continue;
+        }
+
+        final upperAudiences = event.audiences.map((e) => e.toUpperCase()).toSet();
+        final hasAudienceRestriction = upperAudiences.isNotEmpty;
+        final audienceAllowed = !hasAudienceRestriction ||
+            upperAudiences.contains('ALL') ||
+            upperAudiences.contains('MECHANIC') ||
+            (scope.isFreeMechanic && upperAudiences.contains('FREE_MECHANIC')) ||
+            (!scope.isFreeMechanic && (upperAudiences.contains('STAFF') || upperAudiences.contains('STAFF_MECHANIC')));
+        if (!audienceAllowed) continue;
+
+        if (scope.isFreeMechanic && event.isSupplierComplaint) continue;
+
+        if (event.isHelpEvent || event.isWarningEvent || event.isSupplierComplaint || event.isAccessRequest || event.isAdminReply) {
           events.add(_MechanicEvent(
-            title: 'Регистрация: $status',
-            description: comment?.isNotEmpty == true
-                ? comment
-                : (accountType != null && accountType.isNotEmpty
-                    ? 'Тип аккаунта: $accountType'
-                    : 'Заявка на регистрацию обработана'),
-            createdAt: DateTime.now(),
+            title: event.typeKey.label(),
+            description: event.payload?.isNotEmpty == true ? event.payload : event.message,
+            createdAt: event.createdAt,
           ));
         }
+      }
+
+      if (scope.accessibleClubIds.isNotEmpty && scope.isFreeMechanic && clubs.isNotEmpty) {
+        final formattedClubs = clubs.map((club) {
+          final parts = <String>[club.name];
+          if (club.accessLevel != null && club.accessLevel!.isNotEmpty) {
+            parts.add('доступ: ${club.accessLevel}');
+          }
+          if (club.accessExpiresAt != null) {
+            parts.add('до ${_dateFormatter.format(club.accessExpiresAt!)}');
+          }
+          if (club.infoAccessRestricted) {
+            parts.add('техинфо ограничена');
+          }
+          return parts.join(' • ');
+        }).join('; ');
+
+        events.add(_MechanicEvent(
+          title: 'Клубы и доступы',
+          description: formattedClubs,
+          createdAt: DateTime.now(),
+        ));
       }
 
       events.sort((a, b) {

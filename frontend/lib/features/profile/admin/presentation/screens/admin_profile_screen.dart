@@ -198,6 +198,12 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
             text: 'Споры с поставщиками',
             onTap: () => Navigator.pushNamed(context, Routes.adminComplaints),
           ),
+          const SizedBox(height: 10),
+          ProfileTile(
+            icon: Icons.support_agent_outlined,
+            text: 'Обращения и оповещения',
+            onTap: () => Navigator.pushNamed(context, Routes.adminAppeals),
+          ),
           const SizedBox(height: 24),
           ProfileTile(
             icon: Icons.exit_to_app_rounded,
