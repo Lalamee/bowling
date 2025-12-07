@@ -7,6 +7,8 @@ class WarehouseSummaryDto {
   final int? lowStockPositions;
   final int? reservedPositions;
   final bool personalAccess;
+  final String? description;
+  final String? locationReference;
 
   const WarehouseSummaryDto({
     required this.warehouseId,
@@ -17,6 +19,8 @@ class WarehouseSummaryDto {
     this.lowStockPositions,
     this.reservedPositions,
     this.personalAccess = false,
+    this.description,
+    this.locationReference,
   });
 
   factory WarehouseSummaryDto.fromJson(Map<String, dynamic> json) {
@@ -29,6 +33,8 @@ class WarehouseSummaryDto {
       lowStockPositions: _parseOptionalInt(json['lowStockPositions']),
       reservedPositions: _parseOptionalInt(json['reservedPositions']),
       personalAccess: json['personalAccess'] == true,
+      description: json['description']?.toString(),
+      locationReference: (json['locationReference'] ?? json['location'])?.toString(),
     );
   }
 }
