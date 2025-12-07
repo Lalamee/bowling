@@ -1,6 +1,85 @@
+enum NotificationEventType {
+  mechanicHelpRequested,
+  mechanicHelpConfirmed,
+  mechanicHelpDeclined,
+  mechanicHelpReassigned,
+  maintenanceWarning,
+  clubAccessRequest,
+  supplierComplaintUpdate,
+  staffAccessRequest,
+  staffAccessRevocation,
+  technicalAssistance,
+  adminResponse,
+  unknown;
+
+  static NotificationEventType fromBackend(String? raw) {
+    final normalized = raw?.trim().toUpperCase();
+    switch (normalized) {
+      case 'MECHANIC_HELP_REQUESTED':
+        return NotificationEventType.mechanicHelpRequested;
+      case 'MECHANIC_HELP_CONFIRMED':
+        return NotificationEventType.mechanicHelpConfirmed;
+      case 'MECHANIC_HELP_DECLINED':
+        return NotificationEventType.mechanicHelpDeclined;
+      case 'MECHANIC_HELP_REASSIGNED':
+        return NotificationEventType.mechanicHelpReassigned;
+      case 'MAINTENANCE_WARNING':
+        return NotificationEventType.maintenanceWarning;
+      case 'CLUB_ACCESS_REQUEST':
+        return NotificationEventType.clubAccessRequest;
+      case 'SUPPLIER_COMPLAINT_UPDATE':
+        return NotificationEventType.supplierComplaintUpdate;
+      case 'STAFF_ACCESS_REQUEST':
+        return NotificationEventType.staffAccessRequest;
+      case 'STAFF_ACCESS_REVOCATION':
+      case 'STAFF_ACCESS_REVOKE':
+        return NotificationEventType.staffAccessRevocation;
+      case 'TECH_SUPPORT_REQUEST':
+      case 'TECHNICAL_ASSISTANCE':
+        return NotificationEventType.technicalAssistance;
+      case 'ADMIN_RESPONSE':
+      case 'ADMIN_REPLY':
+        return NotificationEventType.adminResponse;
+      default:
+        return NotificationEventType.unknown;
+    }
+  }
+
+  String label() {
+    switch (this) {
+      case NotificationEventType.mechanicHelpRequested:
+        return 'Механик запросил помощь';
+      case NotificationEventType.mechanicHelpConfirmed:
+        return 'Запрос помощи подтвержден';
+      case NotificationEventType.mechanicHelpDeclined:
+        return 'Запрос помощи отклонен';
+      case NotificationEventType.mechanicHelpReassigned:
+        return 'Назначен другой специалист';
+      case NotificationEventType.maintenanceWarning:
+        return 'Предупреждение по ТО';
+      case NotificationEventType.clubAccessRequest:
+        return 'Запрос доступа к клубу';
+      case NotificationEventType.supplierComplaintUpdate:
+        return 'Статус спора с поставщиком';
+      case NotificationEventType.staffAccessRequest:
+        return 'Запрос на доступ/лишение доступа';
+      case NotificationEventType.staffAccessRevocation:
+        return 'Доступ сотрудника изменён';
+      case NotificationEventType.technicalAssistance:
+        return 'Запрос техпомощи/сервиса';
+      case NotificationEventType.adminResponse:
+        return 'Ответ Администрации';
+      case NotificationEventType.unknown:
+      default:
+        return 'Оповещение';
+    }
+  }
+}
+
 class NotificationEventDto {
   final String id;
   final String type;
+  final NotificationEventType typeKey;
   final String message;
   final int? requestId;
   final int? workLogId;
@@ -11,9 +90,10 @@ class NotificationEventDto {
   final DateTime? createdAt;
   final List<String> audiences;
 
-  NotificationEventDto({
+  const NotificationEventDto({
     required this.id,
     required this.type,
+    required this.typeKey,
     required this.message,
     this.requestId,
     this.workLogId,
@@ -25,13 +105,36 @@ class NotificationEventDto {
     this.audiences = const [],
   });
 
+  bool get isHelpEvent =>
+      typeKey == NotificationEventType.mechanicHelpRequested ||
+      typeKey == NotificationEventType.mechanicHelpConfirmed ||
+      typeKey == NotificationEventType.mechanicHelpDeclined ||
+      typeKey == NotificationEventType.mechanicHelpReassigned;
+
+  bool get isWarningEvent => typeKey == NotificationEventType.maintenanceWarning;
+
+  bool get isSupplierComplaint => typeKey == NotificationEventType.supplierComplaintUpdate;
+
+  bool get isAccessRequest => typeKey == NotificationEventType.clubAccessRequest;
+
+  bool get isStaffAccess =>
+      typeKey == NotificationEventType.staffAccessRequest || typeKey == NotificationEventType.staffAccessRevocation;
+
+  bool get isTechSupport => typeKey == NotificationEventType.technicalAssistance;
+
+  bool get isAdminReply => typeKey == NotificationEventType.adminResponse;
+
   factory NotificationEventDto.fromJson(Map<String, dynamic> json) {
     DateTime? _parseDate(dynamic value) =>
         (value is String && value.isNotEmpty) ? DateTime.tryParse(value) : null;
 
+    final rawType = json['type']?.toString();
+    final parsedType = NotificationEventType.fromBackend(rawType);
+
     return NotificationEventDto(
       id: json['id']?.toString() ?? '',
-      type: json['type']?.toString() ?? 'UNKNOWN',
+      type: rawType ?? 'UNKNOWN',
+      typeKey: parsedType,
       message: json['message']?.toString() ?? '',
       requestId: (json['requestId'] as num?)?.toInt(),
       workLogId: (json['workLogId'] as num?)?.toInt(),

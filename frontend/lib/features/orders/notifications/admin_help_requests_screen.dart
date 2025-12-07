@@ -144,6 +144,14 @@ class _AdminHelpRequestsScreenState extends State<AdminHelpRequestsScreen> {
                 children: [
                   Text('Позиция: ${item.partId}', style: t.formInput),
                   if (item.laneNumber != null) Text('Дорожка: ${item.laneNumber}', style: t.formInput),
+                  if (item.partStatus != null)
+                    Text('Статус позиции: ${item.partStatus}', style: t.formInput),
+                  Text(
+                    item.helpRequested == true
+                        ? 'Флаг помощи: включен'
+                        : 'Флаг помощи: снят',
+                    style: t.formInput,
+                  ),
                   if (item.managerNotes != null && item.managerNotes!.isNotEmpty)
                     Text(item.managerNotes!, style: t.formInput),
                 ],

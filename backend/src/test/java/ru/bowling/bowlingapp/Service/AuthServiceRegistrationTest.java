@@ -112,7 +112,7 @@ class AuthServiceRegistrationTest {
         AttestationApplication application = attestationApplicationRepository
                 .findFirstByMechanicProfile_ProfileIdOrderByUpdatedAtDesc(saved.getMechanicProfile().getProfileId())
                 .orElseThrow();
-        assertThat(application.getStatus()).isEqualTo(AttestationStatus.NEW);
+        assertThat(application.getStatus()).isEqualTo(AttestationStatus.PENDING);
         assertThat(application.getComment()).containsIgnoringCase("Премиум").containsIgnoringCase("Базовый");
     }
 

@@ -5,13 +5,17 @@ class AdminRegistrationApplicationDto {
   final String? fullName;
   final String? role;
   final String? accountType;
+  final String? applicationType;
+  final String? status;
   final String? profileType;
   final bool? isActive;
   final bool? isVerified;
   final bool? isProfileVerified;
   final int? clubId;
   final String? clubName;
-  final String? submittedAt;
+  final DateTime? submittedAt;
+  final String? decisionComment;
+  final Map<String, dynamic>? payload;
 
   const AdminRegistrationApplicationDto({
     this.userId,
@@ -20,6 +24,8 @@ class AdminRegistrationApplicationDto {
     this.fullName,
     this.role,
     this.accountType,
+    this.applicationType,
+    this.status,
     this.profileType,
     this.isActive,
     this.isVerified,
@@ -27,6 +33,8 @@ class AdminRegistrationApplicationDto {
     this.clubId,
     this.clubName,
     this.submittedAt,
+    this.decisionComment,
+    this.payload,
   });
 
   factory AdminRegistrationApplicationDto.fromJson(Map<String, dynamic> json) {
@@ -54,6 +62,14 @@ class AdminRegistrationApplicationDto {
       return str.isEmpty ? null : str;
     }
 
+    DateTime? asDate(dynamic value) {
+      if (value is DateTime) return value;
+      if (value is String && value.trim().isNotEmpty) {
+        return DateTime.tryParse(value.trim());
+      }
+      return null;
+    }
+
     return AdminRegistrationApplicationDto(
       userId: asInt(json['userId']),
       profileId: asInt(json['profileId']),
@@ -61,13 +77,19 @@ class AdminRegistrationApplicationDto {
       fullName: asString(json['fullName']),
       role: asString(json['role']),
       accountType: asString(json['accountType']),
+      applicationType: asString(json['applicationType'] ?? json['type']),
+      status: asString(json['status'] ?? json['registrationStatus']),
       profileType: asString(json['profileType']),
       isActive: asBool(json['isActive']),
       isVerified: asBool(json['isVerified']),
       isProfileVerified: asBool(json['isProfileVerified']),
       clubId: asInt(json['clubId']),
       clubName: asString(json['clubName']),
-      submittedAt: asString(json['submittedAt']),
+      submittedAt: asDate(json['submittedAt'] ?? json['createdAt']),
+      decisionComment: asString(json['decisionComment'] ?? json['rejectionReason']),
+      payload: json['payload'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(json['payload'] as Map)
+          : null,
     );
   }
 
@@ -78,12 +100,16 @@ class AdminRegistrationApplicationDto {
         'fullName': fullName,
         'role': role,
         'accountType': accountType,
+        'applicationType': applicationType,
+        'status': status,
         'profileType': profileType,
         'isActive': isActive,
         'isVerified': isVerified,
         'isProfileVerified': isProfileVerified,
         'clubId': clubId,
         'clubName': clubName,
-        'submittedAt': submittedAt,
+        'submittedAt': submittedAt?.toIso8601String(),
+        'decisionComment': decisionComment,
+        'payload': payload,
       };
 }
