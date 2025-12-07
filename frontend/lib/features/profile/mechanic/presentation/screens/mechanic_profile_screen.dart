@@ -16,6 +16,7 @@ import '../../../../orders/notifications/notifications_badge_controller.dart';
 import '../../../../orders/notifications/notifications_page.dart';
 import '../../domain/mechanic_profile.dart';
 import '../../../../../core/models/user_club.dart';
+import '../../../../../core/services/authz/acl.dart';
 import 'edit_mechanic_profile_screen.dart';
 
 enum EditFocus { none, name, phone, address }
@@ -118,7 +119,6 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   }
 
   Future<void> _load() async {
-    await _notificationsController.ensureInitialized(NotificationScope.mechanic);
     try {
       if (mounted) {
         setState(() {
@@ -135,6 +135,8 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         });
         return;
       }
+      final scope = await UserAccessScope.fromProfile(me);
+      await _notificationsController.ensureInitialized(scope);
       final remoteRole = me['role']?.toString();
       final allowEditing = _roleAllowsEditing(remoteRole) || _roleAllowsEditing(_localRole);
       if (_canEditProfile != allowEditing) {

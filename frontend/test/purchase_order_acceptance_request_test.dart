@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frontend/models/purchase_order_acceptance_request_dto.dart';
+import 'package:bowling_market/models/purchase_order_acceptance_request_dto.dart';
 
 void main() {
   test('serializes supplier and placement fields for acceptance', () {

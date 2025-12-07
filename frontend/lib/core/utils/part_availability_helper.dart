@@ -24,7 +24,7 @@ class PartAvailabilityHelper {
     List<PartDto> inventory, {
     Map<int, WarehouseSummaryDto>? warehouses,
   }) {
-    PartDto? findMatch() {
+    PartDto findMatch() {
       final normalizedCatalog = request.catalogNumber.trim().toLowerCase();
       for (final part in inventory) {
         if (part.catalogNumber.trim().toLowerCase() == normalizedCatalog) {

@@ -59,25 +59,28 @@ void main() {
     adapter.onGet(
       '/api/inventory/search',
       (server) {
-        final query = server.request?.queryParameters['query'];
-        if (query == 'ABC-1') {
-          server.reply(200, [
-            {
-              'inventoryId': 10,
-              'catalogId': 11,
-              'catalogNumber': 'ABC-1',
-              'quantity': 3,
-              'reservedQuantity': 0,
-              'warehouseId': 1,
-              'locationReference': 'Бокс 1',
-              'isAvailable': true,
-            }
-          ]);
-        } else {
-          server.reply(200, []);
-        }
+        server.reply(200, [
+          {
+            'inventoryId': 10,
+            'catalogId': 11,
+            'catalogNumber': 'ABC-1',
+            'quantity': 3,
+            'reservedQuantity': 0,
+            'warehouseId': 1,
+            'locationReference': 'Бокс 1',
+            'isAvailable': true,
+          }
+        ]);
       },
-      queryParameters: Matchers.any,
+      queryParameters: {'query': 'ABC-1'},
+    );
+
+    adapter.onGet(
+      '/api/inventory/search',
+      (server) {
+        server.reply(200, []);
+      },
+      queryParameters: {'query': Matchers.any},
     );
 
     adapter.onPost('/api/maintenance/requests', (server) {
