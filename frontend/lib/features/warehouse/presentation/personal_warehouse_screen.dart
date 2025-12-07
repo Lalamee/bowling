@@ -11,20 +11,24 @@ import '../../../models/warehouse_summary_dto.dart';
 import '../../../shared/widgets/nav/app_bottom_nav.dart';
 
 class PersonalWarehouseScreen extends StatefulWidget {
-  const PersonalWarehouseScreen({super.key});
+  final InventoryRepository? repository;
+
+  const PersonalWarehouseScreen({super.key, this.repository});
 
   @override
   State<PersonalWarehouseScreen> createState() => _PersonalWarehouseScreenState();
 }
 
 class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
-  final _repo = InventoryRepository();
+  late final InventoryRepository _repo;
   final _searchCtrl = TextEditingController();
   final _categoryCtrl = TextEditingController();
+  final _searchFocus = FocusNode();
 
   WarehouseSummaryDto? _warehouse;
   List<PartDto> _rawInventory = const [];
   List<PartDto> _filteredInventory = const [];
+  List<String> _suggestions = const [];
   bool _isLoading = false;
   bool _hasError = false;
   bool _onlyUnique = false;
@@ -34,6 +38,7 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
   @override
   void initState() {
     super.initState();
+    _repo = widget.repository ?? InventoryRepository();
     _loadWarehouseAndInventory();
   }
 
@@ -41,6 +46,7 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
   void dispose() {
     _searchCtrl.dispose();
     _categoryCtrl.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -81,7 +87,11 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
       _hasError = false;
     });
     try {
-      final data = await _repo.search(query: query, warehouseId: warehouseId, category: _categoryCtrl.text.trim());
+      final data = await _repo.getWarehouseInventory(
+        warehouseId: warehouseId,
+        query: query,
+        category: _categoryCtrl.text.trim(),
+      );
       if (!mounted) return;
       _rawInventory = data;
       _applyFilters();
@@ -108,8 +118,17 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
       onlyExpiredCheck: _onlyExpired,
       categoryFragment: _categoryCtrl.text,
     );
+    final normalizedQuery = _searchCtrl.text.trim().toLowerCase();
+    final suggestionPool = _rawInventory.where((part) {
+      if (normalizedQuery.isEmpty) return false;
+      return part.catalogNumber.toLowerCase().contains(normalizedQuery) ||
+          (part.commonName?.toLowerCase().contains(normalizedQuery) ?? false) ||
+          (part.officialNameRu?.toLowerCase().contains(normalizedQuery) ?? false);
+    }).map(_displayName).toSet().take(5).toList();
+
     setState(() {
       _filteredInventory = filtered;
+      _suggestions = suggestionPool;
     });
   }
 
@@ -155,6 +174,7 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
               _buildDetailRow('Уникальная деталь', part.isUnique == true ? 'Да' : 'Нет'),
               _buildDetailRow('Адрес хранения', _locationText(part)),
               _buildDetailRow('Последняя проверка', part.lastChecked != null ? _formatDate(part.lastChecked!) : 'не указано'),
+              _buildDetailRow('Заметки', part.notes),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
@@ -236,6 +256,7 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
   Widget _buildInventoryCard(PartDto part) {
     final subtitleStyle = const TextStyle(fontSize: 13, color: AppColors.darkGray);
     final shortage = part.quantity != null && part.reservedQuantity != null && part.quantity! <= part.reservedQuantity!;
+    final note = part.notes?.trim();
     return InkWell(
       onTap: () => _openDetails(part),
       child: Container(
@@ -251,10 +272,20 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
             Text(_displayName(part), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textDark)),
             const SizedBox(height: 4),
             Text('Каталожный номер: ${part.catalogNumber}', style: subtitleStyle),
+            if (part.officialNameRu != null && part.officialNameRu!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text('Название (RU): ${part.officialNameRu}', style: subtitleStyle),
+              ),
+            if (part.officialNameEn != null && part.officialNameEn!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text('Название (EN): ${part.officialNameEn}', style: subtitleStyle),
+              ),
             if (part.commonName != null && part.commonName!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 2),
-                child: Text('Common: ${part.commonName}', style: subtitleStyle),
+                child: Text('Неофициальное: ${part.commonName}', style: subtitleStyle),
               ),
             Padding(
               padding: const EdgeInsets.only(top: 2),
@@ -280,6 +311,11 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 2),
                 child: Text('Адрес хранения: ${_locationText(part)}', style: subtitleStyle),
+              ),
+            if (note != null && note.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text('Заметки: $note', style: subtitleStyle),
               ),
           ],
         ),
@@ -311,9 +347,103 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
     );
   }
 
+  Widget _buildWarehouseHeader() {
+    final warehouseTitle = _warehouse?.title ?? 'Личный ZIP-склад';
+    final description = _warehouse?.description;
+    final location = _warehouse?.locationReference;
+    final stats = <String>[];
+    if (_warehouse?.totalPositions != null) {
+      stats.add('Позиций: ${_warehouse!.totalPositions}');
+    }
+    if (_warehouse?.lowStockPositions != null && _warehouse!.lowStockPositions! > 0) {
+      stats.add('Низкий остаток: ${_warehouse!.lowStockPositions}');
+    }
+    if (_warehouse?.reservedPositions != null) {
+      stats.add('В резерве: ${_warehouse!.reservedPositions}');
+    }
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE6E6E6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(warehouseTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          if (_warehouse != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                _warehouse!.warehouseType.toUpperCase() == 'PERSONAL'
+                    ? 'Персональный ZIP-склад свободного механика'
+                    : 'Склад',
+                style: const TextStyle(color: AppColors.darkGray, fontSize: 13),
+              ),
+            ),
+          if (location != null && location.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text('Адрес хранения: $location', style: const TextStyle(fontSize: 13)),
+            ),
+          if (description != null && description.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(description, style: const TextStyle(color: AppColors.darkGray, fontSize: 13)),
+            ),
+          if (stats.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: stats
+                    .map(
+                      (s) => Chip(
+                        label: Text(s, style: const TextStyle(fontSize: 12)),
+                        backgroundColor: const Color(0xFFF5F5F5),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestionRow() {
+    if (_suggestions.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: _suggestions
+              .map(
+                (s) => Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ActionChip(
+                    label: Text(s),
+                    onPressed: () {
+                      _searchCtrl.text = s;
+                      _searchCtrl.selection = TextSelection.fromPosition(TextPosition(offset: s.length));
+                      _applyFilters();
+                    },
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final warehouseTitle = _warehouse?.title ?? 'Личный ZIP-склад';
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -328,42 +458,45 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(warehouseTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            if (_warehouse != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4, bottom: 12),
-                child: Text(
-                  _warehouse!.warehouseType.toUpperCase() == 'PERSONAL'
-                      ? 'Персональный склад для свободного механика'
-                      : 'Склад',
-                  style: const TextStyle(color: AppColors.darkGray, fontSize: 13),
-                ),
-              ),
+            _buildWarehouseHeader(),
+            const SizedBox(height: 12),
             _buildSearchBar(),
+            _buildSuggestionRow(),
             const SizedBox(height: 10),
             _buildFilterChips(),
             const SizedBox(height: 10),
             Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _hasError
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+              child: RefreshIndicator(
+                onRefresh: _loadWarehouseAndInventory,
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _hasError
+                        ? ListView(
                             children: [
-                              const Text('Не удалось загрузить склад'),
+                              const SizedBox(height: 60),
+                              const Center(child: Text('Не удалось загрузить склад')),
                               const SizedBox(height: 8),
-                              ElevatedButton(onPressed: _loadWarehouseAndInventory, child: const Text('Повторить')),
+                              Center(
+                                child: ElevatedButton(
+                                  onPressed: _loadWarehouseAndInventory,
+                                  child: const Text('Повторить'),
+                                ),
+                              ),
                             ],
-                          ),
-                        )
-                      : _filteredInventory.isEmpty
-                          ? const Center(child: Text('На складе нет подходящих позиций'))
-                          : ListView.separated(
-                              itemBuilder: (_, i) => _buildInventoryCard(_filteredInventory[i]),
-                              separatorBuilder: (_, __) => const SizedBox(height: 10),
-                              itemCount: _filteredInventory.length,
-                            ),
+                          )
+                        : _filteredInventory.isEmpty
+                            ? ListView(
+                                children: const [
+                                  SizedBox(height: 60),
+                                  Center(child: Text('На складе нет подходящих позиций')),
+                                ],
+                              )
+                            : ListView.separated(
+                                itemBuilder: (_, i) => _buildInventoryCard(_filteredInventory[i]),
+                                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                                itemCount: _filteredInventory.length,
+                              ),
+              ),
             ),
           ],
         ),
@@ -378,9 +511,20 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
       children: [
         TextField(
           controller: _searchCtrl,
+          focusNode: _searchFocus,
+          textInputAction: TextInputAction.search,
           decoration: InputDecoration(
             hintText: 'Поиск по каталожному номеру или названию',
             prefixIcon: const Icon(Icons.search),
+            suffixIcon: _searchCtrl.text.isNotEmpty
+                ? IconButton(
+                    onPressed: () {
+                      _searchCtrl.clear();
+                      _applyFilters();
+                    },
+                    icon: const Icon(Icons.clear),
+                  )
+                : null,
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
@@ -388,6 +532,7 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
           onChanged: (value) {
             _applyFilters();
           },
+          onSubmitted: (_) => _fetchInventory(query: _searchCtrl.text),
         ),
         const SizedBox(height: 8),
         TextField(

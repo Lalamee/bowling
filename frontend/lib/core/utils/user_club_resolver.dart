@@ -42,6 +42,24 @@ List<UserClub> resolveUserClubs(Map<String, dynamic>? source) {
     return existing;
   }
 
+  bool _asBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      return normalized == 'true' || normalized == '1' || normalized == 'yes';
+    }
+    return false;
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value is DateTime) return value;
+    if (value is String && value.trim().isNotEmpty) {
+      return DateTime.tryParse(value.trim());
+    }
+    return null;
+  }
+
   String? _mergeField(dynamic incoming, String? current) {
     final candidate = _asString(incoming);
     if (candidate == null) return current;
@@ -58,6 +76,10 @@ List<UserClub> resolveUserClubs(Map<String, dynamic>? source) {
     dynamic equipment,
     dynamic phone,
     dynamic email,
+    dynamic accessLevel,
+    dynamic accessExpiresAt,
+    dynamic temporary,
+    dynamic infoAccessRestricted,
   }) {
     final resolvedId = _asInt(id);
     if (resolvedId == null) return;
@@ -73,6 +95,11 @@ List<UserClub> resolveUserClubs(Map<String, dynamic>? source) {
       equipment: _mergeField(equipment, existing?.equipment),
       phone: _mergeField(phone, existing?.phone),
       email: _mergeField(email, existing?.email),
+      accessLevel: _mergeField(accessLevel, existing?.accessLevel),
+      accessExpiresAt: _parseDate(accessExpiresAt) ?? existing?.accessExpiresAt,
+      infoAccessRestricted:
+          infoAccessRestricted != null ? _asBool(infoAccessRestricted) : (existing?.infoAccessRestricted ?? false),
+      isTemporary: temporary != null ? _asBool(temporary) : (existing?.isTemporary ?? false),
     );
 
     if (index != null) {
@@ -92,6 +119,10 @@ List<UserClub> resolveUserClubs(Map<String, dynamic>? source) {
       equipment: map['equipment'],
       phone: map['contactPhone'] ?? map['clubPhone'] ?? map['phone'],
       email: map['contactEmail'] ?? map['email'],
+      accessLevel: map['accessLevel'] ?? map['accessLevelName'] ?? map['accessLevelCode'],
+      accessExpiresAt: map['accessExpiresAt'] ?? map['accessUntil'] ?? map['accessExpires'],
+      temporary: map['temporaryAccess'] ?? map['isTemporary'],
+      infoAccessRestricted: map['infoAccessRestricted'],
     );
   }
 
@@ -187,6 +218,10 @@ List<UserClub> resolveUserClubs(Map<String, dynamic>? source) {
     equipment: source['equipment'],
     phone: source['contactPhone'] ?? source['clubPhone'] ?? source['phone'],
     email: source['contactEmail'] ?? source['email'],
+    accessLevel: source['accessLevel'] ?? source['accessLevelName'] ?? source['accessLevelCode'],
+    accessExpiresAt: source['accessExpiresAt'] ?? source['accessUntil'] ?? source['accessExpires'],
+    temporary: source['temporaryAccess'] ?? source['isTemporary'],
+    infoAccessRestricted: source['infoAccessRestricted'],
   );
 
   return result;

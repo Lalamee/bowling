@@ -8,12 +8,14 @@ import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/utils/bottom_nav.dart';
+import '../../../../../core/utils/user_club_resolver.dart';
 import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../../shared/widgets/tiles/profile_tile.dart';
 import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
 import '../../../../orders/notifications/notifications_badge_controller.dart';
 import '../../../../orders/notifications/notifications_page.dart';
 import '../../domain/mechanic_profile.dart';
+import '../../../../../core/models/user_club.dart';
 import 'edit_mechanic_profile_screen.dart';
 
 enum EditFocus { none, name, phone, address }
@@ -38,6 +40,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   String? _applicationStatus;
   String? _applicationComment;
   String? _applicationAccountType;
+  List<UserClub> _clubAccesses = const [];
   final NotificationsBadgeController _notificationsController = NotificationsBadgeController();
   int _notificationsCount = 0;
 
@@ -111,7 +114,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     _applicationAccountType = application?['accountType']?.toString() ?? stored['accountType']?.toString();
     _accountType ??= stored['accountType']?.toString();
     _isFreeMechanic = _isFreeMechanic || _isFreeMechanicType(_accountType);
-    _applyProfile(normalized);
+    _applyProfile(normalized, _clubAccesses);
   }
 
   Future<void> _load() async {
@@ -139,11 +142,12 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
           _canEditProfile = allowEditing;
         });
       }
+      final accessClubs = resolveUserClubs(me);
       final cache = _mapApiToCache(me);
       final normalized = _normalizeProfileData(cache);
       await LocalAuthStorage.saveMechanicProfile(normalized);
       if (!mounted) return;
-      _applyProfile(normalized);
+      _applyProfile(normalized, accessClubs);
     } catch (e, s) {
       log('Failed to load mechanic profile: $e', stackTrace: s);
       if (mounted) {
@@ -206,9 +210,9 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       } else {
         final isEntrepreneur = map['isEntrepreneur'];
         if (isEntrepreneur is bool && isEntrepreneur) {
-          status = 'Самозанятый';
+          status = 'ИП';
         } else if (isEntrepreneur is bool) {
-          status = 'Штатный механик';
+          status = 'Самозанятый';
         }
       }
 
@@ -237,7 +241,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     };
   }
 
-  void _applyProfile(Map<String, dynamic> raw) {
+  void _applyProfile(Map<String, dynamic> raw, [List<UserClub> accessClubs = const []]) {
     String? _asString(dynamic value) {
       if (value == null) return null;
       final str = value.toString().trim();
@@ -271,6 +275,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       );
       _isLoading = false;
       _hasError = false;
+      _clubAccesses = accessClubs;
     });
   }
 
@@ -658,26 +663,15 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
                             ),
                             const SizedBox(height: 6),
-                            if (profile.clubs.isEmpty)
+                            if (_clubAccesses.isEmpty)
                               const Text(
                                 'Временные доступы к клубам отсутствуют. Доступ появится после приглашения от клуба или менеджера.',
                                 style: TextStyle(color: AppColors.darkGray, fontSize: 13),
                               )
                             else
-                              ...profile.clubs.map((club) => Padding(
-                                    padding: const EdgeInsets.only(top: 6),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.lock_clock_rounded, size: 18, color: AppColors.primary),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            club,
-                                            style: const TextStyle(fontSize: 14, color: AppColors.textDark),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                              ..._clubAccesses.map((club) => Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: _ClubAccessTile(club: club),
                                   )),
                           ],
                         ),
@@ -741,5 +735,68 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         onTap: (i) => BottomNavDirect.go(context, 3, i),
       ),
     );
+  }
+}
+
+class _ClubAccessTile extends StatelessWidget {
+  final UserClub club;
+
+  const _ClubAccessTile({required this.club});
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = <Widget>[];
+    if (club.accessLevel != null && club.accessLevel!.trim().isNotEmpty) {
+      chips.add(Chip(label: Text('Доступ: ${club.accessLevel}')));
+    }
+    if (club.accessExpiresAt != null) {
+      chips.add(Chip(label: Text('До ${_formatDate(club.accessExpiresAt!)}')));
+    }
+    if (club.infoAccessRestricted) {
+      chips.add(const Chip(label: Text('Без техинфо')));
+    }
+    if (club.isTemporary && chips.isEmpty) {
+      chips.add(const Chip(label: Text('Временный доступ')));
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(Icons.lock_clock_rounded, size: 18, color: AppColors.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                club.name,
+                style: const TextStyle(fontSize: 14, color: AppColors.textDark, fontWeight: FontWeight.w600),
+              ),
+              if (club.address != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    club.address!,
+                    style: const TextStyle(fontSize: 12, color: AppColors.darkGray),
+                  ),
+                ),
+              if (chips.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: chips,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatDate(DateTime value) {
+    return '${value.day.toString().padLeft(2, '0')}.${value.month.toString().padLeft(2, '0')}.${value.year}';
   }
 }

@@ -142,6 +142,7 @@ class PurchaseOrderAcceptanceFlowTest {
                                 .partId(part1.getPartId())
                                 .status(PartStatus.PARTIALLY_ACCEPTED)
                                 .acceptedQuantity(2)
+                                .comment("Частично принят из-за упаковки")
                                 .storageLocation("Стеллаж A")
                                 .shelfCode("S-1")
                                 .cellCode("C-1")
@@ -165,6 +166,8 @@ class PurchaseOrderAcceptanceFlowTest {
                 .filter(p -> p.getPartId().equals(part1.getPartId()))
                 .findFirst().orElseThrow();
         assertThat(storedAccepted.getAcceptedQuantity()).isEqualTo(2);
+        assertThat(storedAccepted.getAcceptanceDate()).isNotNull();
+        assertThat(storedAccepted.getAcceptanceComment()).contains("Частично принят");
         assertThat(storedAccepted.getWarehouseId()).isEqualTo(club.getClubId().intValue());
 
         WarehouseInventory inventory = warehouseInventoryRepository
@@ -198,6 +201,8 @@ class PurchaseOrderAcceptanceFlowTest {
 
         Supplier ratedSupplier = supplierRepository.findFirstByInn("7712345678");
         assertThat(ratedSupplier.getRating()).isCloseTo(4.0, Offset.offset(0.01));
+        assertThat(ratedSupplier.getContactPerson()).isEqualTo("Менеджер");
+        assertThat(ratedSupplier.getContactPhone()).isEqualTo("+79990000001");
     }
 }
 
