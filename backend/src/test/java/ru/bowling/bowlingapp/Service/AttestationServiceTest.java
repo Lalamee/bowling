@@ -76,6 +76,8 @@ class AttestationServiceTest {
         assertThat(saved.getStatus()).isEqualTo(AttestationDecisionStatus.PENDING);
         assertThat(saved.getRequestedGrade()).isEqualTo(MechanicGrade.MIDDLE);
         assertThat(attestationApplicationRepository.findAll()).hasSize(1);
+        MechanicProfile reloaded = mechanicProfileRepository.findById(profile.getProfileId()).orElseThrow();
+        assertThat(reloaded.getIsCertified()).isFalse();
     }
 
     @Test
@@ -121,6 +123,8 @@ class AttestationServiceTest {
         assertThat(decided.getRequestedGrade()).isEqualTo(MechanicGrade.LEAD);
         assertThat(reloaded.getIsDataVerified()).isTrue();
         assertThat(reloaded.getVerificationDate()).isEqualTo(LocalDate.now());
+        assertThat(reloaded.getIsCertified()).isTrue();
+        assertThat(reloaded.getCertifiedGrade()).isEqualTo(MechanicGrade.LEAD);
     }
 
     private MechanicProfile createActiveMechanic(String phone, String name) {

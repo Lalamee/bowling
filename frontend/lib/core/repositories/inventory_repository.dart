@@ -24,6 +24,7 @@ class InventoryRepository {
     int? clubId,
     String? availability,
     String? category,
+    int? componentId,
   }) async {
     final params = <String, dynamic>{'query': query};
     if (warehouseId != null) {
@@ -38,7 +39,33 @@ class InventoryRepository {
     if (category != null) {
       params['category'] = category;
     }
+    if (componentId != null) {
+      params['componentId'] = componentId;
+    }
     final res = await _dio.get('/api/inventory/search', queryParameters: params);
+    if (res.statusCode == 200 && res.data is List) {
+      return (res.data as List)
+          .whereType<Map>()
+          .map((e) => PartDto.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+    }
+    return const [];
+  }
+
+  Future<List<PartDto>> getWarehouseInventory({
+    required int warehouseId,
+    String query = '',
+    String? category,
+    int? componentId,
+  }) async {
+    final params = <String, dynamic>{'query': query};
+    if (category != null && category.isNotEmpty) {
+      params['category'] = category;
+    }
+    if (componentId != null) {
+      params['componentId'] = componentId;
+    }
+    final res = await _dio.get('/api/inventory/warehouses/$warehouseId/items', queryParameters: params);
     if (res.statusCode == 200 && res.data is List) {
       return (res.data as List)
           .whereType<Map>()
