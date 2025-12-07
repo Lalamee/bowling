@@ -8,10 +8,10 @@ import '../../../../../core/authz/role_access.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/utils/net_ui.dart';
 import '../../../../../models/admin_account_update_dto.dart';
+import '../../../../../models/admin_mechanic_account_change_dto.dart';
 import '../../../../../models/admin_registration_application_dto.dart';
 import '../../../../../models/mechanic_club_link_request_dto.dart';
 import '../../../../../models/club_summary_dto.dart';
-import '../../../../../core/authz/role_access.dart';
 
 class AdminRegistrationsScreen extends StatefulWidget {
   const AdminRegistrationsScreen({super.key});
@@ -30,6 +30,10 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
   List<ClubSummaryDto> _clubs = [];
   String? _roleFilter;
   String? _accountFilter;
+  String? _statusFilter;
+  String? _typeFilter;
+  DateTime? _from;
+  DateTime? _to;
   final TextEditingController _searchCtrl = TextEditingController();
 
   @override
@@ -76,16 +80,29 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     return _applications.where((app) {
       final matchesRole = _roleFilter == null || app.role?.toLowerCase() == _roleFilter?.toLowerCase();
       final matchesAcc = _accountFilter == null || app.accountType?.toLowerCase() == _accountFilter?.toLowerCase();
+      final matchesStatus = _statusFilter == null || app.status?.toLowerCase() == _statusFilter?.toLowerCase();
+      final matchesType = _typeFilter == null || app.applicationType?.toLowerCase() == _typeFilter?.toLowerCase();
+      final submitted = app.submittedAt;
+      final matchesFrom = _from == null || (submitted != null && !submitted.isBefore(_from!));
+      final matchesTo = _to == null || (submitted != null && !submitted.isAfter(_to!));
       final matchesQuery = query.isEmpty ||
           (app.fullName?.toLowerCase().contains(query) ?? false) ||
           (app.phone?.toLowerCase().contains(query) ?? false) ||
           (app.clubName?.toLowerCase().contains(query) ?? false);
-      return matchesRole && matchesAcc && matchesQuery;
+      return matchesRole && matchesAcc && matchesStatus && matchesType && matchesFrom && matchesTo && matchesQuery;
     }).toList();
   }
 
   Future<void> _approve(AdminRegistrationApplicationDto app) async {
     if (app.userId == null) return;
+    if (app.role == 'MECHANIC') {
+      final prepared = await _prepareMechanicAccount(app);
+      if (prepared != null) {
+        app = prepared;
+      } else {
+        return;
+      }
+    }
     try {
       final updated = await _repository.approveRegistration(app.userId!);
       if (!mounted) return;
@@ -136,62 +153,12 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
 
   Future<void> _updateAccount(AdminRegistrationApplicationDto app) async {
     if (app.userId == null) return;
-    String? account = app.accountType;
-    String? access = 'PREMIUM';
-    final formKey = GlobalKey<FormState>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Настройка аккаунта механика'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String?>(
-                value: account,
-                decoration: const InputDecoration(labelText: 'Тип аккаунта'),
-                items: AccountTypeName.values
-                    .map((t) => DropdownMenuItem<String?>(
-                          value: t.apiName,
-                          child: Text(t.apiName),
-                        ))
-                    .toList(),
-                onChanged: (value) => account = value,
-                validator: (value) => (value == null || value.isEmpty) ? 'Выберите тип аккаунта' : null,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String?>(
-                value: access,
-                decoration: const InputDecoration(labelText: 'Уровень доступа'),
-                items: const [
-                  DropdownMenuItem(value: 'PREMIUM', child: Text('PREMIUM')),
-                  DropdownMenuItem(value: 'BASIC', child: Text('BASIC')),
-                ],
-                onChanged: (value) => access = value,
-                validator: (value) => (value == null || value.isEmpty) ? 'Укажите уровень доступа' : null,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
-          FilledButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              Navigator.of(ctx).pop(true);
-            },
-            child: const Text('Сохранить'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
+    final decision = await _askAccountChange(app.accountType, allowClub: true, initialClubId: app.clubId);
+    if (decision == null) return;
     try {
-      final updated = await _repository.updateFreeMechanicAccount(
+      final updated = await _repository.convertMechanicAccount(
         app.userId!,
-        AdminAccountUpdateDto(accountTypeName: account, accessLevelName: access),
+        decision,
       );
       if (!mounted) return;
       _replace(updated);
@@ -304,6 +271,42 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
                 options: AccountTypeName.values.map((e) => e.apiName).toList(),
                 onChanged: (v) => setState(() => _accountFilter = v),
               ),
+              const SizedBox(width: 8),
+              _buildDropdownFilter(
+                hint: 'Статус',
+                value: _statusFilter,
+                options: const ['PENDING', 'APPROVED', 'REJECTED'],
+                onChanged: (v) => setState(() => _statusFilter = v),
+              ),
+              const SizedBox(width: 8),
+              _buildDropdownFilter(
+                hint: 'Тип заявки',
+                value: _typeFilter,
+                options: const ['MECHANIC', 'CLUB', 'MANAGER', 'OWNER', 'ADMIN'],
+                onChanged: (v) => setState(() => _typeFilter = v),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _pickDate(isFrom: true),
+                  icon: const Icon(Icons.calendar_today),
+                  label: Text(_from == null ? 'С' : 'С: ${_from!.toLocal().toString().split(' ').first}'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _pickDate(isFrom: false),
+                  icon: const Icon(Icons.calendar_month),
+                  label: Text(_to == null ? 'По' : 'По: ${_to!.toLocal().toString().split(' ').first}'),
+                ),
+              ),
             ],
           ),
         ),
@@ -346,6 +349,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     final status = _resolveStatus(app);
     final role = app.role ?? '—';
     final account = app.accountType ?? '—';
+    final type = app.applicationType ?? role;
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -369,7 +373,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
               ],
             ),
             const SizedBox(height: 6),
-            Text('Роль: $role, аккаунт: $account'),
+            Text('Тип: $type • Роль: $role • Аккаунт: $account'),
             if (app.clubName != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -378,7 +382,27 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
             if (app.submittedAt != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text('Отправлено: ${app.submittedAt}'),
+                child: Text('Отправлено: ${app.submittedAt!.toLocal().toString().split('.').first}'),
+              ),
+            if (app.decisionComment != null && app.decisionComment!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text('Комментарий: ${app.decisionComment}'),
+              ),
+            if (app.payload != null && app.payload!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: app.payload!.entries
+                      .map(
+                        (e) => Chip(
+                          label: Text('${e.key}: ${e.value}'),
+                        ),
+                      )
+                      .toList(),
+                ),
               ),
             const SizedBox(height: 8),
             Wrap(
@@ -422,8 +446,124 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
   }
 
   String _resolveStatus(AdminRegistrationApplicationDto app) {
-    if (app.isVerified == true) return 'Одобрено';
-    if (app.isActive == false || app.isVerified == false) return 'На модерации';
-    return 'Черновик';
+    if (app.status != null) return app.status!;
+    if (app.isVerified == true) return 'APPROVED';
+    if (app.isActive == false || app.isVerified == false) return 'PENDING';
+    return 'DRAFT';
+  }
+
+  Future<void> _pickDate({required bool isFrom}) async {
+    final now = DateTime.now();
+    final initial = isFrom ? (_from ?? now.subtract(const Duration(days: 7))) : (_to ?? now);
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: now.subtract(const Duration(days: 365)),
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (selected != null) {
+      setState(() {
+        if (isFrom) {
+          _from = selected;
+        } else {
+          _to = selected;
+        }
+      });
+    }
+  }
+
+  Future<AdminMechanicAccountChangeDto?> _askAccountChange(String? currentAccount, {bool allowClub = false, int? initialClubId}) async {
+    String? account = currentAccount;
+    String? access = 'PREMIUM';
+    bool attachToClub = allowClub && initialClubId != null;
+    int? selectedClub = initialClubId;
+    final formKey = GlobalKey<FormState>();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Настройка аккаунта механика'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String?>(
+                value: account,
+                decoration: const InputDecoration(labelText: 'Тип аккаунта'),
+                items: AccountTypeName.values
+                    .map((t) => DropdownMenuItem<String?>(
+                          value: t.apiName,
+                          child: Text(t.apiName),
+                        ))
+                    .toList(),
+                onChanged: (value) => account = value,
+                validator: (value) => (value == null || value.isEmpty) ? 'Выберите тип аккаунта' : null,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String?>(
+                value: access,
+                decoration: const InputDecoration(labelText: 'Уровень доступа'),
+                items: const [
+                  DropdownMenuItem(value: 'PREMIUM', child: Text('PREMIUM')),
+                  DropdownMenuItem(value: 'BASIC', child: Text('BASIC')),
+                ],
+                onChanged: (value) => access = value,
+                validator: (value) => (value == null || value.isEmpty) ? 'Укажите уровень доступа' : null,
+              ),
+              if (allowClub) ...[
+                const SizedBox(height: 12),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  value: attachToClub,
+                  title: const Text('Привязать к клубу'),
+                  onChanged: (v) => attachToClub = v,
+                ),
+                DropdownButtonFormField<int?>(
+                  value: selectedClub,
+                  decoration: const InputDecoration(labelText: 'Клуб'),
+                  items: [
+                    const DropdownMenuItem<int?>(value: null, child: Text('Без клуба')),
+                    ..._clubs
+                        .map((c) => DropdownMenuItem<int?>(
+                              value: c.id,
+                              child: Text(c.name ?? 'Клуб ${c.id}'),
+                            ))
+                        .toList(),
+                  ],
+                  onChanged: attachToClub ? (value) => selectedClub = value : null,
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
+          FilledButton(
+            onPressed: () {
+              if (!formKey.currentState!.validate()) return;
+              Navigator.of(ctx).pop(true);
+            },
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return null;
+    return AdminMechanicAccountChangeDto(
+      accountTypeName: account,
+      accessLevelName: access,
+      clubId: attachToClub ? selectedClub : null,
+      attachToClub: attachToClub,
+    );
+  }
+
+  Future<AdminRegistrationApplicationDto?> _prepareMechanicAccount(AdminRegistrationApplicationDto app) async {
+    final decision = await _askAccountChange(app.accountType, allowClub: true, initialClubId: app.clubId);
+    if (decision == null || app.userId == null) return null;
+    final updated = await _repository.convertMechanicAccount(app.userId!, decision);
+    _replace(updated);
+    return updated;
   }
 }

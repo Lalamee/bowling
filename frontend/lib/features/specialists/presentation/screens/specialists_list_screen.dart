@@ -17,6 +17,7 @@ class _SpecialistsListScreenState extends State<SpecialistsListScreen> {
   final TextEditingController _specializationCtrl = TextEditingController();
   final TextEditingController _ratingCtrl = TextEditingController(text: '0');
   MechanicGrade? _grade;
+  String _format = 'ANY';
 
   Future<List<SpecialistCard>>? _future;
 
@@ -43,7 +44,14 @@ class _SpecialistsListScreenState extends State<SpecialistsListScreen> {
         specializationId: specializationId,
         grade: _grade,
         minRating: rating,
-      );
+      ).then((items) {
+        return items.where((item) {
+          final isFree = (item.accountType ?? '').toUpperCase().contains('FREE_MECHANIC');
+          if (_format == 'FREE' && !isFree) return false;
+          if (_format == 'STAFF' && isFree) return false;
+          return true;
+        }).toList();
+      });
     });
   }
 
@@ -133,6 +141,20 @@ class _SpecialistsListScreenState extends State<SpecialistsListScreen> {
           onSubmitted: (_) => _load(),
         ),
         const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: _format,
+          decoration: const InputDecoration(
+            labelText: 'Формат работы',
+            prefixIcon: Icon(Icons.assignment_ind_outlined),
+          ),
+          items: const [
+            DropdownMenuItem(value: 'ANY', child: Text('Любой')),
+            DropdownMenuItem(value: 'FREE', child: Text('Свободный / самозанятый')),
+            DropdownMenuItem(value: 'STAFF', child: Text('Штатный механик клуба')),
+          ],
+          onChanged: (value) => setState(() => _format = value ?? 'ANY'),
+        ),
+        const SizedBox(height: 8),
         Align(
           alignment: Alignment.centerRight,
           child: ElevatedButton.icon(
@@ -146,17 +168,48 @@ class _SpecialistsListScreenState extends State<SpecialistsListScreen> {
   }
 
   Widget _buildTile(SpecialistCard item) {
-    final subtitleParts = <String>[];
-    if (item.attestedGrade != null) subtitleParts.add('Грейд: ${item.attestedGrade!.toApiValue()}');
-    if (item.region != null && item.region!.isNotEmpty) subtitleParts.add('Регион: ${item.region}');
-    if (item.totalExperienceYears != null) subtitleParts.add('Стаж: ${item.totalExperienceYears} лет');
-    if (item.skills != null && item.skills!.isNotEmpty) subtitleParts.add(item.skills!);
-    if (item.isEntrepreneur == true) subtitleParts.add('Формат: свободный / самозанятый');
-    if (item.clubs.isNotEmpty) subtitleParts.add('Клубы: ${item.clubs.join(', ')}');
+    final chips = <Widget>[];
+    final formatLabel = _formatLabel(item);
+    if (item.attestedGrade != null) {
+      chips.add(Chip(label: Text('Грейд: ${item.attestedGrade!.toApiValue()}')));
+    }
+    if (formatLabel != null) {
+      chips.add(Chip(label: Text(formatLabel)));
+    }
+    if (item.region != null && item.region!.isNotEmpty) {
+      chips.add(Chip(label: Text('Регион: ${item.region}')));
+    }
+    if (item.totalExperienceYears != null) {
+      chips.add(Chip(label: Text('Стаж: ${item.totalExperienceYears} лет')));
+    }
+    if (item.bowlingExperienceYears != null) {
+      chips.add(Chip(label: Text('В боулинге: ${item.bowlingExperienceYears} лет')));
+    }
+    if (item.specializationId != null) {
+      chips.add(Chip(label: Text('Специализация #${item.specializationId}')));
+    }
+    if (item.clubs.isNotEmpty) chips.add(Chip(label: Text('Клубы: ${item.clubs.join(', ')}')));
+
+    final description = [
+      if (item.skills != null && item.skills!.isNotEmpty) item.skills!,
+      if (item.advantages != null && item.advantages!.isNotEmpty) item.advantages!,
+    ].join(' • ');
     return Card(
       child: ListTile(
         title: Text(item.fullName ?? 'Без имени'),
-        subtitle: subtitleParts.isNotEmpty ? Text(subtitleParts.join(' • ')) : null,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (description.isNotEmpty) Text(description),
+            const SizedBox(height: 6),
+            if (chips.isNotEmpty)
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: chips,
+              ),
+          ],
+        ),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -173,6 +226,14 @@ class _SpecialistsListScreenState extends State<SpecialistsListScreen> {
         },
       ),
     );
+  }
+
+  String? _formatLabel(SpecialistCard item) {
+    final type = (item.accountType ?? '').toUpperCase();
+    if (type.contains('FREE_MECHANIC')) return 'Свободный специалист';
+    if (type.isNotEmpty) return 'Штатный механик клуба';
+    if (item.isEntrepreneur == true) return 'Свободный / ИП';
+    return null;
   }
 }
 

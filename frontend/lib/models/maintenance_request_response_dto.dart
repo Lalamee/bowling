@@ -12,6 +12,7 @@ class MaintenanceRequestResponseDto {
   final DateTime? managerDecisionDate;
   final String? verificationStatus;
   final String? reason;
+  final DateTime? publishedAt;
   final List<RequestPartResponseDto> requestedParts;
 
   MaintenanceRequestResponseDto({
@@ -28,6 +29,7 @@ class MaintenanceRequestResponseDto {
     this.managerDecisionDate,
     this.verificationStatus,
     this.reason,
+    this.publishedAt,
     required this.requestedParts,
   });
 
@@ -47,6 +49,7 @@ class MaintenanceRequestResponseDto {
       managerDecisionDate: _d(json['managerDecisionDate']),
       verificationStatus: json['verificationStatus'] as String?,
       reason: json['reason'] as String?,
+      publishedAt: _d(json['publishedAt']),
       requestedParts: (json['requestedParts'] as List<dynamic>? ?? [])
           .map((e) => RequestPartResponseDto.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList(),
@@ -67,6 +70,7 @@ class MaintenanceRequestResponseDto {
         'managerDecisionDate': managerDecisionDate?.toIso8601String(),
         'verificationStatus': verificationStatus,
         'reason': reason,
+        'publishedAt': publishedAt?.toIso8601String(),
         'requestedParts': requestedParts.map((e) => e.toJson()).toList(),
       };
 }
