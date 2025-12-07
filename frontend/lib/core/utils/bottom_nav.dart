@@ -10,6 +10,7 @@ import '../../features/orders/presentation/screens/admin_orders_screen.dart';
 import '../../features/search/presentation/screens/global_search_screen.dart';
 import '../../features/clubs/presentation/screens/club_screen.dart';
 import '../routing/routes.dart';
+import '../utils/user_club_resolver.dart';
 
 import '../../features/profile/mechanic/presentation/screens/mechanic_profile_screen.dart';
 import '../../features/profile/owner/presentation/screens/owner_profile_screen.dart';
@@ -57,7 +58,12 @@ class BottomNavDirect {
           break;
         case 2:
           if (ctx.access.allows(AccessSection.freeWarehouse) && !ctx.access.allows(AccessSection.clubEquipment)) {
-            Navigator.pushReplacementNamed(context, Routes.personalWarehouse);
+            final hasClubAccess = await _freeMechanicHasClubAccess();
+            if (hasClubAccess) {
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ClubScreen()));
+            } else {
+              Navigator.pushReplacementNamed(context, Routes.personalWarehouse);
+            }
           } else {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ClubScreen()));
           }
@@ -144,5 +150,11 @@ class BottomNavDirect {
       default:
         return true;
     }
+  }
+
+  static Future<bool> _freeMechanicHasClubAccess() async {
+    final profile = await LocalAuthStorage.loadMechanicProfile();
+    if (profile == null) return false;
+    return resolveUserClubs(profile).isNotEmpty;
   }
 }

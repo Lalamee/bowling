@@ -6,6 +6,10 @@ class UserClub {
   final String? equipment;
   final String? phone;
   final String? email;
+  final String? accessLevel;
+  final DateTime? accessExpiresAt;
+  final bool infoAccessRestricted;
+  final bool isTemporary;
 
   const UserClub({
     required this.id,
@@ -15,6 +19,10 @@ class UserClub {
     this.equipment,
     this.phone,
     this.email,
+    this.accessLevel,
+    this.accessExpiresAt,
+    this.infoAccessRestricted = false,
+    this.isTemporary = false,
   });
 
   UserClub copyWith({
@@ -24,6 +32,10 @@ class UserClub {
     String? equipment,
     String? phone,
     String? email,
+    String? accessLevel,
+    DateTime? accessExpiresAt,
+    bool? infoAccessRestricted,
+    bool? isTemporary,
   }) {
     return UserClub(
       id: id,
@@ -33,6 +45,10 @@ class UserClub {
       equipment: equipment ?? this.equipment,
       phone: phone ?? this.phone,
       email: email ?? this.email,
+      accessLevel: accessLevel ?? this.accessLevel,
+      accessExpiresAt: accessExpiresAt ?? this.accessExpiresAt,
+      infoAccessRestricted: infoAccessRestricted ?? this.infoAccessRestricted,
+      isTemporary: isTemporary ?? this.isTemporary,
     );
   }
 }
