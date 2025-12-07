@@ -7,7 +7,7 @@ class PartDto {
   final String? commonName;
   final String? description;
   final int? quantity;
-  final int? reservedQuantity; // TODO: reservedQuantity придёт из API склада
+  final int? reservedQuantity;
   final int? warehouseId;
   final String? location;
   final String? cellCode;
@@ -22,6 +22,7 @@ class PartDto {
   final int? equipmentNodeId;
   final List<int> equipmentNodePath;
   final List<String> compatibility;
+  final bool? isAvailable;
 
   PartDto({
     required this.inventoryId,
@@ -47,6 +48,7 @@ class PartDto {
     this.equipmentNodeId,
     this.equipmentNodePath = const [],
     this.compatibility = const [],
+    this.isAvailable,
   });
 
   factory PartDto.fromJson(Map<String, dynamic> json) {
@@ -91,6 +93,7 @@ class PartDto {
               .whereType<String>()
               .toList() ??
           const [],
+      isAvailable: _parseOptionalBool(json['isAvailable'] ?? json['available']),
     );
   }
 
@@ -119,6 +122,7 @@ class PartDto {
         'equipmentNodeId': equipmentNodeId,
         'equipmentNodePath': equipmentNodePath,
         'compatibility': compatibility,
+        'isAvailable': isAvailable,
       };
 }
 

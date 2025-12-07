@@ -157,12 +157,14 @@ void main() {
       'reservedQuantity': 1,
       'quantity': 4,
       'notes': 'для быстрой замены',
+      'isAvailable': true,
     };
 
     final dto = PartDto.fromJson(json);
     expect(dto.location, 'Стеллаж А');
     expect(dto.cellCode, 'A1');
     expect(dto.notes, 'для быстрой замены');
+    expect(dto.isAvailable, isTrue);
     expect(dto.toJson()['locationReference'], 'Стеллаж А');
   });
 }
