@@ -268,13 +268,22 @@ class _NotificationsPageState extends State<NotificationsPage> {
       }
 
       final notifications = await _notificationsRepository.fetchNotifications(role: scope.role);
-      for (final event in notifications.where((e) => e.isHelpEvent)) {
+      for (final event in notifications) {
+        if (event.isHelpEvent || event.isWarningEvent || event.isSupplierComplaint || event.isAccessRequest) {
+          events.add(_MechanicEvent(
+            title: event.typeKey.label(),
+            description: event.payload?.isNotEmpty == true ? event.payload : event.message,
+            createdAt: event.createdAt,
+          ));
+        }
+      }
+
+      if (scope.accessibleClubIds.isNotEmpty && scope.isFreeMechanic) {
+        final clubList = scope.accessibleClubIds.join(', ');
         events.add(_MechanicEvent(
-          title: event.typeKey.label(),
-          description: event.payload?.isNotEmpty == true
-              ? event.payload
-              : event.message,
-          createdAt: event.createdAt,
+          title: 'Клубы и доступы',
+          description: 'Доступны клубы: $clubList',
+          createdAt: DateTime.now(),
         ));
       }
 

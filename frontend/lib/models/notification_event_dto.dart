@@ -3,6 +3,9 @@ enum NotificationEventType {
   mechanicHelpConfirmed,
   mechanicHelpDeclined,
   mechanicHelpReassigned,
+  maintenanceWarning,
+  clubAccessRequest,
+  supplierComplaintUpdate,
   unknown;
 
   static NotificationEventType fromBackend(String? raw) {
@@ -16,6 +19,12 @@ enum NotificationEventType {
         return NotificationEventType.mechanicHelpDeclined;
       case 'MECHANIC_HELP_REASSIGNED':
         return NotificationEventType.mechanicHelpReassigned;
+      case 'MAINTENANCE_WARNING':
+        return NotificationEventType.maintenanceWarning;
+      case 'CLUB_ACCESS_REQUEST':
+        return NotificationEventType.clubAccessRequest;
+      case 'SUPPLIER_COMPLAINT_UPDATE':
+        return NotificationEventType.supplierComplaintUpdate;
       default:
         return NotificationEventType.unknown;
     }
@@ -31,6 +40,12 @@ enum NotificationEventType {
         return 'Запрос помощи отклонен';
       case NotificationEventType.mechanicHelpReassigned:
         return 'Назначен другой специалист';
+      case NotificationEventType.maintenanceWarning:
+        return 'Предупреждение по ТО';
+      case NotificationEventType.clubAccessRequest:
+        return 'Запрос доступа к клубу';
+      case NotificationEventType.supplierComplaintUpdate:
+        return 'Статус спора с поставщиком';
       case NotificationEventType.unknown:
       default:
         return 'Оповещение';
@@ -72,6 +87,12 @@ class NotificationEventDto {
       typeKey == NotificationEventType.mechanicHelpConfirmed ||
       typeKey == NotificationEventType.mechanicHelpDeclined ||
       typeKey == NotificationEventType.mechanicHelpReassigned;
+
+  bool get isWarningEvent => typeKey == NotificationEventType.maintenanceWarning;
+
+  bool get isSupplierComplaint => typeKey == NotificationEventType.supplierComplaintUpdate;
+
+  bool get isAccessRequest => typeKey == NotificationEventType.clubAccessRequest;
 
   factory NotificationEventDto.fromJson(Map<String, dynamic> json) {
     DateTime? _parseDate(dynamic value) =>

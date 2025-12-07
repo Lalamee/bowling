@@ -305,9 +305,15 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
                   ],
                 ),
                 const SizedBox(height: 8),
+                _infoRow('Тип', item.equipmentType ?? '—'),
+                _infoRow('Производитель', item.manufacturer ?? '—'),
                 _infoRow('Год выпуска', item.productionYear?.toString() ?? '—'),
+                _infoRow('Серийный номер', item.serialNumber ?? '—'),
+                _infoRow('Статус', item.status ?? '—'),
                 _infoRow('Плановое ТО', _formatDate(item.nextMaintenanceDate) ?? '—'),
                 _infoRow('Последнее ТО', _formatDate(item.lastMaintenanceDate) ?? '—'),
+                _infoRow('Дата покупки', _formatDate(item.purchaseDate) ?? '—'),
+                _infoRow('Гарантия до', _formatDate(item.warrantyUntil) ?? '—'),
                 const SizedBox(height: 10),
                 if (item.components.isNotEmpty)
                   Column(
@@ -435,23 +441,27 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
                               children: [
                                 Expanded(
                                   child: Text(
-                                    'Заявка ${entry.requestId ?? '-'} • дорожка ${entry.laneNumber ?? '-'}',
+                                    '${entry.requestId != null ? 'Заявка ${entry.requestId}' : 'Работа ${entry.serviceHistoryId ?? '-'}'} • дорожка ${entry.laneNumber ?? '-'}',
                                     style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark),
                                   ),
                                 ),
                                 Chip(
-                                  label: Text(entry.status ?? ''),
+                                  label: Text(entry.status ?? entry.requestStatus ?? ''),
                                   backgroundColor: AppColors.background,
                                 )
                               ],
                             ),
                             const SizedBox(height: 6),
-                            Text(entry.workType ?? 'Тип работы не указан', style: const TextStyle(color: AppColors.darkGray)),
+                            Text(
+                              entry.workType ?? entry.serviceType ?? 'Тип работы не указан',
+                              style: const TextStyle(color: AppColors.darkGray),
+                            ),
                             const SizedBox(height: 6),
                             _infoRow('Оборудование', entry.equipmentModel ?? '—'),
                             _infoRow('Исполнитель', entry.mechanicName ?? '—'),
                             _infoRow('Создано', _formatDateTime(entry.createdDate) ?? '—'),
-                            _infoRow('Завершено', _formatDateTime(entry.completedDate) ?? '—'),
+                            _infoRow('Работа выполнена',
+                                _formatDateTime(entry.completedDate ?? entry.serviceDate) ?? '—'),
                             if (entry.partsUsed.isNotEmpty) ...[
                               const SizedBox(height: 8),
                               const Text('Использованные детали', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -482,7 +492,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (_, i) {
           final warning = _warnings[i];
-          final isCritical = warning.type.contains('OVERDUE') || warning.type.contains('EXCEEDED');
+          final isCritical =
+              warning.type.contains('OVERDUE') || warning.type.contains('EXCEEDED') || warning.type.contains('CRITICAL');
           return Container(
             decoration: BoxDecoration(
               color: isCritical ? Colors.red.withOpacity(0.08) : AppColors.background,
@@ -532,8 +543,18 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
         itemBuilder: (_, i) {
           final notif = _notifications[i];
           final isHelp = notif.isHelpEvent;
+          final isWarning = notif.isWarningEvent;
+          final isComplaint = notif.isSupplierComplaint;
+          final isAccess = notif.isAccessRequest;
           final label = notif.typeKey.label();
           final status = deriveHelpRequestStatus(events: _notifications, requestId: notif.requestId ?? -1);
+          final Color accentColor = isWarning
+              ? Colors.orange
+              : isComplaint
+                  ? Colors.deepPurple
+                  : isAccess
+                      ? Colors.blueGrey
+                      : AppColors.primary;
           return CommonUI.card(
             padding: const EdgeInsets.all(12),
             child: Column(
@@ -543,7 +564,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
                   children: [
                     Expanded(
                       child: Text(label,
-                          style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                          style: TextStyle(fontWeight: FontWeight.w700, color: accentColor)),
                     ),
                     if (isHelp)
                       Chip(
