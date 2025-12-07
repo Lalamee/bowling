@@ -8,17 +8,17 @@ import ru.bowling.bowlingapp.DTO.NotificationEvent;
 import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Entity.enums.WorkLogStatus;
 import ru.bowling.bowlingapp.Entity.enums.WorkType;
+import ru.bowling.bowlingapp.Entity.ServiceHistory;
+import ru.bowling.bowlingapp.Entity.WorkLogStatusHistory;
 import ru.bowling.bowlingapp.Repository.EquipmentComponentRepository;
 import ru.bowling.bowlingapp.Enum.RoleName;
 import ru.bowling.bowlingapp.Repository.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -30,8 +30,10 @@ public class OwnerDashboardService {
     private final WorkLogRepository workLogRepository;
     private final WorkLogPartUsageRepository workLogPartUsageRepository;
     private final ServiceHistoryPartRepository serviceHistoryPartRepository;
-    private final ClubStaffRepository clubStaffRepository;
+    private final ServiceHistoryRepository serviceHistoryRepository;
     private final NotificationService notificationService;
+    private final UserRepository userRepository;
+    private final UserClubAccessService userClubAccessService;
 
     @Transactional(readOnly = true)
     public List<TechnicalInfoDTO> getTechnicalInformation(Long userId, Long clubId) {
@@ -44,9 +46,15 @@ public class OwnerDashboardService {
                 .map(eq -> TechnicalInfoDTO.builder()
                         .equipmentId(eq.getEquipmentId())
                         .model(eq.getModel())
+                        .serialNumber(eq.getSerialNumber())
+                        .equipmentType(eq.getEquipmentType() != null ? eq.getEquipmentType().getName() : null)
+                        .manufacturer(eq.getManufacturer() != null ? eq.getManufacturer().getName() : eq.getOtherManufacturerName())
                         .productionYear(eq.getProductionYear())
                         .lanesCount(eq.getLanesCount())
                         .conditionPercentage(eq.getConditionPercentage())
+                        .purchaseDate(eq.getPurchaseDate())
+                        .warrantyUntil(eq.getWarrantyUntil())
+                        .status(eq.getStatus())
                         .lastMaintenanceDate(eq.getLastMaintenanceDate())
                         .nextMaintenanceDate(eq.getNextMaintenanceDate())
                         .components(components)
@@ -69,13 +77,27 @@ public class OwnerDashboardService {
         Long resolvedClubId = resolveClubForUser(userId, clubId);
         List<WorkLog> logs = workLogRepository.findByClubClubIdOrderByCreatedDateDesc(resolvedClubId);
 
-        return logs.stream()
+        List<ServiceJournalEntryDTO> workLogEntries = logs.stream()
                 .filter(log -> laneNumber == null || Objects.equals(log.getLaneNumber(), laneNumber))
                 .filter(log -> workType == null || workType.equals(log.getWorkType()))
                 .filter(log -> status == null || status.equals(log.getStatus()))
                 .filter(log -> start == null || (log.getCreatedDate() != null && !log.getCreatedDate().isBefore(start)))
                 .filter(log -> end == null || (log.getCreatedDate() != null && !log.getCreatedDate().isAfter(end)))
                 .map(this::toJournalEntry)
+                .collect(Collectors.toList());
+
+        List<ServiceJournalEntryDTO> serviceHistoryEntries = serviceHistoryRepository.findByClubClubIdOrderByServiceDateDesc(resolvedClubId)
+                .stream()
+                .filter(history -> laneNumber == null || Objects.equals(history.getLaneNumber(), laneNumber))
+                .filter(history -> start == null || (history.getServiceDate() != null && !history.getServiceDate().isBefore(start)))
+                .filter(history -> end == null || (history.getServiceDate() != null && !history.getServiceDate().isAfter(end)))
+                .map(this::toJournalEntry)
+                .collect(Collectors.toList());
+
+        return Stream.of(workLogEntries, serviceHistoryEntries)
+                .flatMap(List::stream)
+                .sorted(Comparator.comparing(entry -> Optional.ofNullable(entry.getCompletedDate()).orElse(entry.getServiceDate()),
+                        Comparator.nullsLast(LocalDateTime::compareTo)).reversed())
                 .collect(Collectors.toList());
     }
 
@@ -86,8 +108,18 @@ public class OwnerDashboardService {
 
         List<WarningDTO> scheduleWarnings = equipmentMaintenanceScheduleRepository.findByClubClubId(resolvedClubId).stream()
                 .flatMap(schedule -> {
+                    WarningDTO criticalMissing = null;
+                    if (Boolean.TRUE.equals(schedule.getIsCritical()) && schedule.getLastPerformed() == null) {
+                        criticalMissing = WarningDTO.builder()
+                                .type("CRITICAL_MAINTENANCE_MISSING")
+                                .message("Критичное оборудование без запланированного ТО: " + readableEquipment(schedule))
+                                .equipmentId(schedule.getEquipment() != null ? schedule.getEquipment().getEquipmentId() : null)
+                                .scheduleId(schedule.getScheduleId())
+                                .dueDate(schedule.getScheduledDate())
+                                .build();
+                    }
                     if (schedule.getScheduledDate() == null) {
-                        return List.<WarningDTO>of().stream();
+                        return List.of(criticalMissing).stream().filter(Objects::nonNull);
                     }
                     WarningDTO overdue = null;
                     WarningDTO upcoming = null;
@@ -108,7 +140,7 @@ public class OwnerDashboardService {
                                 .dueDate(schedule.getScheduledDate())
                                 .build();
                     }
-                    return List.of(overdue, upcoming).stream().filter(Objects::nonNull);
+                    return Stream.of(overdue, upcoming, criticalMissing).filter(Objects::nonNull);
                 })
                 .toList();
 
@@ -134,7 +166,7 @@ public class OwnerDashboardService {
                         .build())
                 .toList();
 
-        return List.of(scheduleWarnings, equipmentWarnings, partWarnings).stream()
+        return Stream.of(scheduleWarnings, equipmentWarnings, partWarnings)
                 .flatMap(List::stream)
                 .sorted(Comparator.comparing(WarningDTO::getDueDate, Comparator.nullsLast(LocalDate::compareTo)))
                 .toList();
@@ -142,10 +174,26 @@ public class OwnerDashboardService {
 
     @Transactional(readOnly = true)
     public List<NotificationEvent> getManagerNotifications(Long userId, Long clubId, RoleName roleName) {
-        Long resolvedClubId = resolveClubForUser(userId, clubId);
-        return notificationService.getNotificationsForRole(roleName == null ? RoleName.CLUB_OWNER : roleName).stream()
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Long resolvedClubId = resolveClubForUser(user, clubId);
+        List<Long> accessibleClubIds = userClubAccessService.resolveAccessibleClubIds(user);
+        List<NotificationEvent> filtered = notificationService.getNotificationsForUser(user, accessibleClubIds).stream()
                 .filter(event -> event.getClubId() == null || Objects.equals(event.getClubId(), resolvedClubId))
-                .collect(Collectors.toList());
+                .toList();
+        List<NotificationEvent> events = new ArrayList<>(filtered);
+
+        getWarnings(userId, resolvedClubId).forEach(warning -> events.add(NotificationEvent.builder()
+                .id(UUID.randomUUID())
+                .type(NotificationEventType.MAINTENANCE_WARNING)
+                .message(warning.getMessage())
+                .clubId(resolvedClubId)
+                .createdAt(LocalDateTime.now())
+                .payload(warning.getType())
+                .audiences(Set.of(RoleName.ADMIN, RoleName.CLUB_OWNER, RoleName.HEAD_MECHANIC))
+                .build()));
+
+        return events;
     }
 
     private ServiceJournalEntryDTO toJournalEntry(WorkLog log) {
@@ -156,22 +204,74 @@ public class OwnerDashboardService {
                         .catalogNumber(part.getCatalogNumber())
                         .quantityUsed(part.getQuantityUsed())
                         .totalCost(part.getTotalCost())
-                        .build())
+                .build())
                 .toList();
+
+        LocalDateTime finished = resolveCompletionDate(log);
 
         return ServiceJournalEntryDTO.builder()
                 .workLogId(log.getLogId())
                 .requestId(log.getMaintenanceRequest() != null ? log.getMaintenanceRequest().getRequestId() : null)
+                .serviceHistoryId(null)
                 .laneNumber(log.getLaneNumber())
                 .equipmentId(log.getEquipment() != null ? log.getEquipment().getEquipmentId() : null)
                 .equipmentModel(log.getEquipment() != null ? log.getEquipment().getModel() : null)
                 .workType(log.getWorkType())
+                .serviceType(null)
                 .status(log.getStatus())
+                .requestStatus(log.getMaintenanceRequest() != null ? log.getMaintenanceRequest().getStatus() : null)
                 .createdDate(log.getCreatedDate())
-                .completedDate(log.getCompletedDate())
+                .completedDate(finished)
+                .serviceDate(finished != null ? finished : log.getCreatedDate())
                 .mechanicName(log.getMechanic() != null ? log.getMechanic().getFullName() : null)
                 .partsUsed(parts)
                 .build();
+    }
+
+    private ServiceJournalEntryDTO toJournalEntry(ServiceHistory history) {
+        List<WorkLogPartUsageDTO> parts = serviceHistoryPartRepository.findByServiceHistoryServiceIdOrderByCreatedDate(history.getServiceId())
+                .stream()
+                .map(part -> WorkLogPartUsageDTO.builder()
+                        .usageId(part.getId())
+                        .partName(part.getPartName())
+                        .catalogNumber(part.getCatalogNumber())
+                        .quantityUsed(part.getQuantity())
+                        .totalCost(part.getTotalCost())
+                        .build())
+                .toList();
+
+        return ServiceJournalEntryDTO.builder()
+                .workLogId(null)
+                .requestId(null)
+                .serviceHistoryId(history.getServiceId())
+                .laneNumber(history.getLaneNumber())
+                .equipmentId(history.getEquipment() != null ? history.getEquipment().getEquipmentId() : null)
+                .equipmentModel(history.getEquipment() != null ? history.getEquipment().getModel() : null)
+                .workType(null)
+                .serviceType(history.getServiceType())
+                .status(null)
+                .requestStatus(null)
+                .createdDate(history.getCreatedDate())
+                .completedDate(history.getServiceDate())
+                .serviceDate(history.getServiceDate())
+                .mechanicName(history.getPerformedBy() != null ? history.getPerformedBy().getFullName() : null)
+                .partsUsed(parts)
+                .build();
+    }
+
+    private LocalDateTime resolveCompletionDate(WorkLog log) {
+        if (log.getCompletedDate() != null) {
+            return log.getCompletedDate();
+        }
+        if (log.getStatusHistory() == null) {
+            return null;
+        }
+        return log.getStatusHistory().stream()
+                .filter(h -> h.getNewStatus() == WorkLogStatus.COMPLETED || h.getNewStatus() == WorkLogStatus.VERIFIED || h.getNewStatus() == WorkLogStatus.CLOSED)
+                .map(WorkLogStatusHistory::getChangedDate)
+                .filter(Objects::nonNull)
+                .max(LocalDateTime::compareTo)
+                .orElse(null);
     }
 
     private EquipmentComponentDTO toComponentDto(EquipmentComponent component) {
@@ -197,16 +297,22 @@ public class OwnerDashboardService {
     }
 
     private Long resolveClubForUser(Long userId, Long explicitClubId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        return resolveClubForUser(user, explicitClubId);
+    }
+
+    private Long resolveClubForUser(User user, Long explicitClubId) {
+        List<Long> accessibleClubIds = userClubAccessService.resolveAccessibleClubIds(user);
         if (explicitClubId != null) {
-            boolean allowed = clubStaffRepository.existsByClubClubIdAndUserUserIdAndIsActiveTrue(explicitClubId, userId);
+            boolean allowed = accessibleClubIds.contains(explicitClubId);
             if (!allowed) {
                 throw new IllegalArgumentException("Пользователь не привязан к клубу");
             }
             return explicitClubId;
         }
-        return clubStaffRepository.findByUserUserIdAndIsActiveTrue(userId).stream()
+        return accessibleClubIds.stream()
                 .findFirst()
-                .map(staff -> staff.getClub().getClubId())
                 .orElseThrow(() -> new IllegalArgumentException("Для пользователя не найден активный клуб"));
     }
 

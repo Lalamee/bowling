@@ -65,18 +65,23 @@ class RoleAccessMatrix {
   static RoleAccessConfig resolve(RoleName role, AccountTypeName? type) {
     switch (role) {
       case RoleName.admin:
+        final isMainAdmin = type == AccountTypeName.mainAdmin;
         return RoleAccessConfig(
-          homeRoute: Routes.profileAdmin,
+          homeRoute: isMainAdmin ? Routes.profileAdmin : Routes.profileMechanic,
           allowedSections: {
-            AccessSection.adminCabinet,
-            AccessSection.notifications,
-            AccessSection.specialistsBase,
-            AccessSection.supplyAcceptance,
-            AccessSection.serviceJournal,
-            AccessSection.technicalInfo,
-            AccessSection.staffManagement,
-            AccessSection.maintenance,
-            AccessSection.clubEquipment,
+            if (isMainAdmin) ...{
+              AccessSection.adminCabinet,
+              AccessSection.notifications,
+              AccessSection.specialistsBase,
+              AccessSection.supplyAcceptance,
+              AccessSection.serviceJournal,
+              AccessSection.technicalInfo,
+              AccessSection.staffManagement,
+              AccessSection.maintenance,
+              AccessSection.clubEquipment,
+            } else ...{
+              AccessSection.notifications,
+            }
           },
         );
       case RoleName.clubOwner:

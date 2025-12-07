@@ -3,6 +3,10 @@ import '../../models/admin_account_update_dto.dart';
 import '../../models/admin_complaint_dto.dart';
 import '../../models/admin_help_request_dto.dart';
 import '../../models/admin_registration_application_dto.dart';
+import '../../models/admin_appeal_dto.dart';
+import '../../models/admin_mechanic_account_change_dto.dart';
+import '../../models/admin_mechanic_status_change_dto.dart';
+import '../../models/admin_staff_status_update_dto.dart';
 import '../../models/mechanic_club_link_request_dto.dart';
 
 class AdminCabinetRepository {
@@ -10,6 +14,10 @@ class AdminCabinetRepository {
 
   Future<List<AdminRegistrationApplicationDto>> getRegistrations() {
     return _api.getAdminRegistrations();
+  }
+
+  Future<List<AdminAppealDto>> listAppeals() {
+    return _api.listAdminAppeals();
   }
 
   Future<AdminRegistrationApplicationDto> approveRegistration(int userId) {
@@ -25,6 +33,13 @@ class AdminCabinetRepository {
     AdminAccountUpdateDto update,
   ) {
     return _api.updateFreeMechanicAccount(userId, update);
+  }
+
+  Future<AdminRegistrationApplicationDto> convertMechanicAccount(
+    int userId,
+    AdminMechanicAccountChangeDto change,
+  ) {
+    return _api.convertMechanicAccount(userId, change);
   }
 
   Future<AdminRegistrationApplicationDto> changeMechanicClubLink(
@@ -45,6 +60,14 @@ class AdminCabinetRepository {
     String? notes,
   }) {
     return _api.updateSupplierComplaint(reviewId: reviewId, status: status, resolved: resolved, notes: notes);
+  }
+
+  Future<List<AdminMechanicStatusChangeDto>> listMechanicStatusChanges() {
+    return _api.listMechanicStatusChanges();
+  }
+
+  Future<AdminMechanicStatusChangeDto> updateMechanicStatus({required int staffId, required AdminStaffStatusUpdateDto update}) {
+    return _api.updateMechanicStatus(staffId: staffId, update: update);
   }
 
   Future<List<AdminHelpRequestDto>> listHelpRequests() {

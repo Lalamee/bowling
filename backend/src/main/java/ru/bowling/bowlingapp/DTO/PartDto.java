@@ -31,6 +31,7 @@ public class PartDto {
     private Integer warehouseId;
     private Boolean unique;
     private LocalDate lastChecked;
+    private String notes;
 
     private String imageUrl;
     private String diagramUrl;

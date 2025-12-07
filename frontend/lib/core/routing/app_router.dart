@@ -4,6 +4,7 @@ import 'package:bowling_market/features/profile/admin/presentation/screens/admin
 import 'package:bowling_market/features/profile/admin/presentation/screens/admin_mechanics_screen.dart';
 import 'package:bowling_market/features/profile/admin/presentation/screens/admin_profile_screen.dart';
 import 'package:bowling_market/features/profile/admin/presentation/screens/admin_registrations_screen.dart';
+import 'package:bowling_market/features/orders/notifications/admin_appeals_screen.dart';
 import 'package:bowling_market/features/orders/presentation/screens/supply_acceptance_screen.dart';
 import 'package:bowling_market/features/orders/presentation/screens/supply_archive_screen.dart';
 import 'package:bowling_market/features/orders/presentation/screens/supply_order_details_screen.dart';
@@ -238,6 +239,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const AdminRegistrationsScreen());
       case Routes.adminComplaints:
         return MaterialPageRoute(builder: (_) => const AdminComplaintsScreen());
+      case Routes.adminAppeals:
+        return MaterialPageRoute(builder: (_) => const AdminAppealsScreen());
 
       case Routes.maintenanceRequests:
         return MaterialPageRoute(builder: (_) => const MaintenanceRequestsScreen());

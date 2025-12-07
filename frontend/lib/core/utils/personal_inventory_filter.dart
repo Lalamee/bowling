@@ -52,6 +52,7 @@ class PersonalInventoryFilter {
       part.commonName,
       part.description,
       part.location,
+      part.notes,
     ];
     for (final field in fields) {
       if (field != null && field.toLowerCase().contains(normalizedQuery)) {

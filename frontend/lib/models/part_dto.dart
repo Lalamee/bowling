@@ -7,7 +7,7 @@ class PartDto {
   final String? commonName;
   final String? description;
   final int? quantity;
-  final int? reservedQuantity; // TODO: reservedQuantity придёт из API склада
+  final int? reservedQuantity;
   final int? warehouseId;
   final String? location;
   final String? cellCode;
@@ -16,11 +16,13 @@ class PartDto {
   final String? placementStatus;
   final bool? isUnique;
   final DateTime? lastChecked;
+  final String? notes;
   final String? imageUrl;
   final String? diagramUrl;
   final int? equipmentNodeId;
   final List<int> equipmentNodePath;
   final List<String> compatibility;
+  final bool? isAvailable;
 
   PartDto({
     required this.inventoryId,
@@ -40,11 +42,13 @@ class PartDto {
     this.placementStatus,
     this.isUnique,
     this.lastChecked,
+    this.notes,
     this.imageUrl,
     this.diagramUrl,
     this.equipmentNodeId,
     this.equipmentNodePath = const [],
     this.compatibility = const [],
+    this.isAvailable,
   });
 
   factory PartDto.fromJson(Map<String, dynamic> json) {
@@ -68,13 +72,14 @@ class PartDto {
       quantity: _parseOptionalInt(json['quantity']),
       reservedQuantity: _parseOptionalInt(json['reservedQuantity'] ?? json['reserved_quantity']),
       warehouseId: _parseOptionalInt(json['warehouseId']),
-      location: json['location']?.toString(),
+      location: (json['location'] ?? json['locationReference'])?.toString(),
       cellCode: json['cellCode']?.toString(),
       shelfCode: json['shelfCode']?.toString(),
       laneNumber: _parseOptionalInt(json['laneNumber']),
       placementStatus: json['placementStatus']?.toString(),
       isUnique: _parseOptionalBool(json['unique'] ?? json['isUnique']),
       lastChecked: _parseOptionalDate(json['lastChecked'] ?? json['last_checked']),
+      notes: json['notes']?.toString(),
       imageUrl: json['imageUrl']?.toString(),
       diagramUrl: json['diagramUrl']?.toString(),
       equipmentNodeId: _parseOptionalInt(json['equipmentNodeId'])?.toInt(),
@@ -88,6 +93,7 @@ class PartDto {
               .whereType<String>()
               .toList() ??
           const [],
+      isAvailable: _parseOptionalBool(json['isAvailable'] ?? json['available']),
     );
   }
 
@@ -103,17 +109,20 @@ class PartDto {
         'reservedQuantity': reservedQuantity,
         'warehouseId': warehouseId,
         'location': location,
+        'locationReference': location,
         'cellCode': cellCode,
         'shelfCode': shelfCode,
         'laneNumber': laneNumber,
         'placementStatus': placementStatus,
         'unique': isUnique,
         'lastChecked': lastChecked?.toIso8601String(),
+        'notes': notes,
         'imageUrl': imageUrl,
         'diagramUrl': diagramUrl,
         'equipmentNodeId': equipmentNodeId,
         'equipmentNodePath': equipmentNodePath,
         'compatibility': compatibility,
+        'isAvailable': isAvailable,
       };
 }
 

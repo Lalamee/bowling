@@ -4,12 +4,17 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import ru.bowling.bowlingapp.DTO.AdminAppealDTO;
+import ru.bowling.bowlingapp.DTO.AdminMechanicAccountChangeDTO;
 import ru.bowling.bowlingapp.DTO.AdminMechanicListResponseDTO;
+import ru.bowling.bowlingapp.DTO.AdminMechanicStatusChangeDTO;
 import ru.bowling.bowlingapp.DTO.AdminRegistrationApplicationDTO;
 import ru.bowling.bowlingapp.DTO.AdminComplaintDTO;
 import ru.bowling.bowlingapp.DTO.AdminAccountUpdateDTO;
 import ru.bowling.bowlingapp.DTO.AdminHelpRequestDTO;
+import ru.bowling.bowlingapp.DTO.AdminStaffStatusUpdateDTO;
 import ru.bowling.bowlingapp.DTO.AttestationApplicationDTO;
+import ru.bowling.bowlingapp.DTO.AttestationDecisionDTO;
 import ru.bowling.bowlingapp.DTO.FreeMechanicApplicationResponseDTO;
 import ru.bowling.bowlingapp.DTO.MechanicApplicationDecisionDTO;
 import ru.bowling.bowlingapp.DTO.MechanicClubLinkRequestDTO;
@@ -80,6 +85,14 @@ public class AdminController {
         return ResponseEntity.ok(adminCabinetService.updateFreeMechanicAccount(userId, update));
     }
 
+    @PatchMapping("/mechanics/{userId}/account")
+    public ResponseEntity<AdminRegistrationApplicationDTO> convertMechanicAccount(
+            @PathVariable Long userId,
+            @RequestBody AdminMechanicAccountChangeDTO change
+    ) {
+        return ResponseEntity.ok(adminCabinetService.convertMechanicAccount(userId, change));
+    }
+
     @PatchMapping("/mechanics/{profileId}/clubs")
     public ResponseEntity<AdminRegistrationApplicationDTO> changeMechanicClub(
             @PathVariable Long profileId,
@@ -91,6 +104,14 @@ public class AdminController {
     @GetMapping("/attestations")
     public ResponseEntity<List<AttestationApplicationDTO>> listAttestations() {
         return ResponseEntity.ok(adminCabinetService.listAttestationApplications());
+    }
+
+    @PutMapping("/attestations/{id}/decision")
+    public ResponseEntity<AttestationApplicationDTO> decideAttestation(
+            @PathVariable Long id,
+            @RequestBody AttestationDecisionDTO decision
+    ) {
+        return ResponseEntity.ok(adminCabinetService.decideAttestation(id, decision));
     }
 
     @GetMapping("/supplier-complaints")
@@ -111,6 +132,24 @@ public class AdminController {
     @GetMapping("/help-requests")
     public ResponseEntity<List<AdminHelpRequestDTO>> listHelpRequests() {
         return ResponseEntity.ok(adminCabinetService.listHelpRequests());
+    }
+
+    @GetMapping("/staff/status-requests")
+    public ResponseEntity<List<AdminMechanicStatusChangeDTO>> listMechanicStatusChanges() {
+        return ResponseEntity.ok(adminCabinetService.listMechanicStatusChanges());
+    }
+
+    @PatchMapping("/staff/{staffId}/status")
+    public ResponseEntity<AdminMechanicStatusChangeDTO> updateMechanicStatus(
+            @PathVariable Long staffId,
+            @RequestBody AdminStaffStatusUpdateDTO update
+    ) {
+        return ResponseEntity.ok(adminCabinetService.updateMechanicStaffStatus(staffId, update));
+    }
+
+    @GetMapping("/appeals")
+    public ResponseEntity<List<AdminAppealDTO>> listAppeals() {
+        return ResponseEntity.ok(adminCabinetService.listAdministrativeAppeals());
     }
 
     @PutMapping("/users/{userId}/verify")

@@ -10,16 +10,19 @@ void main() {
       clubId: 3,
       status: AttestationDecisionStatus.pending,
       requestedGrade: MechanicGrade.senior,
+      approvedGrade: MechanicGrade.lead,
       comment: 'Опыт 5 лет',
     );
 
     final json = app.toJson();
     expect(json['status'], 'PENDING');
     expect(json['requestedGrade'], 'SENIOR');
+    expect(json['approvedGrade'], 'LEAD');
 
     final parsed = AttestationApplication.fromJson(json);
     expect(parsed.status, AttestationDecisionStatus.pending);
     expect(parsed.requestedGrade, MechanicGrade.senior);
+    expect(parsed.approvedGrade, MechanicGrade.lead);
     expect(parsed.comment, 'Опыт 5 лет');
   });
 
