@@ -31,6 +31,12 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
   bool _feedbackInProgress = false;
   bool _complaintStatusInProgress = false;
   final Map<int, _PartAcceptanceState> _partStates = {};
+  final TextEditingController _supplierInnController = TextEditingController();
+  final TextEditingController _supplierNameController = TextEditingController();
+  final TextEditingController _supplierContactController = TextEditingController();
+  final TextEditingController _supplierPhoneController = TextEditingController();
+  final TextEditingController _supplierEmailController = TextEditingController();
+  bool _supplierVerified = false;
   static const List<String> _complaintStatuses = ['DRAFT', 'SENT', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
 
   @override
@@ -44,6 +50,11 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
     for (final state in _partStates.values) {
       state.dispose();
     }
+    _supplierInnController.dispose();
+    _supplierNameController.dispose();
+    _supplierContactController.dispose();
+    _supplierPhoneController.dispose();
+    _supplierEmailController.dispose();
     super.dispose();
   }
 
@@ -75,12 +86,23 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
       final decision = _decisionFromStatus(part.status);
       final quantity = part.acceptedQuantity ?? part.orderedQuantity ?? 0;
       final comment = part.acceptanceComment ?? part.rejectionReason ?? '';
-      _partStates[part.partId] = _PartAcceptanceState(decision: decision, quantity: quantity, comment: comment);
+      _partStates[part.partId] = _PartAcceptanceState(
+        decision: decision,
+        quantity: quantity,
+        comment: comment,
+        storageLocation: part.inventoryLocation,
+      );
     }
     setState(() {
       _detail = detail;
       _loading = false;
       _error = false;
+      _supplierInnController.text = detail.supplierInn ?? '';
+      _supplierNameController.text = detail.supplierName ?? '';
+      _supplierContactController.text = detail.supplierContact ?? '';
+      _supplierPhoneController.text = detail.supplierPhone ?? '';
+      _supplierEmailController.text = detail.supplierEmail ?? '';
+      _supplierVerified = false;
     });
   }
 
@@ -127,6 +149,8 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
           _buildSummary(detail),
+          const SizedBox(height: 12),
+          _buildSupplierForm(),
           const SizedBox(height: 16),
           Text('Состав поставки', style: _sectionTitle),
           const SizedBox(height: 8),
@@ -148,6 +172,9 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
 
   Widget _buildSummary(PurchaseOrderDetailDto detail) {
     final lines = <String>[];
+    if (detail.supplierInn != null) {
+      lines.add('ИНН: ${detail.supplierInn}');
+    }
     if (detail.expectedDeliveryDate != null) {
       lines.add('Ожидалось: ${_dateFormat.format(detail.expectedDeliveryDate!)}');
     }
@@ -185,6 +212,55 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
             Text('Телефон: ${detail.supplierPhone}', style: const TextStyle(color: AppColors.darkGray)),
           if (detail.supplierEmail != null)
             Text('Email: ${detail.supplierEmail}', style: const TextStyle(color: AppColors.darkGray)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupplierForm() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Данные поставщика', style: _sectionTitle),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _supplierInnController,
+            decoration: const InputDecoration(labelText: 'ИНН поставщика*', border: OutlineInputBorder()),
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _supplierNameController,
+            decoration: const InputDecoration(labelText: 'Наименование поставщика', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _supplierContactController,
+            decoration: const InputDecoration(labelText: 'Контактное лицо', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _supplierPhoneController,
+            decoration: const InputDecoration(labelText: 'Телефон', border: OutlineInputBorder()),
+            keyboardType: TextInputType.phone,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _supplierEmailController,
+            decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
+            keyboardType: TextInputType.emailAddress,
+          ),
+          const SizedBox(height: 4),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _supplierVerified,
+            onChanged: (val) => setState(() => _supplierVerified = val ?? false),
+            title: const Text('Поставщик подтверждён'),
+            controlAffinity: ListTileControlAffinity.leading,
+          ),
         ],
       ),
     );
@@ -265,6 +341,37 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
               decoration: const InputDecoration(labelText: 'Комментарий/причина'),
               maxLines: 2,
             ),
+            if (decision != AcceptanceDecision.rejected) ...[
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: state.storageController,
+                decoration: const InputDecoration(labelText: 'Адрес хранения / зона складирования'),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: state.shelfController,
+                      decoration: const InputDecoration(labelText: 'Полка/стеллаж'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: state.cellController,
+                      decoration: const InputDecoration(labelText: 'Ячейка/ряд'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: state.placementNotesController,
+                decoration: const InputDecoration(labelText: 'Примечание к размещению'),
+                maxLines: 2,
+              ),
+            ],
           ],
         ],
       ),
@@ -373,6 +480,12 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
   Future<void> _submitAcceptance() async {
     final detail = _detail;
     if (detail == null) return;
+    final supplierInn = _supplierInnController.text.trim();
+    if (supplierInn.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Введите ИНН поставщика для приёмки')));
+      return;
+    }
     for (final part in detail.parts) {
       final state = _partStates[part.partId];
       if (state == null) continue;
@@ -396,6 +509,12 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
         );
         return;
       }
+      if (state.decision != AcceptanceDecision.rejected && qty > 0 && state.storageLocation == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Укажите место хранения для ${part.partName ?? part.partId}')),
+        );
+        return;
+      }
     }
     setState(() => _acceptanceInProgress = true);
     try {
@@ -409,13 +528,29 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
           status: status,
           acceptedQuantity: accepted,
           comment: state.comment,
+          storageLocation: state.storageLocation,
+          shelfCode: state.shelfCode,
+          cellCode: state.cellCode,
+          placementNotes: state.placementNotes,
         );
       }).whereType<PartAcceptanceDto>().toList();
       if (partsPayload.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Нет данных для приёмки')));
         return;
       }
-      final updated = await _repository.accept(detail.orderId, PurchaseOrderAcceptanceRequestDto(parts: partsPayload));
+      final updated = await _repository.accept(
+        detail.orderId,
+        PurchaseOrderAcceptanceRequestDto(
+          parts: partsPayload,
+          supplierInn: supplierInn,
+          supplierName: _supplierNameController.text.trim().isEmpty ? null : _supplierNameController.text.trim(),
+          supplierContactPerson:
+              _supplierContactController.text.trim().isEmpty ? null : _supplierContactController.text.trim(),
+          supplierPhone: _supplierPhoneController.text.trim().isEmpty ? null : _supplierPhoneController.text.trim(),
+          supplierEmail: _supplierEmailController.text.trim().isEmpty ? null : _supplierEmailController.text.trim(),
+          supplierVerified: _supplierVerified,
+        ),
+      );
       if (!mounted) return;
       _applyDetail(updated);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Приёмка сохранена')));
@@ -810,17 +945,39 @@ class _PartAcceptanceState {
   AcceptanceDecision decision;
   final TextEditingController quantityController;
   final TextEditingController commentController;
+  final TextEditingController storageController;
+  final TextEditingController shelfController;
+  final TextEditingController cellController;
+  final TextEditingController placementNotesController;
 
-  _PartAcceptanceState({required this.decision, required int quantity, String? comment})
+  _PartAcceptanceState({
+    required this.decision,
+    required int quantity,
+    String? comment,
+    String? storageLocation,
+  })
       : quantityController = TextEditingController(text: quantity.toString()),
-        commentController = TextEditingController(text: comment ?? '');
+        commentController = TextEditingController(text: comment ?? ''),
+        storageController = TextEditingController(text: storageLocation ?? ''),
+        shelfController = TextEditingController(),
+        cellController = TextEditingController(),
+        placementNotesController = TextEditingController();
 
   int get quantity => int.tryParse(quantityController.text) ?? 0;
   String? get comment => commentController.text.trim().isEmpty ? null : commentController.text.trim();
+  String? get storageLocation => storageController.text.trim().isEmpty ? null : storageController.text.trim();
+  String? get shelfCode => shelfController.text.trim().isEmpty ? null : shelfController.text.trim();
+  String? get cellCode => cellController.text.trim().isEmpty ? null : cellController.text.trim();
+  String? get placementNotes =>
+      placementNotesController.text.trim().isEmpty ? null : placementNotesController.text.trim();
 
   void dispose() {
     quantityController.dispose();
     commentController.dispose();
+    storageController.dispose();
+    shelfController.dispose();
+    cellController.dispose();
+    placementNotesController.dispose();
   }
 }
 

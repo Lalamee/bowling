@@ -15,6 +15,7 @@ import '../../../../core/models/user_club.dart';
 import '../../../../models/part_request_dto.dart';
 import '../../../../models/part_dto.dart';
 import '../../../../models/parts_catalog_response_dto.dart';
+import '../../../../models/warehouse_summary_dto.dart';
 import '../../../../shared/widgets/buttons/custom_button.dart';
 import '../widgets/part_picker_sheet.dart';
 
@@ -47,6 +48,8 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
   int? _selectedClubId;
   int? _selectedLane;
   List<UserClub> _clubs = const [];
+  Map<int, WarehouseSummaryDto> _warehouses = const {};
+  bool _submitting = false;
 
   List<RequestedPartDto> requestedParts = [];
   List<PartAvailabilityResult?> _availability = const [];
@@ -90,6 +93,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
         _selectedLane = null;
         _isLoading = false;
       });
+      await _loadWarehouses();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -97,6 +101,21 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
         _hasError = true;
       });
       showApiError(context, e);
+    }
+  }
+
+  Future<void> _loadWarehouses() async {
+    try {
+      final items = await _inventoryRepository.getWarehouses();
+      if (!mounted) return;
+      setState(() {
+        _warehouses = {for (final w in items) w.warehouseId: w};
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _warehouses = const {};
+      });
     }
   }
 
@@ -112,7 +131,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     for (final part in requestedParts) {
       try {
         final matches = await _inventoryRepository.search(query: part.catalogNumber, clubId: clubId);
-        results.add(PartAvailabilityHelper.resolve(part, matches));
+        results.add(PartAvailabilityHelper.resolve(part, matches, warehouses: _warehouses));
       } catch (_) {
         results.add(null);
       }
@@ -164,6 +183,9 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
         warehouseId: selected?.warehouseId ?? _selectedClubId,
         location: selected?.location,
         helpRequested: helpRequested,
+        isAvailable: selected?.isAvailable ??
+            ((catalogSelection?.availabilityStatus?.toUpperCase() == 'AVAILABLE' ||
+                    (catalogSelection?.availableQuantity ?? 0) > 0)),
       );
 
       if (newItem.inventoryId != null) {
@@ -301,7 +323,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     });
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit({required bool publish}) async {
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedClubId == null) {
@@ -341,14 +363,29 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       requestedParts: requestedParts,
     );
 
-    final result = await handleApiCall(
-      context,
-      () => _repo.create(request),
-      successMessage: 'Заявка успешно создана',
-    );
+    setState(() => _submitting = true);
+    try {
+      final result = await handleApiCall(
+        context,
+        () => _repo.create(request),
+        successMessage: publish ? 'Черновик сохранён' : 'Черновик сохранён',
+      );
 
-    if (result != null && mounted) {
-      Navigator.pop(context, true);
+      if (result != null && publish) {
+        await handleApiCall(
+          context,
+          () => _repo.publish(result.requestId),
+          successMessage: 'Заявка отправлена менеджеру',
+        );
+      }
+
+      if (result != null && mounted) {
+        Navigator.pop(context, true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
     }
   }
 
@@ -468,12 +505,15 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
                   ),
                 )
                 .toList(),
-            onChanged: (value) => setState(() {
-              _selectedClubId = value;
-              _selectedLane = null;
-              _laneController.clear();
-              _refreshAvailability();
-            }),
+            onChanged: (value) {
+              setState(() {
+                _selectedClubId = value;
+                _selectedLane = null;
+                _laneController.clear();
+                _refreshAvailability();
+              });
+              _loadWarehouses();
+            },
             validator: (value) => value == null ? 'Выберите клуб' : null,
           ),
           const SizedBox(height: 16),
@@ -681,10 +721,39 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
 
           const SizedBox(height: 8),
 
-          // Кнопка создания
-          CustomButton(
-            text: 'Создать заявку',
-            onPressed: _submit,
+          // Действия со статусом заявки
+          const Text(
+            'Статус заявки',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Сохраните черновик, чтобы дополнить позже, или сразу отправьте менеджеру для согласования и выдачи.',
+            style: TextStyle(color: AppColors.darkGray),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _submitting ? null : () => _submit(publish: false),
+                  icon: const Icon(Icons.save_outlined, color: AppColors.primary),
+                  label: const Text('Сохранить черновик', style: TextStyle(color: AppColors.primary)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.primary),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: CustomButton(
+                  text: _submitting ? 'Отправка...' : 'Отправить менеджеру',
+                  onPressed: _submitting ? null : () => _submit(publish: true),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -851,9 +920,20 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     }
     final color = status.available ? Colors.green : Colors.orange;
     final icon = status.available ? Icons.inventory_2 : Icons.shopping_cart_checkout;
-    final text = status.available
-        ? 'Есть на складе ${status.location != null ? '(${status.location})' : ''}'.trim()
-        : 'Нужно заказывать';
+    final buffer = StringBuffer(status.available ? 'Есть на складе' : 'Нужно заказывать');
+    if (status.available) {
+      final scope = status.warehouseType == 'PERSONAL'
+          ? 'Личный склад'
+          : status.warehouseHint;
+      if (scope != null && scope.isNotEmpty) {
+        buffer.write(' · $scope');
+      }
+      final loc = status.location;
+      if (loc != null && loc.isNotEmpty) {
+        buffer.write(' · $loc');
+      }
+    }
+    final text = buffer.toString();
     final details = status.warehouseHint;
     return Row(
       children: [

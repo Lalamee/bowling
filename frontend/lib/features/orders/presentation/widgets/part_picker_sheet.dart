@@ -157,7 +157,7 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
             TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Поиск по каталожному номеру или названию',
+                hintText: 'Каталожный номер, название или ключевые слова',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
@@ -247,6 +247,17 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
                     ))
                 .toList(),
           ),
+        ),
+        TextButton(
+          onPressed: () {
+            setState(() {
+              _path.clear();
+              _selectedBrand = null;
+              _resetParts();
+            });
+            _loadCategories();
+          },
+          child: const Text('Сбросить'),
         ),
       ],
     );
