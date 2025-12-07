@@ -94,11 +94,14 @@ public class OwnerDashboardService {
                 .map(this::toJournalEntry)
                 .collect(Collectors.toList());
 
-        return Stream.of(workLogEntries, serviceHistoryEntries)
-                .flatMap(List::stream)
-                .sorted(Comparator.comparing(entry -> Optional.ofNullable(entry.getCompletedDate()).orElse(entry.getServiceDate()),
-                        Comparator.nullsLast(LocalDateTime::compareTo)).reversed())
-                .collect(Collectors.toList());
+        Stream<ServiceJournalEntryDTO> combined = Stream.concat(workLogEntries.stream(), serviceHistoryEntries.stream());
+
+        return combined
+                .sorted(Comparator.comparing((ServiceJournalEntryDTO entry) ->
+                                Optional.ofNullable(entry.getCompletedDate()).orElse(entry.getServiceDate()),
+                        Comparator.nullsLast(LocalDateTime::compareTo))
+                        .reversed())
+                .toList();
     }
 
     @Transactional(readOnly = true)
