@@ -81,11 +81,9 @@ public class InventoryServiceImpl implements InventoryService {
         String normalizedQuery = request != null && request.getQuery() != null ? request.getQuery().trim() : "";
         Integer warehouseIdFilter = resolveWarehouseId(request);
         InventoryAvailabilityFilter availabilityFilter = request != null ? request.getAvailability() : null;
-        String categoryCodeFilter = normalizeCategoryCode(request != null ? request.getCategoryCode() : null);
+        String normalizedCategoryCode = normalizeCategoryCode(request != null ? request.getCategoryCode() : null);
         String componentCategoryCode = resolveComponentCategory(request != null ? request.getComponentId() : null);
-        if (componentCategoryCode != null) {
-            categoryCodeFilter = componentCategoryCode;
-        }
+        final String categoryCodeFilter = componentCategoryCode != null ? componentCategoryCode : normalizedCategoryCode;
         Set<Integer> allowedWarehouses = normalizeAllowedWarehouses(
                 request != null ? request.getAllowedWarehouseIds() : null);
 

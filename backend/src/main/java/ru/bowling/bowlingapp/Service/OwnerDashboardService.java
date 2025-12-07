@@ -17,6 +17,8 @@ import ru.bowling.bowlingapp.Repository.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -29,7 +31,6 @@ public class OwnerDashboardService {
     private final WorkLogPartUsageRepository workLogPartUsageRepository;
     private final ServiceHistoryPartRepository serviceHistoryPartRepository;
     private final ServiceHistoryRepository serviceHistoryRepository;
-    private final ClubStaffRepository clubStaffRepository;
     private final NotificationService notificationService;
     private final UserRepository userRepository;
     private final UserClubAccessService userClubAccessService;
@@ -93,7 +94,7 @@ public class OwnerDashboardService {
                 .map(this::toJournalEntry)
                 .collect(Collectors.toList());
 
-        return List.of(workLogEntries, serviceHistoryEntries).stream()
+        return Stream.of(workLogEntries, serviceHistoryEntries)
                 .flatMap(List::stream)
                 .sorted(Comparator.comparing(entry -> Optional.ofNullable(entry.getCompletedDate()).orElse(entry.getServiceDate()),
                         Comparator.nullsLast(LocalDateTime::compareTo)).reversed())
@@ -139,7 +140,7 @@ public class OwnerDashboardService {
                                 .dueDate(schedule.getScheduledDate())
                                 .build();
                     }
-                    return List.of(overdue, upcoming, criticalMissing).stream().filter(Objects::nonNull);
+                    return Stream.of(overdue, upcoming, criticalMissing).filter(Objects::nonNull);
                 })
                 .toList();
 
@@ -165,7 +166,7 @@ public class OwnerDashboardService {
                         .build())
                 .toList();
 
-        return List.of(scheduleWarnings, equipmentWarnings, partWarnings).stream()
+        return Stream.of(scheduleWarnings, equipmentWarnings, partWarnings)
                 .flatMap(List::stream)
                 .sorted(Comparator.comparing(WarningDTO::getDueDate, Comparator.nullsLast(LocalDate::compareTo)))
                 .toList();
@@ -177,11 +178,10 @@ public class OwnerDashboardService {
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         Long resolvedClubId = resolveClubForUser(user, clubId);
         List<Long> accessibleClubIds = userClubAccessService.resolveAccessibleClubIds(user);
-        RoleName effectiveRole = roleName == null ? RoleName.from(user.getRole().getName()) : roleName;
-        List<NotificationEvent> events = new ArrayList<>(notificationService.getNotificationsForUser(user, accessibleClubIds));
-        events = events.stream()
+        List<NotificationEvent> filtered = notificationService.getNotificationsForUser(user, accessibleClubIds).stream()
                 .filter(event -> event.getClubId() == null || Objects.equals(event.getClubId(), resolvedClubId))
                 .toList();
+        List<NotificationEvent> events = new ArrayList<>(filtered);
 
         getWarnings(userId, resolvedClubId).forEach(warning -> events.add(NotificationEvent.builder()
                 .id(UUID.randomUUID())
@@ -190,7 +190,7 @@ public class OwnerDashboardService {
                 .clubId(resolvedClubId)
                 .createdAt(LocalDateTime.now())
                 .payload(warning.getType())
-                .audiences(Set.of(RoleName.ADMIN, RoleName.CLUB_OWNER, RoleName.CLUB_MANAGER, RoleName.HEAD_MECHANIC))
+                .audiences(Set.of(RoleName.ADMIN, RoleName.CLUB_OWNER, RoleName.HEAD_MECHANIC))
                 .build()));
 
         return events;
