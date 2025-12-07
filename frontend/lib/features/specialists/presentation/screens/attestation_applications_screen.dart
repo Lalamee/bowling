@@ -27,7 +27,8 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
 
   final _formKey = GlobalKey<FormState>();
   MechanicGrade? _selectedGrade;
-  final TextEditingController _commentCtrl = TextEditingController();
+  final TextEditingController _experienceCtrl = TextEditingController();
+  final TextEditingController _extraCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -37,7 +38,8 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
 
   @override
   void dispose() {
-    _commentCtrl.dispose();
+    _experienceCtrl.dispose();
+    _extraCtrl.dispose();
     super.dispose();
   }
 
@@ -88,6 +90,9 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
     if (!_formKey.currentState!.validate()) {
       return;
     }
+    final experience = _experienceCtrl.text.trim();
+    final extras = _extraCtrl.text.trim();
+    final commentText = extras.isNotEmpty ? '$experience\nДополнительно: $extras' : experience;
     setState(() => _submitting = true);
     try {
       final dto = AttestationApplication(
@@ -95,7 +100,7 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
         mechanicProfileId: _mechanicProfileId,
         clubId: _clubId,
         requestedGrade: _selectedGrade,
-        comment: _commentCtrl.text.trim(),
+        comment: commentText,
       );
       final created = await _repository.submitAttestationApplication(dto);
       if (!mounted) return;
@@ -103,7 +108,8 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Заявка на аттестацию отправлена')),
         );
-        _commentCtrl.clear();
+        _experienceCtrl.clear();
+        _extraCtrl.clear();
         _selectedGrade = null;
         await _load();
       } else {
@@ -156,9 +162,9 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
               ),
               const SizedBox(height: 12),
               TextFormField(
-                controller: _commentCtrl,
+                controller: _experienceCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Описание опыта и дополнительная информация',
+                  labelText: 'Описание опыта и компетенций',
                   hintText: 'Укажите опыт, ключевые навыки и сильные стороны',
                 ),
                 maxLines: 4,
@@ -168,6 +174,15 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
                   }
                   return null;
                 },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _extraCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Дополнительные сведения (при необходимости)',
+                  hintText: 'Ссылки на дипломы, сертификаты, ссылки на работы',
+                ),
+                maxLines: 3,
               ),
               const SizedBox(height: 16),
               SizedBox(
@@ -220,17 +235,60 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
   }
 
   Widget _buildTile(AttestationApplication app) {
-    final subtitle = <String>[];
-    if (app.status != null) subtitle.add('Статус: ${_statusLabel(app.status!)}');
-    if (app.submittedAt != null) subtitle.add('Подача: ${app.submittedAt!.toLocal().toString().split('.').first}');
-    if (app.updatedAt != null) subtitle.add('Обновлено: ${app.updatedAt!.toLocal().toString().split('.').first}');
-    if (app.comment != null && app.comment!.isNotEmpty) subtitle.add('Комментарий: ${app.comment}');
+    final requested = app.requestedGrade != null ? _gradeLabel(app.requestedGrade!) : null;
+    final approved = app.approvedGrade != null ? _gradeLabel(app.approvedGrade!) : null;
+    final status = app.status != null ? _statusLabel(app.status!) : 'Статус не указан';
+    final commentLabel = app.status == AttestationDecisionStatus.pending
+        ? 'Описание опыта'
+        : 'Комментарий Администрации';
+
+    final submitted = app.submittedAt != null
+        ? 'Подача: ${app.submittedAt!.toLocal().toString().split('.').first}'
+        : null;
+    final updated = app.updatedAt != null
+        ? 'Обновлено: ${app.updatedAt!.toLocal().toString().split('.').first}'
+        : null;
 
     return Card(
-      child: ListTile(
-        title: Text('Заявка #${app.id ?? '—'}'),
-        subtitle: subtitle.isNotEmpty ? Text(subtitle.join('\n')) : null,
-        trailing: app.requestedGrade != null ? Chip(label: Text(_gradeLabel(app.requestedGrade!))) : null,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Заявка #${app.id ?? '—'}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                Chip(label: Text(status)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                if (approved != null)
+                  Chip(label: Text('Подтверждённый грейд: $approved'))
+                else if (requested != null)
+                  Chip(label: Text('Запрошенный грейд: $requested')),
+                if (requested != null && approved != null && approved != requested)
+                  Chip(label: Text('Запрошено: $requested')),
+                if (app.clubId != null) Chip(label: Text('Клуб: ${app.clubId}')),
+              ],
+            ),
+            if (app.comment != null && app.comment!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text('$commentLabel:\n${app.comment}'),
+            ],
+            if (submitted != null || updated != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                [submitted, updated].whereType<String>().join(' • '),
+                style: const TextStyle(color: Colors.black54),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

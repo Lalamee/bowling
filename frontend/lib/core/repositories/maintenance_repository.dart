@@ -52,6 +52,14 @@ class MaintenanceRepository {
     }
   }
 
+  Future<MaintenanceRequestResponseDto?> publish(int id) async {
+    try {
+      return await _api.publishMaintenanceRequest(id);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<MaintenanceRequestResponseDto> addPartsToRequest(
     int requestId,
     List<RequestedPartDto> parts,
