@@ -134,6 +134,7 @@ public class AuthService implements UserDetailsService {
         }
 
         Role role = resolveRole(dto, accountTypeName);
+        validateRoleAndAccountTypeCombination(role, accountTypeName);
 
         User user = User.builder()
                 .phone(normalizedPhone)
@@ -263,7 +264,7 @@ public class AuthService implements UserDetailsService {
                             .club(finalMechanicClub)
                             .user(user)
                             .assignedAt(LocalDateTime.now())
-                            .isActive(true)
+                            .isActive(Boolean.TRUE.equals(user.getIsActive()))
                             .build());
             clubStaff.setRole(user.getRole());
             if (clubStaff.getAssignedAt() == null) {
@@ -279,7 +280,7 @@ public class AuthService implements UserDetailsService {
                             .club(finalManagerClub)
                             .user(user)
                             .assignedAt(LocalDateTime.now())
-                            .isActive(true)
+                            .isActive(Boolean.TRUE.equals(user.getIsActive()))
                             .build());
             clubStaff.setRole(user.getRole());
             if (clubStaff.getAssignedAt() == null) {
@@ -354,6 +355,12 @@ public class AuthService implements UserDetailsService {
             }
             if (isFreeMechanic(accountTypeName) && mechanicDto.getClubId() != null) {
                 throw new IllegalArgumentException("Free mechanics cannot be attached to a club during registration");
+            }
+            if (trimOrNull(mechanicDto.getRegion()) == null) {
+                throw new IllegalArgumentException("Region is required for mechanic profile");
+            }
+            if (mechanicDto.getIsEntrepreneur() == null) {
+                throw new IllegalArgumentException("Entrepreneur/self-employment flag is required for mechanic profile");
             }
         } else if (isManagerAccount(accountTypeName)) {
             if (managerDto == null) {
@@ -784,10 +791,23 @@ public class AuthService implements UserDetailsService {
     }
 
     private boolean resolveInitialActiveFlag(AccountTypeName accountTypeName) {
-        if (isFreeMechanic(accountTypeName)) {
-            return false;
+        return switch (accountTypeName) {
+            case FREE_MECHANIC_BASIC, FREE_MECHANIC_PREMIUM -> false;
+            case CLUB_OWNER, CLUB_MANAGER -> false;
+            case MAIN_ADMIN -> true;
+            case INDIVIDUAL -> true;
+        };
+    }
+
+    private void validateRoleAndAccountTypeCombination(Role role, AccountTypeName accountTypeName) {
+        if (role == null || role.getName() == null) {
+            throw new IllegalArgumentException("Role is required");
         }
-        return true;
+        RoleName providedRole = RoleName.from(role.getName());
+        RoleName expectedRole = mapRoleByAccountType(accountTypeName);
+        if (!providedRole.equals(expectedRole)) {
+            throw new IllegalArgumentException("Role " + providedRole + " is not allowed for account type " + accountTypeName);
+        }
     }
 
     private void createFreeMechanicApplication(User user, MechanicProfile mechanicProfile) {
@@ -798,7 +818,7 @@ public class AuthService implements UserDetailsService {
         AttestationApplication application = AttestationApplication.builder()
                 .user(user)
                 .mechanicProfile(mechanicProfile)
-                .status(AttestationStatus.NEW)
+                .status(AttestationStatus.PENDING)
                 .comment("Регистрация свободного механика ожидает подтверждения администрацией и выбора аккаунта (Базовый/Премиум)")
                 .submittedAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())

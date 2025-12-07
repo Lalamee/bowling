@@ -5,6 +5,9 @@ import 'package:bowling_market/models/maintenance_request_response_dto.dart';
 import 'package:bowling_market/models/parts_catalog_response_dto.dart';
 import 'package:bowling_market/models/work_log_dto.dart';
 import 'package:bowling_market/models/service_history_dto.dart';
+import 'package:bowling_market/models/mechanic_profile_dto.dart';
+import 'package:bowling_market/models/part_dto.dart';
+import 'package:bowling_market/models/notification_event_dto.dart';
 
 void main() {
   test('LoginResponseDto parse', () {
@@ -110,5 +113,76 @@ void main() {
     final dto = ServiceHistoryDto.fromJson(json);
     expect(dto.serviceType, 'MAINTENANCE');
     expect(dto.partsUsed?.first.partName, 'Oil');
+  });
+
+  test('MechanicProfileDto covers verification and region fields', () {
+    final json = {
+      'fullName': 'Иван Тестовый',
+      'birthDate': '1991-02-03',
+      'educationLevelId': 2,
+      'educationalInstitution': 'СПбГЭТУ',
+      'totalExperienceYears': 8,
+      'bowlingExperienceYears': 5,
+      'isEntrepreneur': true,
+      'isDataVerified': true,
+      'verificationDate': '2024-05-10',
+      'specializationId': 1,
+      'skills': 'ремонт',
+      'advantages': 'быстро',
+      'workPlaces': 'Клуб А',
+      'workPeriods': '2020-2024',
+      'rating': 4.7,
+      'region': 'Москва',
+      'clubId': 3,
+    };
+
+    final profile = MechanicProfileDto.fromJson(json);
+    expect(profile.isDataVerified, isTrue);
+    expect(profile.verificationDate?.year, 2024);
+    expect(profile.region, 'Москва');
+
+    final back = profile.toJson();
+    expect(back['verificationDate'], '2024-05-10');
+    expect(back['region'], 'Москва');
+  });
+
+  test('PartDto parses location reference and notes', () {
+    final json = {
+      'inventoryId': 5,
+      'catalogId': 6,
+      'catalogNumber': 'ZIP-55',
+      'locationReference': 'Стеллаж А',
+      'cellCode': 'A1',
+      'shelfCode': 'S2',
+      'laneNumber': 3,
+      'reservedQuantity': 1,
+      'quantity': 4,
+      'notes': 'для быстрой замены',
+      'isAvailable': true,
+    };
+
+    final dto = PartDto.fromJson(json);
+    expect(dto.location, 'Стеллаж А');
+    expect(dto.cellCode, 'A1');
+    expect(dto.notes, 'для быстрой замены');
+    expect(dto.isAvailable, isTrue);
+    expect(dto.toJson()['locationReference'], 'Стеллаж А');
+  });
+
+  test('NotificationEventDto maps help types', () {
+    final dto = NotificationEventDto.fromJson({
+      'id': 'abc',
+      'type': 'MECHANIC_HELP_DECLINED',
+      'message': 'declined',
+      'requestId': 15,
+      'partIds': [1, 2],
+      'payload': 'нет доступа',
+      'createdAt': '2024-03-03T10:00:00Z',
+    });
+
+    expect(dto.typeKey, NotificationEventType.mechanicHelpDeclined);
+    expect(dto.isHelpEvent, isTrue);
+    expect(dto.requestId, 15);
+    expect(dto.partIds, [1, 2]);
   });
 }

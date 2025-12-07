@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/repositories/user_repository.dart';
 import '../../../core/repositories/specialists_repository.dart';
+import '../../../core/repositories/notifications_repository.dart';
 import '../../../core/services/authz/acl.dart';
 import '../../../core/services/local_auth_storage.dart';
 import '../../../core/theme/colors.dart';
@@ -22,6 +23,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   final _badgeController = NotificationsBadgeController();
   final _userRepository = UserRepository();
   final _specialistsRepository = SpecialistsRepository();
+  final _notificationsRepository = NotificationsRepository();
   final _dateFormatter = DateFormat('dd.MM.yyyy HH:mm');
 
   UserAccessScope? _scope;
@@ -263,6 +265,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
             createdAt: DateTime.now(),
           ));
         }
+      }
+
+      final notifications = await _notificationsRepository.fetchNotifications(role: scope.role);
+      for (final event in notifications.where((e) => e.isHelpEvent)) {
+        events.add(_MechanicEvent(
+          title: event.typeKey.label(),
+          description: event.payload?.isNotEmpty == true
+              ? event.payload
+              : event.message,
+          createdAt: event.createdAt,
+        ));
       }
 
       events.sort((a, b) {
