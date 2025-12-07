@@ -52,8 +52,13 @@ class PartAvailabilityHelper {
     final freeQty = qty - reserved;
     final availableFlag = match.isAvailable;
     final available = availableFlag ?? freeQty >= request.quantity;
+
+    WarehouseSummaryDto? warehouse;
     final warehouseId = match.warehouseId;
-    final warehouse = warehouseId != null ? warehouses?[warehouseId] : null;
+    if (warehouseId != null && warehouses != null) {
+      warehouse = warehouses[warehouseId];
+    }
+
     String? warehouseHint;
     if (warehouse != null) {
       warehouseHint = warehouse.title ??
