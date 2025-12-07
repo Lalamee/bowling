@@ -163,6 +163,11 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
 
     final selected = _selectedCatalogPart;
     final catalogSelection = _selectedCatalogItem;
+
+    if (selected == null && catalogSelection == null) {
+      showSnack(context, 'Выберите запчасть из каталога по категории оборудования');
+      return;
+    }
     final catalogNumberInput = _catalogNumberController.text.trim();
     final resolvedCatalogNumber = catalogNumberInput.isNotEmpty
         ? catalogNumberInput

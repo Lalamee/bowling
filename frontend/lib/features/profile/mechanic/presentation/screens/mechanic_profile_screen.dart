@@ -210,9 +210,9 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       } else {
         final isEntrepreneur = map['isEntrepreneur'];
         if (isEntrepreneur is bool && isEntrepreneur) {
-          status = 'Самозанятый';
+          status = 'ИП';
         } else if (isEntrepreneur is bool) {
-          status = 'Штатный механик';
+          status = 'Самозанятый';
         }
       }
 
