@@ -83,6 +83,25 @@ void main() {
     expect(dto.typeKey, NotificationEventType.maintenanceWarning);
   });
 
+  test('NotificationEventDto maps staff and admin events', () {
+    final staff = NotificationEventDto.fromJson({
+      'id': 'uuid-2',
+      'type': 'STAFF_ACCESS_REQUEST',
+      'message': 'Лишить доступ сотруднику',
+    });
+
+    final response = NotificationEventDto.fromJson({
+      'id': 'uuid-3',
+      'type': 'ADMIN_RESPONSE',
+      'message': 'Ответ по обращению',
+    });
+
+    expect(staff.typeKey, NotificationEventType.staffAccessRequest);
+    expect(staff.isStaffAccess, isTrue);
+    expect(response.typeKey, NotificationEventType.adminResponse);
+    expect(response.isAdminReply, isTrue);
+  });
+
   test('WarningDto marks overdue type', () {
     final dto = WarningDto.fromJson({
       'type': 'MAINTENANCE_OVERDUE',
@@ -92,5 +111,6 @@ void main() {
 
     expect(dto.message, contains('ТО'));
     expect(dto.dueDate?.year, 2025);
+    expect(dto.isCritical, isTrue);
   });
 }

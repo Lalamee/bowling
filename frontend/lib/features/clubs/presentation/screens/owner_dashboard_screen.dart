@@ -37,6 +37,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
   bool _hasError = false;
   List<UserClub> _clubs = const [];
   int? _selectedClubId;
+  String? _roleName;
 
   List<TechnicalInfoDto> _technical = const [];
   List<ServiceJournalEntryDto> _journal = const [];
@@ -47,6 +48,10 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
   String? _workTypeFilter;
   String? _statusFilter;
   DateTimeRange? _dateRange;
+  bool _criticalWarningsOnly = false;
+  NotificationEventType? _notificationFilter;
+
+  final _laneController = TextEditingController();
 
   late TabController _tabController;
 
@@ -60,6 +65,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
   @override
   void dispose() {
     _tabController.dispose();
+    _laneController.dispose();
     super.dispose();
   }
 
@@ -71,6 +77,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
     try {
       final me = await _userRepository.me();
       final clubs = resolveUserClubs(me);
+      final role = me['role']?.toString() ?? me['roleName']?.toString();
       int? selectedId;
       if (widget.initialClubId != null && clubs.any((c) => c.id == widget.initialClubId)) {
         selectedId = widget.initialClubId;
@@ -80,6 +87,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
       setState(() {
         _clubs = clubs;
         _selectedClubId = selectedId;
+        _roleName = role;
       });
       await _loadData();
     } catch (e) {
@@ -115,7 +123,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
           status: _statusFilter,
         ),
         _repository.warnings(clubId: _selectedClubId),
-        _notificationsRepository.fetchNotifications(clubId: _selectedClubId),
+        _notificationsRepository.fetchNotifications(clubId: _selectedClubId, role: _roleName),
       ]);
       if (!mounted) return;
       setState(() {
@@ -154,6 +162,20 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
 
   void _updateStatus(String? value) {
     setState(() => _statusFilter = value?.isEmpty ?? true ? null : value);
+    _loadData();
+  }
+
+  void _toggleCriticalWarnings(bool? value) {
+    setState(() => _criticalWarningsOnly = value ?? false);
+  }
+
+  void _updateNotificationFilter(NotificationEventType? filter) {
+    setState(() => _notificationFilter = filter);
+  }
+
+  void _clearLaneFilter() {
+    _laneController.clear();
+    _laneFilter = null;
     _loadData();
   }
 
@@ -306,11 +328,15 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
                 ),
                 const SizedBox(height: 8),
                 _infoRow('Тип', item.equipmentType ?? '—'),
+                _infoRow('Дорожек', item.lanesCount?.toString() ?? '—'),
                 _infoRow('Производитель', item.manufacturer ?? '—'),
                 _infoRow('Год выпуска', item.productionYear?.toString() ?? '—'),
                 _infoRow('Серийный номер', item.serialNumber ?? '—'),
                 _infoRow('Статус', item.status ?? '—'),
-                _infoRow('Плановое ТО', _formatDate(item.nextMaintenanceDate) ?? '—'),
+                _infoRow(
+                    'Плановое ТО',
+                    _formatDate(item.nextMaintenanceDate) ??
+                        (item.nextMaintenanceDate == null ? 'Не запланировано' : '—')),
                 _infoRow('Последнее ТО', _formatDate(item.lastMaintenanceDate) ?? '—'),
                 _infoRow('Дата покупки', _formatDate(item.purchaseDate) ?? '—'),
                 _infoRow('Гарантия до', _formatDate(item.warrantyUntil) ?? '—'),
@@ -321,13 +347,22 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
                     children: [
                       const Text('Узлы и компоненты', style: TextStyle(fontWeight: FontWeight.w600)),
                       const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        children: item.components
-                            .map((c) => Chip(label: Text(c.name), backgroundColor: AppColors.background))
-                            .toList(),
-                      ),
+                      ...item.components.map(
+                        (c) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(c.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (c.category != null) Text('Категория: ${c.category}'),
+                              if (c.manufacturer != null) Text('Производитель: ${c.manufacturer}'),
+                              if (c.code != null) Text('Код: ${c.code}'),
+                              if (c.notes != null) Text('Описание: ${c.notes}'),
+                            ],
+                          ),
+                        ),
+                      )
                     ],
                   ),
                 if (item.schedules.isNotEmpty) ...[
@@ -340,7 +375,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
                         children: [
                           Icon(
                             s.critical == true ? Icons.warning_amber_rounded : Icons.event_available,
-                            color: s.critical == true ? Colors.red : AppColors.primary,
+                            color: s.critical == true
+                                ? Colors.red
+                                : (s.scheduledDate != null && s.scheduledDate!.isBefore(DateTime.now())
+                                    ? Colors.orange
+                                    : AppColors.primary),
                             size: 18,
                           ),
                           const SizedBox(width: 6),
@@ -364,6 +403,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
   }
 
   Widget _buildJournalTab() {
+    _laneController.text = _laneFilter?.toString() ?? '';
     return Column(
       children: [
         Padding(
@@ -372,7 +412,16 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
             children: [
               Flexible(
                 child: TextField(
-                  decoration: const InputDecoration(labelText: 'Дорожка'),
+                  controller: _laneController,
+                  decoration: InputDecoration(
+                    labelText: 'Дорожка',
+                    suffixIcon: _laneFilter != null
+                        ? IconButton(
+                            onPressed: _clearLaneFilter,
+                            icon: const Icon(Icons.clear, size: 18),
+                          )
+                        : null,
+                  ),
                   keyboardType: TextInputType.number,
                   onSubmitted: _updateLaneFilter,
                 ),
@@ -421,6 +470,40 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
             ],
           ),
         ),
+        if (_laneFilter != null || _workTypeFilter != null || _statusFilter != null || _dateRange != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                if (_laneFilter != null)
+                  Chip(
+                    label: Text('Дорожка $_laneFilter'),
+                    onDeleted: _clearLaneFilter,
+                  ),
+                if (_workTypeFilter != null)
+                  Chip(
+                    label: Text('Тип: $_workTypeFilter'),
+                    onDeleted: () => _updateWorkType(null),
+                  ),
+                if (_statusFilter != null)
+                  Chip(
+                    label: Text('Статус: $_statusFilter'),
+                    onDeleted: () => _updateStatus(null),
+                  ),
+                if (_dateRange != null)
+                  Chip(
+                    label: Text(
+                        'Период: ${_formatDate(_dateRange?.start)}–${_formatDate(_dateRange?.end)}'),
+                    onDeleted: () {
+                      setState(() => _dateRange = null);
+                      _loadData();
+                    },
+                  ),
+              ],
+            ),
+          ),
         Expanded(
           child: _journal.isEmpty
               ? const Center(child: Text('Нет записей журнала', style: TextStyle(color: AppColors.darkGray)))
@@ -479,21 +562,39 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
   }
 
   Widget _buildWarningsTab() {
-    if (_warnings.isEmpty) {
-      return const Center(
-        child: Text('Активных предупреждений нет', style: TextStyle(color: AppColors.darkGray)),
+    final filtered = _criticalWarningsOnly
+        ? _warnings.where((w) => w.isCritical).toList()
+        : _warnings;
+    if (filtered.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _loadData,
+        child: ListView(
+          children: const [
+            SizedBox(height: 120),
+            Center(
+              child: Text('Активных предупреждений нет', style: TextStyle(color: AppColors.darkGray)),
+            ),
+          ],
+        ),
       );
     }
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
-        itemCount: _warnings.length,
+        itemCount: filtered.isEmpty ? 2 : filtered.length + 1,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (_, i) {
-          final warning = _warnings[i];
-          final isCritical =
-              warning.type.contains('OVERDUE') || warning.type.contains('EXCEEDED') || warning.type.contains('CRITICAL');
+          if (i == 0) {
+            return Row(
+              children: [
+                Checkbox(value: _criticalWarningsOnly, onChanged: _toggleCriticalWarnings),
+                const Text('Только критичные/просроченные'),
+              ],
+            );
+          }
+          final warning = filtered[i - 1];
+          final isCritical = warning.isCritical;
           return Container(
             decoration: BoxDecoration(
               color: isCritical ? Colors.red.withOpacity(0.08) : AppColors.background,
@@ -512,6 +613,10 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
                     Expanded(
                       child: Text(warning.message, style: const TextStyle(color: AppColors.textDark)),
                     ),
+                    Chip(
+                      label: Text(warning.type),
+                      backgroundColor: AppColors.background,
+                    )
                   ],
                 ),
                 if (warning.dueDate != null)
@@ -529,6 +634,9 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
   }
 
   Widget _buildNotificationsTab() {
+    final filtered = _notificationFilter == null
+        ? _notifications
+        : _notifications.where((n) => n.typeKey == _notificationFilter).toList();
     if (_notifications.isEmpty) {
       return const Center(
         child: Text('Оповещения отсутствуют', style: TextStyle(color: AppColors.darkGray)),
@@ -538,23 +646,61 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
       onRefresh: _loadData,
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
-        itemCount: _notifications.length,
+        itemCount: filtered.isEmpty ? 2 : filtered.length + 1,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (_, i) {
-          final notif = _notifications[i];
+          if (i == 0) {
+            return Row(
+              children: [
+                const Text('Фильтр:', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(width: 12),
+                DropdownButton<NotificationEventType?>(
+                  value: _notificationFilter,
+                  hint: const Text('Все события'),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('Все события')),
+                    ...NotificationEventType.values
+                        .where((e) => e != NotificationEventType.unknown)
+                        .map(
+                          (e) => DropdownMenuItem(
+                            value: e,
+                            child: Text(e.label()),
+                          ),
+                        )
+                  ],
+                  onChanged: _updateNotificationFilter,
+                )
+              ],
+            );
+          }
+          if (filtered.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('Нет событий для выбранного фильтра',
+                  style: TextStyle(color: AppColors.darkGray)),
+            );
+          }
+          final notif = filtered[i - 1];
           final isHelp = notif.isHelpEvent;
           final isWarning = notif.isWarningEvent;
           final isComplaint = notif.isSupplierComplaint;
           final isAccess = notif.isAccessRequest;
+          final isStaff = notif.isStaffAccess;
+          final isTechSupport = notif.isTechSupport;
+          final isAdminReply = notif.isAdminReply;
           final label = notif.typeKey.label();
           final status = deriveHelpRequestStatus(events: _notifications, requestId: notif.requestId ?? -1);
           final Color accentColor = isWarning
               ? Colors.orange
               : isComplaint
                   ? Colors.deepPurple
-                  : isAccess
+                  : isAccess || isStaff
                       ? Colors.blueGrey
-                      : AppColors.primary;
+                      : isTechSupport
+                          ? Colors.teal
+                          : isAdminReply
+                              ? Colors.indigo
+                              : AppColors.primary;
           return CommonUI.card(
             padding: const EdgeInsets.all(12),
             child: Column(
@@ -562,10 +708,22 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
               children: [
                 Row(
                   children: [
-                    Expanded(
-                      child: Text(label,
-                          style: TextStyle(fontWeight: FontWeight.w700, color: accentColor)),
+                    Icon(
+                      isWarning
+                          ? Icons.warning_amber
+                          : isComplaint
+                              ? Icons.rule_folder
+                              : isStaff
+                                  ? Icons.manage_accounts
+                                  : isTechSupport
+                                      ? Icons.build
+                                      : isAdminReply
+                                          ? Icons.mark_email_read
+                                          : Icons.notifications,
+                      color: accentColor,
                     ),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(label, style: TextStyle(fontWeight: FontWeight.w700, color: accentColor))),
                     if (isHelp)
                       Chip(
                         label: Text(_helpStatusLabel(status.resolution),

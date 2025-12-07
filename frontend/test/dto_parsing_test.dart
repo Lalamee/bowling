@@ -8,6 +8,7 @@ import 'package:bowling_market/models/service_history_dto.dart';
 import 'package:bowling_market/models/mechanic_profile_dto.dart';
 import 'package:bowling_market/models/part_dto.dart';
 import 'package:bowling_market/models/notification_event_dto.dart';
+import 'package:bowling_market/core/utils/user_club_resolver.dart';
 
 void main() {
   test('LoginResponseDto parse', () {
@@ -184,5 +185,24 @@ void main() {
     expect(dto.isHelpEvent, isTrue);
     expect(dto.requestId, 15);
     expect(dto.partIds, [1, 2]);
+  });
+
+  test('resolveUserClubs parses access metadata for free mechanic', () {
+    final clubs = resolveUserClubs({
+      'clubsDetailed': [
+        {
+          'id': 7,
+          'name': 'Клуб «Страйк»',
+          'accessLevel': 'PREMIUM',
+          'accessExpiresAt': '2024-12-31',
+          'infoAccessRestricted': true,
+        }
+      ],
+    });
+
+    expect(clubs, hasLength(1));
+    expect(clubs.first.accessLevel, 'PREMIUM');
+    expect(clubs.first.accessExpiresAt?.year, 2024);
+    expect(clubs.first.infoAccessRestricted, isTrue);
   });
 }

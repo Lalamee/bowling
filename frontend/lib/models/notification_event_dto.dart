@@ -6,6 +6,10 @@ enum NotificationEventType {
   maintenanceWarning,
   clubAccessRequest,
   supplierComplaintUpdate,
+  staffAccessRequest,
+  staffAccessRevocation,
+  technicalAssistance,
+  adminResponse,
   unknown;
 
   static NotificationEventType fromBackend(String? raw) {
@@ -25,6 +29,17 @@ enum NotificationEventType {
         return NotificationEventType.clubAccessRequest;
       case 'SUPPLIER_COMPLAINT_UPDATE':
         return NotificationEventType.supplierComplaintUpdate;
+      case 'STAFF_ACCESS_REQUEST':
+        return NotificationEventType.staffAccessRequest;
+      case 'STAFF_ACCESS_REVOCATION':
+      case 'STAFF_ACCESS_REVOKE':
+        return NotificationEventType.staffAccessRevocation;
+      case 'TECH_SUPPORT_REQUEST':
+      case 'TECHNICAL_ASSISTANCE':
+        return NotificationEventType.technicalAssistance;
+      case 'ADMIN_RESPONSE':
+      case 'ADMIN_REPLY':
+        return NotificationEventType.adminResponse;
       default:
         return NotificationEventType.unknown;
     }
@@ -46,6 +61,14 @@ enum NotificationEventType {
         return 'Запрос доступа к клубу';
       case NotificationEventType.supplierComplaintUpdate:
         return 'Статус спора с поставщиком';
+      case NotificationEventType.staffAccessRequest:
+        return 'Запрос на доступ/лишение доступа';
+      case NotificationEventType.staffAccessRevocation:
+        return 'Доступ сотрудника изменён';
+      case NotificationEventType.technicalAssistance:
+        return 'Запрос техпомощи/сервиса';
+      case NotificationEventType.adminResponse:
+        return 'Ответ Администрации';
       case NotificationEventType.unknown:
       default:
         return 'Оповещение';
@@ -93,6 +116,13 @@ class NotificationEventDto {
   bool get isSupplierComplaint => typeKey == NotificationEventType.supplierComplaintUpdate;
 
   bool get isAccessRequest => typeKey == NotificationEventType.clubAccessRequest;
+
+  bool get isStaffAccess =>
+      typeKey == NotificationEventType.staffAccessRequest || typeKey == NotificationEventType.staffAccessRevocation;
+
+  bool get isTechSupport => typeKey == NotificationEventType.technicalAssistance;
+
+  bool get isAdminReply => typeKey == NotificationEventType.adminResponse;
 
   factory NotificationEventDto.fromJson(Map<String, dynamic> json) {
     DateTime? _parseDate(dynamic value) =>
