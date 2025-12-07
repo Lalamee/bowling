@@ -54,10 +54,15 @@ class PartAvailabilityHelper {
     final available = availableFlag ?? freeQty >= request.quantity;
     final warehouseId = match.warehouseId;
     final warehouse = warehouseId != null ? warehouses?[warehouseId] : null;
-    final warehouseHint = warehouse?.title ??
-        (warehouse?.warehouseType == 'PERSONAL'
-            ? 'Личный склад'
-            : (warehouseId != null ? 'Склад #$warehouseId' : null));
+    String? warehouseHint;
+    if (warehouse != null) {
+      warehouseHint = warehouse.title ??
+          (warehouse.warehouseType == 'PERSONAL'
+              ? 'Личный склад'
+              : null);
+    }
+    warehouseHint ??= warehouseId != null ? 'Склад #$warehouseId' : null;
+
     final location = match.location ?? warehouse?.locationReference ?? request.location;
     return PartAvailabilityResult(
       available: available,

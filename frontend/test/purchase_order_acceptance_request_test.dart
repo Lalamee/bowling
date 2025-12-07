@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+
 import 'package:bowling_market/models/purchase_order_acceptance_request_dto.dart';
 
 void main() {
@@ -39,4 +40,4 @@ void main() {
     expect(partJson['cellCode'], 'C-3');
     expect(partJson['placementNotes'], 'Проверено при приемке');
   });
-});
+}
