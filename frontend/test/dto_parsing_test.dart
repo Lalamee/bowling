@@ -7,6 +7,7 @@ import 'package:bowling_market/models/work_log_dto.dart';
 import 'package:bowling_market/models/service_history_dto.dart';
 import 'package:bowling_market/models/mechanic_profile_dto.dart';
 import 'package:bowling_market/models/part_dto.dart';
+import 'package:bowling_market/models/notification_event_dto.dart';
 
 void main() {
   test('LoginResponseDto parse', () {
@@ -166,5 +167,22 @@ void main() {
     expect(dto.notes, 'для быстрой замены');
     expect(dto.isAvailable, isTrue);
     expect(dto.toJson()['locationReference'], 'Стеллаж А');
+  });
+
+  test('NotificationEventDto maps help types', () {
+    final dto = NotificationEventDto.fromJson({
+      'id': 'abc',
+      'type': 'MECHANIC_HELP_DECLINED',
+      'message': 'declined',
+      'requestId': 15,
+      'partIds': [1, 2],
+      'payload': 'нет доступа',
+      'createdAt': '2024-03-03T10:00:00Z',
+    });
+
+    expect(dto.typeKey, NotificationEventType.mechanicHelpDeclined);
+    expect(dto.isHelpEvent, isTrue);
+    expect(dto.requestId, 15);
+    expect(dto.partIds, [1, 2]);
   });
 }

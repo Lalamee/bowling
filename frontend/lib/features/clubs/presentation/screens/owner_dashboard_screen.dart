@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/models/user_club.dart';
 import '../../../../core/repositories/owner_dashboard_repository.dart';
+import '../../../../core/repositories/maintenance_repository.dart';
+import '../../../../core/repositories/notifications_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../core/utils/user_club_resolver.dart';
+import '../../../../core/utils/help_request_status_helper.dart';
 import '../../../../models/notification_event_dto.dart';
 import '../../../../models/service_journal_entry_dto.dart';
 import '../../../../models/technical_info_dto.dart';
@@ -13,6 +16,7 @@ import '../../../../models/warning_dto.dart';
 import '../../../../shared/widgets/layout/common_ui.dart';
 import '../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../core/utils/bottom_nav.dart';
+import '../../../orders/presentation/screens/order_summary_screen.dart';
 
 class OwnerDashboardScreen extends StatefulWidget {
   final int? initialClubId;
@@ -26,6 +30,8 @@ class OwnerDashboardScreen extends StatefulWidget {
 class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with SingleTickerProviderStateMixin {
   final _userRepository = UserRepository();
   final _repository = OwnerDashboardRepository();
+  final _notificationsRepository = NotificationsRepository();
+  final _maintenanceRepository = MaintenanceRepository();
 
   bool _isLoading = true;
   bool _hasError = false;
@@ -109,7 +115,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
           status: _statusFilter,
         ),
         _repository.warnings(clubId: _selectedClubId),
-        _repository.managerNotifications(clubId: _selectedClubId),
+        _notificationsRepository.fetchNotifications(clubId: _selectedClubId),
       ]);
       if (!mounted) return;
       setState(() {
@@ -525,20 +531,62 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (_, i) {
           final notif = _notifications[i];
+          final isHelp = notif.isHelpEvent;
+          final label = notif.typeKey.label();
+          final status = deriveHelpRequestStatus(events: _notifications, requestId: notif.requestId ?? -1);
           return CommonUI.card(
             padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(notif.type, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(label,
+                          style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                    ),
+                    if (isHelp)
+                      Chip(
+                        label: Text(_helpStatusLabel(status.resolution),
+                            style: const TextStyle(color: Colors.white)),
+                        backgroundColor: _helpStatusColor(status.resolution),
+                      ),
+                  ],
+                ),
                 const SizedBox(height: 4),
                 Text(notif.message, style: const TextStyle(color: AppColors.darkGray)),
+                if (notif.payload != null && notif.payload!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(notif.payload!, style: const TextStyle(color: AppColors.darkGray)),
+                  ),
+                if (notif.partIds.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text('Позиции: ${notif.partIds.join(', ')}',
+                        style: const TextStyle(color: AppColors.darkGray)),
+                  ),
                 if (notif.createdAt != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
                       _formatDateTime(notif.createdAt!) ?? '',
                       style: const TextStyle(fontSize: 12, color: AppColors.darkGray),
+                    ),
+                  ),
+                if (isHelp && notif.requestId != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _openRequest(notif.requestId!),
+                            icon: const Icon(Icons.open_in_new, color: AppColors.primary),
+                            label: const Text('Открыть заявку'),
+                          ),
+                        ),
+                      ],
                     ),
                   )
               ],
@@ -547,6 +595,65 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
         },
       ),
     );
+  }
+
+  Future<void> _openRequest(int requestId) async {
+    try {
+      final detail = await _maintenanceRepository.getById(requestId);
+      if (detail == null) {
+        showSnack(context, 'Не удалось открыть заявку $requestId');
+        return;
+      }
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OrderSummaryScreen(
+            orderNumber: 'Заявка №${detail.requestId}',
+            order: detail,
+            canResolveHelp: true,
+            canRequestHelp: false,
+            canConfirm: false,
+            canComplete: false,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showApiError(context, e);
+    }
+  }
+
+  Color _helpStatusColor(HelpRequestResolution resolution) {
+    switch (resolution) {
+      case HelpRequestResolution.approved:
+        return Colors.green;
+      case HelpRequestResolution.declined:
+        return Colors.redAccent;
+      case HelpRequestResolution.reassigned:
+        return Colors.blue;
+      case HelpRequestResolution.awaiting:
+        return Colors.orange;
+      case HelpRequestResolution.none:
+      default:
+        return AppColors.darkGray;
+    }
+  }
+
+  String _helpStatusLabel(HelpRequestResolution resolution) {
+    switch (resolution) {
+      case HelpRequestResolution.approved:
+        return 'Подтверждено';
+      case HelpRequestResolution.declined:
+        return 'Отклонено';
+      case HelpRequestResolution.reassigned:
+        return 'Переназначено';
+      case HelpRequestResolution.awaiting:
+        return 'Ожидание';
+      case HelpRequestResolution.none:
+      default:
+        return 'Без статуса';
+    }
   }
 
   String? _formatDate(DateTime? date) => date != null ? '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}' : null;

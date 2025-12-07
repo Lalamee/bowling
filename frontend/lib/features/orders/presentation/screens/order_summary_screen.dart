@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 import '../../../../../core/repositories/user_repository.dart';
 import '../../../../../core/services/authz/acl.dart';
 import '../../../../../core/repositories/maintenance_repository.dart';
+import '../../../../../core/repositories/notifications_repository.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/theme/typography_extension.dart';
 import '../../../../../models/maintenance_request_response_dto.dart';
 import '../../../../../models/help_request_dto.dart';
 import '../../../../../core/utils/net_ui.dart';
+import '../../../../../core/utils/help_request_status_helper.dart';
+import '../../../../../models/notification_event_dto.dart';
 import '../../domain/order_status.dart';
 import '../widgets/order_status_badge.dart';
 
@@ -44,6 +47,7 @@ class OrderSummaryScreen extends StatefulWidget {
 class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
   final _userRepository = UserRepository();
   final _maintenanceRepository = MaintenanceRepository();
+  final _notificationsRepository = NotificationsRepository();
   MaintenanceRequestResponseDto? _currentRequest;
   bool _isSubmitting = false;
   bool _isCompleting = false;
@@ -53,9 +57,12 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
   late final TextEditingController _reassignController;
   bool _accessCheckInProgress = true;
   bool _accessDenied = false;
+  bool _helpStatusLoading = false;
   final Map<int, bool> _availabilityDecisions = {};
   Set<int> _selectedHelpPartIds = {};
   HelpResponseDecision _decision = HelpResponseDecision.approved;
+  List<NotificationEventDto> _helpEvents = const [];
+  UserAccessScope? _scope;
 
   String get _title {
     if (widget.orderNumber != null && widget.orderNumber!.isNotEmpty) return widget.orderNumber!;
@@ -108,6 +115,10 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
           .toSet();
     });
     widget.onOrderUpdated?.call(updated);
+    final scope = _scope;
+    if (scope != null) {
+      _loadHelpNotifications(scope);
+    }
   }
 
   String _availabilityLabel(bool? value) {
@@ -475,18 +486,44 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
     try {
       final me = await _userRepository.me();
       final scope = await UserAccessScope.fromProfile(me);
+      _scope = scope;
       final allowed = scope.canViewOrder(order);
       if (!mounted) return;
       setState(() {
         _accessDenied = !allowed;
         _accessCheckInProgress = false;
       });
+      if (allowed) {
+        await _loadHelpNotifications(scope);
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _accessDenied = true;
         _accessCheckInProgress = false;
       });
+    }
+  }
+
+  Future<void> _loadHelpNotifications(UserAccessScope scope) async {
+    final request = _request;
+    if (request == null) return;
+    setState(() => _helpStatusLoading = true);
+    try {
+      final events = await _notificationsRepository.fetchNotifications(
+        clubId: request.clubId,
+        role: scope.role,
+      );
+      if (!mounted) return;
+      setState(() {
+        _helpEvents = events.where((e) => e.requestId == request.requestId).toList();
+      });
+    } catch (e) {
+      if (mounted) {
+        showApiError(context, e);
+      }
+    } finally {
+      if (mounted) setState(() => _helpStatusLoading = false);
     }
   }
 
@@ -519,6 +556,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
   Widget _buildHelpRequestSection(AppTypography t, MaintenanceRequestResponseDto request) {
     final helpCount = request.requestedParts.where((part) => part.helpRequested == true).length;
     final hasActiveHelp = helpCount > 0;
+    final status = deriveHelpRequestStatus(events: _helpEvents, requestId: request.requestId);
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -535,6 +573,12 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                 const SizedBox(width: 8),
                 Text('Запрос помощи', style: t.sectionTitle.copyWith(fontSize: 18)),
                 const Spacer(),
+                if (_helpStatusLoading)
+                  const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orange),
+                  ),
                 if (hasActiveHelp)
                   Chip(
                     label: Text('Активно: $helpCount', style: const TextStyle(color: Colors.orange)),
@@ -550,6 +594,28 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                   : 'Если не получается выполнить работу, отправьте запрос помощи менеджеру/Администрации.',
               style: t.formInput,
             ),
+            const SizedBox(height: 8),
+            if (status.resolution != HelpRequestResolution.none)
+              Row(
+                children: [
+                  Chip(
+                    backgroundColor: _helpStatusColor(status.resolution).withOpacity(0.15),
+                    label: Text(
+                      'Статус: ${_helpStatusLabel(status.resolution)}',
+                      style: TextStyle(color: _helpStatusColor(status.resolution)),
+                    ),
+                  ),
+                  if (status.updatedAt != null) ...[
+                    const SizedBox(width: 8),
+                    Text(_formatDate(status.updatedAt!), style: t.formInput),
+                  ]
+                ],
+              ),
+            if (status.comment != null && status.comment!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(status.comment!, style: t.formInput),
+              ),
             const SizedBox(height: 12),
             if (widget.canRequestHelp)
               SizedBox(
@@ -822,6 +888,38 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
         return 'Назначить другого';
       case HelpResponseDecision.declined:
         return 'Отклонить';
+    }
+  }
+
+  Color _helpStatusColor(HelpRequestResolution resolution) {
+    switch (resolution) {
+      case HelpRequestResolution.approved:
+        return Colors.green;
+      case HelpRequestResolution.declined:
+        return Colors.redAccent;
+      case HelpRequestResolution.reassigned:
+        return Colors.blue;
+      case HelpRequestResolution.awaiting:
+        return Colors.orange;
+      case HelpRequestResolution.none:
+      default:
+        return AppColors.darkGray;
+    }
+  }
+
+  String _helpStatusLabel(HelpRequestResolution resolution) {
+    switch (resolution) {
+      case HelpRequestResolution.approved:
+        return 'Подтверждено';
+      case HelpRequestResolution.declined:
+        return 'Отклонено';
+      case HelpRequestResolution.reassigned:
+        return 'Переназначено';
+      case HelpRequestResolution.awaiting:
+        return 'Ожидает ответа';
+      case HelpRequestResolution.none:
+      default:
+        return 'Без статуса';
     }
   }
 
