@@ -54,8 +54,10 @@ public class PartsService {
                 String componentRootCode = resolveComponentCode(searchDTO.getComponentId());
                 List<String> categoryCodes = resolveCategoryCodes(componentRootCode != null ? componentRootCode
                                 : normalizedCategoryCode);
-                Sort sort = Sort.by(Sort.Direction.fromString(searchDTO.getSortDirection()), searchDTO.getSortBy());
-                Pageable pageable = PageRequest.of(searchDTO.getPage(), searchDTO.getSize(), sort);
+                Sort sort = Sort.by(resolveSortDirection(searchDTO.getSortDirection()),
+                                resolveSortBy(searchDTO.getSortBy()));
+                Pageable pageable = PageRequest.of(resolvePage(searchDTO.getPage()),
+                                resolvePageSize(searchDTO.getSize()), sort);
 
                 Page<PartsCatalog> page = partsCatalogRepository.search(query, manufacturerId, isUnique, categoryCodes, pageable);
                 List<PartsCatalog> parts = page.getContent();
@@ -99,13 +101,13 @@ public class PartsService {
 				.collect(Collectors.toList());
 	}
 
-	private PartsCatalogResponseDTO convertToResponseDTO(PartsCatalog part) {
-		List<WarehouseInventory> inventories = warehouseInventoryRepository.findByCatalogId(part.getCatalogId().intValue());
-		int totalQuantity = inventories.stream().mapToInt(WarehouseInventory::getQuantity).sum();
-		AvailabilityStatus availabilityStatus = totalQuantity > 0 ? AvailabilityStatus.AVAILABLE : AvailabilityStatus.NOT_AVAILABLE;
+        private PartsCatalogResponseDTO convertToResponseDTO(PartsCatalog part) {
+                List<WarehouseInventory> inventories = warehouseInventoryRepository.findByCatalogId(part.getCatalogId().intValue());
+                int totalQuantity = inventories.stream().mapToInt(WarehouseInventory::getQuantity).sum();
+                AvailabilityStatus availabilityStatus = totalQuantity > 0 ? AvailabilityStatus.AVAILABLE : AvailabilityStatus.NOT_AVAILABLE;
 
-		return convertCommon(part, totalQuantity, availabilityStatus);
-	}
+                return convertCommon(part, totalQuantity, availabilityStatus);
+        }
 
 	private PartsCatalogResponseDTO convertToResponseDTO(PartsCatalog part, int totalQuantity) {
 		AvailabilityStatus availabilityStatus = totalQuantity > 0 ? AvailabilityStatus.AVAILABLE : AvailabilityStatus.NOT_AVAILABLE;
@@ -143,6 +145,41 @@ public class PartsService {
                 return partImageRepository.findFirstByCatalogId(catalogId)
                                 .map(image -> image.getImageUrl())
                                 .orElse(null);
+        }
+
+        private int resolvePage(Integer requestedPage) {
+                if (requestedPage == null || requestedPage < 0) {
+                        return 0;
+                }
+                return requestedPage;
+        }
+
+        private int resolvePageSize(Integer requestedSize) {
+                if (requestedSize == null || requestedSize <= 0) {
+                        return 20;
+                }
+                return requestedSize;
+        }
+
+        private String resolveSortBy(String requestedSort) {
+                return Optional.ofNullable(requestedSort)
+                                .map(String::trim)
+                                .filter(s -> !s.isBlank())
+                                .orElse("catalogId");
+        }
+
+        private Sort.Direction resolveSortDirection(String requestedDirection) {
+                return Optional.ofNullable(requestedDirection)
+                                .map(String::trim)
+                                .filter(s -> !s.isBlank())
+                                .map(value -> {
+                                        try {
+                                                return Sort.Direction.fromString(value);
+                                        } catch (IllegalArgumentException ignored) {
+                                                return null;
+                                        }
+                                })
+                                .orElse(Sort.Direction.ASC);
         }
 
         private List<String> resolveCategoryCodes(String normalizedCategoryCode) {
