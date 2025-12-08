@@ -61,6 +61,16 @@ public class PartsService {
 
                 Page<PartsCatalog> page = partsCatalogRepository.search(query, manufacturerId, isUnique, categoryCodes, pageable);
                 List<PartsCatalog> parts = page.getContent();
+
+                if (parts.isEmpty() && categoryCodes != null && !categoryCodes.isEmpty()) {
+                        Page<PartsCatalog> fallbackPage = partsCatalogRepository.search(query, manufacturerId, isUnique, null,
+                                        pageable);
+
+                        parts = fallbackPage.getContent().stream()
+                                        .filter(part -> part.getCategoryCode() != null)
+                                        .filter(part -> categoryCodes.contains(part.getCategoryCode().trim().toLowerCase()))
+                                        .toList();
+                }
                 if (catalogNumberFilter != null) {
                         String loweredFilter = catalogNumberFilter.toLowerCase();
                         parts = parts.stream()
