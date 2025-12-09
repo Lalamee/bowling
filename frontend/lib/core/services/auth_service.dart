@@ -212,6 +212,7 @@ class AuthService {
           skills: skills,
           workPlaces: workPlaces,
           workPeriods: workPeriods,
+          region: region,
           clubId: clubId,
         ),
       );

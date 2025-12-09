@@ -402,6 +402,17 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () {
+                  Navigator.of(ctx).pushNamedAndRemoveUntil(Routes.welcome, (route) => false);
+                },
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
+                label: const Text('Назад к входу', style: TextStyle(color: AppColors.primary)),
+                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+              ),
+            ),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),

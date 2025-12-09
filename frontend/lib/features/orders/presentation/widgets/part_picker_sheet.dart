@@ -30,7 +30,7 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
   bool _loadingParts = false;
   String? _selectedBrand;
 
-  bool get _canSearchParts => _path.isNotEmpty;
+  bool get _canSearchParts => _path.isNotEmpty && _path.last.level >= 3;
 
   @override
   void initState() {
@@ -74,7 +74,11 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
     }
     _path.add(category);
     await _loadCategories(parentId: category.id);
-    _runSearch(categoryCode: category.code ?? category.id.toString());
+    if (category.level >= 3) {
+      _runSearch(categoryCode: category.code ?? category.id.toString());
+    } else {
+      _resetParts();
+    }
   }
 
   Future<void> _onBackLevel() async {
@@ -83,7 +87,7 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
     _selectedBrand = _path.isNotEmpty ? _path.first.brand : null;
     final parentId = _path.isNotEmpty ? _path.last.id : null;
     await _loadCategories(parentId: parentId);
-    if (_canSearchParts) {
+    if (_path.isNotEmpty && _path.last.level >= 3) {
       final last = _path.last;
       _runSearch(categoryCode: last.code ?? last.id.toString());
     } else {

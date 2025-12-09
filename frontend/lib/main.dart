@@ -13,7 +13,7 @@ void main() async {
   String? envBaseUrl;
   try {
     await dotenv.load(fileName: '.env');
-    envBaseUrl = dotenv.maybeGet('API_URL');
+    envBaseUrl = 'http://92.242.61.128:8081';
   } catch (_) {
     envBaseUrl = null;
   }

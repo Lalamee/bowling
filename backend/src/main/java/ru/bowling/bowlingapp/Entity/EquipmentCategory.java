@@ -28,6 +28,9 @@ public class EquipmentCategory {
     @Column(name = "brand")
     private String brand;
 
+    @Column(name = "code")
+    private String code;
+
     @Column(name = "name_ru", nullable = false)
     private String nameRu;
 

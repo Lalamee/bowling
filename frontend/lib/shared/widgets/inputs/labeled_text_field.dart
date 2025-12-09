@@ -39,6 +39,7 @@ class LabeledTextField extends StatefulWidget {
 class _LabeledTextFieldState extends State<LabeledTextField> {
   String? errorText;
   late FocusNode _focusNode;
+  late bool _obscureText;
 
   final maskFormatter = MaskTextInputFormatter(
     mask: '+7 (###) ### ## ##',
@@ -54,6 +55,7 @@ class _LabeledTextFieldState extends State<LabeledTextField> {
   void initState() {
     super.initState();
     _focusNode = FocusNode();
+    _obscureText = widget.obscureText;
 
     _focusNode.addListener(() {
       if (isPhone && _focusNode.hasFocus) {
@@ -184,7 +186,7 @@ class _LabeledTextFieldState extends State<LabeledTextField> {
                   controller: widget.controller,
                   keyboardType: widget.keyboardType,
                   readOnly: widget.readOnly,
-                  obscureText: widget.obscureText,
+                  obscureText: _obscureText,
                   onTap: widget.onTap,
                   inputFormatters: inputFormatters,
                   textInputAction: widget.textInputAction,
@@ -193,6 +195,25 @@ class _LabeledTextFieldState extends State<LabeledTextField> {
                     hintStyle: AppTextStyles.formLabel,
                     prefixIcon: widget.icon != null
                         ? Icon(widget.icon, size: 20, color: AppColors.primary)
+                        : null,
+                    suffixIcon: widget.obscureText
+                        ? Tooltip(
+                            message: _obscureText ? 'Показать пароль' : 'Скрыть пароль',
+                            preferBelow: false,
+                            child: IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _obscureText = !_obscureText;
+                                });
+                              },
+                              icon: Icon(
+                                _obscureText
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          )
                         : null,
                     border: OutlineInputBorder(
                       borderSide: BorderSide.none,

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.DTO.PartsCatalogResponseDTO;
 import ru.bowling.bowlingapp.DTO.PartsSearchDTO;
+import ru.bowling.bowlingapp.Entity.EquipmentCategory;
 import ru.bowling.bowlingapp.Entity.PartsCatalog;
 import ru.bowling.bowlingapp.Entity.WarehouseInventory;
 import ru.bowling.bowlingapp.Entity.enums.AvailabilityStatus;
@@ -197,21 +198,36 @@ public class PartsService {
                         return null;
                 }
 
+                List<String> rawCodes = new ArrayList<>();
+
                 try {
                         Long rootId = Long.parseLong(normalizedCategoryCode);
-                        List<String> codes = new ArrayList<>();
-                        ArrayDeque<Long> queue = new ArrayDeque<>();
-                        queue.add(rootId);
 
-                        while (!queue.isEmpty()) {
-                                Long currentId = queue.poll();
-                                codes.add(currentId.toString());
+                        equipmentCategoryRepository.findByIdAndIsActiveTrue(rootId).ifPresent(root -> {
+                                ArrayDeque<EquipmentCategory> queue = new ArrayDeque<>();
+                                queue.add(root);
 
-                                equipmentCategoryRepository.findByParent_IdAndIsActiveTrueOrderBySortOrder(currentId)
-                                                .forEach(child -> queue.add(child.getId()));
+                                while (!queue.isEmpty()) {
+                                        EquipmentCategory current = queue.poll();
+
+                                        if (current.getId() != null) {
+                                                rawCodes.add(current.getId().toString());
+                                        }
+                                        if (current.getCode() != null && !current.getCode().isBlank()) {
+                                                rawCodes.add(current.getCode());
+                                        }
+
+                                        equipmentCategoryRepository
+                                                        .findByParent_IdAndIsActiveTrueOrderBySortOrder(current.getId())
+                                                        .forEach(queue::add);
+                                }
+                        });
+
+                        if (rawCodes.isEmpty()) {
+                                rawCodes.add(normalizedCategoryCode);
                         }
 
-                        return normalizeCodesList(codes);
+                        return normalizeCodesList(rawCodes);
                 } catch (NumberFormatException ignored) {
                         return normalizeCodesList(List.of(normalizedCategoryCode));
                 }
