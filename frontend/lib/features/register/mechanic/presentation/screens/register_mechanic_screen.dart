@@ -394,7 +394,11 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
 
   @override
   Widget build(BuildContext ctx) {
-    final steps = [_buildStepOne(ctx), _buildStepTwo(ctx), _buildStepThree(ctx)];
+    final steps = [
+      _buildStepOne(ctx),
+      _buildStepTwo(ctx),
+      _buildStepThree(ctx),
+    ];
     final isLast = step == steps.length - 1;
 
     return Scaffold(
@@ -439,6 +443,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
 
   Widget _buildStepOne(BuildContext ctx) {
     return Column(
+      key: const ValueKey('register_mechanic_step_1'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextButton.icon(
@@ -488,6 +493,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
   Widget _buildStepTwo(BuildContext ctx) {
     final eduOptions = _eduMap.keys.toList();
     return Column(
+      key: const ValueKey('register_mechanic_step_2'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextButton.icon(
@@ -531,6 +537,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     final selectedClub = _selectedClub;
     final selectedClubAddress = selectedClub?.address?.trim();
     return Column(
+      key: const ValueKey('register_mechanic_step_3'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextButton.icon(
