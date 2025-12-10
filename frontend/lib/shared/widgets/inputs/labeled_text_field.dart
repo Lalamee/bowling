@@ -70,6 +70,14 @@ class _LabeledTextFieldState extends State<LabeledTextField> {
   }
 
   @override
+  void didUpdateWidget(covariant LabeledTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.obscureText != widget.obscureText) {
+      _obscureText = widget.obscureText;
+    }
+  }
+
+  @override
   void dispose() {
     _focusNode.dispose();
     super.dispose();
