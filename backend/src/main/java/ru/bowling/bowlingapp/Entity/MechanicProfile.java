@@ -95,4 +95,27 @@ public class MechanicProfile {
     @OneToMany(mappedBy = "mechanicProfile", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<MechanicWorkHistory> workHistoryEntries = new ArrayList<>();
+
+    @Transient
+    private Boolean originalIsEntrepreneur;
+
+    @PostLoad
+    public void captureOriginalEntrepreneurFlag() {
+        this.originalIsEntrepreneur = this.isEntrepreneur;
+    }
+
+    @PrePersist
+    public void applyDefaultEntrepreneurFlag() {
+        if (this.isEntrepreneur == null) {
+            this.isEntrepreneur = Boolean.FALSE;
+        }
+        captureOriginalEntrepreneurFlag();
+    }
+
+    @PreUpdate
+    public void restoreMissingEntrepreneurFlag() {
+        if (this.isEntrepreneur == null) {
+            this.isEntrepreneur = this.originalIsEntrepreneur;
+        }
+    }
 }

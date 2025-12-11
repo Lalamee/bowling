@@ -523,7 +523,7 @@ public class AuthService implements UserDetailsService {
         if (!clubDetails.isEmpty()) {
             result.put("clubsDetailed", clubDetails);
         }
-        result.put("status", Boolean.TRUE.equals(profile.getIsEntrepreneur()) ? "Самозанятый" : "Штатный механик");
+        result.put("status", Boolean.TRUE.equals(profile.getIsEntrepreneur()) ? "ИП" : "Самозанятый");
         result.put("workplaceVerified", Boolean.TRUE.equals(profile.getIsDataVerified()));
 
         return result;
