@@ -42,12 +42,14 @@ class AuthService {
         throw ApiException('Введите пароль');
       }
 
+      // IDs должны соответствовать фактическим значениям в таблицах role и account_type
+      // (см. данные продовой БД: CLUB_OWNER -> role.id = 44, account_type.id = 64).
       final request = RegisterRequestDto(
         user: RegisterUserDto(
           phone: data['phone'],
           password: password,
-          roleId: 5,
-          accountTypeId: 2,
+          roleId: 44,
+          accountTypeId: 64,
         ),
         ownerProfile: OwnerProfileDto(
           inn: nullableString(data['inn']) ?? '',
@@ -192,12 +194,14 @@ class AuthService {
         return true;
       }
 
+      // Для наймных механиков используем идентификаторы из таблиц role и account_type
+      // (role.MECHANIC = 42, account_type.INDIVIDUAL = 63).
       final request = RegisterRequestDto(
         user: RegisterUserDto(
           phone: data['phone'],
           password: password,
-          roleId: 4,
-          accountTypeId: 1,
+          roleId: 42,
+          accountTypeId: 63,
         ),
         mechanicProfile: MechanicProfileDto(
           fullName: data['fio'],
