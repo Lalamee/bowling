@@ -67,7 +67,6 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   @override
   void dispose() {
     _notificationsController.removeListener(_handleNotificationsUpdate);
-    _notificationsController.dispose();
     super.dispose();
   }
 

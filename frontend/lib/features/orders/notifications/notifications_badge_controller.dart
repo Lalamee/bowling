@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:collection';
 
+import 'package:dio/dio.dart';
+
 import 'package:flutter/foundation.dart';
 
+import '../../../api/api_core.dart';
 import '../../../core/repositories/maintenance_repository.dart';
 import '../../../core/services/authz/acl.dart';
 import '../../../core/services/notifications/local_notification_service.dart';
@@ -50,6 +53,19 @@ class NotificationsBadgeController extends ChangeNotifier {
   Future<void> refresh() async {
     final scope = _scope;
     if (scope == null || _isFetching) return;
+
+    final hasAnyAccess =
+        scope.isAdmin || scope.mechanicProfileId != null || scope.accessibleClubIds.isNotEmpty;
+    if (!hasAnyAccess) {
+      // Нет доступа к заявкам — сбрасываем таймер и список, чтобы не спамить запросами.
+      stop();
+      if (_pending.isNotEmpty) {
+        _pending.clear();
+        notifyListeners();
+      }
+      return;
+    }
+
     _isFetching = true;
     try {
       await _notificationService.init();
@@ -78,6 +94,19 @@ class NotificationsBadgeController extends ChangeNotifier {
         ..addAll(fresh);
       notifyListeners();
       await _notifyAboutNewOrders(newItems);
+    } on DioException catch (error, stackTrace) {
+      final apiError = error.error;
+      final status = error.response?.statusCode ?? (apiError is ApiException ? apiError.statusCode : null);
+      final isForbidden =
+          status == 401 || status == 403 || (apiError is ApiException && apiError.message.contains('Доступ запрещён'));
+
+      if (isForbidden) {
+        debugPrint('Notifications refresh skipped: unauthorized (${status ?? 'unknown'})');
+        stop();
+      } else {
+        debugPrint('Notifications refresh failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
     } catch (error, stackTrace) {
       debugPrint('Notifications refresh failed: $error');
       debugPrintStack(stackTrace: stackTrace);
