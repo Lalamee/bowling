@@ -194,7 +194,8 @@ class _LabeledTextFieldState extends State<LabeledTextField> {
                   controller: widget.controller,
                   keyboardType: widget.keyboardType,
                   readOnly: widget.readOnly,
-                  obscureText: _obscureText,
+                  // Never obscure regular text fields; only hide input when explicitly asked.
+                  obscureText: widget.obscureText && _obscureText,
                   onTap: widget.onTap,
                   inputFormatters: inputFormatters,
                   textInputAction: widget.textInputAction,
