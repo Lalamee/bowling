@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import ru.bowling.bowlingapp.Entity.enums.AttestationStatus;
 import ru.bowling.bowlingapp.Entity.enums.MechanicGrade;
+import ru.bowling.bowlingapp.Entity.converter.AttestationStatusConverter;
 
 import java.time.LocalDateTime;
 
@@ -35,7 +36,7 @@ public class AttestationApplication {
     @JoinColumn(name = "club_id")
     private BowlingClub club;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = AttestationStatusConverter.class)
     @Column(name = "status", nullable = false)
     private AttestationStatus status;
 
