@@ -792,8 +792,8 @@ public class AuthService implements UserDetailsService {
 
     private boolean resolveInitialActiveFlag(AccountTypeName accountTypeName) {
         return switch (accountTypeName) {
-            case FREE_MECHANIC_BASIC, FREE_MECHANIC_PREMIUM -> false;
-            case CLUB_OWNER, CLUB_MANAGER -> false;
+            case FREE_MECHANIC_BASIC, FREE_MECHANIC_PREMIUM -> true;
+            case CLUB_OWNER, CLUB_MANAGER -> true;
             case MAIN_ADMIN -> true;
             case INDIVIDUAL -> true;
         };
