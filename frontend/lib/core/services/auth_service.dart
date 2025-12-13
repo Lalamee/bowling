@@ -227,6 +227,12 @@ class AuthService {
       return true;
     } on ApiException {
       rethrow;
+    } on DioException catch (e) {
+      final error = e.error;
+      if (error is ApiException) {
+        throw error;
+      }
+      throw ApiException(error?.toString() ?? 'Не удалось зарегистрировать механика');
     } catch (_) {
       throw ApiException('Не удалось зарегистрировать механика');
     }
