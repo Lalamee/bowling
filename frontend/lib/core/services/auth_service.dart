@@ -10,8 +10,6 @@ import '../../models/owner_profile_dto.dart';
 import '../../models/manager_profile_dto.dart';
 import '../../models/bowling_club_dto.dart';
 import '../../models/user_info_dto.dart';
-import '../../models/free_mechanic_application_request_dto.dart';
-import '../../models/free_mechanic_application_response_dto.dart';
 import '../../models/mechanic_work_history_dto.dart';
 import '../utils/validators.dart';
 import 'local_auth_storage.dart';
@@ -146,80 +144,61 @@ class AuthService {
         throw ApiException('Укажите статус: ИП или самозанятый');
       }
 
-      if (clubId == null) {
-        final workHistory = entries
-            .map((e) => MechanicWorkHistoryDto(
-                  organization: e.place,
-                  position: 'Механик',
-                  startDate: e.from,
-                  endDate: e.to,
-                  description: skills,
-                ))
-            .toList();
-
-        final request = FreeMechanicApplicationRequestDto(
-          phone: data['phone'],
-          password: password,
-          fullName: data['fio'],
-          birthDate: birthDate,
-          educationLevelId: int.tryParse(data['educationLevelId']?.toString() ?? ''),
-          educationalInstitution: data['educationName'],
-          totalExperienceYears: int.tryParse(data['workYears']?.toString() ?? '0') ?? 0,
-          bowlingExperienceYears: int.tryParse(data['bowlingYears']?.toString() ?? '0') ?? 0,
-          isEntrepreneur: entrepreneur ?? false,
-          specializationId: int.tryParse(data['specializationId']?.toString() ?? ''),
-          region: region,
-          skills: skills,
-          advantages: advantages,
-          workHistory: workHistory,
-        );
-
-        final FreeMechanicApplicationResponseDto response = await _api.applyFreeMechanic(request);
-        final cachedProfile = {
-          'fullName': data['fio'],
-          'phone': data['phone'],
-          'status': 'Заявка отправлена',
-          'clubs': <String>[],
-          'address': region,
-          'workplaceVerified': false,
-          'applicationStatus': response.status ?? 'NEW',
-          'applicationComment': response.comment,
-          'accountType': response.accountType ?? 'FREE_MECHANIC_BASIC',
-        };
-        await LocalAuthStorage.saveMechanicProfile(cachedProfile);
-        await LocalAuthStorage.setMechanicRegistered(true);
-        await LocalAuthStorage.saveMechanicApplication(response.toJson());
-        await LocalAuthStorage.setRegisteredRole('mechanic');
-        await LocalAuthStorage.setRegisteredAccountType(response.accountType ?? 'FREE_MECHANIC_BASIC');
-        return true;
-      }
-
-      // Для наймных механиков используем идентификаторы из таблиц role и account_type
-      // (role.MECHANIC = 42, account_type.INDIVIDUAL = 63).
-      final request = RegisterRequestDto(
-        user: RegisterUserDto(
-          phone: data['phone'],
-          password: password,
-          roleId: 42,
-          accountTypeId: 63,
-        ),
-        mechanicProfile: MechanicProfileDto(
-          fullName: data['fio'],
-          birthDate: birthDate,
-          educationLevelId: int.tryParse(data['educationLevelId']?.toString() ?? '') ?? 1,
-          educationalInstitution: data['educationName'],
-          specializationId: int.tryParse(data['specializationId']?.toString() ?? '') ?? 1,
-          advantages: advantages,
-          totalExperienceYears: int.tryParse(data['workYears']?.toString() ?? '0') ?? 0,
-          bowlingExperienceYears: int.tryParse(data['bowlingYears']?.toString() ?? '0') ?? 0,
-          isEntrepreneur: entrepreneur,
-          skills: skills,
-          workPlaces: workPlaces,
-          workPeriods: workPeriods,
-          region: region,
-          clubId: clubId,
-        ),
-      );
+      // Свободный механик регистрируется с ролью MECHANIC и account_type FREE_MECHANIC_BASIC
+      // (role.id = 42, account_type.id = 66 в текущей БД).
+      final request = clubId == null
+          ? RegisterRequestDto(
+              user: RegisterUserDto(
+                phone: data['phone'],
+                password: password,
+                roleId: 42,
+                accountTypeId: 66,
+              ),
+              mechanicProfile: MechanicProfileDto(
+                fullName: data['fio'],
+                birthDate: birthDate,
+                educationLevelId: int.tryParse(data['educationLevelId']?.toString() ?? '') ?? 1,
+                educationalInstitution: data['educationName'],
+                specializationId: int.tryParse(data['specializationId']?.toString() ?? '') ?? 1,
+                advantages: advantages,
+                totalExperienceYears: int.tryParse(data['workYears']?.toString() ?? '0') ?? 0,
+                bowlingExperienceYears:
+                    int.tryParse(data['bowlingYears']?.toString() ?? '0') ?? 0,
+                isEntrepreneur: entrepreneur ?? false,
+                skills: skills,
+                workPlaces: workPlaces,
+                workPeriods: workPeriods,
+                region: region,
+                clubId: null,
+              ),
+            )
+          : RegisterRequestDto(
+              // Для наймных механиков используем идентификаторы из таблиц role и account_type
+              // (role.MECHANIC = 42, account_type.INDIVIDUAL = 63).
+              user: RegisterUserDto(
+                phone: data['phone'],
+                password: password,
+                roleId: 42,
+                accountTypeId: 63,
+              ),
+              mechanicProfile: MechanicProfileDto(
+                fullName: data['fio'],
+                birthDate: birthDate,
+                educationLevelId: int.tryParse(data['educationLevelId']?.toString() ?? '') ?? 1,
+                educationalInstitution: data['educationName'],
+                specializationId: int.tryParse(data['specializationId']?.toString() ?? '') ?? 1,
+                advantages: advantages,
+                totalExperienceYears: int.tryParse(data['workYears']?.toString() ?? '0') ?? 0,
+                bowlingExperienceYears:
+                    int.tryParse(data['bowlingYears']?.toString() ?? '0') ?? 0,
+                isEntrepreneur: entrepreneur,
+                skills: skills,
+                workPlaces: workPlaces,
+                workPeriods: workPeriods,
+                region: region,
+                clubId: clubId,
+              ),
+            );
       final response = await _api.register(request);
       if (!response.isSuccess) {
         throw ApiException(response.message);
@@ -263,12 +242,14 @@ class AuthService {
         throw ApiException('Выберите клуб, в котором вы работаете');
       }
 
+      // Используем актуальные идентификаторы из БД: HEAD_MECHANIC -> role.id = 43,
+      // CLUB_MANAGER -> account_type.id = 65.
       final request = RegisterRequestDto(
         user: RegisterUserDto(
           phone: normalizedPhone,
           password: password,
-          roleId: 6,
-          accountTypeId: 3,
+          roleId: 43,
+          accountTypeId: 65,
         ),
         managerProfile: ManagerProfileDto(
           fullName: data['fio'],
