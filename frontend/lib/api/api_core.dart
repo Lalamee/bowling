@@ -23,7 +23,8 @@ class ApiCore {
   final Dio dio = Dio();
   final FlutterSecureStorage storage = const FlutterSecureStorage();
 
-  static const String _defaultBaseUrl = 'http://92.242.61.128:8081';
+  // static const String _defaultBaseUrl = 'http://92.242.61.128:8081';
+  static const String _defaultBaseUrl = 'http://10.0.2.2:8081';
 
   String _baseUrl = _defaultBaseUrl;
   String get baseUrl => _baseUrl;

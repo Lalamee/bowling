@@ -13,7 +13,8 @@ void main() async {
   String? envBaseUrl;
   try {
     await dotenv.load(fileName: '.env');
-    envBaseUrl = 'http://92.242.61.128:8081';
+    // envBaseUrl = 'http://92.242.61.128:8081';
+    envBaseUrl = 'http://10.0.2.2:8081';
   } catch (_) {
     envBaseUrl = null;
   }
