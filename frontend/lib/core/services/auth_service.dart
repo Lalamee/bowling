@@ -263,12 +263,14 @@ class AuthService {
         throw ApiException('Выберите клуб, в котором вы работаете');
       }
 
+      // Используем актуальные идентификаторы из БД: HEAD_MECHANIC -> role.id = 43,
+      // CLUB_MANAGER -> account_type.id = 65.
       final request = RegisterRequestDto(
         user: RegisterUserDto(
           phone: normalizedPhone,
           password: password,
-          roleId: 6,
-          accountTypeId: 3,
+          roleId: 43,
+          accountTypeId: 65,
         ),
         managerProfile: ManagerProfileDto(
           fullName: data['fio'],
