@@ -76,14 +76,15 @@ public class ClubStaffService {
         OwnerProfile owner = club.getOwner();
         if (owner != null && owner.getUser() != null) {
             User ownerUser = owner.getUser();
+            Boolean confirmation = resolveConfirmationStatus(ownerUser, owner.getIsDataVerified());
             staff.add(ClubStaffMemberDTO.builder()
                     .userId(ownerUser.getUserId())
                     .fullName(resolveOwnerName(owner))
                     .phone(ownerUser.getPhone())
                     .email(owner.getContactEmail())
                     .role("OWNER")
-                    .isActive(ownerUser.getIsActive())
-                    .isVerified(ownerUser.getIsVerified())
+                    .isActive(confirmation)
+                    .isVerified(confirmation)
                     .build());
         }
 
@@ -97,10 +98,8 @@ public class ClubStaffService {
                     .phone(manager.getContactPhone() != null ? manager.getContactPhone() : (managerUser != null ? managerUser.getPhone() : null))
                     .email(manager.getContactEmail())
                     .role(staffRoleToResponse(managerRole, managerUser != null ? managerUser.getRole() : null))
-                    .isActive(resolveStaffActiveStatus(club, managerUser, managerUser != null ? managerUser.getIsActive() : Boolean.TRUE))
-                    .isVerified(managerUser != null && managerUser.getIsVerified() != null
-                            ? managerUser.getIsVerified()
-                            : manager.getIsDataVerified())
+                    .isVerified(resolveConfirmationStatus(managerUser, manager.getIsDataVerified()))
+                    .isActive(resolveConfirmationStatus(managerUser, manager.getIsDataVerified()))
                     .build());
         }
 
@@ -113,10 +112,8 @@ public class ClubStaffService {
                     .phone(administrator.getContactPhone() != null ? administrator.getContactPhone() : (administratorUser != null ? administratorUser.getPhone() : null))
                     .email(administrator.getContactEmail())
                     .role(staffRoleToResponse(StaffRole.ADMINISTRATOR, administratorUser != null ? administratorUser.getRole() : null))
-                    .isActive(resolveStaffActiveStatus(club, administratorUser, administratorUser != null ? administratorUser.getIsActive() : Boolean.TRUE))
-                    .isVerified(administratorUser != null && administratorUser.getIsVerified() != null
-                            ? administratorUser.getIsVerified()
-                            : administrator.getIsDataVerified())
+                    .isVerified(resolveConfirmationStatus(administratorUser, administrator.getIsDataVerified()))
+                    .isActive(resolveStaffActiveStatus(club, administratorUser, resolveConfirmationStatus(administratorUser, administrator.getIsDataVerified())))
                     .build());
         }
 
@@ -131,10 +128,8 @@ public class ClubStaffService {
                     .fullName(trim(mechanic.getFullName(), mechanicUser != null ? mechanicUser.getPhone() : null))
                     .phone(mechanicUser != null ? mechanicUser.getPhone() : null)
                     .role(staffRoleToResponse(StaffRole.MECHANIC, mechanicUser != null ? mechanicUser.getRole() : null))
-                    .isActive(resolveStaffActiveStatus(club, mechanicUser, mechanicUser != null ? mechanicUser.getIsActive() : Boolean.TRUE))
-                    .isVerified(mechanicUser != null && mechanicUser.getIsVerified() != null
-                            ? mechanicUser.getIsVerified()
-                            : mechanic.getIsDataVerified())
+                    .isVerified(resolveConfirmationStatus(mechanicUser, mechanic.getIsDataVerified()))
+                    .isActive(resolveStaffActiveStatus(club, mechanicUser, resolveConfirmationStatus(mechanicUser, mechanic.getIsDataVerified())))
                     // Передаем флаг, чтобы на фронте можно было ограничить доступ механика в рамках конкретного клуба
                     .accessRestricted(clubStaff != null && Boolean.TRUE.equals(clubStaff.getInfoAccessRestricted()))
                     .build());
@@ -353,6 +348,14 @@ public class ClubStaffService {
         registerClubStaff(club, user, role, requestedBy);
 
         return buildResponse(user, profile.getFullName(), rawPassword, role, club, StaffRole.MANAGER);
+    }
+
+    private Boolean resolveConfirmationStatus(User user, Boolean profileVerified) {
+        if (user != null && user.getIsVerified() != null) {
+            return user.getIsVerified();
+        }
+
+        return profileVerified != null ? profileVerified : Boolean.FALSE;
     }
 
     private CreateStaffResponseDTO createMechanicStaff(

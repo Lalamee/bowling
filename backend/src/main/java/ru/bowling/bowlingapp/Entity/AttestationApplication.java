@@ -36,7 +36,6 @@ public class AttestationApplication {
     @JoinColumn(name = "club_id")
     private BowlingClub club;
 
-    @Enumerated(EnumType.STRING)
     @Convert(converter = AttestationStatusConverter.class)
     @Column(name = "status", nullable = false)
     private AttestationStatus status;
