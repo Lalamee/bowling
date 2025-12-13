@@ -83,6 +83,7 @@ public class ClubStaffService {
                     .email(owner.getContactEmail())
                     .role("OWNER")
                     .isActive(ownerUser.getIsActive())
+                    .isVerified(ownerUser.getIsVerified())
                     .build());
         }
 
@@ -97,6 +98,9 @@ public class ClubStaffService {
                     .email(manager.getContactEmail())
                     .role(staffRoleToResponse(managerRole, managerUser != null ? managerUser.getRole() : null))
                     .isActive(resolveStaffActiveStatus(club, managerUser, managerUser != null ? managerUser.getIsActive() : Boolean.TRUE))
+                    .isVerified(managerUser != null && managerUser.getIsVerified() != null
+                            ? managerUser.getIsVerified()
+                            : manager.getIsDataVerified())
                     .build());
         }
 
@@ -110,6 +114,9 @@ public class ClubStaffService {
                     .email(administrator.getContactEmail())
                     .role(staffRoleToResponse(StaffRole.ADMINISTRATOR, administratorUser != null ? administratorUser.getRole() : null))
                     .isActive(resolveStaffActiveStatus(club, administratorUser, administratorUser != null ? administratorUser.getIsActive() : Boolean.TRUE))
+                    .isVerified(administratorUser != null && administratorUser.getIsVerified() != null
+                            ? administratorUser.getIsVerified()
+                            : administrator.getIsDataVerified())
                     .build());
         }
 
@@ -125,6 +132,9 @@ public class ClubStaffService {
                     .phone(mechanicUser != null ? mechanicUser.getPhone() : null)
                     .role(staffRoleToResponse(StaffRole.MECHANIC, mechanicUser != null ? mechanicUser.getRole() : null))
                     .isActive(resolveStaffActiveStatus(club, mechanicUser, mechanicUser != null ? mechanicUser.getIsActive() : Boolean.TRUE))
+                    .isVerified(mechanicUser != null && mechanicUser.getIsVerified() != null
+                            ? mechanicUser.getIsVerified()
+                            : mechanic.getIsDataVerified())
                     // Передаем флаг, чтобы на фронте можно было ограничить доступ механика в рамках конкретного клуба
                     .accessRestricted(clubStaff != null && Boolean.TRUE.equals(clubStaff.getInfoAccessRestricted()))
                     .build());
