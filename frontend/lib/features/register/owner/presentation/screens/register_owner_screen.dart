@@ -212,15 +212,24 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () {
-                  Navigator.of(ctx).pushNamedAndRemoveUntil(Routes.welcome, (route) => false);
-                },
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
-                label: const Text('Назад к входу', style: TextStyle(color: AppColors.primary)),
-                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.of(ctx).pushNamedAndRemoveUntil(Routes.welcome, (route) => false);
+                    },
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
+                    label: const Text('Назад к входу', style: TextStyle(color: AppColors.primary)),
+                    style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                  ),
+                ],
               ),
             ),
             Expanded(

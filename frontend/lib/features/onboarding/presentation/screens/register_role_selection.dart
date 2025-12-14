@@ -3,6 +3,7 @@ import '../../../register/owner/presentation/screens/register_owner_screen.dart'
 import '../../../register/mechanic/presentation/screens/register_mechanic_screen.dart';
 import '../../../register/manager/presentation/screens/register_manager_screen.dart';
 import '../../../../shared/widgets/titles/bowling_market_title.dart';
+import '../../../../core/routing/routes.dart';
 
 class RegisterRoleSelectionScreen extends StatelessWidget {
   const RegisterRoleSelectionScreen({super.key});
@@ -19,9 +20,10 @@ class RegisterRoleSelectionScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32.0),
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterMechanicScreen()));
-                },
+                onPressed: () => _showAuthOptions(
+                  context,
+                  const RegisterMechanicScreen(),
+                ),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size.fromHeight(60),
                   backgroundColor: Colors.grey[700],
@@ -77,7 +79,7 @@ void _showClubRoleOptions(BuildContext context) {
               title: const Text('Я владелец клуба'),
               onTap: () {
                 Navigator.pop(ctx);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterOwnerScreen()));
+                _showAuthOptions(context, const RegisterOwnerScreen());
               },
             ),
             ListTile(
@@ -85,7 +87,42 @@ void _showClubRoleOptions(BuildContext context) {
               title: const Text('Я менеджер клуба'),
               onTap: () {
                 Navigator.pop(ctx);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterManagerScreen()));
+                _showAuthOptions(context, const RegisterManagerScreen());
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+void _showAuthOptions(BuildContext context, Widget registerScreen) {
+  showModalBottomSheet(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (ctx) {
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.login),
+              title: const Text('Войти'),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.pushNamed(context, Routes.authLogin);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_add_alt_1_outlined),
+              title: const Text('Зарегистрироваться'),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => registerScreen));
               },
             ),
             const SizedBox(height: 12),
