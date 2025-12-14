@@ -4,6 +4,7 @@ import '../../../register/mechanic/presentation/screens/register_mechanic_screen
 import '../../../register/manager/presentation/screens/register_manager_screen.dart';
 import '../../../../shared/widgets/titles/bowling_market_title.dart';
 import '../../../../core/routing/routes.dart';
+import '../../../../core/theme/colors.dart';
 
 class RegisterRoleSelectionScreen extends StatelessWidget {
   const RegisterRoleSelectionScreen({super.key});
@@ -14,8 +15,25 @@ class RegisterRoleSelectionScreen extends StatelessWidget {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil(Routes.welcome, (route) => false),
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
+                    label: const Text('Назад к входу', style: TextStyle(color: AppColors.primary)),
+                    style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                  ),
+                ],
+              ),
+            ),
             const Spacer(),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32.0),
