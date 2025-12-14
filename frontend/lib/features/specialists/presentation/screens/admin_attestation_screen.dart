@@ -176,7 +176,13 @@ class _AdminAttestationScreenState extends State<AdminAttestationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Заявки на аттестацию (Администратор)')),
+      appBar: AppBar(
+        title: const Text('Заявки на аттестацию (Администратор)'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
       body: Column(
         children: [
           Padding(

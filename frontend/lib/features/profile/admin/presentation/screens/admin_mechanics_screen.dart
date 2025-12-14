@@ -13,6 +13,7 @@ import '../../../../../models/mechanic_club_link_request_dto.dart';
 import '../../../../../models/admin_mechanic_status_change_dto.dart';
 import '../../../../../models/admin_staff_status_update_dto.dart';
 import '../../../../../models/admin_mechanic_account_change_dto.dart';
+import '../../../../../models/free_mechanic_application_response_dto.dart';
 
 class AdminMechanicsScreen extends StatefulWidget {
   const AdminMechanicsScreen({super.key});
@@ -27,12 +28,22 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
   final AdminCabinetRepository _cabinetRepository = AdminCabinetRepository();
   final ClubsRepository _clubsRepository = ClubsRepository();
 
+  static const Map<String, String> _accountLabels = {
+    'INDIVIDUAL': 'Механик',
+    'CLUB_OWNER': 'Владелец',
+    'CLUB_MANAGER': 'Менеджер клуба',
+    'FREE_MECHANIC_BASIC': 'Свободный механик (базовый)',
+    'FREE_MECHANIC_PREMIUM': 'Свободный механик (премиум)',
+    'MAIN_ADMIN': 'Администрация сервиса',
+  };
+
   bool _isLoading = true;
   bool _hasError = false;
   List<_PendingMechanic> _pending = [];
   List<_ClubMechanicsSection> _sections = [];
   List<AdminMechanicStatusChangeDto> _statusRequests = [];
   List<_ClubOption> _clubOptions = [];
+  List<FreeMechanicApplicationResponseDto> _freeMechanics = [];
 
   @override
   void initState() {
@@ -41,43 +52,58 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
   }
 
   Future<void> _loadData() async {
-    try {
-      if (mounted) {
-        setState(() {
-          _isLoading = true;
-          _hasError = false;
-        });
-      }
+    List<_PendingMechanic> pending = [];
+    List<_ClubMechanicsSection> sections = [];
+    List<AdminMechanicStatusChangeDto> statusRequests = [];
+    List<_ClubOption> clubOptions = [];
+    List<FreeMechanicApplicationResponseDto> freeMechanics = [];
+    bool overviewFailed = false;
 
-      final overview = await _mechanicsRepository.getOverview();
-      final statusRequests = await _cabinetRepository.listMechanicStatusChanges();
-      final clubs = await _clubsRepository.getClubs();
-      if (!mounted) return;
-
-      final pending = overview.pending.map(_mapPending).where((m) => m.userId != null).toList();
-      final sections = overview.clubs.map(_mapClub).toList();
-      sections.sort((a, b) => (a.clubName ?? '').toLowerCase().compareTo((b.clubName ?? '').toLowerCase()));
-
+    if (mounted) {
       setState(() {
-        _pending = pending;
-        _sections = sections;
-        _statusRequests = statusRequests;
-        _clubOptions = clubs
-            .map((c) => _ClubOption(id: c.id, name: c.name ?? 'Клуб ${c.id}'))
-            .toList();
-        _isLoading = false;
+        _isLoading = true;
         _hasError = false;
       });
+    }
+
+    try {
+      final overview = await _mechanicsRepository.getOverview();
+      final clubs = await _clubsRepository.getClubs();
+      pending = overview.pending.map(_mapPending).where((m) => m.userId != null).toList();
+      sections = overview.clubs.map(_mapClub).toList();
+      sections.sort((a, b) => (a.clubName ?? '').toLowerCase().compareTo((b.clubName ?? '').toLowerCase()));
+      clubOptions = clubs.map((c) => _ClubOption(id: c.id, name: c.name ?? 'Клуб ${c.id}')).toList();
     } catch (e, s) {
-      log('Failed to load admin mechanics: $e', stackTrace: s);
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _hasError = true;
-        _pending = [];
-        _sections = [];
-      });
-      showApiError(context, e);
+      overviewFailed = true;
+      log('Failed to load admin mechanics overview: $e', stackTrace: s);
+    }
+
+    try {
+      statusRequests = await _cabinetRepository.listMechanicStatusChanges();
+    } catch (e, s) {
+      log('Failed to load mechanic status requests: $e', stackTrace: s);
+    }
+
+    try {
+      freeMechanics = await _cabinetRepository.listFreeMechanicApplications();
+    } catch (e, s) {
+      log('Failed to load free mechanics: $e', stackTrace: s);
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _pending = pending;
+      _sections = sections;
+      _statusRequests = statusRequests;
+      _clubOptions = clubOptions;
+      _freeMechanics = freeMechanics;
+      _isLoading = false;
+      _hasError = overviewFailed && _freeMechanics.isEmpty;
+    });
+
+    if (_hasError) {
+      showApiError(context, 'Не удалось загрузить данные по механикам');
     }
   }
 
@@ -401,7 +427,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       );
     }
 
-    if (_pending.isEmpty && _sections.isEmpty) {
+    if (_pending.isEmpty && _sections.isEmpty && _freeMechanics.isEmpty && _statusRequests.isEmpty) {
       return const Center(child: Text('Механики не найдены'));
     }
 
@@ -410,6 +436,8 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         children: [
+          _buildFreeMechanicsSection(),
+          const SizedBox(height: 16),
           if (_statusRequests.isNotEmpty) ...[
             _buildStatusRequests(),
             const SizedBox(height: 16),
@@ -425,6 +453,94 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
               _buildSectionCard(_sections[i], i),
               if (i < _sections.length - 1) const SizedBox(height: 12),
             ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFreeMechanicsSection() {
+    final freeAgents = _freeMechanics
+        .where(
+          (m) =>
+              (m.accountType?.toUpperCase().contains('FREE_MECHANIC') ?? false) &&
+              (m.isVerified == true),
+        )
+        .toList();
+
+    if (freeAgents.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.lightGray),
+        ),
+        child: const Text(
+          'Свободные механики не найдены',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textDark),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.primary.withOpacity(0.4)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 3))],
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Свободные механики',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
+          ),
+          const SizedBox(height: 12),
+          for (var i = 0; i < freeAgents.length; i++) ...[
+            if (i > 0) const SizedBox(height: 12),
+            _buildFreeMechanicTile(freeAgents[i]),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFreeMechanicTile(FreeMechanicApplicationResponseDto mechanic) {
+    final info = <String>[];
+    if (mechanic.phone?.isNotEmpty == true) info.add(mechanic.phone!);
+    if (mechanic.submittedAt != null) {
+      info.add('Заявка: ${mechanic.submittedAt!.toLocal().toString().split('.').first}');
+    }
+    final status = mechanic.status?.toUpperCase();
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.lightGray),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            mechanic.fullName ?? 'Без имени',
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textDark),
+          ),
+          if (info.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(info.join(' • '), style: const TextStyle(fontSize: 13, color: AppColors.darkGray)),
+          ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Chip(label: Text(status == 'APPROVED' ? 'Одобрена' : 'В обработке')),
+              const SizedBox(width: 8),
+              Chip(label: Text(_accountLabel(mechanic.accountType))),
+            ],
+          ),
         ],
       ),
     );
@@ -805,6 +921,12 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textDark),
       ),
     );
+  }
+
+  String _accountLabel(String? account) {
+    if (account == null) return '—';
+    final key = account.trim().toUpperCase();
+    return _accountLabels[key] ?? account;
   }
 }
 

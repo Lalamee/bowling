@@ -31,8 +31,12 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadLocalProfile();
-    _load();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _loadLocalProfile();
+    await _load();
   }
 
   Future<void> _loadLocalProfile() async {

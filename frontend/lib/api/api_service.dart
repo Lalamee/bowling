@@ -271,6 +271,18 @@ class ApiService {
         .toList();
   }
 
+  /// GET /api/admin/free-mechanics/applications - заявки и аккаунты свободных механиков
+  Future<List<FreeMechanicApplicationResponseDto>> listFreeMechanicApplications() async {
+    final response = await _dio.get('/api/admin/free-mechanics/applications');
+    return (response.data as List)
+        .map(
+          (e) => FreeMechanicApplicationResponseDto.fromJson(
+            Map<String, dynamic>.from(e as Map),
+          ),
+        )
+        .toList();
+  }
+
   /// GET /api/admin/registrations - заявки на регистрацию
   Future<List<AdminRegistrationApplicationDto>> getAdminRegistrations() async {
     final response = await _dio.get('/api/admin/registrations');
