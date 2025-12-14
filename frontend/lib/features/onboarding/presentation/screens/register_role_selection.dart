@@ -24,13 +24,6 @@ class RegisterRoleSelectionScreen extends StatelessWidget {
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
                   ),
-                  const Spacer(),
-                  TextButton.icon(
-                    onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil(Routes.welcome, (route) => false),
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
-                    label: const Text('Назад к входу', style: TextStyle(color: AppColors.primary)),
-                    style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-                  ),
                 ],
               ),
             ),
