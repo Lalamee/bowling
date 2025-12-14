@@ -96,7 +96,8 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       if (api != null) {
         if (api.statusCode == 403) {
-          showSnack(context, 'Аккаунт не активирован. Обратитесь к владельцу клуба.');
+          final msg = await _activationMessage();
+          showSnack(context, msg);
           return;
         }
         if (api.statusCode == 401) {
@@ -109,7 +110,8 @@ class _LoginScreenState extends State<LoginScreen> {
       closeLoader();
       if (!mounted) return;
       if (e.statusCode == 403) {
-        showSnack(context, 'Аккаунт не активирован. Обратитесь к владельцу клуба.');
+        final msg = await _activationMessage();
+        showSnack(context, msg);
         return;
       }
       if (e.statusCode == 401) {
@@ -150,6 +152,16 @@ class _LoginScreenState extends State<LoginScreen> {
     await LocalAuthStorage.setRegisteredRole(resolved.role.name);
     await LocalAuthStorage.setRegisteredAccountType(resolved.accountType?.name);
     return resolved;
+  }
+
+  Future<String> _activationMessage() async {
+    final storedType = await LocalAuthStorage.getRegisteredAccountType();
+    final parsedType = RoleAccessMatrix.parseAccountType(storedType);
+    final awaitingAdmin = parsedType == AccountTypeName.freeMechanicBasic || parsedType == AccountTypeName.freeMechanicPremium;
+    if (awaitingAdmin) {
+      return 'Аккаунт не активирован. Ожидается подтверждение администрацией сервиса.';
+    }
+    return 'Аккаунт не активирован. Обратитесь к владельцу клуба.';
   }
 
   @override
