@@ -569,6 +569,43 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     );
   }
 
+  Widget _buildPendingApprovalNotice() {
+    if (!_isFreeMechanic || profile.workplaceVerified) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.lightGray),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.lock_clock_rounded, color: AppColors.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Ограниченный доступ',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textDark),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Функционал будет расширен после подтверждения администрацией сервиса.',
+                  style: TextStyle(fontSize: 13, color: AppColors.darkGray, height: 1.3),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -617,6 +654,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   children: [
                     _buildApplicationBanner(),
+                    _buildPendingApprovalNotice(),
                     ProfileTile(
                       icon: Icons.person,
                       text: profile.fullName,

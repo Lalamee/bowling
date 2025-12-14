@@ -191,7 +191,9 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
           final email = (item['email'] as String?)?.trim();
           final phone = (item['phone'] as String?)?.trim();
           final fio = (item['fullName'] as String?)?.trim();
-          final isActive = item['isActive'] is bool ? item['isActive'] as bool : true;
+          final verified = _asBool(item['isVerified']);
+          final activeFlag = _asBool(item['isActive']);
+          final isActive = verified ? activeFlag : false;
           final normalizedRole = rawRole.toUpperCase();
           bool canToggleActive = false;
           if (normalizedRole == 'MECHANIC') {
@@ -330,6 +332,17 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
     }
 
     return normalized.toUpperCase();
+  }
+
+  bool _asBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized == 'true' || normalized == '1') return true;
+      if (normalized == 'false' || normalized == '0') return false;
+    }
+    return false;
   }
 
   String _mapRoleToRussian(String role) {

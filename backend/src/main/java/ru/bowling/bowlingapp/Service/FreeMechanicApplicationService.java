@@ -36,6 +36,7 @@ public class FreeMechanicApplicationService {
     private final AttestationApplicationRepository attestationApplicationRepository;
     private final PersonalWarehouseRepository personalWarehouseRepository;
     private final PasswordEncoder passwordEncoder;
+    private final NotificationService notificationService;
 
     @Transactional
     public FreeMechanicApplicationResponseDTO submitApplication(FreeMechanicApplicationRequestDTO request) {
@@ -61,7 +62,7 @@ public class FreeMechanicApplicationService {
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .role(mechanicRole)
                 .registrationDate(LocalDate.now())
-                .isActive(false)
+                .isActive(true)
                 .isVerified(false)
                 .accountType(accountType)
                 .build();
@@ -101,6 +102,7 @@ public class FreeMechanicApplicationService {
                 .build();
 
         attestationApplicationRepository.save(application);
+        notificationService.notifyFreeMechanicPending(profile);
         log.info("Free mechanic application {} submitted for user {}", application.getApplicationId(), normalizedPhone);
 
         return toResponse(application);

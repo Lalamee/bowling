@@ -51,6 +51,27 @@ public class NotificationService {
         notifications.clear();
     }
 
+    public NotificationEvent notifyFreeMechanicPending(MechanicProfile mechanicProfile) {
+        if (mechanicProfile == null || mechanicProfile.getUser() == null) {
+            return null;
+        }
+
+        NotificationEvent event = NotificationEvent.builder()
+                .id(UUID.randomUUID())
+                .type(NotificationEventType.FREE_MECHANIC_PENDING)
+                .message("Свободный механик ожидает подтверждения")
+                .mechanicId(mechanicProfile.getProfileId())
+                .payload(mechanicProfile.getFullName())
+                .createdAt(LocalDateTime.now())
+                .audiences(Set.of(RoleName.ADMIN))
+                .build();
+        notifications.add(event);
+
+        log.info("NOTIFICATION: Свободный механик {} ожидает подтверждения администрацией (user {})",
+                mechanicProfile.getProfileId(), mechanicProfile.getUser().getUserId());
+        return event;
+    }
+
     public NotificationEvent notifyHelpRequested(
             MaintenanceRequest request,
             List<RequestPart> parts,

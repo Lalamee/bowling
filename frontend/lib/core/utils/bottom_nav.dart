@@ -36,10 +36,13 @@ class BottomNavDirect {
       }
 
       if (tapped != 3 && !hasAccess) {
+        final needsAdminApproval = ctx.accountType == AccountTypeName.freeMechanicBasic ||
+            ctx.accountType == AccountTypeName.freeMechanicPremium;
+        final approver = needsAdminApproval ? 'администрацией сервиса' : 'владельцем клуба';
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Доступ к разделу откроется после подтверждения владельцем клуба'),
+          SnackBar(
+            content: Text('Доступ к разделу откроется после подтверждения $approver'),
           ),
         );
         return;
@@ -100,7 +103,7 @@ class BottomNavDirect {
   }
 
   static Future<bool> _hasFullAccess(RoleAccountContext ctx) async {
-    if (ctx.role == RoleName.admin || ctx.role == RoleName.clubOwner || ctx.role == RoleName.headMechanic) {
+    if (ctx.role == RoleName.admin) {
       return true;
     }
 
@@ -110,6 +113,8 @@ class BottomNavDirect {
       profile = await LocalAuthStorage.loadMechanicProfile();
     } else if (ctx.role == RoleName.headMechanic) {
       profile = await LocalAuthStorage.loadManagerProfile();
+    } else if (ctx.role == RoleName.clubOwner) {
+      profile = await LocalAuthStorage.loadOwnerProfile();
     } else {
       return true;
     }
@@ -120,6 +125,7 @@ class BottomNavDirect {
 
     bool _boolFrom(dynamic value) {
       if (value is bool) return value;
+      if (value is num) return value != 0;
       if (value is String) {
         final normalized = value.trim().toLowerCase();
         if (normalized == 'true' || normalized == '1') return true;
