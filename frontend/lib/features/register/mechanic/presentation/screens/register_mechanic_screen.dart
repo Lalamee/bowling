@@ -345,29 +345,29 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'clubAddress': selectedClub?.address,
       'freeAgent': !hasSelectedClub,
     };
-    if (!hasSelectedClub) {
+    final awaitingAdmin = !hasSelectedClub;
+    if (awaitingAdmin) {
       _showBar('Заявка отправлена. Дождитесь проверки администрацией сервиса.');
+    }
+
+    Future<void> persistProfile() async {
       await LocalAuthStorage.saveMechanicProfile(profileData);
       await LocalAuthStorage.setMechanicRegistered(true);
+      await LocalAuthStorage.clearOwnerState();
+      await LocalAuthStorage.clearManagerState();
       await LocalAuthStorage.setRegisteredRole('mechanic');
-      await LocalAuthStorage.setRegisteredAccountType('FREE_MECHANIC_BASIC');
-      if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil(Routes.authLogin, (route) => false);
+      if (awaitingAdmin) {
+        await LocalAuthStorage.setRegisteredAccountType('FREE_MECHANIC_BASIC');
       }
-      setState(() => _isSubmitting = false);
-      return;
     }
+
     try {
       final loginResult = await AuthService.login(phone: normalizedPhone, password: passwordValue);
       if (loginResult == null) {
         throw ApiException('Не удалось войти с новыми данными, попробуйте позже');
       }
 
-      await LocalAuthStorage.saveMechanicProfile(profileData);
-      await LocalAuthStorage.setMechanicRegistered(true);
-      await LocalAuthStorage.clearOwnerState();
-      await LocalAuthStorage.clearManagerState();
-      await LocalAuthStorage.setRegisteredRole('mechanic');
+      await persistProfile();
 
       if (!mounted) return;
       Navigator.of(context).pushNamedAndRemoveUntil(Routes.profileMechanic, (route) => false);
@@ -376,9 +376,10 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
         if (mounted) {
           final approvalMessage = hasSelectedClub
               ? 'Данные отправлены владельцу клуба. Дождитесь подтверждения аккаунта.'
-              : 'Данные отправлены администрации приложения. Дождитесь подтверждения аккаунта.';
+              : 'Данные отправлены администрацией приложения. Дождитесь подтверждения аккаунта.';
           _showBar(approvalMessage);
-          Navigator.of(context).pushNamedAndRemoveUntil(Routes.authLogin, (route) => false);
+          await persistProfile();
+          Navigator.of(context).pushNamedAndRemoveUntil(Routes.profileMechanic, (route) => false);
         }
       } else {
         _showBar(e.message);
