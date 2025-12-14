@@ -36,6 +36,37 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
   DateTime? _to;
   final TextEditingController _searchCtrl = TextEditingController();
 
+  static const Map<String, String> _roleLabels = {
+    'ADMIN': 'Администрация',
+    'MECHANIC': 'Механик',
+    'HEAD_MECHANIC': 'Менеджер',
+    'CLUB_OWNER': 'Владелец клуба',
+  };
+
+  static const Map<String, String> _accountLabels = {
+    'INDIVIDUAL': 'Механик',
+    'CLUB_OWNER': 'Владелец',
+    'CLUB_MANAGER': 'Менеджер клуба',
+    'FREE_MECHANIC_BASIC': 'Свободный механик (базовый)',
+    'FREE_MECHANIC_PREMIUM': 'Свободный механик (премиум)',
+    'MAIN_ADMIN': 'Администрация сервиса',
+  };
+
+  static const Map<String, String> _statusLabels = {
+    'PENDING': 'В обработке',
+    'APPROVED': 'Одобрена',
+    'REJECTED': 'Отклонена',
+    'DRAFT': 'Черновик',
+  };
+
+  static const Map<String, String> _applicationTypeLabels = {
+    'MECHANIC': 'Механик',
+    'CLUB': 'Клуб',
+    'MANAGER': 'Менеджер клуба',
+    'OWNER': 'Владелец клуба',
+    'ADMIN': 'Администратор',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -60,7 +91,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
       final clubs = await clubsFuture;
       if (!mounted) return;
       setState(() {
-        _applications = apps;
+        _applications = apps.where((app) => app.isVerified != true).toList();
         _clubs = clubs;
         _loading = false;
       });
@@ -258,32 +289,10 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              _buildDropdownFilter(
-                hint: 'Роль',
-                value: _roleFilter,
-                options: const ['ADMIN', 'MECHANIC', 'HEAD_MECHANIC', 'CLUB_OWNER'],
-                onChanged: (v) => setState(() => _roleFilter = v),
-              ),
-              const SizedBox(width: 8),
-              _buildDropdownFilter(
-                hint: 'Тип аккаунта',
-                value: _accountFilter,
-                options: AccountTypeName.values.map((e) => e.apiName).toList(),
-                onChanged: (v) => setState(() => _accountFilter = v),
-              ),
-              const SizedBox(width: 8),
-              _buildDropdownFilter(
-                hint: 'Статус',
-                value: _statusFilter,
-                options: const ['PENDING', 'APPROVED', 'REJECTED'],
-                onChanged: (v) => setState(() => _statusFilter = v),
-              ),
-              const SizedBox(width: 8),
-              _buildDropdownFilter(
-                hint: 'Тип заявки',
-                value: _typeFilter,
-                options: const ['MECHANIC', 'CLUB', 'MANAGER', 'OWNER', 'ADMIN'],
-                onChanged: (v) => setState(() => _typeFilter = v),
+              FilledButton.icon(
+                onPressed: _openFilterSheet,
+                icon: const Icon(Icons.tune_rounded),
+                label: const Text('Фильтры'),
               ),
             ],
           ),
@@ -325,31 +334,15 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     );
   }
 
-  Widget _buildDropdownFilter({
-    required String hint,
-    required String? value,
-    required List<String> options,
-    required ValueChanged<String?> onChanged,
-  }) {
-    return SizedBox(
-      width: 150,
-      child: DropdownButtonFormField<String?>(
-        value: value,
-        items: [
-          const DropdownMenuItem(value: null, child: Text('Все')),
-          ...options.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-        ],
-        decoration: InputDecoration(labelText: hint),
-        onChanged: onChanged,
-      ),
-    );
-  }
-
   Widget _buildCard(AdminRegistrationApplicationDto app) {
     final status = _resolveStatus(app);
     final role = app.role ?? '—';
     final account = app.accountType ?? '—';
     final type = app.applicationType ?? role;
+    final statusLabel = _statusLabel(status);
+    final roleLabel = _roleLabel(role);
+    final accountLabel = _accountLabel(account);
+    final typeLabel = _applicationTypeLabel(type);
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -369,11 +362,11 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
                     ],
                   ),
                 ),
-                Chip(label: Text(status)),
+                Chip(label: Text(statusLabel)),
               ],
             ),
             const SizedBox(height: 6),
-            Text('Тип: $type • Роль: $role • Аккаунт: $account'),
+            Text('Тип: $typeLabel • Роль: $roleLabel • Аккаунт: $accountLabel'),
             if (app.clubName != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -557,6 +550,139 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
       clubId: attachToClub ? selectedClub : null,
       attachToClub: attachToClub,
     );
+  }
+
+  Future<void> _openFilterSheet() async {
+    String? role = _roleFilter;
+    String? account = _accountFilter;
+    String? status = _statusFilter;
+    String? type = _typeFilter;
+
+    await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Фильтры', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 12),
+                _buildFilterDropdown(
+                  label: 'Роль',
+                  value: role,
+                  options: _roleLabels,
+                  onChanged: (v) => role = v,
+                ),
+                const SizedBox(height: 12),
+                _buildFilterDropdown(
+                  label: 'Тип аккаунта',
+                  value: account,
+                  options: _accountLabels,
+                  onChanged: (v) => account = v,
+                ),
+                const SizedBox(height: 12),
+                _buildFilterDropdown(
+                  label: 'Статус',
+                  value: status,
+                  options: _statusLabels,
+                  onChanged: (v) => status = v,
+                ),
+                const SizedBox(height: 12),
+                _buildFilterDropdown(
+                  label: 'Тип заявки',
+                  value: type,
+                  options: _applicationTypeLabels,
+                  onChanged: (v) => type = v,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          setState(() {
+                            _roleFilter = null;
+                            _accountFilter = null;
+                            _statusFilter = null;
+                            _typeFilter = null;
+                          });
+                          Navigator.of(ctx).pop();
+                        },
+                        child: const Text('Сбросить'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () {
+                          setState(() {
+                            _roleFilter = role;
+                            _accountFilter = account;
+                            _statusFilter = status;
+                            _typeFilter = type;
+                          });
+                          Navigator.of(ctx).pop();
+                        },
+                        child: const Text('Применить'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterDropdown({
+    required String label,
+    required String? value,
+    required Map<String, String> options,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return DropdownButtonFormField<String?>(
+      value: value,
+      decoration: InputDecoration(labelText: label),
+      items: [
+        const DropdownMenuItem(value: null, child: Text('Все')),
+        ...options.entries
+            .map((e) => DropdownMenuItem<String?>(value: e.key, child: Text(e.value)))
+            .toList(),
+      ],
+      onChanged: onChanged,
+    );
+  }
+
+  String _roleLabel(String? role) {
+    if (role == null) return '—';
+    final key = role.trim().toUpperCase();
+    return _roleLabels[key] ?? role;
+  }
+
+  String _accountLabel(String? account) {
+    if (account == null) return '—';
+    final key = account.trim().toUpperCase();
+    return _accountLabels[key] ?? account;
+  }
+
+  String _statusLabel(String? status) {
+    if (status == null) return '—';
+    final key = status.trim().toUpperCase();
+    return _statusLabels[key] ?? status;
+  }
+
+  String _applicationTypeLabel(String? type) {
+    if (type == null) return '—';
+    final key = type.trim().toUpperCase();
+    return _applicationTypeLabels[key] ?? type;
   }
 
   Future<AdminRegistrationApplicationDto?> _prepareMechanicAccount(AdminRegistrationApplicationDto app) async {
