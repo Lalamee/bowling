@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../../core/repositories/admin_cabinet_repository.dart';
 import '../../../../../core/repositories/clubs_repository.dart';
@@ -32,6 +33,8 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
   String? _accountFilter;
   String? _statusFilter;
   String? _typeFilter;
+  _SortField _sortField = _SortField.status;
+  bool _sortAsc = true;
   DateTime? _from;
   DateTime? _to;
   final TextEditingController _searchCtrl = TextEditingController();
@@ -65,6 +68,13 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     'MANAGER': 'Менеджер клуба',
     'OWNER': 'Владелец клуба',
     'ADMIN': 'Администратор',
+  };
+
+  static const Map<String, int> _statusOrder = {
+    'PENDING': 0,
+    'DRAFT': 1,
+    'APPROVED': 2,
+    'REJECTED': 3,
   };
 
   @override
@@ -108,7 +118,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
 
   List<AdminRegistrationApplicationDto> get _filtered {
     final query = _searchCtrl.text.trim().toLowerCase();
-    return _applications.where((app) {
+    final filtered = _applications.where((app) {
       final matchesRole = _roleFilter == null || app.role?.toLowerCase() == _roleFilter?.toLowerCase();
       final matchesAcc = _accountFilter == null || app.accountType?.toLowerCase() == _accountFilter?.toLowerCase();
       final matchesStatus = _statusFilter == null || app.status?.toLowerCase() == _statusFilter?.toLowerCase();
@@ -122,6 +132,26 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
           (app.clubName?.toLowerCase().contains(query) ?? false);
       return matchesRole && matchesAcc && matchesStatus && matchesType && matchesFrom && matchesTo && matchesQuery;
     }).toList();
+
+    filtered.sort((a, b) {
+      switch (_sortField) {
+        case _SortField.type:
+          return _compareNullableStrings(_applicationTypeLabel(a.applicationType), _applicationTypeLabel(b.applicationType));
+        case _SortField.status:
+          final orderA = _statusOrder[_resolveStatus(a).toUpperCase()] ?? 999;
+          final orderB = _statusOrder[_resolveStatus(b).toUpperCase()] ?? 999;
+          return orderA.compareTo(orderB);
+        case _SortField.date:
+          final aDate = a.submittedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bDate = b.submittedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return aDate.compareTo(bDate);
+      }
+    });
+
+    if (!_sortAsc) {
+      return filtered.reversed.toList();
+    }
+    return filtered;
   }
 
   Future<void> _approve(AdminRegistrationApplicationDto app) async {
@@ -375,7 +405,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
             if (app.submittedAt != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text('Отправлено: ${app.submittedAt!.toLocal().toString().split('.').first}'),
+                child: Text('Отправлено: ${_formatDate(app.submittedAt!)}'),
               ),
             if (app.decisionComment != null && app.decisionComment!.isNotEmpty)
               Padding(
@@ -557,6 +587,8 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     String? account = _accountFilter;
     String? status = _statusFilter;
     String? type = _typeFilter;
+    var sortField = _sortField;
+    var sortAsc = _sortAsc;
 
     await showModalBottomSheet<bool>(
       context: context,
@@ -600,6 +632,23 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
                   options: _applicationTypeLabels,
                   onChanged: (v) => type = v,
                 ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<_SortField>(
+                  value: sortField,
+                  decoration: const InputDecoration(labelText: 'Сортировка'),
+                  items: const [
+                    DropdownMenuItem(value: _SortField.status, child: Text('По статусу')),
+                    DropdownMenuItem(value: _SortField.type, child: Text('По типу заявки')),
+                    DropdownMenuItem(value: _SortField.date, child: Text('По дате подачи')),
+                  ],
+                  onChanged: (v) => sortField = v ?? sortField,
+                ),
+                SwitchListTile.adaptive(
+                  value: sortAsc,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('По возрастанию'),
+                  onChanged: (v) => sortAsc = v,
+                ),
                 const SizedBox(height: 16),
                 Row(
                   children: [
@@ -611,6 +660,8 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
                             _accountFilter = null;
                             _statusFilter = null;
                             _typeFilter = null;
+                            _sortField = _SortField.status;
+                            _sortAsc = true;
                           });
                           Navigator.of(ctx).pop();
                         },
@@ -626,6 +677,8 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
                             _accountFilter = account;
                             _statusFilter = status;
                             _typeFilter = type;
+                            _sortField = sortField;
+                            _sortAsc = sortAsc;
                           });
                           Navigator.of(ctx).pop();
                         },
@@ -692,4 +745,14 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     _replace(updated);
     return updated;
   }
+
+  String _formatDate(DateTime date) => DateFormat('dd.MM.yyyy').format(date.toLocal());
+
+  int _compareNullableStrings(String? a, String? b) {
+    final left = (a ?? '').toLowerCase();
+    final right = (b ?? '').toLowerCase();
+    return left.compareTo(right);
+  }
 }
+
+enum _SortField { status, type, date }

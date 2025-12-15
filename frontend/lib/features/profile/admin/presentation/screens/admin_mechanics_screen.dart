@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../../core/repositories/admin_mechanics_repository.dart';
 import '../../../../../core/repositories/admin_users_repository.dart';
@@ -389,7 +390,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Механики',
+          'База свободных агентов',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textDark),
         ),
         actions: [
@@ -428,7 +429,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     }
 
     if (_pending.isEmpty && _sections.isEmpty && _freeMechanics.isEmpty && _statusRequests.isEmpty) {
-      return const Center(child: Text('Механики не найдены'));
+      return const Center(child: Text('Свободные агенты не найдены'));
     }
 
     return RefreshIndicator(
@@ -476,7 +477,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
           border: Border.all(color: AppColors.lightGray),
         ),
         child: const Text(
-          'Свободные механики не найдены',
+          'Свободные агенты не найдены',
           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textDark),
         ),
       );
@@ -494,7 +495,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Свободные механики',
+            'Свободные агенты',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
           ),
           const SizedBox(height: 12),
@@ -511,9 +512,10 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     final info = <String>[];
     if (mechanic.phone?.isNotEmpty == true) info.add(mechanic.phone!);
     if (mechanic.submittedAt != null) {
-      info.add('Заявка: ${mechanic.submittedAt!.toLocal().toString().split('.').first}');
+      info.add('Заявка: ${_formatDate(mechanic.submittedAt!)}');
     }
     final status = mechanic.status?.toUpperCase();
+    final statusLabel = _freeStatusLabel(status);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -531,13 +533,18 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
           ),
           if (info.isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text(info.join(' • '), style: const TextStyle(fontSize: 13, color: AppColors.darkGray)),
+            Text(
+              info.join(' • '),
+              style: const TextStyle(fontSize: 13, color: AppColors.darkGray),
+              softWrap: true,
+            ),
           ],
           const SizedBox(height: 8),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              Chip(label: Text(status == 'APPROVED' ? 'Одобрена' : 'В обработке')),
-              const SizedBox(width: 8),
+              Chip(label: Text(statusLabel)),
               Chip(label: Text(_accountLabel(mechanic.accountType))),
             ],
           ),
@@ -922,6 +929,19 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       ),
     );
   }
+
+  String _freeStatusLabel(String? status) {
+    switch (status) {
+      case 'APPROVED':
+        return 'Одобрена';
+      case 'REJECTED':
+        return 'Отклонена';
+      default:
+        return 'В обработке';
+    }
+  }
+
+  String _formatDate(DateTime date) => DateFormat('dd.MM.yyyy').format(date.toLocal());
 
   String _accountLabel(String? account) {
     if (account == null) return '—';

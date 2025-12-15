@@ -169,7 +169,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
           const SizedBox(height: 10),
           ProfileTile(
             icon: Icons.handyman_outlined,
-            text: 'Механики',
+            text: 'База свободных агентов',
             onTap: () => Navigator.pushNamed(context, Routes.adminMechanics),
           ),
           const SizedBox(height: 10),
