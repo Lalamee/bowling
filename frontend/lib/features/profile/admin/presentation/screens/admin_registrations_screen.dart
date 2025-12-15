@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../../core/repositories/admin_cabinet_repository.dart';
 import '../../../../../core/repositories/clubs_repository.dart';
@@ -32,9 +33,49 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
   String? _accountFilter;
   String? _statusFilter;
   String? _typeFilter;
+  _SortField _sortField = _SortField.status;
+  bool _sortAsc = true;
   DateTime? _from;
   DateTime? _to;
   final TextEditingController _searchCtrl = TextEditingController();
+
+  static const Map<String, String> _roleLabels = {
+    'ADMIN': 'Администрация',
+    'MECHANIC': 'Механик',
+    'HEAD_MECHANIC': 'Менеджер',
+    'CLUB_OWNER': 'Владелец клуба',
+  };
+
+  static const Map<String, String> _accountLabels = {
+    'INDIVIDUAL': 'Механик',
+    'CLUB_OWNER': 'Владелец',
+    'CLUB_MANAGER': 'Менеджер клуба',
+    'FREE_MECHANIC_BASIC': 'Свободный механик (базовый)',
+    'FREE_MECHANIC_PREMIUM': 'Свободный механик (премиум)',
+    'MAIN_ADMIN': 'Администрация сервиса',
+  };
+
+  static const Map<String, String> _statusLabels = {
+    'PENDING': 'В обработке',
+    'APPROVED': 'Одобрена',
+    'REJECTED': 'Отклонена',
+    'DRAFT': 'Черновик',
+  };
+
+  static const Map<String, String> _applicationTypeLabels = {
+    'MECHANIC': 'Механик',
+    'CLUB': 'Клуб',
+    'MANAGER': 'Менеджер клуба',
+    'OWNER': 'Владелец клуба',
+    'ADMIN': 'Администратор',
+  };
+
+  static const Map<String, int> _statusOrder = {
+    'PENDING': 0,
+    'DRAFT': 1,
+    'APPROVED': 2,
+    'REJECTED': 3,
+  };
 
   @override
   void initState() {
@@ -60,7 +101,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
       final clubs = await clubsFuture;
       if (!mounted) return;
       setState(() {
-        _applications = apps;
+        _applications = apps.where((app) => app.isVerified != true).toList();
         _clubs = clubs;
         _loading = false;
       });
@@ -77,7 +118,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
 
   List<AdminRegistrationApplicationDto> get _filtered {
     final query = _searchCtrl.text.trim().toLowerCase();
-    return _applications.where((app) {
+    final filtered = _applications.where((app) {
       final matchesRole = _roleFilter == null || app.role?.toLowerCase() == _roleFilter?.toLowerCase();
       final matchesAcc = _accountFilter == null || app.accountType?.toLowerCase() == _accountFilter?.toLowerCase();
       final matchesStatus = _statusFilter == null || app.status?.toLowerCase() == _statusFilter?.toLowerCase();
@@ -91,6 +132,26 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
           (app.clubName?.toLowerCase().contains(query) ?? false);
       return matchesRole && matchesAcc && matchesStatus && matchesType && matchesFrom && matchesTo && matchesQuery;
     }).toList();
+
+    filtered.sort((a, b) {
+      switch (_sortField) {
+        case _SortField.type:
+          return _compareNullableStrings(_applicationTypeLabel(a.applicationType), _applicationTypeLabel(b.applicationType));
+        case _SortField.status:
+          final orderA = _statusOrder[_resolveStatus(a).toUpperCase()] ?? 999;
+          final orderB = _statusOrder[_resolveStatus(b).toUpperCase()] ?? 999;
+          return orderA.compareTo(orderB);
+        case _SortField.date:
+          final aDate = a.submittedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bDate = b.submittedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return aDate.compareTo(bDate);
+      }
+    });
+
+    if (!_sortAsc) {
+      return filtered.reversed.toList();
+    }
+    return filtered;
   }
 
   Future<void> _approve(AdminRegistrationApplicationDto app) async {
@@ -258,32 +319,10 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              _buildDropdownFilter(
-                hint: 'Роль',
-                value: _roleFilter,
-                options: const ['ADMIN', 'MECHANIC', 'HEAD_MECHANIC', 'CLUB_OWNER'],
-                onChanged: (v) => setState(() => _roleFilter = v),
-              ),
-              const SizedBox(width: 8),
-              _buildDropdownFilter(
-                hint: 'Тип аккаунта',
-                value: _accountFilter,
-                options: AccountTypeName.values.map((e) => e.apiName).toList(),
-                onChanged: (v) => setState(() => _accountFilter = v),
-              ),
-              const SizedBox(width: 8),
-              _buildDropdownFilter(
-                hint: 'Статус',
-                value: _statusFilter,
-                options: const ['PENDING', 'APPROVED', 'REJECTED'],
-                onChanged: (v) => setState(() => _statusFilter = v),
-              ),
-              const SizedBox(width: 8),
-              _buildDropdownFilter(
-                hint: 'Тип заявки',
-                value: _typeFilter,
-                options: const ['MECHANIC', 'CLUB', 'MANAGER', 'OWNER', 'ADMIN'],
-                onChanged: (v) => setState(() => _typeFilter = v),
+              FilledButton.icon(
+                onPressed: _openFilterSheet,
+                icon: const Icon(Icons.tune_rounded),
+                label: const Text('Фильтры'),
               ),
             ],
           ),
@@ -325,31 +364,15 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     );
   }
 
-  Widget _buildDropdownFilter({
-    required String hint,
-    required String? value,
-    required List<String> options,
-    required ValueChanged<String?> onChanged,
-  }) {
-    return SizedBox(
-      width: 150,
-      child: DropdownButtonFormField<String?>(
-        value: value,
-        items: [
-          const DropdownMenuItem(value: null, child: Text('Все')),
-          ...options.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-        ],
-        decoration: InputDecoration(labelText: hint),
-        onChanged: onChanged,
-      ),
-    );
-  }
-
   Widget _buildCard(AdminRegistrationApplicationDto app) {
     final status = _resolveStatus(app);
     final role = app.role ?? '—';
     final account = app.accountType ?? '—';
     final type = app.applicationType ?? role;
+    final statusLabel = _statusLabel(status);
+    final roleLabel = _roleLabel(role);
+    final accountLabel = _accountLabel(account);
+    final typeLabel = _applicationTypeLabel(type);
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -369,11 +392,11 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
                     ],
                   ),
                 ),
-                Chip(label: Text(status)),
+                Chip(label: Text(statusLabel)),
               ],
             ),
             const SizedBox(height: 6),
-            Text('Тип: $type • Роль: $role • Аккаунт: $account'),
+            Text('Тип: $typeLabel • Роль: $roleLabel • Аккаунт: $accountLabel'),
             if (app.clubName != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -382,7 +405,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
             if (app.submittedAt != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text('Отправлено: ${app.submittedAt!.toLocal().toString().split('.').first}'),
+                child: Text('Отправлено: ${_formatDate(app.submittedAt!)}'),
               ),
             if (app.decisionComment != null && app.decisionComment!.isNotEmpty)
               Padding(
@@ -559,6 +582,162 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     );
   }
 
+  Future<void> _openFilterSheet() async {
+    String? role = _roleFilter;
+    String? account = _accountFilter;
+    String? status = _statusFilter;
+    String? type = _typeFilter;
+    var sortField = _sortField;
+    var sortAsc = _sortAsc;
+
+    await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Фильтры', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 12),
+                _buildFilterDropdown(
+                  label: 'Роль',
+                  value: role,
+                  options: _roleLabels,
+                  onChanged: (v) => role = v,
+                ),
+                const SizedBox(height: 12),
+                _buildFilterDropdown(
+                  label: 'Тип аккаунта',
+                  value: account,
+                  options: _accountLabels,
+                  onChanged: (v) => account = v,
+                ),
+                const SizedBox(height: 12),
+                _buildFilterDropdown(
+                  label: 'Статус',
+                  value: status,
+                  options: _statusLabels,
+                  onChanged: (v) => status = v,
+                ),
+                const SizedBox(height: 12),
+                _buildFilterDropdown(
+                  label: 'Тип заявки',
+                  value: type,
+                  options: _applicationTypeLabels,
+                  onChanged: (v) => type = v,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<_SortField>(
+                  value: sortField,
+                  decoration: const InputDecoration(labelText: 'Сортировка'),
+                  items: const [
+                    DropdownMenuItem(value: _SortField.status, child: Text('По статусу')),
+                    DropdownMenuItem(value: _SortField.type, child: Text('По типу заявки')),
+                    DropdownMenuItem(value: _SortField.date, child: Text('По дате подачи')),
+                  ],
+                  onChanged: (v) => sortField = v ?? sortField,
+                ),
+                SwitchListTile.adaptive(
+                  value: sortAsc,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('По возрастанию'),
+                  onChanged: (v) => sortAsc = v,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          setState(() {
+                            _roleFilter = null;
+                            _accountFilter = null;
+                            _statusFilter = null;
+                            _typeFilter = null;
+                            _sortField = _SortField.status;
+                            _sortAsc = true;
+                          });
+                          Navigator.of(ctx).pop();
+                        },
+                        child: const Text('Сбросить'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () {
+                          setState(() {
+                            _roleFilter = role;
+                            _accountFilter = account;
+                            _statusFilter = status;
+                            _typeFilter = type;
+                            _sortField = sortField;
+                            _sortAsc = sortAsc;
+                          });
+                          Navigator.of(ctx).pop();
+                        },
+                        child: const Text('Применить'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterDropdown({
+    required String label,
+    required String? value,
+    required Map<String, String> options,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return DropdownButtonFormField<String?>(
+      value: value,
+      decoration: InputDecoration(labelText: label),
+      items: [
+        const DropdownMenuItem(value: null, child: Text('Все')),
+        ...options.entries
+            .map((e) => DropdownMenuItem<String?>(value: e.key, child: Text(e.value)))
+            .toList(),
+      ],
+      onChanged: onChanged,
+    );
+  }
+
+  String _roleLabel(String? role) {
+    if (role == null) return '—';
+    final key = role.trim().toUpperCase();
+    return _roleLabels[key] ?? role;
+  }
+
+  String _accountLabel(String? account) {
+    if (account == null) return '—';
+    final key = account.trim().toUpperCase();
+    return _accountLabels[key] ?? account;
+  }
+
+  String _statusLabel(String? status) {
+    if (status == null) return '—';
+    final key = status.trim().toUpperCase();
+    return _statusLabels[key] ?? status;
+  }
+
+  String _applicationTypeLabel(String? type) {
+    if (type == null) return '—';
+    final key = type.trim().toUpperCase();
+    return _applicationTypeLabels[key] ?? type;
+  }
+
   Future<AdminRegistrationApplicationDto?> _prepareMechanicAccount(AdminRegistrationApplicationDto app) async {
     final decision = await _askAccountChange(app.accountType, allowClub: true, initialClubId: app.clubId);
     if (decision == null || app.userId == null) return null;
@@ -566,4 +745,14 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     _replace(updated);
     return updated;
   }
+
+  String _formatDate(DateTime date) => DateFormat('dd.MM.yyyy').format(date.toLocal());
+
+  int _compareNullableStrings(String? a, String? b) {
+    final left = (a ?? '').toLowerCase();
+    final right = (b ?? '').toLowerCase();
+    return left.compareTo(right);
+  }
 }
+
+enum _SortField { status, type, date }
