@@ -31,14 +31,18 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadLocalProfile();
-    _load();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _loadLocalProfile();
+    await _load();
   }
 
   Future<void> _loadLocalProfile() async {
     final stored = await LocalAuthStorage.loadAdminProfile();
     if (!mounted || stored == null) return;
-    _applyProfile(stored);
+    _applyProfile(stored, fromCache: true);
   }
 
   Future<void> _load() async {
@@ -93,7 +97,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     };
   }
 
-  void _applyProfile(Map<String, dynamic> raw) {
+  void _applyProfile(Map<String, dynamic> raw, {bool fromCache = false}) {
     String? asString(dynamic value) {
       if (value == null) return null;
       final str = value.toString().trim();
@@ -104,8 +108,10 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
       fullName = asString(raw['fullName']) ?? fullName;
       phone = asString(raw['phone']) ?? phone;
       email = asString(raw['email']) ?? email;
-      _isLoading = false;
-      _hasError = false;
+      if (!fromCache) {
+        _isLoading = false;
+        _hasError = false;
+      }
     });
   }
 
@@ -165,7 +171,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
           const SizedBox(height: 10),
           ProfileTile(
             icon: Icons.handyman_outlined,
-            text: 'Механики',
+            text: 'База свободных агентов',
             onTap: () => Navigator.pushNamed(context, Routes.adminMechanics),
           ),
           const SizedBox(height: 10),

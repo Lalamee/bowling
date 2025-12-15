@@ -107,8 +107,15 @@ class _AdminClubsScreenState extends State<AdminClubsScreen> {
     try {
       final staff = await _loadStaff(entry.clubId);
       if (!mounted) return;
+      final owner = staff.firstWhere(
+        (m) => m.roleKey == 'OWNER',
+        orElse: () => _StaffMemberInfo(roleKey: 'OWNER', displayRole: 'Владелец клуба', name: '', isActive: true),
+      );
       setState(() {
         entry.staff = staff;
+        if (owner.name.isNotEmpty) {
+          entry.ownerName = owner.name;
+        }
         entry.isLoadingStaff = false;
         entry.staffLoaded = true;
       });
@@ -119,16 +126,30 @@ class _AdminClubsScreenState extends State<AdminClubsScreen> {
         entry.isLoadingStaff = false;
         entry.staffError = true;
       });
-      showApiError(context, e);
     }
   }
 
   Future<void> _loadEntryInventory(_ClubEntry entry) async {
+    if (entry.clubId == null) {
+      if (mounted) {
+        setState(() {
+          entry.isLoadingInventory = false;
+          entry.inventoryLoaded = true;
+        });
+      }
+      return;
+    }
     try {
       final inventory = await _inventoryRepository.search(query: '', clubId: entry.clubId);
       if (!mounted) return;
       setState(() {
         entry.inventoryCount = inventory.length;
+        entry.equipmentSample = inventory
+            .take(3)
+            .map((e) => e.commonName ?? e.officialNameRu ?? e.catalogNumber)
+            .where((name) => name != null && name!.isNotEmpty)
+            .map((e) => e!)
+            .join(', ');
         entry.isLoadingInventory = false;
         entry.inventoryLoaded = true;
       });
@@ -139,7 +160,6 @@ class _AdminClubsScreenState extends State<AdminClubsScreen> {
         entry.isLoadingInventory = false;
         entry.inventoryError = true;
       });
-      showApiError(context, e);
     }
   }
 
@@ -306,6 +326,10 @@ class _AdminClubsScreenState extends State<AdminClubsScreen> {
           if (entry.contactEmail != null && entry.contactEmail!.isNotEmpty) ...[
             const SizedBox(height: 10),
             _infoTile(Icons.email_outlined, entry.contactEmail!),
+          ],
+          if (entry.ownerName != null && entry.ownerName!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _infoTile(Icons.person, 'Владелец: ${entry.ownerName}'),
           ],
           const SizedBox(height: 16),
           _sectionTitle('Параметры клуба'),
@@ -489,7 +513,16 @@ class _AdminClubsScreenState extends State<AdminClubsScreen> {
         child: Text('Информация о складе отсутствует'),
       );
     }
-    return _infoTile(Icons.inventory_2_outlined, 'Позиции на складе: $count');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _infoTile(Icons.inventory_2_outlined, 'Позиции на складе: $count'),
+        if (entry.equipmentSample != null && entry.equipmentSample!.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _infoTile(Icons.build, 'Оборудование: ${entry.equipmentSample}'),
+        ],
+      ],
+    );
   }
 
   Widget _infoTile(IconData icon, String text) {
@@ -610,6 +643,8 @@ class _ClubEntry {
   final int? lanes;
   final String? contactPhone;
   final String? contactEmail;
+  String? ownerName;
+  String? equipmentSample;
 
   bool isOpen = false;
   bool isLoadingStaff = false;

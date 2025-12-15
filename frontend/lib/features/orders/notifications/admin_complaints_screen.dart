@@ -22,6 +22,12 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen> {
   bool? _resolvedFilter;
   List<AdminComplaintDto> _items = [];
 
+  static const Map<String, String> _statusLabels = {
+    'OPEN': 'Открыт',
+    'IN_PROGRESS': 'В работе',
+    'CLOSED': 'Закрыт',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -60,7 +66,7 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen> {
   }
 
   Future<void> _updateStatus(AdminComplaintDto complaint) async {
-    final statusCtrl = TextEditingController(text: complaint.complaintStatus);
+    String? statusCtrl = complaint.complaintStatus;
     final notesCtrl = TextEditingController(text: complaint.resolutionNotes ?? '');
     bool resolved = complaint.complaintResolved ?? false;
     final confirmed = await showDialog<bool>(
@@ -70,9 +76,15 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextFormField(
-              controller: statusCtrl,
-              decoration: const InputDecoration(labelText: 'Статус (OPEN/IN_PROGRESS/CLOSED)'),
+            DropdownButtonFormField<String?>(
+              value: statusCtrl,
+              decoration: const InputDecoration(labelText: 'Статус'),
+              items: const [
+                DropdownMenuItem(value: 'OPEN', child: Text('Открыт')),
+                DropdownMenuItem(value: 'IN_PROGRESS', child: Text('В работе')),
+                DropdownMenuItem(value: 'CLOSED', child: Text('Закрыт')),
+              ],
+              onChanged: (v) => statusCtrl = v,
             ),
             CheckboxListTile(
               value: resolved,
@@ -98,7 +110,7 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen> {
     try {
       final updated = await _repository.updateComplaint(
         reviewId: complaint.reviewId!,
-        status: statusCtrl.text.trim().isEmpty ? null : statusCtrl.text.trim(),
+        status: statusCtrl?.trim().isEmpty ?? true ? null : statusCtrl?.trim(),
         resolved: resolved,
         notes: notesCtrl.text.trim(),
       );
@@ -154,9 +166,9 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen> {
                   decoration: const InputDecoration(labelText: 'Статус'),
                   items: const [
                     DropdownMenuItem(value: null, child: Text('Все')),
-                    DropdownMenuItem(value: 'OPEN', child: Text('OPEN')),
-                    DropdownMenuItem(value: 'IN_PROGRESS', child: Text('IN_PROGRESS')),
-                    DropdownMenuItem(value: 'CLOSED', child: Text('CLOSED')),
+                    DropdownMenuItem(value: 'OPEN', child: Text('Открыт')),
+                    DropdownMenuItem(value: 'IN_PROGRESS', child: Text('В работе')),
+                    DropdownMenuItem(value: 'CLOSED', child: Text('Закрыт')),
                   ],
                   onChanged: (v) => setState(() => _statusFilter = v),
                 ),
@@ -203,7 +215,7 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen> {
             Row(
               children: [
                 Expanded(child: Text(item.complaintTitle ?? 'Спор #${item.reviewId ?? '-'}', style: const TextStyle(fontWeight: FontWeight.w700))),
-                Chip(label: Text(item.complaintStatus ?? '—')),
+                Chip(label: Text(_statusLabels[item.complaintStatus?.toUpperCase()] ?? '—')),
               ],
             ),
             if (item.comment != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(item.comment!)),
