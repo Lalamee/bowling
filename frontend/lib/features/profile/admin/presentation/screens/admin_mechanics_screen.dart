@@ -15,6 +15,7 @@ import '../../../../../models/admin_mechanic_status_change_dto.dart';
 import '../../../../../models/admin_staff_status_update_dto.dart';
 import '../../../../../models/admin_mechanic_account_change_dto.dart';
 import '../../../../../models/free_mechanic_application_response_dto.dart';
+import '../../../../../models/club_summary_dto.dart';
 
 class AdminMechanicsScreen extends StatefulWidget {
   const AdminMechanicsScreen({super.key});
@@ -75,7 +76,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
         _cabinetRepository.listFreeMechanicApplications(),
       ]);
 
-      final overview = futures[0] as AdminMechanicsOverviewDto;
+      final overview = futures[0] as AdminMechanicsOverview;
       final clubs = futures[1] as List<ClubSummaryDto>;
       statusRequests = futures[2] as List<AdminMechanicStatusChangeDto>;
       freeMechanics = futures[3] as List<FreeMechanicApplicationResponseDto>;
@@ -83,7 +84,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       pending = overview.pending.map(_mapPending).where((m) => m.userId != null).toList();
       sections = overview.clubs.map(_mapClub).toList();
       sections.sort((a, b) => (a.clubName ?? '').toLowerCase().compareTo((b.clubName ?? '').toLowerCase()));
-      clubOptions = clubs.map((c) => _ClubOption(id: c.id, name: c.name ?? 'Клуб ${c.id}')).toList();
+      clubOptions = clubs.map((c) => _ClubOption(id: c.id, name: c.name)).toList();
     } catch (e, s) {
       overviewFailed = true;
       log('Failed to load admin mechanics overview: $e', stackTrace: s);
@@ -1015,8 +1016,8 @@ class _MechanicInfo {
 }
 
 class _ClubOption {
-  final int? id;
-  final String? name;
+  final int id;
+  final String name;
 
   _ClubOption({required this.id, required this.name});
 }
