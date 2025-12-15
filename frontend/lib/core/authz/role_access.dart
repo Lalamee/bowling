@@ -67,7 +67,9 @@ class RoleAccessMatrix {
       case RoleName.admin:
         final isMainAdmin = type == AccountTypeName.mainAdmin;
         return RoleAccessConfig(
-          homeRoute: isMainAdmin ? Routes.profileAdmin : Routes.profileMechanic,
+          // Администраторов всегда отправляем на их профиль, чтобы избежать
+          // загрузки механического кабинета при отсутствии типа аккаунта в кеше.
+          homeRoute: Routes.profileAdmin,
           allowedSections: {
             if (isMainAdmin) ...{
               AccessSection.adminCabinet,
