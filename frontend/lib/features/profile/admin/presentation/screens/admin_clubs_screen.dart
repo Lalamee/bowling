@@ -126,7 +126,6 @@ class _AdminClubsScreenState extends State<AdminClubsScreen> {
         entry.isLoadingStaff = false;
         entry.staffError = true;
       });
-      showApiError(context, e);
     }
   }
 
@@ -161,7 +160,6 @@ class _AdminClubsScreenState extends State<AdminClubsScreen> {
         entry.isLoadingInventory = false;
         entry.inventoryError = true;
       });
-      showApiError(context, e);
     }
   }
 

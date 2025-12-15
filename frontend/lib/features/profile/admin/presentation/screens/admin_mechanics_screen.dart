@@ -68,8 +68,18 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     }
 
     try {
-      final overview = await _mechanicsRepository.getOverview();
-      final clubs = await _clubsRepository.getClubs();
+      final futures = await Future.wait([
+        _mechanicsRepository.getOverview(),
+        _clubsRepository.getClubs(),
+        _cabinetRepository.listMechanicStatusChanges(),
+        _cabinetRepository.listFreeMechanicApplications(),
+      ]);
+
+      final overview = futures[0] as AdminMechanicsOverviewDto;
+      final clubs = futures[1] as List<ClubSummaryDto>;
+      statusRequests = futures[2] as List<AdminMechanicStatusChangeDto>;
+      freeMechanics = futures[3] as List<FreeMechanicApplicationResponseDto>;
+
       pending = overview.pending.map(_mapPending).where((m) => m.userId != null).toList();
       sections = overview.clubs.map(_mapClub).toList();
       sections.sort((a, b) => (a.clubName ?? '').toLowerCase().compareTo((b.clubName ?? '').toLowerCase()));
@@ -77,18 +87,6 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     } catch (e, s) {
       overviewFailed = true;
       log('Failed to load admin mechanics overview: $e', stackTrace: s);
-    }
-
-    try {
-      statusRequests = await _cabinetRepository.listMechanicStatusChanges();
-    } catch (e, s) {
-      log('Failed to load mechanic status requests: $e', stackTrace: s);
-    }
-
-    try {
-      freeMechanics = await _cabinetRepository.listFreeMechanicApplications();
-    } catch (e, s) {
-      log('Failed to load free mechanics: $e', stackTrace: s);
     }
 
     if (!mounted) return;
@@ -447,9 +445,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
             _buildPendingSection(),
             const SizedBox(height: 16),
           ],
-          if (_sections.isEmpty)
-            const Center(child: Text('Клубы с механиками не найдены'))
-          else
+          if (_sections.isNotEmpty)
             for (var i = 0; i < _sections.length; i++) ...[
               _buildSectionCard(_sections[i], i),
               if (i < _sections.length - 1) const SizedBox(height: 12),

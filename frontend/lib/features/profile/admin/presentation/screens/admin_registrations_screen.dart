@@ -95,13 +95,19 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
       _error = false;
     });
     try {
-      final appsFuture = _repository.getRegistrations();
-      final clubsFuture = _clubsRepository.getClubs();
-      final apps = await appsFuture;
-      final clubs = await clubsFuture;
+      final results = await Future.wait([
+        _repository.getRegistrations(),
+        _clubsRepository.getClubs(),
+      ]);
+      final apps = results[0] as List<AdminRegistrationApplicationDto>;
+      final clubs = results[1] as List<ClubSummaryDto>;
       if (!mounted) return;
       setState(() {
-        _applications = apps.where((app) => app.isVerified != true).toList();
+        _applications = apps
+            .where(
+              (app) => app.isVerified == false || app.isProfileVerified == false || _resolveStatus(app) == 'PENDING',
+            )
+            .toList();
         _clubs = clubs;
         _loading = false;
       });
