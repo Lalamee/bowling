@@ -113,8 +113,9 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     _applicationStatus = application?['status']?.toString() ?? stored['applicationStatus']?.toString();
     _applicationComment = application?['comment']?.toString() ?? stored['applicationComment']?.toString();
     _applicationAccountType = application?['accountType']?.toString() ?? stored['accountType']?.toString();
-    _accountType ??= stored['accountType']?.toString();
-    _isFreeMechanic = _isFreeMechanic || _isFreeMechanicType(_accountType);
+    _accountType ??= _applicationAccountType ?? stored['accountType']?.toString();
+    _isFreeMechanic =
+        _isFreeMechanic || _isFreeMechanicType(_accountType) || _isFreeMechanicType(_applicationAccountType);
     _applyProfile(normalized, _clubAccesses);
   }
 
