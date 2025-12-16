@@ -60,6 +60,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     List<_ClubOption> clubOptions = [];
     List<FreeMechanicApplicationResponseDto> freeMechanics = [];
     bool overviewFailed = false;
+    bool freeMechanicsFailed = false;
 
     if (mounted) {
       setState(() {
@@ -70,10 +71,24 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
 
     try {
       final futures = await Future.wait([
-        _mechanicsRepository.getOverview(),
-        _clubsRepository.getClubs(),
-        _cabinetRepository.listMechanicStatusChanges(),
-        _cabinetRepository.listFreeMechanicApplications(),
+        _mechanicsRepository.getOverview().catchError((e, s) {
+          overviewFailed = true;
+          log('Failed to load admin mechanics overview: $e', stackTrace: s);
+          return AdminMechanicsOverview.empty();
+        }),
+        _clubsRepository.getClubs().catchError((e, s) {
+          log('Failed to load admin clubs list: $e', stackTrace: s);
+          return <ClubSummaryDto>[];
+        }),
+        _cabinetRepository.listMechanicStatusChanges().catchError((e, s) {
+          log('Failed to load mechanic status changes: $e', stackTrace: s);
+          return <AdminMechanicStatusChangeDto>[];
+        }),
+        _cabinetRepository.listFreeMechanicApplications().catchError((e, s) {
+          freeMechanicsFailed = true;
+          log('Failed to load free mechanic applications: $e', stackTrace: s);
+          return <FreeMechanicApplicationResponseDto>[];
+        }),
       ]);
 
       final overview = futures[0] as AdminMechanicsOverview;
@@ -87,6 +102,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       clubOptions = clubs.map((c) => _ClubOption(id: c.id, name: c.name)).toList();
     } catch (e, s) {
       overviewFailed = true;
+      freeMechanicsFailed = true;
       log('Failed to load admin mechanics overview: $e', stackTrace: s);
     }
 
@@ -99,7 +115,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       _clubOptions = clubOptions;
       _freeMechanics = freeMechanics;
       _isLoading = false;
-      _hasError = overviewFailed && _freeMechanics.isEmpty;
+      _hasError = overviewFailed && freeMechanicsFailed;
     });
 
     if (_hasError) {
@@ -330,9 +346,10 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
                 value: account,
                 decoration: const InputDecoration(labelText: 'Тип аккаунта'),
                 items: const [
-                  DropdownMenuItem(value: 'FREE_MECHANIC_BASIC', child: Text('FREE_MECHANIC_BASIC')),
-                  DropdownMenuItem(value: 'FREE_MECHANIC_PREMIUM', child: Text('FREE_MECHANIC_PREMIUM')),
+                  DropdownMenuItem(value: 'FREE_MECHANIC_BASIC', child: Text('Свободный механик (базовый)')),
+                  DropdownMenuItem(value: 'FREE_MECHANIC_PREMIUM', child: Text('Свободный механик (премиум)')),
                 ],
+                isExpanded: true,
                 onChanged: (v) => account = v,
                 validator: (v) => v == null ? 'Укажите тип' : null,
               ),
@@ -341,9 +358,10 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
                 value: access,
                 decoration: const InputDecoration(labelText: 'Уровень доступа'),
                 items: const [
-                  DropdownMenuItem(value: 'PREMIUM', child: Text('PREMIUM')),
-                  DropdownMenuItem(value: 'BASIC', child: Text('BASIC')),
+                  DropdownMenuItem(value: 'PREMIUM', child: Text('Премиум')),
+                  DropdownMenuItem(value: 'BASIC', child: Text('Базовый')),
                 ],
+                isExpanded: true,
                 onChanged: (v) => access = v,
               ),
             ],
