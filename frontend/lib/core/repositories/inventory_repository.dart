@@ -82,4 +82,24 @@ class InventoryRepository {
     }
     return null;
   }
+
+  Future<void> createPersonalItem({
+    required int warehouseId,
+    required String catalogNumber,
+    String? name,
+    int? quantity,
+    String? notes,
+  }) async {
+    final payload = {
+      'catalogNumber': catalogNumber,
+      if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+      if (quantity != null) 'quantity': quantity,
+      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+    };
+    await _dio.post('/api/inventory/warehouses/$warehouseId/items', data: payload);
+  }
+
+  Future<void> deleteInventoryItem(int inventoryId) async {
+    await _dio.delete('/api/inventory/$inventoryId');
+  }
 }
