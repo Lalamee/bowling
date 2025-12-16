@@ -75,6 +75,11 @@ public class EquipmentCategoryService {
     }
 
     private EquipmentCategoryDTO toDto(EquipmentCategory category) {
+        String code = Optional.ofNullable(category.getCode())
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .orElseGet(() -> category.getId() != null ? category.getId().toString() : null);
+
         return EquipmentCategoryDTO.builder()
                 .id(category.getId())
                 .parentId(category.getParent() != null ? category.getParent().getId() : null)
@@ -82,7 +87,7 @@ public class EquipmentCategoryService {
                 .brand(category.getBrand())
                 .nameRu(category.getNameRu())
                 .nameEn(category.getNameEn())
-                .code(category.getId() != null ? category.getId().toString() : null)
+                .code(code)
                 .sortOrder(category.getSortOrder())
                 .active(category.isActive())
                 .build();

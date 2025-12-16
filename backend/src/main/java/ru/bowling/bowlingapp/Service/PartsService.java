@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.bowling.bowlingapp.DTO.PartsCatalogCreateDTO;
 import ru.bowling.bowlingapp.DTO.PartsCatalogResponseDTO;
 import ru.bowling.bowlingapp.DTO.PartsSearchDTO;
 import ru.bowling.bowlingapp.Entity.EquipmentCategory;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -98,19 +100,49 @@ public class PartsService {
 				.map(this::convertToResponseDTO);
 	}
 
-	@Transactional(readOnly = true)
-	public List<PartsCatalogResponseDTO> getUniqueParts() {
-		List<PartsCatalog> parts = partsCatalogRepository.findByIsUniqueTrue();
-		Map<Integer, Integer> totals = warehouseInventoryRepository
-				.sumQuantitiesByCatalogIds(parts.stream().map(p -> p.getCatalogId().intValue()).toList())
+        @Transactional(readOnly = true)
+        public List<PartsCatalogResponseDTO> getUniqueParts() {
+                List<PartsCatalog> parts = partsCatalogRepository.findByIsUniqueTrue();
+                Map<Integer, Integer> totals = warehouseInventoryRepository
+                                .sumQuantitiesByCatalogIds(parts.stream().map(p -> p.getCatalogId().intValue()).toList())
 				.stream().collect(Collectors.toMap(
 					row -> (Integer) row[0],
 					row -> ((Number) row[1]).intValue()
 				));
 		return parts.stream()
-				.map(p -> convertToResponseDTO(p, totals.getOrDefault(p.getCatalogId().intValue(), 0)))
-				.collect(Collectors.toList());
-	}
+                                .map(p -> convertToResponseDTO(p, totals.getOrDefault(p.getCatalogId().intValue(), 0)))
+                                .collect(Collectors.toList());
+        }
+
+        @Transactional
+        public PartsCatalogResponseDTO findOrCreateCatalog(PartsCatalogCreateDTO payload) {
+                if (payload == null || payload.getCatalogNumber() == null || payload.getCatalogNumber().isBlank()) {
+                        throw new IllegalArgumentException("Каталожный номер обязателен");
+                }
+                String normalizedNumber = payload.getCatalogNumber().trim();
+                String normalizedName = payload.getName() != null && !payload.getName().trim().isEmpty()
+                                ? payload.getName().trim()
+                                : normalizedNumber;
+
+                PartsCatalog part = Stream.concat(
+                                partsCatalogRepository.findByCatalogNumber(normalizedNumber).stream(),
+                                partsCatalogRepository.findByCatalogNumberContainingIgnoreCase(normalizedNumber)
+                                                .stream()
+                                                .filter(existing -> existing.getCatalogNumber() != null
+                                                                && existing.getCatalogNumber().equalsIgnoreCase(normalizedNumber)))
+                                .findFirst()
+                                .orElseGet(() -> partsCatalogRepository.save(PartsCatalog.builder()
+                                                .catalogNumber(normalizedNumber)
+                                                .commonName(normalizedName)
+                                                .officialNameRu(normalizedName)
+                                                .officialNameEn(normalizedName)
+                                                .description(payload.getDescription())
+                                                .categoryCode(payload.getCategoryCode())
+                                                .isUnique(payload.getIsUnique())
+                                                .build()));
+
+                return convertCommon(part, 0, AvailabilityStatus.NOT_AVAILABLE);
+        }
 
         private PartsCatalogResponseDTO convertToResponseDTO(PartsCatalog part) {
                 List<WarehouseInventory> inventories = warehouseInventoryRepository.findByCatalogId(part.getCatalogId().intValue());
