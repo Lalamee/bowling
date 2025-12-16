@@ -53,6 +53,14 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
   final TextEditingController _supplierPhoneController = TextEditingController();
   final TextEditingController _supplierEmailController = TextEditingController();
   bool _supplierVerified = false;
+  static const List<String> _complaintStatuses = ['DRAFT', 'SENT', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
+  static const Map<String, String> _complaintStatusLabels = {
+    'DRAFT': 'Черновик',
+    'SENT': 'Отправлена',
+    'IN_PROGRESS': 'В работе',
+    'RESOLVED': 'Решена',
+    'CLOSED': 'Закрыта',
+  };
 
   static const Map<String, String> _statusLabels = {
     'PENDING': 'Ожидает',
@@ -837,6 +845,13 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
       resolutionController.dispose();
       return value;
     });
+  }
+
+  String _describeComplaintStatus(String? status) {
+    if (status == null) return '-';
+    final normalized = status.trim().toUpperCase();
+    if (normalized.isEmpty) return '-';
+    return _complaintStatusLabels[normalized] ?? status;
   }
 
   AcceptanceDecision _decisionFromStatus(String? status) {
