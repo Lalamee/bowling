@@ -7,6 +7,7 @@ import '../../../core/repositories/notifications_repository.dart';
 import '../../../core/services/authz/acl.dart';
 import '../../../core/services/local_auth_storage.dart';
 import '../../../core/theme/colors.dart';
+import '../../../core/models/order_status.dart';
 import '../../../core/utils/net_ui.dart';
 import '../../../core/utils/user_club_resolver.dart';
 import '../../../core/models/user_club.dart';
@@ -443,7 +444,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       parts.add(order.clubName!);
     }
     if (order.status != null && order.status!.isNotEmpty) {
-      parts.add(order.status!);
+      parts.add(describeOrderStatus(order.status));
     }
     if (updatedAt != null) {
       parts.add(_dateFormatter.format(updatedAt));
