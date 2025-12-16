@@ -215,12 +215,9 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
-                  ),
-                  const Spacer(),
+                  _buildStepBackButton(ctx),
                   TextButton.icon(
                     onPressed: () {
                       Navigator.of(ctx).pushNamedAndRemoveUntil(Routes.welcome, (route) => false);
@@ -253,21 +250,28 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
     );
   }
 
+  Widget _buildStepBackButton(BuildContext ctx) {
+    return TextButton.icon(
+      onPressed: () {
+        if (step == 0) {
+          final navigator = Navigator.of(ctx);
+          if (navigator.canPop()) {
+            navigator.pop();
+          }
+        } else {
+          prevStep();
+        }
+      },
+      icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+      label: const Text('Шаг назад', style: TextStyle(color: AppColors.primary)),
+      style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+    );
+  }
+
   Widget _buildStepOne(BuildContext ctx) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TextButton.icon(
-          onPressed: () {
-            final navigator = Navigator.of(ctx);
-            if (navigator.canPop()) {
-              navigator.pop();
-            }
-          },
-          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
-          label: const Text('Шаг назад', style: TextStyle(color: AppColors.primary)),
-          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-        ),
         formStepTitle('Добро пожаловать!'),
         formDescription('Это нужно, чтобы мы знали, каким клубом вы управляете, и могли предоставить вам доступ к инструментам управления.'),
         LabeledTextField(
@@ -318,12 +322,6 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TextButton.icon(
-          onPressed: prevStep,
-          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
-          label: const Text('Шаг назад', style: TextStyle(color: AppColors.primary)),
-          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-        ),
         sectionTitle('Расскажите о Вашем клубе:'),
         formDescription('Укажите количество дорожек и установленное оборудование.'),
         LabeledTextField(label: 'Название клуба', controller: _club, validator: Validators.notEmpty, icon: Icons.sports, isRequired: true),

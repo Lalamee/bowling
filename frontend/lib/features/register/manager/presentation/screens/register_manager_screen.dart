@@ -186,18 +186,24 @@ class _RegisterManagerScreenState extends State<RegisterManagerScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextButton.icon(
-                  onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil(Routes.welcome, (route) => false),
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
-                  label: const Text('Назад к входу', style: TextStyle(color: AppColors.primary)),
-                  style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+                      label: const Text('Шаг назад', style: TextStyle(color: AppColors.primary)),
+                      style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil(Routes.welcome, (route) => false),
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
+                      label: const Text('Назад к входу', style: TextStyle(color: AppColors.primary)),
+                      style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                    ),
+                  ],
                 ),
-                TextButton.icon(
-                  onPressed: () => Navigator.of(context).maybePop(),
-                  icon: const Icon(Icons.arrow_back, color: AppColors.primary),
-                  label: const Text('Назад', style: TextStyle(color: AppColors.primary)),
-                  style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-                ),
+                const SizedBox(height: 8),
                 sectionTitle('Регистрация менеджера'),
                 const SizedBox(height: 16),
                 LabeledTextField(
