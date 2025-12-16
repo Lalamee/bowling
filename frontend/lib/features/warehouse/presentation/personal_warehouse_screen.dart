@@ -6,6 +6,7 @@ import '../../../core/utils/net_ui.dart';
 import '../../../core/utils/personal_inventory_filter.dart';
 import '../../../core/utils/bottom_nav.dart';
 import '../../../core/routing/routes.dart';
+import '../../../core/repositories/parts_repository.dart';
 import '../../../models/part_dto.dart';
 import '../../../models/warehouse_summary_dto.dart';
 import '../../../shared/widgets/nav/app_bottom_nav.dart';
@@ -21,6 +22,7 @@ class PersonalWarehouseScreen extends StatefulWidget {
 
 class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
   late final InventoryRepository _repo;
+  final PartsRepository _partsRepo = PartsRepository();
   final _searchCtrl = TextEditingController();
   final _categoryCtrl = TextEditingController();
   final _searchFocus = FocusNode();
@@ -328,6 +330,17 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
     return int.tryParse(trimmed);
   }
 
+  Future<int?> _resolveCatalogId(String catalogNumber) async {
+    final results = await _partsRepo.search(catalogNumber);
+    if (results.isEmpty) return null;
+    final normalized = catalogNumber.trim().toLowerCase();
+    final exact = results.firstWhere(
+      (p) => p.catalogNumber.toLowerCase() == normalized,
+      orElse: () => results.first,
+    );
+    return exact.catalogId;
+  }
+
   Future<void> _openAddPartSheet() async {
     _newCatalogCtrl.clear();
     _newNameCtrl.clear();
@@ -408,14 +421,26 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
       showApiError(context, 'Укажите каталожный номер');
       return;
     }
+    final quantity = _parseQuantity(_newQtyCtrl.text) ?? 1;
     setState(() => _isMutating = true);
     try {
+      final catalogId = await _resolveCatalogId(catalog);
+      if (!mounted) return;
+      if (catalogId == null) {
+        showApiError(context, 'Каталожный номер "$catalog" не найден');
+        return;
+      }
+
+      final notes = [
+        if (_newNameCtrl.text.trim().isNotEmpty) 'Название: ${_newNameCtrl.text.trim()}',
+        if (_newNotesCtrl.text.trim().isNotEmpty) _newNotesCtrl.text.trim(),
+      ].where((e) => e.isNotEmpty).join('\n');
+
       await _repo.createPersonalItem(
         warehouseId: warehouseId,
-        catalogNumber: catalog,
-        name: _newNameCtrl.text,
-        quantity: _parseQuantity(_newQtyCtrl.text),
-        notes: _newNotesCtrl.text,
+        catalogId: catalogId,
+        quantity: quantity,
+        notes: notes.isEmpty ? null : notes,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context)

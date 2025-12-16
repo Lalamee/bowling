@@ -85,18 +85,20 @@ class InventoryRepository {
 
   Future<void> createPersonalItem({
     required int warehouseId,
-    required String catalogNumber,
-    String? name,
-    int? quantity,
+    required int catalogId,
+    required int quantity,
     String? notes,
+    int? reservedQuantity,
   }) async {
     final payload = {
-      'catalogNumber': catalogNumber,
-      if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
-      if (quantity != null) 'quantity': quantity,
+      'warehouseId': warehouseId,
+      'catalogId': catalogId,
+      'quantity': quantity,
+      if (reservedQuantity != null) 'reservedQuantity': reservedQuantity,
       if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
     };
-    await _dio.post('/api/inventory/warehouses/$warehouseId/items', data: payload);
+
+    await _dio.post('/api/inventory', data: payload);
   }
 
   Future<void> deleteInventoryItem(int inventoryId) async {

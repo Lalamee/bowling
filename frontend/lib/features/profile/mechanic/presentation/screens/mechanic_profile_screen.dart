@@ -737,6 +737,12 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                     ),
                     const SizedBox(height: 10),
                     ProfileTile(
+                      icon: Icons.verified_user_outlined,
+                      text: 'Аттестация и грейд',
+                      onTap: () => Navigator.pushNamed(context, Routes.attestationApplications),
+                    ),
+                    const SizedBox(height: 10),
+                    ProfileTile(
                       icon: Icons.menu_book_rounded,
                       text: 'База знаний',
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen())),
