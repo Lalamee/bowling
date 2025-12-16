@@ -31,10 +31,12 @@ class RegisterRoleSelectionScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32.0),
               child: ElevatedButton(
-                onPressed: () => _showAuthOptions(
-                  context,
-                  const RegisterMechanicScreen(),
-                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const RegisterMechanicScreen()),
+                  );
+                },
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size.fromHeight(60),
                   backgroundColor: Colors.grey[700],

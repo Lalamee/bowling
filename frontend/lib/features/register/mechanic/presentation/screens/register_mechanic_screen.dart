@@ -410,7 +410,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   TextButton.icon(
                     onPressed: () {
