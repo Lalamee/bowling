@@ -26,14 +26,31 @@ public interface PartsCatalogRepository extends JpaRepository<PartsCatalog, Long
 	
 	List<PartsCatalog> findByCatalogNumberContainingIgnoreCase(String catalogNumber);
 
-        @Query("select p from PartsCatalog p left join p.manufacturer m " +
-                        "where (:q is null or cast(p.officialNameRu as text) ilike concat('%', :q, '%') " +
-                        "or cast(p.officialNameEn as text) ilike concat('%', :q, '%') " +
-                        "or cast(p.commonName as text) ilike concat('%', :q, '%') " +
-                        "or cast(p.catalogNumber as text) ilike concat('%', :q, '%')) " +
-                        "and (:manufacturerId is null or m.manufacturerId = :manufacturerId) " +
-                        "and (:isUnique is null or p.isUnique = :isUnique) " +
-                        "and (:categoryCodes is null or lower(trim(p.categoryCode)) in :categoryCodes)")
+        @Query(value = """
+                        select p.* from parts_catalog p
+                        left join manufacturer m on m.manufacturer_id = p.manufacturer_id
+                        where (:q is null or
+                                       p.official_name_ru::text ilike concat('%', cast(:q as text), '%') or
+                                       p.official_name_en::text ilike concat('%', cast(:q as text), '%') or
+                                       p.common_name::text ilike concat('%', cast(:q as text), '%') or
+                                       p.catalog_number::text ilike concat('%', cast(:q as text), '%'))
+                          and (:manufacturerId is null or m.manufacturer_id = :manufacturerId)
+                          and (:isUnique is null or p.is_unique = :isUnique)
+                          and (:categoryCodes is null or lower(trim(p.category_code)) = any(cast(:categoryCodes as text[])))
+                        """,
+                        countQuery = """
+                        select count(*) from parts_catalog p
+                        left join manufacturer m on m.manufacturer_id = p.manufacturer_id
+                        where (:q is null or
+                                       p.official_name_ru::text ilike concat('%', cast(:q as text), '%') or
+                                       p.official_name_en::text ilike concat('%', cast(:q as text), '%') or
+                                       p.common_name::text ilike concat('%', cast(:q as text), '%') or
+                                       p.catalog_number::text ilike concat('%', cast(:q as text), '%'))
+                          and (:manufacturerId is null or m.manufacturer_id = :manufacturerId)
+                          and (:isUnique is null or p.is_unique = :isUnique)
+                          and (:categoryCodes is null or lower(trim(p.category_code)) = any(cast(:categoryCodes as text[])))
+                        """,
+                        nativeQuery = true)
         Page<PartsCatalog> search(
                 @Param("q") String q,
                 @Param("manufacturerId") Integer manufacturerId,
