@@ -21,6 +21,22 @@ class SupplyOrderDetailsScreen extends StatefulWidget {
   State<SupplyOrderDetailsScreen> createState() => _SupplyOrderDetailsScreenState();
 }
 
+const List<String> _complaintStatuses = ['DRAFT', 'SENT', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
+const Map<String, String> _complaintStatusLabels = {
+  'DRAFT': 'Черновик',
+  'SENT': 'Отправлена',
+  'IN_PROGRESS': 'В работе',
+  'RESOLVED': 'Решена',
+  'CLOSED': 'Закрыта',
+};
+
+String _describeComplaintStatus(String? status) {
+  if (status == null) return '-';
+  final normalized = status.trim().toUpperCase();
+  if (normalized.isEmpty) return '-';
+  return _complaintStatusLabels[normalized] ?? status;
+}
+
 class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
   final PurchaseOrdersRepository _repository = PurchaseOrdersRepository();
   final DateFormat _dateFormat = DateFormat('dd.MM.yyyy');
