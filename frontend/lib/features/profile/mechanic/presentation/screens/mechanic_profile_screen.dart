@@ -619,6 +619,8 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   Widget build(BuildContext context) {
     final visibleClubs = profile.clubs.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     final showClubPlaceholder = _clubAccesses.isEmpty && _isFreeMechanic && visibleClubs.isEmpty;
+    final clubsToDisplay =
+        visibleClubs.isNotEmpty ? visibleClubs : (showClubPlaceholder ? ['Клубы и доступы'] : []);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -740,15 +742,15 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen())),
                     ),
                     const SizedBox(height: 10),
-                    ...List.generate(visibleClubs.length, (i) {
-                      final club = visibleClubs[i];
+                    ...List.generate(clubsToDisplay.length, (i) {
+                      final club = clubsToDisplay[i];
                       return Padding(
-                        padding: EdgeInsets.only(bottom: i == visibleClubs.length - 1 ? 0 : 10),
+                        padding: EdgeInsets.only(bottom: i == clubsToDisplay.length - 1 ? 0 : 10),
                         child: ProfileTile(
                           icon: Icons.location_searching_rounded,
                           text: club,
-                          showAlertBadge: !profile.workplaceVerified && i == 0,
-                          onTap: _canEditProfile ? () => _openEdit(EditFocus.none) : null,
+                          showAlertBadge: !profile.workplaceVerified && club.isNotEmpty && i == 0,
+                          onTap: _canEditProfile && club.isNotEmpty ? () => _openEdit(EditFocus.none) : null,
                         ),
                       );
                     }),
