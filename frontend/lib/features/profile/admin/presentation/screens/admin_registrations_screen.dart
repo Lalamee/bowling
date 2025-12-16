@@ -503,7 +503,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
 
   Future<AdminMechanicAccountChangeDto?> _askAccountChange(String? currentAccount, {bool allowClub = false, int? initialClubId}) async {
     String? account = currentAccount;
-    String? access = 'PREMIUM';
+    String? access = currentAccount == 'FREE_MECHANIC_BASIC' ? 'BASIC' : 'PREMIUM';
     bool attachToClub = allowClub && initialClubId != null;
     int? selectedClub = initialClubId;
     final formKey = GlobalKey<FormState>();
@@ -520,23 +520,30 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
               DropdownButtonFormField<String?>(
                 value: account,
                 decoration: const InputDecoration(labelText: 'Тип аккаунта'),
-                items: AccountTypeName.values
-                    .map((t) => DropdownMenuItem<String?>(
-                          value: t.apiName,
-                          child: Text(t.apiName),
-                        ))
-                    .toList(),
-                onChanged: (value) => account = value,
+                items: const [
+                  DropdownMenuItem(value: 'INDIVIDUAL', child: Text('Механик')),
+                  DropdownMenuItem(value: 'FREE_MECHANIC_BASIC', child: Text('Свободный механик (базовый)')),
+                  DropdownMenuItem(value: 'FREE_MECHANIC_PREMIUM', child: Text('Свободный механик (премиум)')),
+                ],
+                isExpanded: true,
+                onChanged: (value) {
+                  account = value;
+                  final allowedAccess = _accessOptionsFor(account);
+                  access = allowedAccess.first;
+                },
                 validator: (value) => (value == null || value.isEmpty) ? 'Выберите тип аккаунта' : null,
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String?>(
                 value: access,
                 decoration: const InputDecoration(labelText: 'Уровень доступа'),
-                items: const [
-                  DropdownMenuItem(value: 'PREMIUM', child: Text('PREMIUM')),
-                  DropdownMenuItem(value: 'BASIC', child: Text('BASIC')),
-                ],
+                items: _accessOptionsFor(account)
+                    .map((value) => DropdownMenuItem<String?>(
+                          value: value,
+                          child: Text(value == 'PREMIUM' ? 'Премиум' : 'Базовый'),
+                        ))
+                    .toList(),
+                isExpanded: true,
                 onChanged: (value) => access = value,
                 validator: (value) => (value == null || value.isEmpty) ? 'Укажите уровень доступа' : null,
               ),
@@ -606,7 +613,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text('Фильтры', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
@@ -710,6 +717,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     return DropdownButtonFormField<String?>(
       value: value,
       decoration: InputDecoration(labelText: label),
+      isExpanded: true,
       items: [
         const DropdownMenuItem(value: null, child: Text('Все')),
         ...options.entries
@@ -718,6 +726,17 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
       ],
       onChanged: onChanged,
     );
+  }
+
+  List<String> _accessOptionsFor(String? account) {
+    switch (account) {
+      case 'FREE_MECHANIC_BASIC':
+        return const ['BASIC'];
+      case 'FREE_MECHANIC_PREMIUM':
+        return const ['PREMIUM'];
+      default:
+        return const ['PREMIUM', 'BASIC'];
+    }
   }
 
   String _roleLabel(String? role) {

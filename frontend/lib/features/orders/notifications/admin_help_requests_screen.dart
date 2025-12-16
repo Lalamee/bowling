@@ -145,7 +145,7 @@ class _AdminHelpRequestsScreenState extends State<AdminHelpRequestsScreen> {
                   Text('Позиция: ${item.partId}', style: t.formInput),
                   if (item.laneNumber != null) Text('Дорожка: ${item.laneNumber}', style: t.formInput),
                   if (item.partStatus != null)
-                    Text('Статус позиции: ${item.partStatus}', style: t.formInput),
+                    Text('Статус позиции: ${_partStatusLabel(item.partStatus)}', style: t.formInput),
                   Text(
                     item.helpRequested == true
                         ? 'Флаг помощи: включен'
@@ -156,6 +156,7 @@ class _AdminHelpRequestsScreenState extends State<AdminHelpRequestsScreen> {
                     Text(item.managerNotes!, style: t.formInput),
                 ],
               ),
+              isThreeLine: true,
               trailing: IconButton(
                 icon: const Icon(Icons.open_in_new, color: AppColors.primary),
                 onPressed: () => _openRequest(item),
@@ -165,5 +166,24 @@ class _AdminHelpRequestsScreenState extends State<AdminHelpRequestsScreen> {
         },
       ),
     );
+  }
+
+  String _partStatusLabel(String? status) {
+    switch (status?.toUpperCase()) {
+      case 'APPROVAL_PENDING':
+        return 'Ожидает подтверждения';
+      case 'APPROVAL_REJECTED':
+        return 'Отклонено';
+      case 'APPROVED':
+        return 'Одобрено';
+      case 'DELIVERED':
+        return 'Доставлено';
+      case 'REQUESTED':
+        return 'Запрошено';
+      case 'IN_PROGRESS':
+        return 'В работе';
+      default:
+        return status ?? '—';
+    }
   }
 }

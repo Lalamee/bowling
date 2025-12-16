@@ -22,6 +22,14 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
   String? _typeFilter;
   final TextEditingController _searchCtrl = TextEditingController();
 
+  static const Map<String, String> _typeLabels = {
+    'REGISTRATION_DECISION': 'Решение по регистрации',
+    'ATTESTATION_DECISION': 'Решение по аттестации',
+    'HELP_REQUEST': 'Запрос помощи',
+    'SUPPLIER_COMPLAINT': 'Жалоба поставщику',
+    'ACCESS_REQUEST': 'Запрос доступа',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -118,13 +126,9 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
                   decoration: const InputDecoration(labelText: 'Тип события'),
                   items: [
                     const DropdownMenuItem(value: null, child: Text('Все')),
-                    ...{
-                      'REGISTRATION_DECISION',
-                      'ATTESTATION_DECISION',
-                      'HELP_REQUEST',
-                      'SUPPLIER_COMPLAINT',
-                      'ACCESS_REQUEST',
-                    }.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                    ..._typeLabels.entries
+                        .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                        .toList(),
                   ],
                   onChanged: (v) => setState(() => _typeFilter = v),
                 ),
@@ -159,7 +163,7 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
       child: ListTile(
         title: Text(item.message ?? 'Оповещение ${item.id ?? ''}'),
         subtitle: subtitle.isNotEmpty ? Text(subtitle.join('\n')) : null,
-        trailing: Chip(label: Text(item.type ?? '—')),
+        trailing: Chip(label: Text(_typeLabel(item.type))),
         onTap: () => _showDetails(item),
       ),
     );
@@ -169,7 +173,7 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(item.type ?? 'Обращение'),
+        title: Text(_typeLabel(item.type)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -186,6 +190,11 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
         actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть'))],
       ),
     );
+  }
+
+  String _typeLabel(String? type) {
+    if (type == null) return '—';
+    return _typeLabels[type.trim().toUpperCase()] ?? type;
   }
 }
 
