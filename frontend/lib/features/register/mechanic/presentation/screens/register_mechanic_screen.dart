@@ -410,12 +410,8 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
-                  ),
-                  const Spacer(),
                   TextButton.icon(
                     onPressed: () {
                       Navigator.of(ctx).pushNamedAndRemoveUntil(Routes.welcome, (route) => false);
