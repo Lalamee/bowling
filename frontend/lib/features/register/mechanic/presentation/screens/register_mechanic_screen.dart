@@ -410,8 +410,9 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  _buildStepBackButton(ctx),
                   TextButton.icon(
                     onPressed: () {
                       Navigator.of(ctx).pushNamedAndRemoveUntil(Routes.welcome, (route) => false);
@@ -447,22 +448,29 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     );
   }
 
+  Widget _buildStepBackButton(BuildContext ctx) {
+    return TextButton.icon(
+      onPressed: () {
+        if (step == 0) {
+          final navigator = Navigator.of(ctx);
+          if (navigator.canPop()) {
+            navigator.pop();
+          }
+        } else {
+          prevStep();
+        }
+      },
+      icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+      label: const Text('Шаг назад', style: TextStyle(color: AppColors.primary)),
+      style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+    );
+  }
+
   Widget _buildStepOne(BuildContext ctx) {
     return Column(
       key: const ValueKey('register_mechanic_step_1'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TextButton.icon(
-          onPressed: () {
-            final navigator = Navigator.of(ctx);
-            if (navigator.canPop()) {
-              navigator.pop();
-            }
-          },
-          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
-          label: const Text('Шаг назад', style: TextStyle(color: AppColors.primary)),
-          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-        ),
         formStepTitle('Добро пожаловать!'),
         formDescription('Пожалуйста, заполните форму — это нужно, чтобы мы знали, где вы работаете и могли подключить Вас к системе.'),
         LabeledTextField(label: 'ФИО', controller: _fio, validator: Validators.notEmpty, icon: Icons.person, isRequired: true),
@@ -502,12 +510,6 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       key: const ValueKey('register_mechanic_step_2'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TextButton.icon(
-          onPressed: prevStep,
-          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
-          label: const Text('Шаг назад', style: TextStyle(color: AppColors.primary)),
-          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-        ),
         sectionTitle('Какое у Вас образование?'),
         const SizedBox(height: 16),
         // показываем пользователю текст, а сохраняем id
@@ -546,12 +548,6 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       key: const ValueKey('register_mechanic_step_3'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TextButton.icon(
-          onPressed: prevStep,
-          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
-          label: const Text('Шаг назад', style: TextStyle(color: AppColors.primary)),
-          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-        ),
         sectionTitle('Стаж работы'),
         const SizedBox(height: 8),
         LabeledTextField(label: 'Общий стаж работы', controller: _workYears, validator: Validators.integer, keyboardType: TextInputType.number, isRequired: true),
