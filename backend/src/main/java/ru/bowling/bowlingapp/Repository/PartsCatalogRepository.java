@@ -33,7 +33,7 @@ public interface PartsCatalogRepository extends JpaRepository<PartsCatalog, Long
                         "or lower(p.catalogNumber) like lower(concat('%', :q, '%'))) " +
                         "and (:manufacturerId is null or m.manufacturerId = :manufacturerId) " +
                         "and (:isUnique is null or p.isUnique = :isUnique) " +
-                        "and (:categoryCodes is null or lower(trim(p.categoryCode)) in :categoryCodes)")
+                        "and (:categoryCodes is null or lower(CAST(p.categoryCode AS text)) in :categoryCodes)")
         Page<PartsCatalog> search(
                 @Param("q") String q,
                 @Param("manufacturerId") Integer manufacturerId,
