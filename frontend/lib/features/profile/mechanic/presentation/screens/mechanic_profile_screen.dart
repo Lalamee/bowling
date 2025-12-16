@@ -93,7 +93,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   bool _isFreeMechanicType(String? accountType) {
     if (accountType == null) return false;
     final normalized = accountType.trim().toUpperCase();
-    return normalized == 'FREE_MECHANIC_BASIC' || normalized == 'FREE_MECHANIC_PREMIUM';
+    return normalized.contains('FREE_MECHANIC');
   }
 
   bool _roleAllowsEditing(String? role) {
@@ -113,8 +113,9 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     _applicationStatus = application?['status']?.toString() ?? stored['applicationStatus']?.toString();
     _applicationComment = application?['comment']?.toString() ?? stored['applicationComment']?.toString();
     _applicationAccountType = application?['accountType']?.toString() ?? stored['accountType']?.toString();
-    _accountType ??= stored['accountType']?.toString();
-    _isFreeMechanic = _isFreeMechanic || _isFreeMechanicType(_accountType);
+    _accountType ??= _applicationAccountType ?? stored['accountType']?.toString();
+    _isFreeMechanic =
+        _isFreeMechanic || _isFreeMechanicType(_accountType) || _isFreeMechanicType(_applicationAccountType);
     _applyProfile(normalized, _clubAccesses);
   }
 
@@ -616,6 +617,8 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final visibleClubs = profile.clubs.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    final showClubPlaceholder = _clubAccesses.isEmpty && _isFreeMechanic && visibleClubs.isEmpty;
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -694,7 +697,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    if (_isFreeMechanic)
+                    if (_clubAccesses.isNotEmpty || showClubPlaceholder)
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -710,26 +713,26 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
                             ),
                             const SizedBox(height: 6),
-                            if (_clubAccesses.isEmpty)
-                              const Text(
-                                'Временные доступы к клубам отсутствуют. Доступ появится после приглашения от клуба или менеджера.',
-                                style: TextStyle(color: AppColors.darkGray, fontSize: 13),
-                              )
-                            else
+                            if (_clubAccesses.isNotEmpty)
                               ..._clubAccesses.map((club) => Padding(
                                     padding: const EdgeInsets.only(top: 8),
                                     child: _ClubAccessTile(club: club),
-                                  )),
+                                  ))
+                            else if (showClubPlaceholder)
+                              const Text(
+                                'Временные доступы к клубам отсутствуют. Доступ появится после приглашения от клуба или менеджера.',
+                                style: TextStyle(color: AppColors.darkGray, fontSize: 13),
+                              ),
                           ],
                         ),
                       ),
-                    if (_isFreeMechanic) const SizedBox(height: 10),
-                    if (_isFreeMechanic)
-                      ProfileTile(
-                        icon: Icons.warehouse_outlined,
-                        text: 'Личный ZIP-склад',
-                        onTap: () => Navigator.pushNamed(context, Routes.personalWarehouse),
-                      ),
+                    if (_clubAccesses.isNotEmpty || showClubPlaceholder)
+                      const SizedBox(height: 10),
+                    ProfileTile(
+                      icon: Icons.warehouse_outlined,
+                      text: 'Личный ZIP-склад',
+                      onTap: () => Navigator.pushNamed(context, Routes.personalWarehouse),
+                    ),
                     const SizedBox(height: 10),
                     ProfileTile(
                       icon: Icons.menu_book_rounded,
@@ -737,10 +740,10 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen())),
                     ),
                     const SizedBox(height: 10),
-                    ...List.generate(profile.clubs.length, (i) {
-                      final club = profile.clubs[i];
+                    ...List.generate(visibleClubs.length, (i) {
+                      final club = visibleClubs[i];
                       return Padding(
-                        padding: EdgeInsets.only(bottom: i == profile.clubs.length - 1 ? 0 : 10),
+                        padding: EdgeInsets.only(bottom: i == visibleClubs.length - 1 ? 0 : 10),
                         child: ProfileTile(
                           icon: Icons.location_searching_rounded,
                           text: club,
