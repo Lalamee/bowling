@@ -21,6 +21,22 @@ class SupplyOrderDetailsScreen extends StatefulWidget {
   State<SupplyOrderDetailsScreen> createState() => _SupplyOrderDetailsScreenState();
 }
 
+const List<String> _complaintStatuses = ['DRAFT', 'SENT', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
+const Map<String, String> _complaintStatusLabels = {
+  'DRAFT': 'Черновик',
+  'SENT': 'Отправлена',
+  'IN_PROGRESS': 'В работе',
+  'RESOLVED': 'Решена',
+  'CLOSED': 'Закрыта',
+};
+
+String _describeComplaintStatus(String? status) {
+  if (status == null) return '-';
+  final normalized = status.trim().toUpperCase();
+  if (normalized.isEmpty) return '-';
+  return _complaintStatusLabels[normalized] ?? status;
+}
+
 class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
   final PurchaseOrdersRepository _repository = PurchaseOrdersRepository();
   final DateFormat _dateFormat = DateFormat('dd.MM.yyyy');
@@ -37,7 +53,15 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
   final TextEditingController _supplierPhoneController = TextEditingController();
   final TextEditingController _supplierEmailController = TextEditingController();
   bool _supplierVerified = false;
-  static const List<String> _complaintStatuses = ['DRAFT', 'SENT', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
+
+  static const Map<String, String> _statusLabels = {
+    'PENDING': 'Ожидает',
+    'CONFIRMED': 'Подтверждена',
+    'PARTIALLY_COMPLETED': 'Частично принята',
+    'COMPLETED': 'Полностью принята',
+    'REJECTED': 'Отклонена',
+    'CANCELED': 'Отменена',
+  };
 
   @override
   void initState() {
@@ -195,7 +219,10 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
           Wrap(
             spacing: 8,
             children: [
-              _StatusBadge(label: detail.status, color: AppColors.primary),
+              _StatusBadge(
+                label: _statusLabels[detail.status?.toUpperCase()] ?? detail.status ?? '-',
+                color: AppColors.primary,
+              ),
               if (detail.hasComplaint)
                 const _StatusBadge(label: 'Есть претензии', color: Colors.redAccent),
               if (detail.hasReview)
@@ -438,7 +465,10 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Статус: ${item.complaintStatus ?? '-'}', style: const TextStyle(color: AppColors.darkGray)),
+                    Text(
+                      'Статус: ${_describeComplaintStatus(item.complaintStatus)}',
+                      style: const TextStyle(color: AppColors.darkGray),
+                    ),
                     if (item.complaintTitle != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
@@ -760,7 +790,12 @@ class _SupplyOrderDetailsScreenState extends State<SupplyOrderDetailsScreen> {
               value: status,
               decoration: const InputDecoration(labelText: 'Статус'),
               items: _complaintStatuses
-                  .map((value) => DropdownMenuItem(value: value, child: Text(value)))
+                  .map(
+                    (value) => DropdownMenuItem(
+                      value: value,
+                      child: Text(_complaintStatusLabels[value] ?? value),
+                    ),
+                  )
                   .toList(),
               onChanged: (value) {
                 if (value != null) status = value;
@@ -887,7 +922,10 @@ class _FeedbackList extends StatelessWidget {
                             ),
                           ),
                         if (complaint && item.complaintStatus != null)
-                          Text('Статус: ${item.complaintStatus}', style: const TextStyle(color: AppColors.darkGray)),
+                          Text(
+                            'Статус: ${_describeComplaintStatus(item.complaintStatus)}',
+                            style: const TextStyle(color: AppColors.darkGray),
+                          ),
                       ],
                     ),
                     if (item.comment != null)
