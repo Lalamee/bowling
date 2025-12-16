@@ -50,6 +50,7 @@ public class RequestPart {
 
     // Индикация запроса помощи по детали от механика (для отображения в заказе)
     @Column(name = "help_requested")
+    @Builder.Default
     private Boolean helpRequested = Boolean.FALSE;
 
     @Enumerated(EnumType.STRING)

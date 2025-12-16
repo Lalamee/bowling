@@ -293,7 +293,7 @@ public class FreeMechanicApplicationService {
             throw new IllegalArgumentException("Entrepreneur flag is required");
         }
         if (request.getRegion() == null || request.getRegion().trim().isEmpty()) {
-            throw new IllegalArgumentException("Region is required");
+            request.setRegion("Не указан");
         }
     }
 

@@ -54,4 +54,23 @@ public class BowlingClub {
 
     @OneToMany(mappedBy = "club", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ClubEquipmentType> equipmentTypes;
+
+    @PrePersist
+    public void applyDefaults() {
+        if (address == null || address.isBlank()) {
+            address = "N/A";
+        }
+        if (isActive == null) {
+            isActive = Boolean.TRUE;
+        }
+        if (isVerified == null) {
+            isVerified = Boolean.FALSE;
+        }
+        if (createdAt == null) {
+            createdAt = LocalDate.now();
+        }
+        if (updatedAt == null) {
+            updatedAt = createdAt;
+        }
+    }
 }
