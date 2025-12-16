@@ -55,10 +55,21 @@ public class OwnerDashboardController {
     }
 
     @GetMapping("/notifications")
-    @PreAuthorize("hasAnyRole('CLUB_OWNER','HEAD_MECHANIC','CLUB_MANAGER','ADMIN')")
+    @PreAuthorize("hasAnyRole('CLUB_OWNER','HEAD_MECHANIC','CLUB_MANAGER','ADMIN','MECHANIC')")
     public ResponseEntity<List<NotificationEvent>> getNotifications(@AuthenticationPrincipal UserPrincipal principal,
                                                                    @RequestParam(name = "clubId", required = false) Long clubId,
-                                                                   @RequestParam(name = "role", required = false) RoleName role) {
-        return ResponseEntity.ok(ownerDashboardService.getManagerNotifications(principal.getId(), clubId, role));
+                                                                   @RequestParam(name = "role", required = false) String role) {
+        return ResponseEntity.ok(ownerDashboardService.getManagerNotifications(principal.getId(), clubId, parseRole(role)));
+    }
+
+    private RoleName parseRole(String rawRole) {
+        if (rawRole == null || rawRole.isBlank()) {
+            return null;
+        }
+        try {
+            return RoleName.from(rawRole);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 }

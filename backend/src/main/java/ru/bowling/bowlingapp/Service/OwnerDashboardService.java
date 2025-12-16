@@ -1,8 +1,10 @@
 package ru.bowling.bowlingapp.Service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import ru.bowling.bowlingapp.DTO.*;
 import ru.bowling.bowlingapp.DTO.NotificationEvent;
 import ru.bowling.bowlingapp.Entity.*;
@@ -178,23 +180,25 @@ public class OwnerDashboardService {
     @Transactional(readOnly = true)
     public List<NotificationEvent> getManagerNotifications(Long userId, Long clubId, RoleName roleName) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-        Long resolvedClubId = resolveClubForUser(user, clubId);
+                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
         List<Long> accessibleClubIds = userClubAccessService.resolveAccessibleClubIds(user);
+        Long resolvedClubId = resolveClubForNotifications(clubId, accessibleClubIds);
         List<NotificationEvent> filtered = notificationService.getNotificationsForUser(user, accessibleClubIds).stream()
-                .filter(event -> event.getClubId() == null || Objects.equals(event.getClubId(), resolvedClubId))
+                .filter(event -> resolvedClubId == null || event.getClubId() == null || Objects.equals(event.getClubId(), resolvedClubId))
                 .toList();
         List<NotificationEvent> events = new ArrayList<>(filtered);
 
-        getWarnings(userId, resolvedClubId).forEach(warning -> events.add(NotificationEvent.builder()
-                .id(UUID.randomUUID())
-                .type(NotificationEventType.MAINTENANCE_WARNING)
-                .message(warning.getMessage())
-                .clubId(resolvedClubId)
-                .createdAt(LocalDateTime.now())
-                .payload(warning.getType())
-                .audiences(Set.of(RoleName.ADMIN, RoleName.CLUB_OWNER, RoleName.HEAD_MECHANIC))
-                .build()));
+        if (resolvedClubId != null) {
+            getWarnings(userId, resolvedClubId).forEach(warning -> events.add(NotificationEvent.builder()
+                    .id(UUID.randomUUID())
+                    .type(NotificationEventType.MAINTENANCE_WARNING)
+                    .message(warning.getMessage())
+                    .clubId(resolvedClubId)
+                    .createdAt(LocalDateTime.now())
+                    .payload(warning.getType())
+                    .audiences(Set.of(RoleName.ADMIN, RoleName.CLUB_OWNER, RoleName.HEAD_MECHANIC))
+                    .build()));
+        }
 
         return events;
     }
@@ -301,7 +305,7 @@ public class OwnerDashboardService {
 
     private Long resolveClubForUser(Long userId, Long explicitClubId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
         return resolveClubForUser(user, explicitClubId);
     }
 
@@ -317,6 +321,16 @@ public class OwnerDashboardService {
         return accessibleClubIds.stream()
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Для пользователя не найден активный клуб"));
+    }
+
+    private Long resolveClubForNotifications(Long explicitClubId, List<Long> accessibleClubIds) {
+        if (explicitClubId != null) {
+            if (!accessibleClubIds.contains(explicitClubId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Нет доступа к выбранному клубу");
+            }
+            return explicitClubId;
+        }
+        return accessibleClubIds.stream().findFirst().orElse(null);
     }
 
     private String readableEquipment(EquipmentMaintenanceSchedule schedule) {
