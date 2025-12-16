@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import ru.bowling.bowlingapp.Entity.converter.WorkTypeConverter;
 import ru.bowling.bowlingapp.Entity.enums.WorkLogStatus;
 import ru.bowling.bowlingapp.Entity.enums.WorkType;
 
@@ -56,7 +57,7 @@ public class WorkLog {
     @Column(name = "status")
     private WorkLogStatus status;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = WorkTypeConverter.class)
     @Column(name = "work_type")
     private WorkType workType;
 

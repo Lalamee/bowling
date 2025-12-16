@@ -357,7 +357,7 @@ public class AuthService implements UserDetailsService {
                 throw new IllegalArgumentException("Free mechanics cannot be attached to a club during registration");
             }
             if (trimOrNull(mechanicDto.getRegion()) == null) {
-                throw new IllegalArgumentException("Region is required for mechanic profile");
+                mechanicDto.setRegion("Не указан");
             }
             if (mechanicDto.getIsEntrepreneur() == null) {
                 throw new IllegalArgumentException("Entrepreneur/self-employment flag is required for mechanic profile");
