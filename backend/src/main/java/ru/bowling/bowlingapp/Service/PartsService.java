@@ -205,10 +205,26 @@ public class PartsService {
         }
 
         private String resolveSortBy(String requestedSort) {
-                return Optional.ofNullable(requestedSort)
+                String normalized = Optional.ofNullable(requestedSort)
                                 .map(String::trim)
                                 .filter(s -> !s.isBlank())
-                                .orElse("catalogId");
+                                .map(String::toLowerCase)
+                                .orElse(null);
+
+                if (normalized == null) {
+                        return "catalog_id";
+                }
+
+                return switch (normalized) {
+                case "catalogid", "catalog_id" -> "catalog_id";
+                case "catalognumber", "catalog_number" -> "catalog_number";
+                case "officialnameen", "official_name_en" -> "official_name_en";
+                case "officialnameru", "official_name_ru" -> "official_name_ru";
+                case "commonname", "common_name" -> "common_name";
+                case "normalservicelife", "normal_service_life" -> "normal_service_life";
+                case "isunique", "is_unique" -> "is_unique";
+                default -> "catalog_id";
+                };
         }
 
         private Sort.Direction resolveSortDirection(String requestedDirection) {
