@@ -298,6 +298,7 @@ class _AdminAttestationScreenState extends State<AdminAttestationScreen> {
             ),
           ],
         ),
+        isThreeLine: true,
         onTap: () => _showDetails(app, region: region, resolvedGrade: resolvedGrade),
       ),
     );
@@ -348,13 +349,13 @@ class _AdminAttestationScreenState extends State<AdminAttestationScreen> {
   String _gradeLabel(MechanicGrade grade) {
     switch (grade) {
       case MechanicGrade.junior:
-        return 'Junior';
+        return 'Джуниор';
       case MechanicGrade.middle:
-        return 'Middle';
+        return 'Миддл';
       case MechanicGrade.senior:
-        return 'Senior';
+        return 'Сеньор';
       case MechanicGrade.lead:
-        return 'Lead';
+        return 'Лид';
     }
   }
 

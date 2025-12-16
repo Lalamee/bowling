@@ -44,6 +44,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     'MECHANIC': 'Механик',
     'HEAD_MECHANIC': 'Менеджер',
     'CLUB_OWNER': 'Владелец клуба',
+    'CLUB_MANAGER': 'Менеджер клуба',
   };
 
   static const Map<String, String> _accountLabels = {
@@ -68,6 +69,47 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     'MANAGER': 'Менеджер клуба',
     'OWNER': 'Владелец клуба',
     'ADMIN': 'Администратор',
+    'INDIVIDUAL': 'Механик',
+  };
+
+  static const Map<String, String> _commonValueLocalizations = {
+    'ADMIN': 'Администратор',
+    'MAIN_ADMIN': 'Администрация сервиса',
+    'MECHANIC': 'Механик',
+    'HEAD_MECHANIC': 'Менеджер',
+    'CLUB_OWNER': 'Владелец клуба',
+    'CLUB_MANAGER': 'Менеджер клуба',
+    'OWNER': 'Владелец клуба',
+    'MANAGER': 'Менеджер клуба',
+    'INDIVIDUAL': 'Механик',
+    'CLUB': 'Клуб',
+    'ADMINISTRATION': 'Администрация',
+    'FREE_MECHANIC_BASIC': 'Свободный механик (базовый)',
+    'FREE_MECHANIC_PREMIUM': 'Свободный механик (премиум)',
+    'BASIC': 'Базовый',
+    'PREMIUM': 'Премиум',
+    'PENDING': 'В обработке',
+    'APPROVED': 'Одобрена',
+    'REJECTED': 'Отклонена',
+    'DRAFT': 'Черновик',
+    'TRUE': 'Да',
+    'FALSE': 'Нет',
+  };
+
+  static const Map<String, String> _payloadKeyLabels = {
+    'ROLE': 'Роль',
+    'ACCOUNT': 'Аккаунт',
+    'ACCOUNT_TYPE': 'Тип аккаунта',
+    'APPLICATION_TYPE': 'Тип заявки',
+    'PROFILE_TYPE': 'Тип профиля',
+    'STATUS': 'Статус',
+    'ACCESS_LEVEL': 'Уровень доступа',
+    'CLUB': 'Клуб',
+    'CLUB_ID': 'ID клуба',
+    'CLUB_NAME': 'Клуб',
+    'COMMENT': 'Комментарий',
+    'REQUEST_TYPE': 'Тип запроса',
+    'ATTACH_TO_CLUB': 'Привязка к клубу',
   };
 
   static const Map<String, int> _statusOrder = {
@@ -426,9 +468,13 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
                   runSpacing: 4,
                   children: app.payload!.entries
                       .map(
-                        (e) => Chip(
-                          label: Text('${e.key}: ${e.value}'),
-                        ),
+                        (e) {
+                          final keyLabel = _localizePayloadKey(e.key);
+                          final valueLabel = _localizeConstantValue(e.value);
+                          return Chip(
+                            label: Text('$keyLabel: $valueLabel'),
+                          );
+                        },
                       )
                       .toList(),
                 ),
@@ -503,7 +549,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
 
   Future<AdminMechanicAccountChangeDto?> _askAccountChange(String? currentAccount, {bool allowClub = false, int? initialClubId}) async {
     String? account = currentAccount;
-    String? access = 'PREMIUM';
+    String? access = currentAccount == 'FREE_MECHANIC_BASIC' ? 'BASIC' : 'PREMIUM';
     bool attachToClub = allowClub && initialClubId != null;
     int? selectedClub = initialClubId;
     final formKey = GlobalKey<FormState>();
@@ -520,23 +566,30 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
               DropdownButtonFormField<String?>(
                 value: account,
                 decoration: const InputDecoration(labelText: 'Тип аккаунта'),
-                items: AccountTypeName.values
-                    .map((t) => DropdownMenuItem<String?>(
-                          value: t.apiName,
-                          child: Text(t.apiName),
-                        ))
-                    .toList(),
-                onChanged: (value) => account = value,
+                items: const [
+                  DropdownMenuItem(value: 'INDIVIDUAL', child: Text('Механик')),
+                  DropdownMenuItem(value: 'FREE_MECHANIC_BASIC', child: Text('Свободный механик (базовый)')),
+                  DropdownMenuItem(value: 'FREE_MECHANIC_PREMIUM', child: Text('Свободный механик (премиум)')),
+                ],
+                isExpanded: true,
+                onChanged: (value) {
+                  account = value;
+                  final allowedAccess = _accessOptionsFor(account);
+                  access = allowedAccess.first;
+                },
                 validator: (value) => (value == null || value.isEmpty) ? 'Выберите тип аккаунта' : null,
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String?>(
                 value: access,
                 decoration: const InputDecoration(labelText: 'Уровень доступа'),
-                items: const [
-                  DropdownMenuItem(value: 'PREMIUM', child: Text('PREMIUM')),
-                  DropdownMenuItem(value: 'BASIC', child: Text('BASIC')),
-                ],
+                items: _accessOptionsFor(account)
+                    .map((value) => DropdownMenuItem<String?>(
+                          value: value,
+                          child: Text(value == 'PREMIUM' ? 'Премиум' : 'Базовый'),
+                        ))
+                    .toList(),
+                isExpanded: true,
                 onChanged: (value) => access = value,
                 validator: (value) => (value == null || value.isEmpty) ? 'Укажите уровень доступа' : null,
               ),
@@ -606,7 +659,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text('Фильтры', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
@@ -710,6 +763,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     return DropdownButtonFormField<String?>(
       value: value,
       decoration: InputDecoration(labelText: label),
+      isExpanded: true,
       items: [
         const DropdownMenuItem(value: null, child: Text('Все')),
         ...options.entries
@@ -720,28 +774,59 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     );
   }
 
+  List<String> _accessOptionsFor(String? account) {
+    switch (account) {
+      case 'FREE_MECHANIC_BASIC':
+        return const ['BASIC'];
+      case 'FREE_MECHANIC_PREMIUM':
+        return const ['PREMIUM'];
+      default:
+        return const ['PREMIUM', 'BASIC'];
+    }
+  }
+
   String _roleLabel(String? role) {
     if (role == null) return '—';
     final key = role.trim().toUpperCase();
-    return _roleLabels[key] ?? role;
+    return _roleLabels[key] ?? _localizeConstantValue(role);
   }
 
   String _accountLabel(String? account) {
     if (account == null) return '—';
     final key = account.trim().toUpperCase();
-    return _accountLabels[key] ?? account;
+    return _accountLabels[key] ?? _localizeConstantValue(account);
   }
 
   String _statusLabel(String? status) {
     if (status == null) return '—';
     final key = status.trim().toUpperCase();
-    return _statusLabels[key] ?? status;
+    return _statusLabels[key] ?? _localizeConstantValue(status);
   }
 
   String _applicationTypeLabel(String? type) {
     if (type == null) return '—';
     final key = type.trim().toUpperCase();
-    return _applicationTypeLabels[key] ?? type;
+    return _applicationTypeLabels[key] ?? _localizeConstantValue(type);
+  }
+
+  String _localizeConstantValue(dynamic value) {
+    final stringValue = value?.toString();
+    if (stringValue == null || stringValue.trim().isEmpty) return '—';
+    final key = stringValue.trim().toUpperCase();
+    if (_commonValueLocalizations.containsKey(key)) return _commonValueLocalizations[key]!;
+
+    final cleaned = stringValue.replaceAll(RegExp(r'[_]+'), ' ').trim();
+    if (cleaned.isEmpty) return stringValue;
+    return cleaned[0].toUpperCase() + cleaned.substring(1).toLowerCase();
+  }
+
+  String _localizePayloadKey(String key) {
+    final upperKey = key.trim().toUpperCase();
+    if (_payloadKeyLabels.containsKey(upperKey)) return _payloadKeyLabels[upperKey]!;
+
+    final cleaned = key.replaceAll(RegExp(r'[_]+'), ' ').trim();
+    if (cleaned.isEmpty) return key;
+    return cleaned[0].toUpperCase() + cleaned.substring(1);
   }
 
   Future<AdminRegistrationApplicationDto?> _prepareMechanicAccount(AdminRegistrationApplicationDto app) async {
