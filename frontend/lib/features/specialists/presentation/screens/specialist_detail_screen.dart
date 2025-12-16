@@ -42,13 +42,13 @@ class _SpecialistDetailScreenState extends State<SpecialistDetailScreen> {
               const SizedBox(height: 8),
               _infoRow('Телефон', detail.contactPhone ?? '—'),
               _infoRow('Специализация', detail.specialization ?? '—'),
-              _infoRow('Статус', detail.status ?? '—'),
+              _infoRow('Статус', _statusLabel(detail.status)),
               _infoRow('Регион', detail.region ?? '—'),
               _infoRow('Рейтинг', detail.rating?.toStringAsFixed(1) ?? '—'),
               _infoRow('Общий стаж', detail.totalExperienceYears?.toString() ?? '—'),
               _infoRow('Опыт в боулинге', detail.bowlingExperienceYears?.toString() ?? '—'),
               _infoRow('Статус данных', detail.isDataVerified == true ? 'Проверено' : 'Не проверено'),
-              _infoRow('Аттестация', detail.attestationStatus ?? 'Нет данных'),
+              _infoRow('Аттестация', _attestationLabel(detail.attestationStatus)),
               _infoRow('Дата верификации', detail.verificationDate != null ? detail.verificationDate!.toLocal().toString().split(' ').first : '—'),
               const SizedBox(height: 12),
               const Text('Связанные клубы'),
@@ -115,6 +115,45 @@ class _SpecialistDetailScreenState extends State<SpecialistDetailScreen> {
         ],
       ),
     );
+  }
+
+  String _statusLabel(String? status) {
+    if (status == null || status.isEmpty) return 'Нет данных';
+    switch (status.toUpperCase()) {
+      case 'ACTIVE':
+        return 'Активен';
+      case 'INACTIVE':
+        return 'Неактивен';
+      case 'BLOCKED':
+        return 'Заблокирован';
+      case 'VERIFIED':
+        return 'Проверен';
+      case 'PENDING':
+      case 'ON_REVIEW':
+      case 'IN_REVIEW':
+        return 'На проверке';
+      case 'APPROVED':
+        return 'Одобрен';
+      case 'REJECTED':
+      case 'DECLINED':
+        return 'Отклонён';
+      default:
+        return status;
+    }
+  }
+
+  String _attestationLabel(String? attestation) {
+    if (attestation == null || attestation.isEmpty) return 'Нет данных';
+    switch (attestation.toUpperCase()) {
+      case 'PENDING':
+        return 'В ожидании решения';
+      case 'APPROVED':
+        return 'Аттестация пройдена';
+      case 'REJECTED':
+        return 'Аттестация не пройдена';
+      default:
+        return attestation;
+    }
   }
 }
 
