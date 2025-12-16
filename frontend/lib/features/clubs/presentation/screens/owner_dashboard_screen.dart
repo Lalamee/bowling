@@ -33,6 +33,30 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
   final _notificationsRepository = NotificationsRepository();
   final _maintenanceRepository = MaintenanceRepository();
 
+  static const Map<String, String> _statusLabels = {
+    'CREATED': 'Создано',
+    'ASSIGNED': 'Назначено',
+    'IN_PROGRESS': 'В работе',
+    'ON_HOLD': 'На паузе',
+    'COMPLETED': 'Завершено',
+    'VERIFIED': 'Проверено',
+    'CLOSED': 'Закрыто',
+    'CANCELLED': 'Отменено',
+  };
+
+  static const Map<String, String> _workTypeLabels = {
+    'PREVENTIVE_MAINTENANCE': 'Профилактическое обслуживание',
+    'CORRECTIVE_MAINTENANCE': 'Корректирующее обслуживание',
+    'EMERGENCY_REPAIR': 'Аварийный ремонт',
+    'INSTALLATION': 'Установка',
+    'REPLACEMENT': 'Замена',
+    'INSPECTION': 'Инспекция',
+    'CLEANING': 'Чистка',
+    'CALIBRATION': 'Калибровка',
+    'UPGRADE': 'Апгрейд',
+    'OTHER': 'Другое',
+  };
+
   bool _isLoading = true;
   bool _hasError = false;
   List<UserClub> _clubs = const [];
@@ -443,7 +467,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
                   'UPGRADE',
                   'OTHER',
                 ]
-                    .map((e) => DropdownMenuItem(value: e.isEmpty ? null : e, child: Text(e.isEmpty ? 'Все типы' : e)))
+                    .map(
+                      (e) => DropdownMenuItem(
+                        value: e.isEmpty ? null : e,
+                        child: Text(_workTypeLabel(e, allowAllLabel: true)),
+                      ),
+                    )
                     .toList(),
                 onChanged: _updateWorkType,
               ),
@@ -462,7 +491,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
                   'CLOSED',
                   'CANCELLED',
                 ]
-                    .map((e) => DropdownMenuItem(value: e.isEmpty ? null : e, child: Text(e.isEmpty ? 'Все' : e)))
+                    .map(
+                      (e) => DropdownMenuItem(
+                        value: e.isEmpty ? null : e,
+                        child: Text(e.isEmpty ? 'Все' : _statusLabel(e)),
+                      ),
+                    )
                     .toList(),
                 onChanged: _updateStatus,
               ),
@@ -484,12 +518,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
                   ),
                 if (_workTypeFilter != null)
                   Chip(
-                    label: Text('Тип: $_workTypeFilter'),
+                    label: Text('Тип: ${_workTypeLabel(_workTypeFilter, allowAllLabel: true)}'),
                     onDeleted: () => _updateWorkType(null),
                   ),
                 if (_statusFilter != null)
                   Chip(
-                    label: Text('Статус: $_statusFilter'),
+                    label: Text('Статус: ${_statusLabel(_statusFilter)}'),
                     onDeleted: () => _updateStatus(null),
                   ),
                 if (_dateRange != null)
@@ -523,23 +557,34 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
                             Row(
                               children: [
                                 Expanded(
-                                  child: Text(
-                                    '${entry.requestId != null ? 'Заявка ${entry.requestId}' : 'Работа ${entry.serviceHistoryId ?? '-'}'} • дорожка ${entry.laneNumber ?? '-'}',
-                                    style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark),
-                                  ),
+                                child: Text(
+                                  '${entry.requestId != null ? 'Заявка ${entry.requestId}' : 'Работа ${entry.serviceHistoryId ?? '-'}'} • дорожка ${entry.laneNumber ?? '-'}',
+                                  style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark),
                                 ),
-                                Chip(
-                                  label: Text(entry.status ?? entry.requestStatus ?? ''),
-                                  backgroundColor: AppColors.background,
-                                )
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              entry.workType ?? entry.serviceType ?? 'Тип работы не указан',
+                              ),
+                              Chip(
+                                label: Text(_statusLabel(entry.status ?? entry.requestStatus)),
+                                backgroundColor: AppColors.background,
+                              )
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Builder(builder: (_) {
+                            final primaryWorkType = _workTypeLabel(entry.workType);
+                            final secondaryWorkType = _workTypeLabel(entry.serviceType);
+                            final workTypeText = primaryWorkType != 'Не указан'
+                                ? primaryWorkType
+                                : secondaryWorkType != 'Не указан'
+                                    ? secondaryWorkType
+                                    : entry.workType ??
+                                        entry.serviceType ??
+                                        'Тип работы не указан';
+                            return Text(
+                              workTypeText,
                               style: const TextStyle(color: AppColors.darkGray),
-                            ),
-                            const SizedBox(height: 6),
+                            );
+                          }),
+                          const SizedBox(height: 6),
                             _infoRow('Оборудование', entry.equipmentModel ?? '—'),
                             _infoRow('Исполнитель', entry.mechanicName ?? '—'),
                             _infoRow('Создано', _formatDateTime(entry.createdDate) ?? '—'),
@@ -833,6 +878,20 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
       default:
         return 'Без статуса';
     }
+  }
+
+  String _statusLabel(String? status) {
+    if (status == null || status.isEmpty) return 'Без статуса';
+    final normalized = status.toUpperCase();
+    return _statusLabels[normalized] ?? status;
+  }
+
+  String _workTypeLabel(String? workType, {bool allowAllLabel = false}) {
+    if (workType == null || workType.isEmpty) {
+      return allowAllLabel ? 'Все типы' : 'Не указан';
+    }
+    final normalized = workType.toUpperCase();
+    return _workTypeLabels[normalized] ?? workType;
   }
 
   String? _formatDate(DateTime? date) => date != null ? '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}' : null;
