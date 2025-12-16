@@ -44,6 +44,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     'MECHANIC': 'Механик',
     'HEAD_MECHANIC': 'Менеджер',
     'CLUB_OWNER': 'Владелец клуба',
+    'CLUB_MANAGER': 'Менеджер клуба',
   };
 
   static const Map<String, String> _accountLabels = {
@@ -68,6 +69,47 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     'MANAGER': 'Менеджер клуба',
     'OWNER': 'Владелец клуба',
     'ADMIN': 'Администратор',
+    'INDIVIDUAL': 'Механик',
+  };
+
+  static const Map<String, String> _commonValueLocalizations = {
+    'ADMIN': 'Администратор',
+    'MAIN_ADMIN': 'Администрация сервиса',
+    'MECHANIC': 'Механик',
+    'HEAD_MECHANIC': 'Менеджер',
+    'CLUB_OWNER': 'Владелец клуба',
+    'CLUB_MANAGER': 'Менеджер клуба',
+    'OWNER': 'Владелец клуба',
+    'MANAGER': 'Менеджер клуба',
+    'INDIVIDUAL': 'Механик',
+    'CLUB': 'Клуб',
+    'ADMINISTRATION': 'Администрация',
+    'FREE_MECHANIC_BASIC': 'Свободный механик (базовый)',
+    'FREE_MECHANIC_PREMIUM': 'Свободный механик (премиум)',
+    'BASIC': 'Базовый',
+    'PREMIUM': 'Премиум',
+    'PENDING': 'В обработке',
+    'APPROVED': 'Одобрена',
+    'REJECTED': 'Отклонена',
+    'DRAFT': 'Черновик',
+    'TRUE': 'Да',
+    'FALSE': 'Нет',
+  };
+
+  static const Map<String, String> _payloadKeyLabels = {
+    'ROLE': 'Роль',
+    'ACCOUNT': 'Аккаунт',
+    'ACCOUNT_TYPE': 'Тип аккаунта',
+    'APPLICATION_TYPE': 'Тип заявки',
+    'PROFILE_TYPE': 'Тип профиля',
+    'STATUS': 'Статус',
+    'ACCESS_LEVEL': 'Уровень доступа',
+    'CLUB': 'Клуб',
+    'CLUB_ID': 'ID клуба',
+    'CLUB_NAME': 'Клуб',
+    'COMMENT': 'Комментарий',
+    'REQUEST_TYPE': 'Тип запроса',
+    'ATTACH_TO_CLUB': 'Привязка к клубу',
   };
 
   static const Map<String, int> _statusOrder = {
@@ -426,9 +468,13 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
                   runSpacing: 4,
                   children: app.payload!.entries
                       .map(
-                        (e) => Chip(
-                          label: Text('${e.key}: ${e.value}'),
-                        ),
+                        (e) {
+                          final keyLabel = _localizePayloadKey(e.key);
+                          final valueLabel = _localizeConstantValue(e.value);
+                          return Chip(
+                            label: Text('$keyLabel: $valueLabel'),
+                          );
+                        },
                       )
                       .toList(),
                 ),
@@ -742,25 +788,45 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
   String _roleLabel(String? role) {
     if (role == null) return '—';
     final key = role.trim().toUpperCase();
-    return _roleLabels[key] ?? role;
+    return _roleLabels[key] ?? _localizeConstantValue(role);
   }
 
   String _accountLabel(String? account) {
     if (account == null) return '—';
     final key = account.trim().toUpperCase();
-    return _accountLabels[key] ?? account;
+    return _accountLabels[key] ?? _localizeConstantValue(account);
   }
 
   String _statusLabel(String? status) {
     if (status == null) return '—';
     final key = status.trim().toUpperCase();
-    return _statusLabels[key] ?? status;
+    return _statusLabels[key] ?? _localizeConstantValue(status);
   }
 
   String _applicationTypeLabel(String? type) {
     if (type == null) return '—';
     final key = type.trim().toUpperCase();
-    return _applicationTypeLabels[key] ?? type;
+    return _applicationTypeLabels[key] ?? _localizeConstantValue(type);
+  }
+
+  String _localizeConstantValue(dynamic value) {
+    final stringValue = value?.toString();
+    if (stringValue == null || stringValue.trim().isEmpty) return '—';
+    final key = stringValue.trim().toUpperCase();
+    if (_commonValueLocalizations.containsKey(key)) return _commonValueLocalizations[key]!;
+
+    final cleaned = stringValue.replaceAll(RegExp(r'[_]+'), ' ').trim();
+    if (cleaned.isEmpty) return stringValue;
+    return cleaned[0].toUpperCase() + cleaned.substring(1).toLowerCase();
+  }
+
+  String _localizePayloadKey(String key) {
+    final upperKey = key.trim().toUpperCase();
+    if (_payloadKeyLabels.containsKey(upperKey)) return _payloadKeyLabels[upperKey]!;
+
+    final cleaned = key.replaceAll(RegExp(r'[_]+'), ' ').trim();
+    if (cleaned.isEmpty) return key;
+    return cleaned[0].toUpperCase() + cleaned.substring(1);
   }
 
   Future<AdminRegistrationApplicationDto?> _prepareMechanicAccount(AdminRegistrationApplicationDto app) async {
