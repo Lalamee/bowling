@@ -48,11 +48,11 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
       setState(() => _loading = true);
       final me = await _userRepository.me();
       if (!mounted) return;
-      _userId = _asInt(me['userId']);
+      _userId = _asInt(me['userId']) ?? _asInt(me['id']);
       final mechanicProfile = me['mechanicProfile'];
       if (mechanicProfile is Map) {
         final map = Map<String, dynamic>.from(mechanicProfile);
-        _mechanicProfileId = _asInt(map['profileId']) ?? _asInt(map['mechanicProfileId']);
+        _mechanicProfileId = _asInt(map['profileId']) ?? _asInt(map['mechanicProfileId']) ?? _asInt(map['id']);
         _clubId = _asInt(map['clubId']);
       }
 

@@ -330,9 +330,15 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
     return int.tryParse(trimmed);
   }
 
-  Future<int?> _resolveCatalogId(String catalogNumber) async {
+  Future<int?> _resolveCatalogId(String catalogNumber, {String? nameHint}) async {
     final results = await _partsRepo.search(catalogNumber);
-    if (results.isEmpty) return null;
+    if (results.isEmpty) {
+      final created = await _partsRepo.createOrFindCatalog(
+        catalogNumber: catalogNumber,
+        name: nameHint,
+      );
+      return created?.catalogId;
+    }
     final normalized = catalogNumber.trim().toLowerCase();
     final exact = results.firstWhere(
       (p) => p.catalogNumber.toLowerCase() == normalized,
@@ -424,7 +430,7 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
     final quantity = _parseQuantity(_newQtyCtrl.text) ?? 1;
     setState(() => _isMutating = true);
     try {
-      final catalogId = await _resolveCatalogId(catalog);
+      final catalogId = await _resolveCatalogId(catalog, nameHint: _newNameCtrl.text.trim());
       if (!mounted) return;
       if (catalogId == null) {
         showApiError(context, 'Каталожный номер "$catalog" не найден');
