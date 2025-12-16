@@ -24,7 +24,7 @@ public class PartsSearchDTO {
     @Builder.Default
     private Integer size = 20;
     @Builder.Default
-    private String sortBy = "catalogId";
+    private String sortBy = "catalog_id";
     @Builder.Default
     private String sortDirection = "ASC";
 }
