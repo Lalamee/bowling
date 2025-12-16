@@ -3,6 +3,7 @@ package ru.bowling.bowlingapp.Controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import ru.bowling.bowlingapp.DTO.PartsCatalogCreateDTO;
 import ru.bowling.bowlingapp.DTO.PartsCatalogResponseDTO;
 import ru.bowling.bowlingapp.DTO.PartsSearchDTO;
 import ru.bowling.bowlingapp.Service.PartsService;
@@ -40,14 +41,27 @@ public class PartsController {
 	}
 
 	@GetMapping("/unique")
-	public ResponseEntity<List<PartsCatalogResponseDTO>> getUniqueParts() {
-		try {
-			List<PartsCatalogResponseDTO> parts = partsService.getUniqueParts();
-			return ResponseEntity.ok(parts);
-		} catch (Exception e) {
-			return ResponseEntity.internalServerError().build();
-		}
-	}
+        public ResponseEntity<List<PartsCatalogResponseDTO>> getUniqueParts() {
+                try {
+                        List<PartsCatalogResponseDTO> parts = partsService.getUniqueParts();
+                        return ResponseEntity.ok(parts);
+                } catch (Exception e) {
+                        return ResponseEntity.internalServerError().build();
+                }
+        }
+
+        @PostMapping("/catalog")
+        public ResponseEntity<?> createOrFindCatalog(@RequestBody PartsCatalogCreateDTO payload) {
+                try {
+                        PartsCatalogResponseDTO part = partsService.findOrCreateCatalog(payload);
+                        return ResponseEntity.ok(part);
+                } catch (IllegalArgumentException e) {
+                        return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+                } catch (Exception e) {
+                        return ResponseEntity.internalServerError()
+                                        .body(Map.of("error", "Failed to create catalog: " + e.getMessage()));
+                }
+        }
 
 	@GetMapping("/all")
 	public ResponseEntity<List<PartsCatalogResponseDTO>> getAllParts() {

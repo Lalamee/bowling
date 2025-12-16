@@ -267,6 +267,12 @@ public class InventoryServiceImpl implements InventoryService {
         if (user.getMechanicProfile() != null && user.getMechanicProfile().getProfileId() != null) {
             List<PersonalWarehouse> personalWarehouses = personalWarehouseRepository
                     .findByMechanicProfile_ProfileIdAndIsActiveTrue(user.getMechanicProfile().getProfileId());
+
+            if (personalWarehouses.isEmpty()) {
+                PersonalWarehouse created = ensurePersonalWarehouse(user.getMechanicProfile());
+                personalWarehouses = List.of(created);
+            }
+
             for (PersonalWarehouse warehouse : personalWarehouses) {
                 if (warehouse == null || warehouse.getWarehouseId() == null) {
                     continue;
