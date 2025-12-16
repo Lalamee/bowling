@@ -55,7 +55,7 @@ public class OwnerDashboardController {
     }
 
     @GetMapping("/notifications")
-    @PreAuthorize("hasAnyRole('CLUB_OWNER','HEAD_MECHANIC','CLUB_MANAGER','ADMIN')")
+    @PreAuthorize("hasAnyRole('CLUB_OWNER','HEAD_MECHANIC','CLUB_MANAGER','ADMIN','MECHANIC')")
     public ResponseEntity<List<NotificationEvent>> getNotifications(@AuthenticationPrincipal UserPrincipal principal,
                                                                    @RequestParam(name = "clubId", required = false) Long clubId,
                                                                    @RequestParam(name = "role", required = false) RoleName role) {
