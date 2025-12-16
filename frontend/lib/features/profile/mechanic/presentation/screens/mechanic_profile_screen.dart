@@ -1,5 +1,6 @@
 import 'dart:developer';
 
+import '../../../../../api/api_core.dart';
 import '../../../../../core/repositories/user_repository.dart';
 import 'package:flutter/material.dart';
 
@@ -151,6 +152,13 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       _applyProfile(normalized, accessClubs);
     } catch (e, s) {
       log('Failed to load mechanic profile: $e', stackTrace: s);
+      if (e is ApiException && e.statusCode == 401) {
+        await AuthService.logout();
+        await LocalAuthStorage.clearMechanicState();
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
+        return;
+      }
       if (mounted) {
         setState(() {
           _isLoading = false;
