@@ -287,16 +287,77 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
 
     return ListView.separated(
       itemCount: _parts.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final part = _parts[index];
         final name = part.commonName ?? part.officialNameRu ?? part.officialNameEn ?? part.catalogNumber;
         final availability = part.availableQuantity ?? 0;
-        return ListTile(
-          title: Text(name),
-          subtitle: Text('Кат. № ${part.catalogNumber} · Доступно: $availability'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.pop(context, part),
+        final serviceLifeParts = <String>[];
+        if (part.normalServiceLife != null) {
+          serviceLifeParts.add(part.normalServiceLife.toString());
+        }
+        if ((part.unit?.isNotEmpty ?? false)) {
+          serviceLifeParts.add(part.unit!);
+        }
+        final serviceLifeText =
+            serviceLifeParts.isNotEmpty ? 'Срок службы: ${serviceLifeParts.join(' ')}' : null;
+        final manufacturerText =
+            (part.manufacturerName?.isNotEmpty ?? false) ? 'Производитель: ${part.manufacturerName}' : null;
+        final description = part.description;
+        final imageUrl = part.imageUrl?.trim();
+
+        return Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 0,
+          color: Colors.white,
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            leading: CircleAvatar(
+              radius: 28,
+              backgroundColor: AppColors.lightGray,
+              backgroundImage:
+                  (imageUrl != null && imageUrl.isNotEmpty) ? NetworkImage(imageUrl) : null,
+              child: (imageUrl == null || imageUrl.isEmpty)
+                  ? const Icon(Icons.image, color: AppColors.darkGray)
+                  : null,
+            ),
+            title: Text(
+              name,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (description?.isNotEmpty ?? false)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      description!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: AppColors.darkGray),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text('Кат. № ${part.catalogNumber} · Доступно: $availability'),
+                ),
+                if (serviceLifeText != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(serviceLifeText),
+                  ),
+                if (manufacturerText != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(manufacturerText),
+                  ),
+              ],
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.pop(context, part),
+          ),
         );
       },
     );
