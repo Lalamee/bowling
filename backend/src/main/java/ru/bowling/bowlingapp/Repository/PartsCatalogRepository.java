@@ -27,10 +27,10 @@ public interface PartsCatalogRepository extends JpaRepository<PartsCatalog, Long
 	List<PartsCatalog> findByCatalogNumberContainingIgnoreCase(String catalogNumber);
 
         @Query("select p from PartsCatalog p left join p.manufacturer m " +
-                        "where (:q is null or CAST(p.officialNameRu AS text) ilike concat('%', :q, '%') " +
-                        "or CAST(p.officialNameEn AS text) ilike concat('%', :q, '%') " +
-                        "or CAST(p.commonName AS text) ilike concat('%', :q, '%') " +
-                        "or CAST(p.catalogNumber AS text) ilike concat('%', :q, '%')) " +
+                        "where (:q is null or CAST(p.officialNameRu AS text) ilike CAST(concat('%', CAST(:q AS text), '%') AS text) " +
+                        "or CAST(p.officialNameEn AS text) ilike CAST(concat('%', CAST(:q AS text), '%') AS text) " +
+                        "or CAST(p.commonName AS text) ilike CAST(concat('%', CAST(:q AS text), '%') AS text) " +
+                        "or CAST(p.catalogNumber AS text) ilike CAST(concat('%', CAST(:q AS text), '%') AS text)) " +
                         "and (:manufacturerId is null or m.manufacturerId = :manufacturerId) " +
                         "and (:isUnique is null or p.isUnique = :isUnique) " +
                         "and (:categoryCodes is null or CAST(p.categoryCode AS text) in :categoryCodes)")
@@ -43,16 +43,16 @@ public interface PartsCatalogRepository extends JpaRepository<PartsCatalog, Long
         );
 
         @Query("select p from PartsCatalog p left join p.manufacturer m " +
-                        "where CAST(p.officialNameRu AS text) ilike concat('%', :query, '%') " +
-                        "or CAST(p.officialNameEn AS text) ilike concat('%', :query, '%') " +
-                        "or CAST(p.commonName AS text) ilike concat('%', :query, '%') " +
-                        "or CAST(p.catalogNumber AS text) ilike concat('%', :query, '%') " +
-                        "or CAST(p.description AS text) ilike concat('%', :query, '%')")
+                        "where CAST(p.officialNameRu AS text) ilike CAST(concat('%', CAST(:query AS text), '%') AS text) " +
+                        "or CAST(p.officialNameEn AS text) ilike CAST(concat('%', CAST(:query AS text), '%') AS text) " +
+                        "or CAST(p.commonName AS text) ilike CAST(concat('%', CAST(:query AS text), '%') AS text) " +
+                        "or CAST(p.catalogNumber AS text) ilike CAST(concat('%', CAST(:query AS text), '%') AS text) " +
+                        "or CAST(p.description AS text) ilike CAST(concat('%', CAST(:query AS text), '%') AS text)")
         List<PartsCatalog> searchByNameOrNumberOrDescription(@Param("query") String query);
 
         @Query("select p from PartsCatalog p " +
-                        "where CAST(p.commonName AS text) ilike :name " +
-                        "or CAST(p.officialNameRu AS text) ilike :name " +
-                        "or CAST(p.officialNameEn AS text) ilike :name")
+                        "where CAST(p.commonName AS text) ilike CAST(:name AS text) " +
+                        "or CAST(p.officialNameRu AS text) ilike CAST(:name AS text) " +
+                        "or CAST(p.officialNameEn AS text) ilike CAST(:name AS text)")
         List<PartsCatalog> findByAnyNameIgnoreCase(@Param("name") String name);
 }
