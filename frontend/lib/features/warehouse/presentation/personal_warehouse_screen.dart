@@ -24,6 +24,10 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
   final _searchCtrl = TextEditingController();
   final _categoryCtrl = TextEditingController();
   final _searchFocus = FocusNode();
+  final _newCatalogCtrl = TextEditingController();
+  final _newNameCtrl = TextEditingController();
+  final _newQtyCtrl = TextEditingController();
+  final _newNotesCtrl = TextEditingController();
 
   WarehouseSummaryDto? _warehouse;
   List<PartDto> _rawInventory = const [];
@@ -34,6 +38,7 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
   bool _onlyUnique = false;
   bool _onlyShortage = false;
   bool _onlyExpired = false;
+  bool _isMutating = false;
 
   @override
   void initState() {
@@ -47,6 +52,10 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
     _searchCtrl.dispose();
     _categoryCtrl.dispose();
     _searchFocus.dispose();
+    _newCatalogCtrl.dispose();
+    _newNameCtrl.dispose();
+    _newQtyCtrl.dispose();
+    _newNotesCtrl.dispose();
     super.dispose();
   }
 
@@ -176,23 +185,83 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
               _buildDetailRow('Последняя проверка', part.lastChecked != null ? _formatDate(part.lastChecked!) : 'не указано'),
               _buildDetailRow('Заметки', part.notes),
               const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Navigator.pushNamed(context, Routes.createMaintenanceRequest);
-                  },
-                  icon: const Icon(Icons.assignment_add),
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-                  label: const Text('Создать заявку на обслуживание'),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.pushNamed(context, Routes.createMaintenanceRequest);
+                      },
+                      icon: const Icon(Icons.assignment_add),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+                      label: const Text('Создать заявку'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _isMutating
+                          ? null
+                          : () async {
+                              Navigator.pop(ctx);
+                              await _confirmDelete(part);
+                            },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red.shade700,
+                        side: BorderSide(color: Colors.red.shade200),
+                      ),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Удалить'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         );
       },
     );
+  }
+
+  Future<void> _confirmDelete(PartDto part) async {
+    final res = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удалить позицию?'),
+        content: Text('"${_displayName(part)}" будет удалена из личного склада.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+          TextButton(
+            onPressed: _isMutating
+                ? null
+                : () async {
+                    Navigator.pop(ctx, true);
+                  },
+            child: const Text('Удалить', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (res == true) {
+      await _deletePart(part);
+    }
+  }
+
+  Future<void> _deletePart(PartDto part) async {
+    setState(() => _isMutating = true);
+    try {
+      await _repo.deleteInventoryItem(part.inventoryId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Позиция удалена')));
+      await _loadWarehouseAndInventory();
+    } catch (e) {
+      if (!mounted) return;
+      showApiError(context, e);
+    } finally {
+      if (mounted) setState(() => _isMutating = false);
+    }
   }
 
   Widget _buildDetailRow(String label, String? value) {
@@ -251,6 +320,114 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+  }
+
+  int? _parseQuantity(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    return int.tryParse(trimmed);
+  }
+
+  Future<void> _openAddPartSheet() async {
+    _newCatalogCtrl.clear();
+    _newNameCtrl.clear();
+    _newQtyCtrl.clear();
+    _newNotesCtrl.clear();
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+          left: 16,
+          right: 16,
+          top: 16,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Добавить деталь', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _newCatalogCtrl,
+                decoration: const InputDecoration(labelText: 'Каталожный номер *'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _newNameCtrl,
+                decoration: const InputDecoration(labelText: 'Название (необязательно)'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _newQtyCtrl,
+                decoration: const InputDecoration(labelText: 'Количество'),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _newNotesCtrl,
+                decoration: const InputDecoration(labelText: 'Заметки'),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _isMutating
+                      ? null
+                      : () async {
+                          Navigator.pop(ctx);
+                          await _saveNewPart();
+                        },
+                  icon: const Icon(Icons.save),
+                  label: const Text('Сохранить'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveNewPart() async {
+    final warehouseId = _warehouse?.warehouseId;
+    final catalog = _newCatalogCtrl.text.trim();
+    if (warehouseId == null) {
+      showApiError(context, 'Личный склад не найден');
+      return;
+    }
+    if (catalog.isEmpty) {
+      showApiError(context, 'Укажите каталожный номер');
+      return;
+    }
+    setState(() => _isMutating = true);
+    try {
+      await _repo.createPersonalItem(
+        warehouseId: warehouseId,
+        catalogNumber: catalog,
+        name: _newNameCtrl.text,
+        quantity: _parseQuantity(_newQtyCtrl.text),
+        notes: _newNotesCtrl.text,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Позиция добавлена в личный склад')));
+      await _loadWarehouseAndInventory();
+    } catch (e) {
+      if (mounted) {
+        showApiError(context, e);
+      }
+    } finally {
+      if (mounted) setState(() => _isMutating = false);
+    }
   }
 
   Widget _buildInventoryCard(PartDto part) {
@@ -500,6 +677,12 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
             ),
           ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _isLoading ? null : _openAddPartSheet,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
       ),
       bottomNavigationBar: AppBottomNav(currentIndex: 2, onTap: (i) => BottomNavDirect.go(context, 2, i)),
     );

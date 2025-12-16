@@ -93,7 +93,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   bool _isFreeMechanicType(String? accountType) {
     if (accountType == null) return false;
     final normalized = accountType.trim().toUpperCase();
-    return normalized == 'FREE_MECHANIC_BASIC' || normalized == 'FREE_MECHANIC_PREMIUM';
+    return normalized.contains('FREE_MECHANIC');
   }
 
   bool _roleAllowsEditing(String? role) {
@@ -694,7 +694,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    if (_isFreeMechanic)
+                    if (_clubAccesses.isNotEmpty || _isFreeMechanic)
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -723,13 +723,12 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                           ],
                         ),
                       ),
-                    if (_isFreeMechanic) const SizedBox(height: 10),
-                    if (_isFreeMechanic)
-                      ProfileTile(
-                        icon: Icons.warehouse_outlined,
-                        text: 'Личный ZIP-склад',
-                        onTap: () => Navigator.pushNamed(context, Routes.personalWarehouse),
-                      ),
+                    if (_clubAccesses.isNotEmpty || _isFreeMechanic) const SizedBox(height: 10),
+                    ProfileTile(
+                      icon: Icons.warehouse_outlined,
+                      text: 'Личный ZIP-склад',
+                      onTap: () => Navigator.pushNamed(context, Routes.personalWarehouse),
+                    ),
                     const SizedBox(height: 10),
                     ProfileTile(
                       icon: Icons.menu_book_rounded,
