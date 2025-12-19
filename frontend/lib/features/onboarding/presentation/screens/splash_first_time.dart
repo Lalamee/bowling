@@ -43,7 +43,7 @@ class _SplashFirstTimeState extends State<SplashFirstTime> {
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Text(
-                'Version 1.0',
+                'Версия 0.1.2',
                 style: const TextStyle(fontSize: 11, color: AppColors.darkGray),
               ),
             ),
