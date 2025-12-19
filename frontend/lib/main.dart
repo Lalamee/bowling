@@ -29,6 +29,13 @@ class App extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        if (child == null) {
+          return const SizedBox.shrink();
+        }
+
+        return SafeArea(child: child);
+      },
       theme: AppTheme.light,
       initialRoute: Routes.splash,
       onGenerateRoute: AppRouter.onGenerateRoute,
