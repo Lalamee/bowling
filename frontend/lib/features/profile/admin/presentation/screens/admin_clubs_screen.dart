@@ -237,10 +237,11 @@ class _AdminClubsScreenState extends State<AdminClubsScreen> {
       return const Center(child: Text('Клубы не найдены'));
     }
 
+    final bottomInset = MediaQuery.of(context).padding.bottom;
     return RefreshIndicator(
       onRefresh: _loadClubs,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + bottomInset),
         itemCount: _entries.length,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (_, index) {
