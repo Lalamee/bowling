@@ -625,6 +625,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
 
   void _showFreeMechanicDetails(FreeMechanicApplicationResponseDto mechanic, MechanicDirectoryDetail detail) {
     final rows = <Widget>[];
+    final detailLines = rows;
 
     void addRow(String label, String? value) {
       if (value == null || value.trim().isEmpty) return;
@@ -682,7 +683,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     }
     addRow('Аттестация', detail.attestationStatus);
 
-    final content = rows.isNotEmpty ? rows : const [Text('Данные анкеты пока не заполнены')];
+    final content = detailLines.isNotEmpty ? detailLines : const [Text('Данные анкеты пока не заполнены')];
 
     showDialog(
       context: context,
