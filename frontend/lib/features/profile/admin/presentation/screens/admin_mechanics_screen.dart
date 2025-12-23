@@ -546,6 +546,11 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
             'Свободные агенты',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
           ),
+          const SizedBox(height: 4),
+          const Text(
+            'Список доступен только для просмотра',
+            style: TextStyle(fontSize: 12, color: AppColors.darkGray),
+          ),
           const SizedBox(height: 12),
           for (var i = 0; i < freeAgents.length; i++) ...[
             if (i > 0) const SizedBox(height: 12),
