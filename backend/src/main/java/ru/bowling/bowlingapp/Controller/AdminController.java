@@ -13,11 +13,13 @@ import ru.bowling.bowlingapp.DTO.AdminComplaintDTO;
 import ru.bowling.bowlingapp.DTO.AdminAccountUpdateDTO;
 import ru.bowling.bowlingapp.DTO.AdminHelpRequestDTO;
 import ru.bowling.bowlingapp.DTO.AdminStaffStatusUpdateDTO;
+import ru.bowling.bowlingapp.DTO.AdminAppealReplyDTO;
 import ru.bowling.bowlingapp.DTO.AttestationApplicationDTO;
 import ru.bowling.bowlingapp.DTO.AttestationDecisionDTO;
 import ru.bowling.bowlingapp.DTO.FreeMechanicApplicationResponseDTO;
 import ru.bowling.bowlingapp.DTO.MechanicApplicationDecisionDTO;
 import ru.bowling.bowlingapp.DTO.MechanicClubLinkRequestDTO;
+import ru.bowling.bowlingapp.DTO.NotificationEvent;
 import ru.bowling.bowlingapp.Service.AdminService;
 import ru.bowling.bowlingapp.Service.FreeMechanicApplicationService;
 import ru.bowling.bowlingapp.Service.AdminCabinetService;
@@ -150,6 +152,14 @@ public class AdminController {
     @GetMapping("/appeals")
     public ResponseEntity<List<AdminAppealDTO>> listAppeals() {
         return ResponseEntity.ok(adminCabinetService.listAdministrativeAppeals());
+    }
+
+    @PostMapping("/appeals/{appealId}/reply")
+    public ResponseEntity<NotificationEvent> replyAppeal(
+            @PathVariable String appealId,
+            @RequestBody AdminAppealReplyDTO request
+    ) {
+        return ResponseEntity.ok(adminCabinetService.replyToAppeal(appealId, request));
     }
 
     @PutMapping("/users/{userId}/verify")

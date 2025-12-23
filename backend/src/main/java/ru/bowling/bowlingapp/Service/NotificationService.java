@@ -72,6 +72,81 @@ public class NotificationService {
         return event;
     }
 
+    public NotificationEvent notifyFreeMechanicApproved(MechanicProfile mechanicProfile) {
+        if (mechanicProfile == null || mechanicProfile.getUser() == null) {
+            return null;
+        }
+
+        NotificationEvent event = NotificationEvent.builder()
+                .id(UUID.randomUUID())
+                .type(NotificationEventType.FREE_MECHANIC_APPROVED)
+                .message("Администрация подтвердила регистрацию свободного механика. Заполните анкету профиля.")
+                .mechanicId(mechanicProfile.getProfileId())
+                .payload(mechanicProfile.getFullName())
+                .createdAt(LocalDateTime.now())
+                .audiences(Set.of(RoleName.MECHANIC))
+                .build();
+        notifications.add(event);
+
+        log.info("NOTIFICATION: Свободный механик {} подтвержден (user {})",
+                mechanicProfile.getProfileId(), mechanicProfile.getUser().getUserId());
+        return event;
+    }
+
+    public NotificationEvent notifyClubAppeal(User user,
+                                              Long clubId,
+                                              NotificationEventType type,
+                                              String message,
+                                              Long requestId) {
+        if (user == null || type == null || message == null || message.isBlank()) {
+            throw new IllegalArgumentException("Appeal payload is required");
+        }
+
+        String senderName = user.getFullName();
+        NotificationEvent event = NotificationEvent.builder()
+                .id(UUID.randomUUID())
+                .type(type)
+                .message(message.trim())
+                .clubId(clubId)
+                .requestId(requestId)
+                .payload(senderName != null ? "Отправитель: " + senderName : null)
+                .createdAt(LocalDateTime.now())
+                .audiences(Set.of(RoleName.ADMIN))
+                .build();
+        notifications.add(event);
+        return event;
+    }
+
+    public NotificationEvent notifyAdminResponse(Long clubId, String message, String payload) {
+        if (clubId == null) {
+            throw new IllegalArgumentException("Club id is required for admin response");
+        }
+        if (message == null || message.isBlank()) {
+            throw new IllegalArgumentException("Response message is required");
+        }
+
+        NotificationEvent event = NotificationEvent.builder()
+                .id(UUID.randomUUID())
+                .type(NotificationEventType.ADMIN_RESPONSE)
+                .message(message.trim())
+                .clubId(clubId)
+                .payload(payload)
+                .createdAt(LocalDateTime.now())
+                .audiences(Set.of(RoleName.CLUB_OWNER, RoleName.HEAD_MECHANIC))
+                .build();
+        notifications.add(event);
+        return event;
+    }
+
+    public Optional<NotificationEvent> findById(UUID id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        return notifications.stream()
+                .filter(event -> id.equals(event.getId()))
+                .findFirst();
+    }
+
     public NotificationEvent notifyHelpRequested(
             MaintenanceRequest request,
             List<RequestPart> parts,
