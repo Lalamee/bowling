@@ -570,21 +570,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     final status = mechanic.status?.toUpperCase();
     final statusLabel = _freeStatusLabel(status);
     final detail = mechanic.mechanicProfileId != null ? _freeMechanicDetails[mechanic.mechanicProfileId!] : null;
-    final statusChips = <Widget>[
-      Chip(label: Text(statusLabel)),
-      Chip(label: Text(_accountLabel(mechanic.accountType))),
-      Chip(
-        label: Text(mechanic.isActive == true ? 'Аккаунт активен' : 'Аккаунт отключён'),
-      ),
-      Chip(
-        label: Text(mechanic.isVerified == true ? 'Аккаунт подтверждён' : 'Аккаунт не подтверждён'),
-      ),
-      Chip(
-        label: Text(mechanic.isProfileVerified == true ? 'Профиль подтверждён' : 'Профиль не подтверждён'),
-      ),
-      if (detail?.attestationStatus != null && detail!.attestationStatus!.trim().isNotEmpty)
-        Chip(label: Text('Аттестация: ${detail.attestationStatus!.trim()}')),
-    ];
+    final statusChips = _buildFreeMechanicStatusChips(mechanic, statusLabel, detail);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -632,6 +618,9 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
               label: const Text('Анкета механика'),
             ),
           ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть')),
         ],
       ),
     );
@@ -713,6 +702,28 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
         ],
       ),
     );
+  }
+
+  List<Widget> _buildFreeMechanicStatusChips(
+    FreeMechanicApplicationResponseDto mechanic,
+    String statusLabel,
+    MechanicDirectoryDetail? detail,
+  ) {
+    return [
+      Chip(label: Text(statusLabel)),
+      Chip(label: Text(_accountLabel(mechanic.accountType))),
+      Chip(
+        label: Text(mechanic.isActive == true ? 'Аккаунт активен' : 'Аккаунт отключён'),
+      ),
+      Chip(
+        label: Text(mechanic.isVerified == true ? 'Аккаунт подтверждён' : 'Аккаунт не подтверждён'),
+      ),
+      Chip(
+        label: Text(mechanic.isProfileVerified == true ? 'Профиль подтверждён' : 'Профиль не подтверждён'),
+      ),
+      if (detail?.attestationStatus != null && detail!.attestationStatus!.trim().isNotEmpty)
+        Chip(label: Text('Аттестация: ${detail.attestationStatus!.trim()}')),
+    ];
   }
 
   Widget _buildPendingSection() {
