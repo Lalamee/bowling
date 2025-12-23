@@ -171,6 +171,8 @@ class AttestationApplication {
   final int? userId;
   final int? mechanicProfileId;
   final int? clubId;
+  final String? mechanicName;
+  final String? mechanicPhone;
   final AttestationDecisionStatus? status;
   final String? comment;
   final MechanicGrade? requestedGrade;
@@ -183,6 +185,8 @@ class AttestationApplication {
     this.userId,
     this.mechanicProfileId,
     this.clubId,
+    this.mechanicName,
+    this.mechanicPhone,
     this.status,
     this.comment,
     this.requestedGrade,
@@ -202,6 +206,8 @@ class AttestationApplication {
       userId: (json['userId'] as num?)?.toInt(),
       mechanicProfileId: (json['mechanicProfileId'] as num?)?.toInt(),
       clubId: (json['clubId'] as num?)?.toInt(),
+      mechanicName: json['mechanicName'] as String?,
+      mechanicPhone: json['mechanicPhone'] as String?,
       status: AttestationDecisionStatus.fromString(json['status'] as String?),
       comment: json['comment'] as String?,
       requestedGrade: MechanicGrade.fromString(json['requestedGrade'] as String?),
@@ -218,6 +224,8 @@ class AttestationApplication {
       'userId': userId,
       'mechanicProfileId': mechanicProfileId,
       'clubId': clubId,
+      'mechanicName': mechanicName,
+      'mechanicPhone': mechanicPhone,
       'status': status?.toApiValue(),
       'comment': comment,
       'requestedGrade': requestedGrade?.toApiValue(),
@@ -289,4 +297,3 @@ class SpecialistCard {
     );
   }
 }
-

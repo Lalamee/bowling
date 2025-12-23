@@ -37,6 +37,30 @@ public class OwnerDashboardService {
     private final UserRepository userRepository;
     private final UserClubAccessService userClubAccessService;
 
+    @Transactional
+    public NotificationEvent submitClubAppeal(Long userId, ClubAppealRequestDTO request) {
+        if (request == null || request.getType() == null || request.getMessage() == null || request.getMessage().isBlank()) {
+            throw new IllegalArgumentException("Appeal data is required");
+        }
+
+        if (!isClubAppealType(request.getType())) {
+            throw new IllegalArgumentException("Unsupported appeal type");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
+
+        Long resolvedClubId = resolveClubForUser(user, request.getClubId());
+
+        return notificationService.notifyClubAppeal(
+                user,
+                resolvedClubId,
+                request.getType(),
+                request.getMessage(),
+                request.getRequestId()
+        );
+    }
+
     @Transactional(readOnly = true)
     public List<TechnicalInfoDTO> getTechnicalInformation(Long userId, Long clubId) {
         Long resolvedClubId = resolveClubForUser(userId, clubId);
@@ -331,6 +355,14 @@ public class OwnerDashboardService {
             return explicitClubId;
         }
         return accessibleClubIds.stream().findFirst().orElse(null);
+    }
+
+    private boolean isClubAppealType(NotificationEventType type) {
+        return type == NotificationEventType.CLUB_TECH_SUPPORT
+                || type == NotificationEventType.CLUB_SUPPLIER_REFUSAL
+                || type == NotificationEventType.CLUB_MECHANIC_FAILURE
+                || type == NotificationEventType.CLUB_LEGAL_ASSISTANCE
+                || type == NotificationEventType.CLUB_SPECIALIST_ACCESS;
     }
 
     private String readableEquipment(EquipmentMaintenanceSchedule schedule) {

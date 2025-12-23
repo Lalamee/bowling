@@ -46,6 +46,7 @@ import '../models/admin_appeal_dto.dart';
 import '../models/admin_mechanic_status_change_dto.dart';
 import '../models/admin_staff_status_update_dto.dart';
 import '../models/admin_mechanic_account_change_dto.dart';
+import '../models/club_appeal_request_dto.dart';
 
 /// Типизированный API сервис для взаимодействия с backend
 class ApiService {
@@ -670,6 +671,16 @@ class ApiService {
     return (response.data as List)
         .map((e) => NotificationEventDto.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
+  }
+
+  /// POST /api/owner-dashboard/appeals - обращение клуба в администрацию
+  Future<void> submitClubAppeal(ClubAppealRequestDto request) async {
+    await _dio.post('/api/owner-dashboard/appeals', data: request.toJson());
+  }
+
+  /// POST /api/admin/appeals/{appealId}/reply - ответ администрации на обращение
+  Future<void> replyToAppeal({required String appealId, required String message}) async {
+    await _dio.post('/api/admin/appeals/$appealId/reply', data: {'message': message});
   }
 
   // ============================================

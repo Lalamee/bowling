@@ -11,12 +11,14 @@ class EditMechanicProfileScreen extends StatefulWidget {
   final String? mechanicId;
   final MechanicProfile? initial;
   final EditFocus focus;
+  final bool showClubFields;
 
   const EditMechanicProfileScreen({
     Key? key,
     this.mechanicId,
     this.initial,
     this.focus = EditFocus.none,
+    this.showClubFields = true,
   }) : super(key: key);
 
   @override
@@ -53,11 +55,13 @@ class _EditMechanicProfileScreenState extends State<EditMechanicProfileScreen> {
       _phone.text = p.phone;
       _birth.text = DateFormat('dd.MM.yyyy').format(p.birthDate);
       _status = p.status;
-      final clubs = (p.clubs.isEmpty ? [p.clubName] : p.clubs);
-      for (final c in clubs) {
-        _clubCtrls.add(TextEditingController(text: c));
+      if (widget.showClubFields) {
+        final clubs = (p.clubs.isEmpty ? [p.clubName] : p.clubs);
+        for (final c in clubs) {
+          _clubCtrls.add(TextEditingController(text: c));
+        }
       }
-    } else {
+    } else if (widget.showClubFields) {
       _clubCtrls.add(TextEditingController());
     }
 
@@ -157,8 +161,12 @@ class _EditMechanicProfileScreenState extends State<EditMechanicProfileScreen> {
       Navigator.pop(context);
       return;
     }
-    final clubs = _clubCtrls.map((c) => c.text.trim()).where((s) => s.isNotEmpty).toList();
-    final clubName = clubs.isNotEmpty ? clubs.first : '';
+    final clubs = widget.showClubFields
+        ? _clubCtrls.map((c) => c.text.trim()).where((s) => s.isNotEmpty).toList()
+        : widget.initial!.clubs;
+    final clubName = widget.showClubFields
+        ? (clubs.isNotEmpty ? clubs.first : '')
+        : widget.initial!.clubName;
     final updated = widget.initial!.copyWith(
       fullName: _fio.text.trim(),
       address: _address.text.trim(),
@@ -203,60 +211,62 @@ class _EditMechanicProfileScreenState extends State<EditMechanicProfileScreen> {
           TextField(controller: _fio, focusNode: _fioFocus, decoration: _dec()),
           const SizedBox(height: 16),
 
-          const Text('Место работы', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
-          const SizedBox(height: 6),
-          ...List.generate(_clubCtrls.length, (i) {
-            final isLast = i == _clubCtrls.length - 1;
-            return Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
-              child: Row(
-                children: [
-                  Expanded(child: TextField(controller: _clubCtrls[i], decoration: _dec(hint: 'Боулинг клуб'))),
-                  const SizedBox(width: 8),
-                  if (_clubCtrls.length > 1)
-                    SizedBox(
-                      height: 48,
-                      width: 48,
-                      child: ElevatedButton(
-                        onPressed: () => _removeClubField(i),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.white,
-                          foregroundColor: AppColors.primary,
-                          elevation: 0,
-                          side: const BorderSide(color: AppColors.lightGray),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: EdgeInsets.zero,
+          if (widget.showClubFields) ...[
+            const Text('Место работы', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
+            const SizedBox(height: 6),
+            ...List.generate(_clubCtrls.length, (i) {
+              final isLast = i == _clubCtrls.length - 1;
+              return Padding(
+                padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+                child: Row(
+                  children: [
+                    Expanded(child: TextField(controller: _clubCtrls[i], decoration: _dec(hint: 'Боулинг клуб'))),
+                    const SizedBox(width: 8),
+                    if (_clubCtrls.length > 1)
+                      SizedBox(
+                        height: 48,
+                        width: 48,
+                        child: ElevatedButton(
+                          onPressed: () => _removeClubField(i),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.white,
+                            foregroundColor: AppColors.primary,
+                            elevation: 0,
+                            side: const BorderSide(color: AppColors.lightGray),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: const Icon(Icons.remove),
                         ),
-                        child: const Icon(Icons.remove),
                       ),
-                    ),
-                ],
-              ),
-            );
-          }),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 48,
-            child: ElevatedButton(
-              onPressed: _addClubField,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.white,
-                foregroundColor: AppColors.primary,
-                elevation: 0,
-                side: const BorderSide(color: AppColors.lightGray),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add),
-                  SizedBox(width: 8),
-                  Text('Добавить клуб'),
-                ],
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _addClubField,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.white,
+                  foregroundColor: AppColors.primary,
+                  elevation: 0,
+                  side: const BorderSide(color: AppColors.lightGray),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add),
+                    SizedBox(width: 8),
+                    Text('Добавить клуб'),
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
+          ],
 
           const Text('Адрес', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
           const SizedBox(height: 6),

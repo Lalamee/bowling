@@ -296,7 +296,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
         if (scope.isFreeMechanic && event.isSupplierComplaint) continue;
 
-        if (event.isHelpEvent || event.isWarningEvent || event.isSupplierComplaint || event.isAccessRequest || event.isAdminReply) {
+        if (event.isHelpEvent ||
+            event.isWarningEvent ||
+            event.isSupplierComplaint ||
+            event.isAccessRequest ||
+            event.isAdminReply ||
+            event.isFreeMechanicEvent) {
           events.add(_MechanicEvent(
             title: event.typeKey.label(),
             description: event.payload?.isNotEmpty == true ? event.payload : event.message,
