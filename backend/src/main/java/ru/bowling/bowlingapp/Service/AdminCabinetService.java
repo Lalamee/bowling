@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -335,6 +336,29 @@ public class AdminCabinetService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
+    public NotificationEvent replyToAppeal(String appealId, AdminAppealReplyDTO request) {
+        if (request == null || request.getMessage() == null || request.getMessage().isBlank()) {
+            throw new IllegalArgumentException("Ответ обязателен");
+        }
+        UUID id;
+        try {
+            id = UUID.fromString(appealId);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Некорректный идентификатор обращения");
+        }
+
+        NotificationEvent appeal = notificationService.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Обращение не найдено"));
+
+        if (appeal.getClubId() == null) {
+            throw new IllegalArgumentException("Обращение не связано с клубом");
+        }
+
+        String payload = "Ответ на обращение " + appeal.getId();
+        return notificationService.notifyAdminResponse(appeal.getClubId(), request.getMessage(), payload);
+    }
+
     private AdminHelpRequestDTO toHelpDto(RequestPart part) {
         MaintenanceRequest request = part.getRequest();
         return AdminHelpRequestDTO.builder()
@@ -395,10 +419,24 @@ public class AdminCabinetService {
     }
 
     private AttestationApplicationDTO toAttestationDto(AttestationApplication application) {
+        User user = application.getUser();
+        MechanicProfile profile = application.getMechanicProfile();
+        if (user == null && profile != null) {
+            user = profile.getUser();
+        }
+        String mechanicName = null;
+        if (profile != null && profile.getFullName() != null && !profile.getFullName().isBlank()) {
+            mechanicName = profile.getFullName().trim();
+        } else if (user != null) {
+            mechanicName = user.getFullName();
+        }
+        String mechanicPhone = user != null ? user.getPhone() : null;
         return AttestationApplicationDTO.builder()
                 .id(application.getApplicationId())
-                .userId(application.getUser() != null ? application.getUser().getUserId() : null)
-                .mechanicProfileId(application.getMechanicProfile() != null ? application.getMechanicProfile().getProfileId() : null)
+                .userId(user != null ? user.getUserId() : null)
+                .mechanicProfileId(profile != null ? profile.getProfileId() : null)
+                .mechanicName(mechanicName)
+                .mechanicPhone(mechanicPhone)
                 .status(AttestationDecisionStatus.fromEntity(application.getStatus()))
                 .comment(application.getComment())
                 .requestedGrade(application.getRequestedGrade())

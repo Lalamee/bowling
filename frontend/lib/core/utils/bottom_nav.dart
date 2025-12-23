@@ -106,6 +106,9 @@ class BottomNavDirect {
     if (ctx.role == RoleName.admin) {
       return true;
     }
+    if (ctx.role == RoleName.clubOwner) {
+      return true;
+    }
 
     Map<String, dynamic>? profile;
 
