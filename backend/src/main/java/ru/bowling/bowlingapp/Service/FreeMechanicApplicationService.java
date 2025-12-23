@@ -162,6 +162,7 @@ public class FreeMechanicApplicationService {
         userRepository.save(user);
         mechanicProfileRepository.save(profile);
         attestationApplicationRepository.save(application);
+        notificationService.notifyFreeMechanicApproved(profile);
 
         log.info("Free mechanic application {} approved with account type {}", applicationId, targetAccountType);
         return toResponse(application);
@@ -382,4 +383,3 @@ public class FreeMechanicApplicationService {
         personalWarehouseRepository.save(warehouse);
     }
 }
-

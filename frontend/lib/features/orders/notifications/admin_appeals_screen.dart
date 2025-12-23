@@ -28,6 +28,11 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
     'HELP_REQUEST': 'Запрос помощи',
     'SUPPLIER_COMPLAINT': 'Жалоба поставщику',
     'ACCESS_REQUEST': 'Запрос доступа',
+    'CLUB_TECH_SUPPORT': 'Клуб: запрос техподдержки',
+    'CLUB_SUPPLIER_REFUSAL': 'Клуб: отказ поставщика',
+    'CLUB_MECHANIC_FAILURE': 'Клуб: ремонт невозможен',
+    'CLUB_LEGAL_ASSISTANCE': 'Клуб: юридическая помощь',
+    'CLUB_SPECIALIST_ACCESS': 'Клуб: доступ к базе специалистов',
   };
 
   @override
@@ -170,6 +175,7 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
   }
 
   void _showDetails(AdminAppealDto item) {
+    final replyCtrl = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -179,6 +185,10 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (item.message != null) Text(item.message!),
+            if (item.payloadText != null && item.payloadText!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(item.payloadText!),
+            ],
             if (item.payload != null && item.payload!.isNotEmpty) ...[
               const SizedBox(height: 8),
               const Text('Данные обращения:'),
@@ -187,7 +197,49 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
             ],
           ],
         ),
-        actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть'))],
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть')),
+          if (item.id != null && item.clubId != null)
+            FilledButton(
+              onPressed: () async {
+                final reply = await showDialog<String>(
+                  context: context,
+                  builder: (dialogCtx) => AlertDialog(
+                    title: const Text('Ответить клубу'),
+                    content: TextField(
+                      controller: replyCtrl,
+                      maxLines: 4,
+                      decoration: const InputDecoration(hintText: 'Введите текст ответа'),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(dialogCtx).pop(),
+                        child: const Text('Отмена'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.of(dialogCtx).pop(replyCtrl.text.trim()),
+                        child: const Text('Отправить'),
+                      ),
+                    ],
+                  ),
+                );
+                replyCtrl.dispose();
+                if (reply == null || reply.isEmpty) return;
+                try {
+                  await _repository.replyToAppeal(appealId: item.id!, message: reply);
+                  if (!mounted) return;
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Ответ отправлен')),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  showApiError(context, e);
+                }
+              },
+              child: const Text('Ответить'),
+            ),
+        ],
       ),
     );
   }
@@ -197,4 +249,3 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
     return _typeLabels[type.trim().toUpperCase()] ?? type;
   }
 }
-

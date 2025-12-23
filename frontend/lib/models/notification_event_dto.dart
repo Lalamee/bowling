@@ -10,6 +10,12 @@ enum NotificationEventType {
   staffAccessRevocation,
   technicalAssistance,
   adminResponse,
+  freeMechanicApproved,
+  clubTechSupport,
+  clubSupplierRefusal,
+  clubMechanicFailure,
+  clubLegalAssistance,
+  clubSpecialistAccess,
   unknown;
 
   static NotificationEventType fromBackend(String? raw) {
@@ -40,6 +46,18 @@ enum NotificationEventType {
       case 'ADMIN_RESPONSE':
       case 'ADMIN_REPLY':
         return NotificationEventType.adminResponse;
+      case 'CLUB_TECH_SUPPORT':
+        return NotificationEventType.clubTechSupport;
+      case 'CLUB_SUPPLIER_REFUSAL':
+        return NotificationEventType.clubSupplierRefusal;
+      case 'CLUB_MECHANIC_FAILURE':
+        return NotificationEventType.clubMechanicFailure;
+      case 'CLUB_LEGAL_ASSISTANCE':
+        return NotificationEventType.clubLegalAssistance;
+      case 'CLUB_SPECIALIST_ACCESS':
+        return NotificationEventType.clubSpecialistAccess;
+      case 'FREE_MECHANIC_APPROVED':
+        return NotificationEventType.freeMechanicApproved;
       default:
         return NotificationEventType.unknown;
     }
@@ -69,6 +87,18 @@ enum NotificationEventType {
         return 'Запрос техпомощи/сервиса';
       case NotificationEventType.adminResponse:
         return 'Ответ Администрации';
+      case NotificationEventType.freeMechanicApproved:
+        return 'Свободный механик подтвержден';
+      case NotificationEventType.clubTechSupport:
+        return 'Запрос техпомощи';
+      case NotificationEventType.clubSupplierRefusal:
+        return 'Отказ поставщика';
+      case NotificationEventType.clubMechanicFailure:
+        return 'Ремонт невозможен';
+      case NotificationEventType.clubLegalAssistance:
+        return 'Юридическая помощь';
+      case NotificationEventType.clubSpecialistAccess:
+        return 'Запрос доступа к базе специалистов';
       case NotificationEventType.unknown:
       default:
         return 'Оповещение';
@@ -113,16 +143,24 @@ class NotificationEventDto {
 
   bool get isWarningEvent => typeKey == NotificationEventType.maintenanceWarning;
 
-  bool get isSupplierComplaint => typeKey == NotificationEventType.supplierComplaintUpdate;
+  bool get isSupplierComplaint =>
+      typeKey == NotificationEventType.supplierComplaintUpdate ||
+      typeKey == NotificationEventType.clubSupplierRefusal;
 
-  bool get isAccessRequest => typeKey == NotificationEventType.clubAccessRequest;
+  bool get isAccessRequest =>
+      typeKey == NotificationEventType.clubAccessRequest ||
+      typeKey == NotificationEventType.clubSpecialistAccess;
 
   bool get isStaffAccess =>
       typeKey == NotificationEventType.staffAccessRequest || typeKey == NotificationEventType.staffAccessRevocation;
 
-  bool get isTechSupport => typeKey == NotificationEventType.technicalAssistance;
+  bool get isTechSupport =>
+      typeKey == NotificationEventType.technicalAssistance ||
+      typeKey == NotificationEventType.clubTechSupport;
 
   bool get isAdminReply => typeKey == NotificationEventType.adminResponse;
+
+  bool get isFreeMechanicEvent => typeKey == NotificationEventType.freeMechanicApproved;
 
   factory NotificationEventDto.fromJson(Map<String, dynamic> json) {
     DateTime? _parseDate(dynamic value) =>

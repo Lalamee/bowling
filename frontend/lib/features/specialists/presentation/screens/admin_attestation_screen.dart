@@ -266,6 +266,10 @@ class _AdminAttestationScreenState extends State<AdminAttestationScreen> {
     final subtitle = <String>[];
     final resolvedGrade = app.approvedGrade ?? app.requestedGrade;
     final region = app.mechanicProfileId != null ? _profileRegions[app.mechanicProfileId!] : null;
+    final mechanicName = app.mechanicName?.trim();
+    final mechanicPhone = app.mechanicPhone?.trim();
+    if (mechanicName != null && mechanicName.isNotEmpty) subtitle.add('Механик: $mechanicName');
+    if (mechanicPhone != null && mechanicPhone.isNotEmpty) subtitle.add('Телефон: $mechanicPhone');
     if (resolvedGrade != null) subtitle.add('Грейд: ${_gradeLabel(resolvedGrade)}');
     if (app.submittedAt != null) subtitle.add('Подача: ${_formatDate(app.submittedAt!)}');
     if (app.comment != null && app.comment!.isNotEmpty) subtitle.add('Комментарий: ${app.comment}');
@@ -313,6 +317,10 @@ class _AdminAttestationScreenState extends State<AdminAttestationScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (app.mechanicName != null && app.mechanicName!.trim().isNotEmpty)
+              Text('Механик: ${app.mechanicName!.trim()}'),
+            if (app.mechanicPhone != null && app.mechanicPhone!.trim().isNotEmpty)
+              Text('Телефон: ${app.mechanicPhone!.trim()}'),
             if (app.status != null) Text('Статус: ${_statusLabel(app.status)}'),
             if (resolvedGrade != null) Text('Грейд: ${_gradeLabel(resolvedGrade)}'),
             if (region != null) Text('Регион: $region'),
