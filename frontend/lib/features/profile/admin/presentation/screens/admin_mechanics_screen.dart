@@ -594,6 +594,15 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
               softWrap: true,
             ),
           ],
+          if (detailLines.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...detailLines.map(
+              (line) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(line, style: const TextStyle(fontSize: 13, color: AppColors.textDark)),
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -609,6 +618,9 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
               label: const Text('Анкета механика'),
             ),
           ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть')),
         ],
       ),
     );
