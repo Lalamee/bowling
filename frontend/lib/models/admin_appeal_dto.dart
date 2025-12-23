@@ -7,6 +7,7 @@ class AdminAppealDto {
   final int? clubId;
   final List<int>? partIds;
   final Map<String, dynamic>? payload;
+  final String? payloadText;
   final DateTime? createdAt;
 
   const AdminAppealDto({
@@ -18,6 +19,7 @@ class AdminAppealDto {
     this.clubId,
     this.partIds,
     this.payload,
+    this.payloadText,
     this.createdAt,
   });
 
@@ -65,6 +67,7 @@ class AdminAppealDto {
       payload: json['payload'] is Map<String, dynamic>
           ? Map<String, dynamic>.from(json['payload'] as Map)
           : null,
+      payloadText: json['payload'] is String ? asString(json['payload']) : null,
       createdAt: asDate(json['createdAt']),
     );
   }
@@ -78,7 +81,7 @@ class AdminAppealDto {
         'clubId': clubId,
         'partIds': partIds,
         'payload': payload,
+        'payloadText': payloadText,
         'createdAt': createdAt?.toIso8601String(),
       };
 }
-

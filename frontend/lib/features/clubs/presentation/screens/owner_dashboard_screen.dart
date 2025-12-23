@@ -10,6 +10,7 @@ import '../../../../core/utils/net_ui.dart';
 import '../../../../core/utils/user_club_resolver.dart';
 import '../../../../core/utils/help_request_status_helper.dart';
 import '../../../../models/notification_event_dto.dart';
+import '../../../../models/club_appeal_request_dto.dart';
 import '../../../../models/service_journal_entry_dto.dart';
 import '../../../../models/technical_info_dto.dart';
 import '../../../../models/warning_dto.dart';
@@ -76,6 +77,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
   NotificationEventType? _notificationFilter;
 
   final _laneController = TextEditingController();
+  final _appealMessageController = TextEditingController();
+  final _appealRequestController = TextEditingController();
 
   late TabController _tabController;
 
@@ -90,8 +93,18 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
   void dispose() {
     _tabController.dispose();
     _laneController.dispose();
+    _appealMessageController.dispose();
+    _appealRequestController.dispose();
     super.dispose();
   }
+
+  static const Map<NotificationEventType, String> _appealTypeLabels = {
+    NotificationEventType.clubTechSupport: 'Техническая помощь / сервис',
+    NotificationEventType.clubSupplierRefusal: 'Отказ поставщика',
+    NotificationEventType.clubMechanicFailure: 'Невозможность ремонта',
+    NotificationEventType.clubLegalAssistance: 'Юридическая помощь',
+    NotificationEventType.clubSpecialistAccess: 'Доступ к базе специалистов',
+  };
 
   Future<void> _loadClubs() async {
     setState(() {
@@ -195,6 +208,130 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
 
   void _updateNotificationFilter(NotificationEventType? filter) {
     setState(() => _notificationFilter = filter);
+  }
+
+  String _appealTypeToApi(NotificationEventType type) {
+    switch (type) {
+      case NotificationEventType.clubTechSupport:
+        return 'CLUB_TECH_SUPPORT';
+      case NotificationEventType.clubSupplierRefusal:
+        return 'CLUB_SUPPLIER_REFUSAL';
+      case NotificationEventType.clubMechanicFailure:
+        return 'CLUB_MECHANIC_FAILURE';
+      case NotificationEventType.clubLegalAssistance:
+        return 'CLUB_LEGAL_ASSISTANCE';
+      case NotificationEventType.clubSpecialistAccess:
+        return 'CLUB_SPECIALIST_ACCESS';
+      default:
+        return type.name.toUpperCase();
+    }
+  }
+
+  Future<void> _openAppealSheet() async {
+    if (_selectedClubId == null) {
+      showApiError(context, 'Выберите клуб для отправки обращения');
+      return;
+    }
+    NotificationEventType selectedType = NotificationEventType.clubTechSupport;
+    _appealMessageController.clear();
+    _appealRequestController.clear();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+            left: 16,
+            right: 16,
+            top: 16,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Обращение в администрацию',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<NotificationEventType>(
+                    value: selectedType,
+                    decoration: const InputDecoration(labelText: 'Тип обращения'),
+                    items: _appealTypeLabels.entries
+                        .map(
+                          (entry) => DropdownMenuItem(
+                            value: entry.key,
+                            child: Text(entry.value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setModalState(() => selectedType = value);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _appealMessageController,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Сообщение',
+                      hintText: 'Опишите проблему или запрос',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _appealRequestController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Номер заявки (если есть)',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () async {
+                        final message = _appealMessageController.text.trim();
+                        if (message.isEmpty) {
+                          showApiError(context, 'Заполните сообщение обращения');
+                          return;
+                        }
+                        final requestId = int.tryParse(_appealRequestController.text.trim());
+                        try {
+                          await _repository.submitClubAppeal(
+                            ClubAppealRequestDto(
+                              clubId: _selectedClubId,
+                              type: _appealTypeToApi(selectedType),
+                              message: message,
+                              requestId: requestId,
+                            ),
+                          );
+                          if (!mounted) return;
+                          Navigator.of(ctx).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Обращение отправлено')),
+                          );
+                          await _loadData();
+                        } catch (e) {
+                          if (!mounted) return;
+                          showApiError(context, e);
+                        }
+                      },
+                      child: const Text('Отправить'),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 
   void _clearLaneFilter() {
@@ -682,19 +819,42 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
     final filtered = _notificationFilter == null
         ? _notifications
         : _notifications.where((n) => n.typeKey == _notificationFilter).toList();
-    if (_notifications.isEmpty) {
-      return const Center(
-        child: Text('Оповещения отсутствуют', style: TextStyle(color: AppColors.darkGray)),
-      );
-    }
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
-        itemCount: filtered.isEmpty ? 2 : filtered.length + 1,
+        itemCount: filtered.isEmpty ? 3 : filtered.length + 2,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (_, i) {
           if (i == 0) {
+            return CommonUI.card(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Обращение в администрацию',
+                    style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Отправьте запрос по технической помощи, отказу поставщика или юридической поддержке.',
+                    style: TextStyle(color: AppColors.darkGray),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _openAppealSheet,
+                      icon: const Icon(Icons.support_agent),
+                      label: const Text('Создать обращение'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          if (i == 1) {
             return Row(
               children: [
                 const Text('Фильтр:', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -725,7 +885,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
                   style: TextStyle(color: AppColors.darkGray)),
             );
           }
-          final notif = filtered[i - 1];
+          final notif = filtered[i - 2];
           final isHelp = notif.isHelpEvent;
           final isWarning = notif.isWarningEvent;
           final isComplaint = notif.isSupplierComplaint;

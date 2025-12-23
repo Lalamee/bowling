@@ -3,6 +3,7 @@ import '../../models/notification_event_dto.dart';
 import '../../models/service_journal_entry_dto.dart';
 import '../../models/technical_info_dto.dart';
 import '../../models/warning_dto.dart';
+import '../../models/club_appeal_request_dto.dart';
 
 class OwnerDashboardRepository {
   final ApiService _api = ApiService();
@@ -35,5 +36,9 @@ class OwnerDashboardRepository {
 
   Future<List<NotificationEventDto>> managerNotifications({int? clubId, String? role}) async {
     return _api.getManagerNotifications(clubId: clubId, role: role);
+  }
+
+  Future<void> submitClubAppeal(ClubAppealRequestDto request) async {
+    await _api.submitClubAppeal(request);
   }
 }

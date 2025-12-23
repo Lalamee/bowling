@@ -7,6 +7,7 @@ import '../../../../../core/repositories/admin_mechanics_repository.dart';
 import '../../../../../core/repositories/admin_users_repository.dart';
 import '../../../../../core/repositories/admin_cabinet_repository.dart';
 import '../../../../../core/repositories/clubs_repository.dart';
+import '../../../../../core/repositories/specialists_repository.dart';
 import '../../../../../core/routing/routes.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/utils/net_ui.dart';
@@ -16,6 +17,7 @@ import '../../../../../models/admin_staff_status_update_dto.dart';
 import '../../../../../models/admin_mechanic_account_change_dto.dart';
 import '../../../../../models/free_mechanic_application_response_dto.dart';
 import '../../../../../models/club_summary_dto.dart';
+import '../../../../../models/mechanic_directory_models.dart';
 
 class AdminMechanicsScreen extends StatefulWidget {
   const AdminMechanicsScreen({super.key});
@@ -29,6 +31,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
   final AdminUsersRepository _usersRepository = AdminUsersRepository();
   final AdminCabinetRepository _cabinetRepository = AdminCabinetRepository();
   final ClubsRepository _clubsRepository = ClubsRepository();
+  final SpecialistsRepository _specialistsRepository = SpecialistsRepository();
 
   static const Map<String, String> _accountLabels = {
     'INDIVIDUAL': 'Механик',
@@ -46,6 +49,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
   List<AdminMechanicStatusChangeDto> _statusRequests = [];
   List<_ClubOption> _clubOptions = [];
   List<FreeMechanicApplicationResponseDto> _freeMechanics = [];
+  Map<int, MechanicDirectoryDetail> _freeMechanicDetails = {};
 
   @override
   void initState() {
@@ -59,6 +63,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     List<AdminMechanicStatusChangeDto> statusRequests = [];
     List<_ClubOption> clubOptions = [];
     List<FreeMechanicApplicationResponseDto> freeMechanics = [];
+    Map<int, MechanicDirectoryDetail> freeMechanicDetails = Map.of(_freeMechanicDetails);
     bool overviewFailed = false;
     bool freeMechanicsFailed = false;
 
@@ -95,6 +100,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       final clubs = futures[1] as List<ClubSummaryDto>;
       statusRequests = futures[2] as List<AdminMechanicStatusChangeDto>;
       freeMechanics = futures[3] as List<FreeMechanicApplicationResponseDto>;
+      freeMechanicDetails = await _loadFreeMechanicDetails(freeMechanics, freeMechanicDetails);
 
       pending = overview.pending.map(_mapPending).where((m) => m.userId != null).toList();
       sections = overview.clubs.map(_mapClub).toList();
@@ -114,6 +120,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       _statusRequests = statusRequests;
       _clubOptions = clubOptions;
       _freeMechanics = freeMechanics;
+      _freeMechanicDetails = freeMechanicDetails;
       _isLoading = false;
       _hasError = overviewFailed && freeMechanicsFailed;
     });
@@ -195,6 +202,34 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     setState(() {
       _sections[index].isOpen = !_sections[index].isOpen;
     });
+  }
+
+  Future<Map<int, MechanicDirectoryDetail>> _loadFreeMechanicDetails(
+    List<FreeMechanicApplicationResponseDto> mechanics,
+    Map<int, MechanicDirectoryDetail> existing,
+  ) async {
+    final idsToFetch = mechanics
+        .map((m) => m.mechanicProfileId)
+        .whereType<int>()
+        .where((id) => !existing.containsKey(id))
+        .toSet();
+
+    if (idsToFetch.isEmpty) {
+      return existing;
+    }
+
+    await Future.wait(idsToFetch.map((id) async {
+      try {
+        final detail = await _specialistsRepository.getDetail(id);
+        if (detail != null) {
+          existing[id] = detail;
+        }
+      } catch (_) {
+        // ignore, keep base info
+      }
+    }));
+
+    return existing;
   }
 
   Future<void> _approvePending(int index) async {
@@ -477,9 +512,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
   Widget _buildFreeMechanicsSection() {
     final freeAgents = _freeMechanics
         .where(
-          (m) =>
-              (m.accountType?.toUpperCase().contains('FREE_MECHANIC') ?? false) &&
-              (m.isVerified == true),
+          (m) => (m.accountType?.toUpperCase().contains('FREE_MECHANIC') ?? false),
         )
         .toList();
 
@@ -531,6 +564,54 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     }
     final status = mechanic.status?.toUpperCase();
     final statusLabel = _freeStatusLabel(status);
+    final detail = mechanic.mechanicProfileId != null ? _freeMechanicDetails[mechanic.mechanicProfileId!] : null;
+    final detailLines = <String>[];
+
+    void addDetail(String label, String? value) {
+      if (value == null || value.trim().isEmpty) return;
+      detailLines.add('$label: $value');
+    }
+
+    if (detail != null) {
+      addDetail('Регион', detail.region);
+      addDetail('Специализация', detail.specialization);
+      if (detail.totalExperienceYears != null) {
+        detailLines.add('Стаж: ${detail.totalExperienceYears} лет');
+      }
+      if (detail.bowlingExperienceYears != null) {
+        detailLines.add('Стаж в боулинге: ${detail.bowlingExperienceYears} лет');
+      }
+      if (detail.rating != null) {
+        detailLines.add('Рейтинг: ${detail.rating!.toStringAsFixed(1)}');
+      }
+      if (detail.isEntrepreneur != null) {
+        detailLines.add(detail.isEntrepreneur == true ? 'Статус: ИП' : 'Статус: Самозанятый');
+      }
+      addDetail('Аттестация', detail.attestationStatus);
+      if (detail.relatedClubs.isNotEmpty) {
+        final clubs = detail.relatedClubs
+            .map((club) => club.fullName)
+            .where((name) => name != null && name.trim().isNotEmpty)
+            .map((name) => name!.trim())
+            .toList();
+        if (clubs.isNotEmpty) {
+          detailLines.add('Клубы: ${clubs.join(', ')}');
+        }
+      }
+      if (detail.certifications.isNotEmpty) {
+        final certs = detail.certifications
+            .map((cert) => cert.title)
+            .where((title) => title != null && title.trim().isNotEmpty)
+            .map((title) => title!.trim())
+            .toList();
+        if (certs.isNotEmpty) {
+          detailLines.add('Сертификаты: ${certs.join(', ')}');
+        }
+      }
+      if (detail.workHistory.isNotEmpty) {
+        detailLines.add('История работ: ${detail.workHistory.length}');
+      }
+    }
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -552,6 +633,15 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
               info.join(' • '),
               style: const TextStyle(fontSize: 13, color: AppColors.darkGray),
               softWrap: true,
+            ),
+          ],
+          if (detailLines.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...detailLines.map(
+              (line) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(line, style: const TextStyle(fontSize: 13, color: AppColors.textDark)),
+              ),
             ),
           ],
           const SizedBox(height: 8),
