@@ -570,53 +570,21 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     final status = mechanic.status?.toUpperCase();
     final statusLabel = _freeStatusLabel(status);
     final detail = mechanic.mechanicProfileId != null ? _freeMechanicDetails[mechanic.mechanicProfileId!] : null;
-    final detailLines = <String>[];
-
-    void addDetail(String label, String? value) {
-      if (value == null || value.trim().isEmpty) return;
-      detailLines.add('$label: $value');
-    }
-
-    if (detail != null) {
-      addDetail('Регион', detail.region);
-      addDetail('Специализация', detail.specialization);
-      if (detail.totalExperienceYears != null) {
-        detailLines.add('Стаж: ${detail.totalExperienceYears} лет');
-      }
-      if (detail.bowlingExperienceYears != null) {
-        detailLines.add('Стаж в боулинге: ${detail.bowlingExperienceYears} лет');
-      }
-      if (detail.rating != null) {
-        detailLines.add('Рейтинг: ${detail.rating!.toStringAsFixed(1)}');
-      }
-      if (detail.isEntrepreneur != null) {
-        detailLines.add(detail.isEntrepreneur == true ? 'Статус: ИП' : 'Статус: Самозанятый');
-      }
-      addDetail('Аттестация', detail.attestationStatus);
-      if (detail.relatedClubs.isNotEmpty) {
-        final clubs = detail.relatedClubs
-            .map((club) => club.fullName)
-            .where((name) => name != null && name.trim().isNotEmpty)
-            .map((name) => name!.trim())
-            .toList();
-        if (clubs.isNotEmpty) {
-          detailLines.add('Клубы: ${clubs.join(', ')}');
-        }
-      }
-      if (detail.certifications.isNotEmpty) {
-        final certs = detail.certifications
-            .map((cert) => cert.title)
-            .where((title) => title != null && title.trim().isNotEmpty)
-            .map((title) => title!.trim())
-            .toList();
-        if (certs.isNotEmpty) {
-          detailLines.add('Сертификаты: ${certs.join(', ')}');
-        }
-      }
-      if (detail.workHistory.isNotEmpty) {
-        detailLines.add('История работ: ${detail.workHistory.length}');
-      }
-    }
+    final statusChips = <Widget>[
+      Chip(label: Text(statusLabel)),
+      Chip(label: Text(_accountLabel(mechanic.accountType))),
+      Chip(
+        label: Text(mechanic.isActive == true ? 'Аккаунт активен' : 'Аккаунт отключён'),
+      ),
+      Chip(
+        label: Text(mechanic.isVerified == true ? 'Аккаунт подтверждён' : 'Аккаунт не подтверждён'),
+      ),
+      Chip(
+        label: Text(mechanic.isProfileVerified == true ? 'Профиль подтверждён' : 'Профиль не подтверждён'),
+      ),
+      if (detail?.attestationStatus != null && detail!.attestationStatus!.trim().isNotEmpty)
+        Chip(label: Text('Аттестация: ${detail.attestationStatus!.trim()}')),
+    ];
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -653,11 +621,95 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [
-              Chip(label: Text(statusLabel)),
-              Chip(label: Text(_accountLabel(mechanic.accountType))),
-            ],
+            children: statusChips,
           ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: detail == null ? null : () => _showFreeMechanicDetails(mechanic, detail),
+              icon: const Icon(Icons.description_outlined),
+              label: const Text('Анкета механика'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFreeMechanicDetails(FreeMechanicApplicationResponseDto mechanic, MechanicDirectoryDetail detail) {
+    final rows = <Widget>[];
+
+    void addRow(String label, String? value) {
+      if (value == null || value.trim().isEmpty) return;
+      rows.add(Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text('$label: ${value.trim()}'),
+      ));
+    }
+
+    addRow('ФИО', detail.fullName ?? mechanic.fullName);
+    addRow('Телефон', mechanic.phone);
+    addRow('Регион', detail.region);
+    addRow('Специализация', detail.specialization);
+    if (detail.totalExperienceYears != null) {
+      addRow('Общий стаж', '${detail.totalExperienceYears} лет');
+    }
+    if (detail.bowlingExperienceYears != null) {
+      addRow('Стаж в боулинге', '${detail.bowlingExperienceYears} лет');
+    }
+    if (detail.isEntrepreneur != null) {
+      addRow('Статус', detail.isEntrepreneur == true ? 'ИП' : 'Самозанятый');
+    }
+    if (detail.rating != null) {
+      addRow('Рейтинг', detail.rating!.toStringAsFixed(1));
+    }
+    if (detail.certifications.isNotEmpty) {
+      final certs = detail.certifications
+          .map((cert) => cert.title)
+          .where((title) => title != null && title.trim().isNotEmpty)
+          .map((title) => title!.trim())
+          .toList();
+      if (certs.isNotEmpty) {
+        addRow('Сертификаты', certs.join(', '));
+      }
+    }
+    if (detail.workHistory.isNotEmpty) {
+      final history = detail.workHistory
+          .map((entry) => entry.organization)
+          .where((name) => name != null && name.trim().isNotEmpty)
+          .map((name) => name!.trim())
+          .toList();
+      if (history.isNotEmpty) {
+        addRow('Опыт работы', history.join(', '));
+      }
+    }
+    if (detail.relatedClubs.isNotEmpty) {
+      final clubs = detail.relatedClubs
+          .map((club) => club.fullName)
+          .where((name) => name != null && name.trim().isNotEmpty)
+          .map((name) => name!.trim())
+          .toList();
+      if (clubs.isNotEmpty) {
+        addRow('Клубы', clubs.join(', '));
+      }
+    }
+    addRow('Аттестация', detail.attestationStatus);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Анкета механика'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: rows.isNotEmpty
+                ? rows
+                : [const Text('Данные анкеты пока не заполнены')],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть')),
         ],
       ),
     );
