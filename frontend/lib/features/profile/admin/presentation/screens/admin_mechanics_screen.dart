@@ -618,9 +618,6 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
               label: const Text('Анкета механика'),
             ),
           ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть')),
         ],
       ),
     );
@@ -685,6 +682,8 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     }
     addRow('Аттестация', detail.attestationStatus);
 
+    final content = rows.isNotEmpty ? rows : const [Text('Данные анкеты пока не заполнены')];
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -692,9 +691,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: rows.isNotEmpty
-                ? rows
-                : [const Text('Данные анкеты пока не заполнены')],
+            children: content,
           ),
         ),
         actions: [
