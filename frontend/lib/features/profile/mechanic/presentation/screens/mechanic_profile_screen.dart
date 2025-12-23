@@ -42,6 +42,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   String? _applicationStatus;
   String? _applicationComment;
   String? _applicationAccountType;
+  bool _needsFreeMechanicQuestionnaire = false;
   List<UserClub> _clubAccesses = const [];
   final NotificationsBadgeController _notificationsController = NotificationsBadgeController();
   int _notificationsCount = 0;
@@ -87,6 +88,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       _accountType = accountType;
       _canEditProfile = _roleAllowsEditing(role);
       _isFreeMechanic = _isFreeMechanicType(accountType);
+      _needsFreeMechanicQuestionnaire = _computeFreeMechanicQuestionnaireNeeded(profile);
     });
   }
 
@@ -286,7 +288,17 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       _isLoading = false;
       _hasError = false;
       _clubAccesses = accessClubs;
+      _needsFreeMechanicQuestionnaire = _computeFreeMechanicQuestionnaireNeeded(profile);
     });
+  }
+
+  bool _computeFreeMechanicQuestionnaireNeeded(MechanicProfile current) {
+    if (!_isFreeMechanic || !current.workplaceVerified) return false;
+    bool missing(String value) => value.trim().isEmpty || value.trim() == '—';
+    return missing(current.fullName) ||
+        missing(current.phone) ||
+        missing(current.address) ||
+        missing(current.status);
   }
 
   Map<String, dynamic> _normalizeProfileData(Map<String, dynamic> raw) {
@@ -513,6 +525,37 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     if (updated != null) setState(() => profile = updated);
   }
 
+  Future<void> _openQuestionnaire() async {
+    final updated = await Navigator.push<MechanicProfile>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditMechanicProfileScreen(
+          initial: profile,
+          focus: EditFocus.none,
+          showClubFields: false,
+        ),
+      ),
+    );
+    if (updated == null) return;
+    final cache = {
+      'fullName': updated.fullName,
+      'phone': updated.phone,
+      'status': updated.status,
+      'clubs': updated.clubs,
+      'clubName': updated.clubName,
+      'address': updated.address,
+      'birthDate': updated.birthDate.toIso8601String(),
+      'workplaceVerified': profile.workplaceVerified,
+    };
+    await LocalAuthStorage.saveMechanicProfile(cache);
+    if (!mounted) return;
+    setState(() {
+      profile = updated;
+      _cachedRawProfile = Map<String, dynamic>.from(cache);
+      _needsFreeMechanicQuestionnaire = _computeFreeMechanicQuestionnaireNeeded(updated);
+    });
+  }
+
   Future<void> _logout() async {
     await AuthService.logout();
     await LocalAuthStorage.clearMechanicState();
@@ -615,6 +658,56 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     );
   }
 
+  Widget _buildQuestionnaireNotice() {
+    if (!_needsFreeMechanicQuestionnaire) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withOpacity(0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.assignment_outlined, color: AppColors.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Заполните анкету',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textDark),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Администрация одобрила регистрацию. Заполните недостающие данные профиля.',
+                      style: TextStyle(fontSize: 13, color: AppColors.darkGray, height: 1.3),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _openQuestionnaire,
+              child: const Text('Заполнить анкету'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final visibleClubs = profile.clubs.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
@@ -668,6 +761,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                   children: [
                     _buildApplicationBanner(),
                     _buildPendingApprovalNotice(),
+                    _buildQuestionnaireNotice(),
                     ProfileTile(
                       icon: Icons.person,
                       text: profile.fullName,
