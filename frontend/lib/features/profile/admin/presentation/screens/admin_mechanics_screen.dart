@@ -570,6 +570,24 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     final status = mechanic.status?.toUpperCase();
     final statusLabel = _freeStatusLabel(status);
     final detail = mechanic.mechanicProfileId != null ? _freeMechanicDetails[mechanic.mechanicProfileId!] : null;
+    final detailLines = <String>[];
+    if (detail != null) {
+      if (detail.region != null && detail.region!.trim().isNotEmpty) {
+        detailLines.add('Регион: ${detail.region!.trim()}');
+      }
+      if (detail.specialization != null && detail.specialization!.trim().isNotEmpty) {
+        detailLines.add('Специализация: ${detail.specialization!.trim()}');
+      }
+      if (detail.totalExperienceYears != null) {
+        detailLines.add('Общий стаж: ${detail.totalExperienceYears} лет');
+      }
+      if (detail.bowlingExperienceYears != null) {
+        detailLines.add('Стаж в боулинге: ${detail.bowlingExperienceYears} лет');
+      }
+      if (detail.attestationStatus != null && detail.attestationStatus!.trim().isNotEmpty) {
+        detailLines.add('Аттестация: ${detail.attestationStatus!.trim()}');
+      }
+    }
     final statusChips = _buildFreeMechanicStatusChips(mechanic, statusLabel, detail);
 
     return Container(
