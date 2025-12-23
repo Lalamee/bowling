@@ -21,6 +21,10 @@ class AdminCabinetRepository {
     return _api.listAdminAppeals();
   }
 
+  Future<void> replyToAppeal({required String appealId, required String message}) async {
+    await _api.replyToAppeal(appealId: appealId, message: message);
+  }
+
   Future<AdminRegistrationApplicationDto> approveRegistration(int userId) {
     return _api.approveRegistration(userId);
   }

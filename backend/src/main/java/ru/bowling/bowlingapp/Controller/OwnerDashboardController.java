@@ -5,9 +5,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import ru.bowling.bowlingapp.DTO.ClubAppealRequestDTO;
 import ru.bowling.bowlingapp.DTO.NotificationEvent;
 import ru.bowling.bowlingapp.DTO.ServiceJournalEntryDTO;
 import ru.bowling.bowlingapp.DTO.TechnicalInfoDTO;
@@ -60,6 +63,13 @@ public class OwnerDashboardController {
                                                                    @RequestParam(name = "clubId", required = false) Long clubId,
                                                                    @RequestParam(name = "role", required = false) String role) {
         return ResponseEntity.ok(ownerDashboardService.getManagerNotifications(principal.getId(), clubId, parseRole(role)));
+    }
+
+    @PostMapping("/appeals")
+    @PreAuthorize("hasAnyRole('CLUB_OWNER','HEAD_MECHANIC','CLUB_MANAGER')")
+    public ResponseEntity<NotificationEvent> submitAppeal(@AuthenticationPrincipal UserPrincipal principal,
+                                                          @RequestBody ClubAppealRequestDTO request) {
+        return ResponseEntity.ok(ownerDashboardService.submitClubAppeal(principal.getId(), request));
     }
 
     private RoleName parseRole(String rawRole) {

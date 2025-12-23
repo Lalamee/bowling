@@ -241,6 +241,8 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
     final commentLabel = app.status == AttestationDecisionStatus.pending
         ? 'Описание опыта'
         : 'Комментарий Администрации';
+    final mechanicName = app.mechanicName?.trim();
+    final mechanicPhone = app.mechanicPhone?.trim();
 
     final submitted = app.submittedAt != null
         ? 'Подача: ${app.submittedAt!.toLocal().toString().split('.').first}'
@@ -276,6 +278,14 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
                 if (app.clubId != null) Chip(label: Text('Клуб: ${app.clubId}')),
               ],
             ),
+            if ((mechanicName != null && mechanicName.isNotEmpty) ||
+                (mechanicPhone != null && mechanicPhone.isNotEmpty)) ...[
+              const SizedBox(height: 6),
+              if (mechanicName != null && mechanicName.isNotEmpty)
+                Text('Механик: $mechanicName'),
+              if (mechanicPhone != null && mechanicPhone.isNotEmpty)
+                Text('Телефон: $mechanicPhone'),
+            ],
             if (app.comment != null && app.comment!.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text('$commentLabel:\n${app.comment}'),
@@ -317,4 +327,3 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
     }
   }
 }
-

@@ -92,11 +92,25 @@ public class AttestationService {
         if (entity == null) {
             return null;
         }
+        User user = entity.getUser();
+        MechanicProfile profile = entity.getMechanicProfile();
+        if (user == null && profile != null) {
+            user = profile.getUser();
+        }
+        String mechanicName = null;
+        if (profile != null && profile.getFullName() != null && !profile.getFullName().isBlank()) {
+            mechanicName = profile.getFullName().trim();
+        } else if (user != null) {
+            mechanicName = user.getFullName();
+        }
+        String mechanicPhone = user != null ? user.getPhone() : null;
         return AttestationApplicationDTO.builder()
                 .id(entity.getApplicationId())
-                .userId(entity.getUser() != null ? entity.getUser().getUserId() : null)
-                .mechanicProfileId(entity.getMechanicProfile() != null ? entity.getMechanicProfile().getProfileId() : null)
+                .userId(user != null ? user.getUserId() : null)
+                .mechanicProfileId(profile != null ? profile.getProfileId() : null)
                 .clubId(entity.getClub() != null ? entity.getClub().getClubId() : null)
+                .mechanicName(mechanicName)
+                .mechanicPhone(mechanicPhone)
                 .status(AttestationDecisionStatus.fromEntity(entity.getStatus()))
                 .comment(entity.getComment())
                 .requestedGrade(entity.getRequestedGrade())
@@ -182,4 +196,3 @@ public class AttestationService {
         }
     }
 }
-

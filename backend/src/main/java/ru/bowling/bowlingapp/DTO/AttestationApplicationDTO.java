@@ -19,10 +19,11 @@ public class AttestationApplicationDTO {
     private Long userId;
     private Long mechanicProfileId;
     private Long clubId; // опционально для клубных механиков
+    private String mechanicName;
+    private String mechanicPhone;
     private AttestationDecisionStatus status;
     private String comment; // обязательный комментарий при отклонении
     private LocalDateTime submittedAt;
     private LocalDateTime updatedAt;
     private MechanicGrade requestedGrade;
 }
-
