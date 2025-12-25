@@ -43,6 +43,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   String? _applicationComment;
   String? _applicationAccountType;
   bool _needsFreeMechanicQuestionnaire = false;
+  bool _ownerApprovalRequired = false;
   List<UserClub> _clubAccesses = const [];
   final NotificationsBadgeController _notificationsController = NotificationsBadgeController();
   int _notificationsCount = 0;
@@ -232,6 +233,10 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       if (verified is bool) {
         workplaceVerified = verified;
       }
+      final ownerApproval = map['ownerApprovalRequired'];
+      if (ownerApproval is bool) {
+        _ownerApprovalRequired = ownerApproval;
+      }
     }
 
     if (workplaceVerified == null) {
@@ -250,6 +255,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       'address': address ?? (clubs.isNotEmpty ? clubs.first : profile.address),
       'birthDate': birthDate?.toIso8601String(),
       'workplaceVerified': workplaceVerified ?? profile.workplaceVerified,
+      'ownerApprovalRequired': _ownerApprovalRequired,
     };
   }
 
@@ -274,6 +280,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       birthDate = DateTime.tryParse(birthRaw);
     }
 
+    final rawOwnerApproval = raw['ownerApprovalRequired'];
     setState(() {
       profile = profile.copyWith(
         fullName: _asString(raw['fullName']) ?? profile.fullName,
@@ -285,6 +292,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         workplaceVerified: raw['workplaceVerified'] as bool? ?? profile.workplaceVerified,
         birthDate: birthDate ?? profile.birthDate,
       );
+      _ownerApprovalRequired = rawOwnerApproval is bool ? rawOwnerApproval : _ownerApprovalRequired;
       _isLoading = false;
       _hasError = false;
       _clubAccesses = accessClubs;

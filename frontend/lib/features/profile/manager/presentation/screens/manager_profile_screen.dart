@@ -125,6 +125,7 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
     final clubNames = <String>[];
     final seenNames = <String>{};
     String? resolvedAddress;
+    bool ownerApprovalRequired = false;
 
     void addClubName(String? value, {bool prioritize = false}) {
       final name = asString(value);
@@ -163,6 +164,10 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
       final rawVerified = map['workplaceVerified'] ?? map['isVerified'];
       if (rawVerified is bool) {
         workplaceVerified = workplaceVerified || rawVerified;
+      }
+      final rawOwnerApproval = map['ownerApprovalRequired'];
+      if (rawOwnerApproval is bool) {
+        ownerApprovalRequired = rawOwnerApproval;
       }
     }
 
@@ -204,6 +209,7 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
       'address': resolvedAddress,
       'clubs': clubNames,
       'workplaceVerified': workplaceVerified,
+      'ownerApprovalRequired': ownerApprovalRequired,
     };
   }
 

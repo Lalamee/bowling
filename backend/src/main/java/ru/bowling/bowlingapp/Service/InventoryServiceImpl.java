@@ -241,12 +241,17 @@ public class InventoryServiceImpl implements InventoryService {
         Map<Integer, PersonalWarehouse> personalWarehouseById = new HashMap<>();
 
         if (user.getManagerProfile() != null && user.getManagerProfile().getClub() != null) {
-            Integer clubWarehouseId = user.getManagerProfile().getClub().getClubId() != null
-                    ? user.getManagerProfile().getClub().getClubId().intValue()
-                    : null;
-            if (clubWarehouseId != null) {
-                warehouseIds.add(clubWarehouseId);
-                typeByWarehouse.put(clubWarehouseId, WarehouseType.CLUB);
+            BowlingClub managerClub = user.getManagerProfile().getClub();
+            boolean approvedManager = Boolean.TRUE.equals(user.getManagerProfile().getIsDataVerified())
+                    && clubStaffRepository.existsByClubAndUserAndIsActiveTrue(managerClub, user);
+            if (approvedManager) {
+                Integer clubWarehouseId = managerClub.getClubId() != null
+                        ? managerClub.getClubId().intValue()
+                        : null;
+                if (clubWarehouseId != null) {
+                    warehouseIds.add(clubWarehouseId);
+                    typeByWarehouse.put(clubWarehouseId, WarehouseType.CLUB);
+                }
             }
         }
 

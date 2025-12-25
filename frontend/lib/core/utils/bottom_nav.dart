@@ -137,6 +137,10 @@ class BottomNavDirect {
       return false;
     }
 
+    if (_boolFrom(profile['ownerApprovalRequired'])) {
+      return false;
+    }
+
     final verified = _boolFrom(profile['workplaceVerified']) ||
         _boolFrom(profile['isVerified']) ||
         _boolFrom(profile['verified']);
