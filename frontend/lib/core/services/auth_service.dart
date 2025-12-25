@@ -282,6 +282,7 @@ class AuthService {
         'address': clubAddress ?? '',
         'clubs': clubName != null && clubName.isNotEmpty ? [clubName] : <String>[],
         'workplaceVerified': false,
+        'ownerApprovalRequired': true,
       };
 
       await LocalAuthStorage.saveManagerProfile(profileData);

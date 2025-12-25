@@ -205,6 +205,9 @@ public class ClubStaffService {
         }
 
         clubStaff.setIsActive(active);
+        if (active) {
+            clubStaff.setInfoAccessRestricted(false);
+        }
         clubStaffRepository.save(clubStaff);
     }
 

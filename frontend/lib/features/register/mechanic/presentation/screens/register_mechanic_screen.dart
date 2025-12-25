@@ -344,6 +344,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'clubId': selectedClub?.id,
       'clubAddress': selectedClub?.address,
       'freeAgent': !hasSelectedClub,
+      'ownerApprovalRequired': hasSelectedClub,
     };
     final awaitingAdmin = !hasSelectedClub;
     if (awaitingAdmin) {

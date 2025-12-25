@@ -264,11 +264,15 @@ public class AuthService implements UserDetailsService {
                             .club(finalMechanicClub)
                             .user(user)
                             .assignedAt(LocalDateTime.now())
-                            .isActive(Boolean.TRUE.equals(user.getIsActive()))
+                            .isActive(false)
+                            .infoAccessRestricted(true)
                             .build());
             clubStaff.setRole(user.getRole());
             if (clubStaff.getAssignedAt() == null) {
                 clubStaff.setAssignedAt(LocalDateTime.now());
+            }
+            if (clubStaff.getIsActive() == null) {
+                clubStaff.setIsActive(false);
             }
             clubStaffRepository.save(clubStaff);
         }
@@ -280,11 +284,15 @@ public class AuthService implements UserDetailsService {
                             .club(finalManagerClub)
                             .user(user)
                             .assignedAt(LocalDateTime.now())
-                            .isActive(Boolean.TRUE.equals(user.getIsActive()))
+                            .isActive(false)
+                            .infoAccessRestricted(true)
                             .build());
             clubStaff.setRole(user.getRole());
             if (clubStaff.getAssignedAt() == null) {
                 clubStaff.setAssignedAt(LocalDateTime.now());
+            }
+            if (clubStaff.getIsActive() == null) {
+                clubStaff.setIsActive(false);
             }
             clubStaffRepository.save(clubStaff);
         }
@@ -525,6 +533,7 @@ public class AuthService implements UserDetailsService {
         }
         result.put("status", Boolean.TRUE.equals(profile.getIsEntrepreneur()) ? "ИП" : "Самозанятый");
         result.put("workplaceVerified", Boolean.TRUE.equals(profile.getIsDataVerified()));
+        result.put("ownerApprovalRequired", isOwnerApprovalRequired(profile));
 
         return result;
     }
@@ -635,6 +644,7 @@ public class AuthService implements UserDetailsService {
         result.put("status", "Менеджер");
         result.put("isVerified", profile.getIsDataVerified());
         result.put("workplaceVerified", Boolean.TRUE.equals(profile.getIsDataVerified()));
+        result.put("ownerApprovalRequired", isManagerOwnerApprovalRequired(profile));
 
         BowlingClub club = profile.getClub();
         List<String> clubs = new ArrayList<>();
@@ -721,6 +731,40 @@ public class AuthService implements UserDetailsService {
         }
 
         return result;
+    }
+
+    private boolean isOwnerApprovalRequired(MechanicProfile profile) {
+        if (profile == null || profile.getUser() == null) {
+            return false;
+        }
+        List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs()).orElse(Collections.emptyList());
+        if (clubs.isEmpty()) {
+            return false;
+        }
+        User user = profile.getUser();
+        return clubs.stream()
+                .anyMatch(club -> club != null
+                        && clubStaffRepository.findByClubAndUser(club, user)
+                                .map(ClubStaff::getIsActive)
+                                .map(active -> !active)
+                                .orElse(true));
+    }
+
+    private boolean isManagerOwnerApprovalRequired(ManagerProfile profile) {
+        if (profile == null || profile.getUser() == null) {
+            return false;
+        }
+        BowlingClub club = profile.getClub();
+        if (club == null) {
+            return false;
+        }
+        if (!Boolean.TRUE.equals(profile.getIsDataVerified())) {
+            return true;
+        }
+        return clubStaffRepository.findByClubAndUser(club, profile.getUser())
+                .map(ClubStaff::getIsActive)
+                .map(active -> !active)
+                .orElse(true);
     }
 
     private AccountType resolveAccountType(RegisterUserDTO dto) {
