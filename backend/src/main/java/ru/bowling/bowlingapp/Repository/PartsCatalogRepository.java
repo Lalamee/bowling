@@ -36,7 +36,10 @@ public interface PartsCatalogRepository extends JpaRepository<PartsCatalog, Long
                                        p.catalog_number::text ilike concat('%', cast(:q as text), '%'))
                           and (:manufacturerId is null or m.manufacturer_id = :manufacturerId)
                           and (:isUnique is null or p.is_unique = :isUnique)
-                          and (:categoryCodes is null or lower(trim(p.category_code)) in (:categoryCodes))
+                          and (
+                                cardinality(coalesce(:categoryCodes, ARRAY[]::varchar[])) = 0
+                                or lower(trim(p.category_code)) = any(coalesce(:categoryCodes, ARRAY[]::varchar[]))
+                          )
                         """,
                         countQuery = """
                         select count(*) from parts_catalog p
@@ -48,7 +51,10 @@ public interface PartsCatalogRepository extends JpaRepository<PartsCatalog, Long
                                        p.catalog_number::text ilike concat('%', cast(:q as text), '%'))
                           and (:manufacturerId is null or m.manufacturer_id = :manufacturerId)
                           and (:isUnique is null or p.is_unique = :isUnique)
-                          and (:categoryCodes is null or lower(trim(p.category_code)) in (:categoryCodes))
+                          and (
+                                cardinality(coalesce(:categoryCodes, ARRAY[]::varchar[])) = 0
+                                or lower(trim(p.category_code)) = any(coalesce(:categoryCodes, ARRAY[]::varchar[]))
+                          )
                         """,
                         nativeQuery = true)
         Page<PartsCatalog> search(
