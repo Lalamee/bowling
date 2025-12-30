@@ -263,11 +263,28 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     return part.catalogId.toString();
   }
 
+  void _clearPartSelection() {
+    _partsSearchDebounce?.cancel();
+    setState(() {
+      _selectedCatalogPart = null;
+      _selectedCatalogItem = null;
+      _partNameController.clear();
+      _catalogNumberController.clear();
+      _partSuggestions = const <PartDto>[];
+      _isSearchingParts = false;
+    });
+  }
+
+  bool get _isCatalogNumberLocked => _selectedCatalogPart != null || _selectedCatalogItem != null;
+
   void _onPartNameChanged(String value) {
     _partsSearchDebounce?.cancel();
-    _selectedCatalogPart = null;
-    _selectedCatalogItem = null;
-    _catalogNumberController.clear();
+    setState(() {
+      _selectedCatalogPart = null;
+      _selectedCatalogItem = null;
+      _catalogNumberController.clear();
+      _partSuggestions = const <PartDto>[];
+    });
     final trimmed = value.trim();
     if (trimmed.length < 2) {
       setState(() {
@@ -573,8 +590,12 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
           // Каталожный номер
           _buildTextField(
             label: 'Каталожный номер *',
-            hint: 'Укажите каталожный номер',
+            hint: _isCatalogNumberLocked ? 'Подставится из выбранной запчасти' : 'Укажите каталожный номер',
             controller: _catalogNumberController,
+            readOnly: _isCatalogNumberLocked,
+            suffixIcon: _isCatalogNumberLocked
+                ? const Icon(Icons.lock_outline, color: AppColors.darkGray)
+                : null,
             validator: (_) {
               if (requestedParts.isNotEmpty) {
                 return null;
@@ -828,7 +849,15 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
         const SizedBox(height: 8),
         TextFormField(
           controller: _partNameController,
-          decoration: _inputDecoration(hint: 'Начните вводить название запчасти'),
+          decoration: _inputDecoration(
+            hint: 'Начните вводить название запчасти',
+            suffixIcon: (_partNameController.text.isNotEmpty || _isCatalogNumberLocked)
+                ? IconButton(
+                    icon: const Icon(Icons.close_rounded, color: AppColors.darkGray),
+                    onPressed: _clearPartSelection,
+                  )
+                : null,
+          ),
           validator: (value) {
             if (requestedParts.isNotEmpty) {
               return null;
@@ -898,6 +927,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     void Function(String)? onChanged,
     TextEditingController? controller,
     bool readOnly = false,
+    Widget? suffixIcon,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -911,7 +941,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
           controller: controller,
           keyboardType: keyboardType,
           readOnly: readOnly,
-          decoration: _inputDecoration(hint: hint),
+          decoration: _inputDecoration(hint: hint, suffixIcon: suffixIcon),
           validator: validator,
           onChanged: onChanged,
         ),
@@ -955,11 +985,12 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     );
   }
 
-  InputDecoration _inputDecoration({String? hint}) {
+  InputDecoration _inputDecoration({String? hint, Widget? suffixIcon}) {
     return InputDecoration(
       hintText: hint,
       filled: true,
       fillColor: Colors.white,
+      suffixIcon: suffixIcon,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: AppColors.lightGray),
