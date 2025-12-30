@@ -52,8 +52,8 @@ public interface PartsCatalogRepository extends JpaRepository<PartsCatalog, Long
                           and (:manufacturerId is null or m.manufacturer_id = :manufacturerId)
                           and (:isUnique is null or p.is_unique = :isUnique)
                           and (
-                                cardinality(coalesce(:categoryCodes, ARRAY[]::varchar[])) = 0
-                                or lower(trim(p.category_code)) = any(coalesce(:categoryCodes, ARRAY[]::varchar[]))
+                                cardinality(coalesce(cast(:categoryCodes as varchar[]), ARRAY[]::varchar[])) = 0
+                                or lower(trim(p.category_code)) = any(coalesce(cast(:categoryCodes as varchar[]), ARRAY[]::varchar[]))
                           )
                         """,
                         nativeQuery = true)
@@ -61,7 +61,7 @@ public interface PartsCatalogRepository extends JpaRepository<PartsCatalog, Long
                 @Param("q") String q,
                 @Param("manufacturerId") Integer manufacturerId,
                 @Param("isUnique") Boolean isUnique,
-                @Param("categoryCodes") List<String> categoryCodes,
+                @Param("categoryCodes") String[] categoryCodes,
                 Pageable pageable
         );
 
