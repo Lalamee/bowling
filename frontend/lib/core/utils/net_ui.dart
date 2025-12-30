@@ -30,21 +30,39 @@ void showApiError(BuildContext ctx, dynamic error) {
 }
 
 Future<T?> withLoader<T>(BuildContext ctx, Future<T> Function() task) async {
-  showDialog(context: ctx, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
+  BuildContext? dialogContext;
+  bool loaderClosed = false;
+
+  void closeLoader() {
+    final navigator = dialogContext != null
+        ? Navigator.of(dialogContext!, rootNavigator: true)
+        : (ctx.mounted ? Navigator.of(ctx, rootNavigator: true) : null);
+
+    if (navigator != null && navigator.canPop()) {
+      navigator.pop();
+      loaderClosed = true;
+    }
+  }
+
+  showDialog(
+    context: ctx,
+    barrierDismissible: false,
+    builder: (dialogCtx) {
+      dialogContext = dialogCtx;
+      return const Center(child: CircularProgressIndicator());
+    },
+  );
   try {
     return await task();
   } catch (e) {
+    closeLoader();
     if (ctx.mounted) {
-      Navigator.of(ctx, rootNavigator: true).pop();
       showApiError(ctx, e);
     }
     return null;
   } finally {
-    if (ctx.mounted) {
-      final navigator = Navigator.of(ctx, rootNavigator: true);
-      if (navigator.canPop()) {
-        navigator.pop();
-      }
+    if (!loaderClosed) {
+      closeLoader();
     }
   }
 }
