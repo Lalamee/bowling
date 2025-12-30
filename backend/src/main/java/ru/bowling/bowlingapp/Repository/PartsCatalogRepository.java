@@ -61,7 +61,7 @@ public interface PartsCatalogRepository extends JpaRepository<PartsCatalog, Long
                 @Param("q") String q,
                 @Param("manufacturerId") Integer manufacturerId,
                 @Param("isUnique") Boolean isUnique,
-                @Param("categoryCodes") List<String> categoryCodes,
+                @Param("categoryCodes") String[] categoryCodes,
                 Pageable pageable
         );
 

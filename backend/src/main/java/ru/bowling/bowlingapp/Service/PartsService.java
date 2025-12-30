@@ -55,7 +55,7 @@ public class PartsService {
                                 ? searchDTO.getCategoryCode().trim()
                                 : null;
                 String componentRootCode = resolveComponentCode(searchDTO.getComponentId());
-                List<String> categoryCodes = resolveCategoryCodes(componentRootCode != null ? componentRootCode
+                String[] categoryCodes = resolveCategoryCodes(componentRootCode != null ? componentRootCode
                                 : normalizedCategoryCode);
                 Sort sort = Sort.by(resolveSortDirection(searchDTO.getSortDirection()),
                                 resolveSortBy(searchDTO.getSortBy()));
@@ -65,13 +65,13 @@ public class PartsService {
                 Page<PartsCatalog> page = partsCatalogRepository.search(query, manufacturerId, isUnique, categoryCodes, pageable);
                 List<PartsCatalog> parts = page.getContent();
 
-                if (parts.isEmpty() && categoryCodes != null && !categoryCodes.isEmpty()) {
+                if (parts.isEmpty() && categoryCodes != null && categoryCodes.length > 0) {
                         Page<PartsCatalog> fallbackPage = partsCatalogRepository.search(query, manufacturerId, isUnique, null,
                                         pageable);
 
                         parts = fallbackPage.getContent().stream()
                                         .filter(part -> part.getCategoryCode() != null)
-                                        .filter(part -> categoryCodes.contains(part.getCategoryCode().trim().toLowerCase()))
+                                        .filter(part -> containsCategory(categoryCodes, part.getCategoryCode()))
                                         .toList();
                 }
                 if (catalogNumberFilter != null) {
@@ -241,7 +241,7 @@ public class PartsService {
                                 .orElse(Sort.Direction.ASC);
         }
 
-        private List<String> resolveCategoryCodes(String normalizedCategoryCode) {
+        private String[] resolveCategoryCodes(String normalizedCategoryCode) {
                 if (normalizedCategoryCode == null || normalizedCategoryCode.isBlank()) {
                         return null;
                 }
@@ -275,20 +275,33 @@ public class PartsService {
                                 rawCodes.add(normalizedCategoryCode);
                         }
 
-                        return normalizeCodesList(rawCodes);
+                        return normalizeCodesArray(rawCodes);
                 } catch (NumberFormatException ignored) {
-                        return normalizeCodesList(List.of(normalizedCategoryCode));
+                        return normalizeCodesArray(List.of(normalizedCategoryCode));
                 }
         }
 
-        private List<String> normalizeCodesList(List<String> codes) {
+        private String[] normalizeCodesArray(List<String> codes) {
                 List<String> cleaned = codes.stream()
                                 .filter(code -> code != null && !code.isBlank())
                                 .map(code -> code.trim().toLowerCase())
                                 .distinct()
                                 .toList();
 
-                return cleaned.isEmpty() ? null : cleaned;
+                return cleaned.isEmpty() ? null : cleaned.toArray(String[]::new);
+        }
+
+        private boolean containsCategory(String[] categories, String candidate) {
+                if (candidate == null || categories == null || categories.length == 0) {
+                        return false;
+                }
+                String normalized = candidate.trim().toLowerCase();
+                for (String category : categories) {
+                        if (category != null && category.trim().toLowerCase().equals(normalized)) {
+                                return true;
+                        }
+                }
+                return false;
         }
 
         private String resolveComponentCode(Long componentId) {
