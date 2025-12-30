@@ -92,14 +92,6 @@ public class MaintenanceRequestService {
                         throw new IllegalArgumentException("Lane number must be > 0 when provided");
                 }
 
-                boolean requiresLaneForStock = Optional.ofNullable(requestDTO.getRequestedParts())
-                                .orElse(List.of())
-                                .stream()
-                                .anyMatch(part -> part != null && part.getInventoryId() != null);
-                if (requiresLaneForStock && requestDTO.getLaneNumber() == null) {
-                        throw new IllegalArgumentException("Для выдачи со склада необходимо указать дорожку");
-                }
-
                 MaintenanceRequest request = MaintenanceRequest.builder()
                                 .club(club)
                                 .laneNumber(requestDTO.getLaneNumber())
