@@ -24,6 +24,7 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
   int? _clubId;
   bool _loading = true;
   bool _submitting = false;
+  bool _showArchive = false;
 
   final _formKey = GlobalKey<FormState>();
   MechanicGrade? _selectedGrade;
@@ -207,6 +208,14 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
 
   @override
   Widget build(BuildContext context) {
+    final visibleApplications = _applications.where((app) {
+      final status = app.status;
+      if (_showArchive) {
+        return status == AttestationDecisionStatus.approved;
+      }
+      return status != AttestationDecisionStatus.approved;
+    }).toList();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Аттестация тех. специалиста')),
       floatingActionButton: FloatingActionButton.extended(
@@ -214,22 +223,56 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
         icon: const Icon(Icons.verified_user_outlined),
         label: const Text('Подать заявку'),
       ),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _applications.isEmpty
-                ? ListView(
-                    children: const [
-                      SizedBox(height: 120),
-                      Center(child: Text('У вас пока нет заявок на аттестацию')),
-                    ],
-                  )
-                : ListView.builder(
-                    itemCount: _applications.length,
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
-                    itemBuilder: (_, index) => _buildTile(_applications[index]),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: FilterChip(
+                    label: Text('Актуальные (${_applications.where((app) => app.status != AttestationDecisionStatus.approved).length})'),
+                    selected: !_showArchive,
+                    onSelected: (_) => setState(() => _showArchive = false),
                   ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilterChip(
+                    label: Text('Архив (${_applications.where((app) => app.status == AttestationDecisionStatus.approved).length})'),
+                    selected: _showArchive,
+                    onSelected: (_) => setState(() => _showArchive = true),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _load,
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : visibleApplications.isEmpty
+                      ? ListView(
+                          children: [
+                            const SizedBox(height: 120),
+                            Center(
+                              child: Text(
+                                _showArchive
+                                    ? 'В архиве пока нет заявок на аттестацию'
+                                    : 'У вас пока нет заявок на аттестацию',
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
+                          itemCount: visibleApplications.length,
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
+                          itemBuilder: (_, index) => _buildTile(visibleApplications[index]),
+                        ),
+            ),
+          ),
+        ],
       ),
     );
   }
