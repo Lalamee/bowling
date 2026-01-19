@@ -257,7 +257,7 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
         TextFormField(
           controller: _partNameController,
           decoration: InputDecoration(
-            hintText: 'Начните вводить название запчасти',
+            hintText: 'Название или каталожный номер запчасти',
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(
@@ -383,10 +383,18 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
     final candidates = [part.commonName, part.officialNameRu, part.officialNameEn];
     for (final candidate in candidates) {
       if (candidate != null && candidate.trim().isNotEmpty) {
-        return candidate.trim();
+        final resolved = candidate.trim();
+        if (part.equipmentNodeName != null && part.equipmentNodeName!.trim().isNotEmpty) {
+          return '$resolved (${part.equipmentNodeName!.trim()})';
+        }
+        return resolved;
       }
     }
-    return part.catalogNumber;
+    final fallback = part.catalogNumber;
+    if (part.equipmentNodeName != null && part.equipmentNodeName!.trim().isNotEmpty) {
+      return '$fallback (${part.equipmentNodeName!.trim()})';
+    }
+    return fallback;
   }
 
   String _resolveCatalogNumber(PartDto part) {
