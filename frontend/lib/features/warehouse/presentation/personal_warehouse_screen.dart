@@ -398,7 +398,6 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
                   onPressed: _isMutating
                       ? null
                       : () async {
-                          Navigator.pop(ctx);
                           await _saveNewPart();
                         },
                   icon: const Icon(Icons.save),
@@ -449,9 +448,11 @@ class _PersonalWarehouseScreenState extends State<PersonalWarehouseScreen> {
         notes: notes.isEmpty ? null : notes,
       );
       if (!mounted) return;
+      await _loadWarehouseAndInventory();
+      if (!mounted) return;
+      Navigator.of(context).pop();
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Позиция добавлена в личный склад')));
-      await _loadWarehouseAndInventory();
     } catch (e) {
       if (mounted) {
         showApiError(context, e);

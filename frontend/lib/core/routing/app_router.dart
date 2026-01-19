@@ -60,6 +60,7 @@ import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/recover_ask_login_screen.dart';
 import '../../features/auth/presentation/screens/recover_code_screen.dart';
 import '../../features/auth/presentation/screens/recover_new_password_screen.dart';
+import '../../features/support/presentation/screens/support_request_screen.dart';
 
 class AppRouter {
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
@@ -174,6 +175,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const SpecialistsListScreen());
       case Routes.attestationApplications:
         return MaterialPageRoute(builder: (_) => const AttestationApplicationsScreen());
+      case Routes.supportAppeal:
+        return MaterialPageRoute(builder: (_) => const SupportRequestScreen());
 
       case Routes.profileOwner:
         return MaterialPageRoute(builder: (_) => const OwnerProfileScreen());

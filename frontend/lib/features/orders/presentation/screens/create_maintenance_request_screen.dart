@@ -239,10 +239,18 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     final names = [part.commonName, part.officialNameRu, part.officialNameEn];
     for (final name in names) {
       if (name != null && name.trim().isNotEmpty) {
-        return name.trim();
+        final resolved = name.trim();
+        if (part.equipmentNodeName != null && part.equipmentNodeName!.trim().isNotEmpty) {
+          return '$resolved (${part.equipmentNodeName!.trim()})';
+        }
+        return resolved;
       }
     }
-    return part.catalogNumber;
+    final fallback = part.catalogNumber;
+    if (part.equipmentNodeName != null && part.equipmentNodeName!.trim().isNotEmpty) {
+      return '$fallback (${part.equipmentNodeName!.trim()})';
+    }
+    return fallback;
   }
 
   String _resolveCatalogNameFromDto(PartsCatalogResponseDto dto) {
@@ -850,7 +858,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
         TextFormField(
           controller: _partNameController,
           decoration: _inputDecoration(
-            hint: 'Начните вводить название запчасти',
+            hint: 'Название или каталожный номер запчасти',
             suffixIcon: (_partNameController.text.isNotEmpty || _isCatalogNumberLocked)
                 ? IconButton(
                     icon: const Icon(Icons.close_rounded, color: AppColors.darkGray),

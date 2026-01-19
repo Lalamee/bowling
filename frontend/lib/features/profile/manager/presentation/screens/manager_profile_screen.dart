@@ -314,6 +314,12 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
             ),
           ),
           const SizedBox(height: 10),
+          ProfileTile(
+            icon: Icons.support_agent_outlined,
+            text: 'Обращение в администрацию',
+            onTap: () => Navigator.pushNamed(context, Routes.supportAppeal),
+          ),
+          const SizedBox(height: 10),
           ProfileTile(icon: Icons.location_searching_rounded, text: clubName, onTap: () {}),
           const SizedBox(height: 10),
           ProfileTile(icon: Icons.location_on_rounded, text: address, onEdit: () {}),
