@@ -58,11 +58,12 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
       }
 
       final apps = await _repository.getAttestationApplications();
+      final attestationOnly = apps.where(_isAttestationApplication).toList();
       if (!mounted) return;
       setState(() {
         _applications = _userId != null
-            ? apps.where((a) => a.userId == null || a.userId == _userId).toList()
-            : apps;
+            ? attestationOnly.where((a) => a.userId == null || a.userId == _userId).toList()
+            : attestationOnly;
         _loading = false;
       });
     } catch (e, s) {
@@ -81,6 +82,10 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
     if (value is num) return value.toInt();
     if (value is String) return int.tryParse(value);
     return null;
+  }
+
+  bool _isAttestationApplication(AttestationApplication app) {
+    return app.requestedGrade != null || app.approvedGrade != null;
   }
 
   Future<void> _submitApplication() async {
