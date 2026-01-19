@@ -39,12 +39,12 @@ class BottomNavDirect {
         final needsAdminApproval = ctx.accountType == AccountTypeName.freeMechanicBasic ||
             ctx.accountType == AccountTypeName.freeMechanicPremium;
         final approver = needsAdminApproval ? 'администрацией сервиса' : 'владельцем клуба';
+        final alreadyShown = await LocalAuthStorage.hasSeenAccessApprovalNotice();
         if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Доступ к разделу откроется после подтверждения $approver'),
-          ),
-        );
+        if (!alreadyShown) {
+          await LocalAuthStorage.setAccessApprovalNoticeSeen();
+          await _showAccessPendingDialog(context, approver);
+        }
         return;
       }
 
@@ -169,5 +169,40 @@ class BottomNavDirect {
     final profile = await LocalAuthStorage.loadMechanicProfile();
     if (profile == null) return false;
     return resolveUserClubs(profile).isNotEmpty;
+  }
+
+  static Future<void> _showAccessPendingDialog(BuildContext context, String approver) async {
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+        contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+        title: Row(
+          children: const [
+            Icon(Icons.lock_clock, color: Colors.deepOrange, size: 28),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Доступ временно ограничен',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Доступ к разделу откроется после подтверждения $approver. '
+          'Мы сообщим, когда проверка будет завершена.',
+          style: const TextStyle(height: 1.4),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Понятно'),
+          ),
+        ],
+      ),
+    );
   }
 }
