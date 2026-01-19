@@ -50,6 +50,7 @@ class Routes {
   static const adminRegistrations = '/admin/registrations';
   static const adminComplaints = '/admin/complaints';
   static const adminAppeals = '/admin/appeals';
+  static const supportAppeal = '/support/appeal';
 
   static const ordersPersonalHistory = '/orders/history-personal';
   static const clubOrdersHistory = '/orders/history-club';

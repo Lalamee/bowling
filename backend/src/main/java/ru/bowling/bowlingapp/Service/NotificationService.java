@@ -117,6 +117,31 @@ public class NotificationService {
         return event;
     }
 
+    public NotificationEvent notifyUserAppeal(User user,
+                                              Long clubId,
+                                              Long mechanicId,
+                                              String subject,
+                                              String message,
+                                              String payload) {
+        if (user == null || message == null || message.isBlank()) {
+            throw new IllegalArgumentException("Appeal payload is required");
+        }
+
+        String title = subject != null && !subject.isBlank() ? subject.trim() : "Обращение пользователя";
+        NotificationEvent event = NotificationEvent.builder()
+                .id(UUID.randomUUID())
+                .type(NotificationEventType.USER_APPEAL)
+                .message(title)
+                .clubId(clubId)
+                .mechanicId(mechanicId)
+                .payload(payload)
+                .createdAt(LocalDateTime.now())
+                .audiences(Set.of(RoleName.ADMIN))
+                .build();
+        notifications.add(event);
+        return event;
+    }
+
     public NotificationEvent notifyAdminResponse(Long clubId, String message, String payload) {
         if (clubId == null) {
             throw new IllegalArgumentException("Club id is required for admin response");
@@ -132,7 +157,28 @@ public class NotificationService {
                 .clubId(clubId)
                 .payload(payload)
                 .createdAt(LocalDateTime.now())
-                .audiences(Set.of(RoleName.CLUB_OWNER, RoleName.HEAD_MECHANIC))
+                .audiences(Set.of(RoleName.CLUB_OWNER, RoleName.HEAD_MECHANIC, RoleName.CLUB_MANAGER))
+                .build();
+        notifications.add(event);
+        return event;
+    }
+
+    public NotificationEvent notifyAdminResponseToMechanic(Long mechanicId, String message, String payload) {
+        if (mechanicId == null) {
+            throw new IllegalArgumentException("Mechanic id is required for admin response");
+        }
+        if (message == null || message.isBlank()) {
+            throw new IllegalArgumentException("Response message is required");
+        }
+
+        NotificationEvent event = NotificationEvent.builder()
+                .id(UUID.randomUUID())
+                .type(NotificationEventType.ADMIN_RESPONSE)
+                .message(message.trim())
+                .mechanicId(mechanicId)
+                .payload(payload)
+                .createdAt(LocalDateTime.now())
+                .audiences(Set.of(RoleName.MECHANIC))
                 .build();
         notifications.add(event);
         return event;

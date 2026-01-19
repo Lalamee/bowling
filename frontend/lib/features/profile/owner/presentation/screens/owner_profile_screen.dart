@@ -371,6 +371,12 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen())),
                     ),
                     const SizedBox(height: 10),
+                    ProfileTile(
+                      icon: Icons.support_agent_outlined,
+                      text: 'Обращение в администрацию',
+                      onTap: () => Navigator.pushNamed(context, Routes.supportAppeal),
+                    ),
+                    const SizedBox(height: 10),
                     if (profile.clubs.isNotEmpty)
                       ...List.generate(profile.clubs.length, (i) {
                         final club = profile.clubs[i];

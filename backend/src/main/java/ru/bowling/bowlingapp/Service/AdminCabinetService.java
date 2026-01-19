@@ -351,12 +351,15 @@ public class AdminCabinetService {
         NotificationEvent appeal = notificationService.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Обращение не найдено"));
 
-        if (appeal.getClubId() == null) {
-            throw new IllegalArgumentException("Обращение не связано с клубом");
+        String payload = "Ответ на обращение " + appeal.getId();
+        if (appeal.getClubId() != null) {
+            return notificationService.notifyAdminResponse(appeal.getClubId(), request.getMessage(), payload);
+        }
+        if (appeal.getMechanicId() != null) {
+            return notificationService.notifyAdminResponseToMechanic(appeal.getMechanicId(), request.getMessage(), payload);
         }
 
-        String payload = "Ответ на обращение " + appeal.getId();
-        return notificationService.notifyAdminResponse(appeal.getClubId(), request.getMessage(), payload);
+        throw new IllegalArgumentException("Обращение не связано с клубом или механиком");
     }
 
     private AdminHelpRequestDTO toHelpDto(RequestPart part) {

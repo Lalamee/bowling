@@ -47,6 +47,7 @@ import '../models/admin_mechanic_status_change_dto.dart';
 import '../models/admin_staff_status_update_dto.dart';
 import '../models/admin_mechanic_account_change_dto.dart';
 import '../models/club_appeal_request_dto.dart';
+import '../models/support_appeal_request_dto.dart';
 
 /// Типизированный API сервис для взаимодействия с backend
 class ApiService {
@@ -676,6 +677,11 @@ class ApiService {
   /// POST /api/owner-dashboard/appeals - обращение клуба в администрацию
   Future<void> submitClubAppeal(ClubAppealRequestDto request) async {
     await _dio.post('/api/owner-dashboard/appeals', data: request.toJson());
+  }
+
+  /// POST /api/support/appeals - обращение пользователя в администрацию
+  Future<void> submitSupportAppeal(SupportAppealRequestDto request) async {
+    await _dio.post('/api/support/appeals', data: request.toJson());
   }
 
   /// POST /api/admin/appeals/{appealId}/reply - ответ администрации на обращение

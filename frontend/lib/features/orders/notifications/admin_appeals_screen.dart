@@ -28,6 +28,7 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
     'HELP_REQUEST': 'Запрос помощи',
     'SUPPLIER_COMPLAINT': 'Жалоба поставщику',
     'ACCESS_REQUEST': 'Запрос доступа',
+    'USER_APPEAL': 'Обращение пользователя',
     'CLUB_TECH_SUPPORT': 'Клуб: запрос техподдержки',
     'CLUB_SUPPLIER_REFUSAL': 'Клуб: отказ поставщика',
     'CLUB_MECHANIC_FAILURE': 'Клуб: ремонт невозможен',
@@ -199,13 +200,14 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть')),
-          if (item.id != null && item.clubId != null)
+          if (item.id != null && (item.clubId != null || item.mechanicId != null))
             FilledButton(
               onPressed: () async {
+                final targetLabel = item.clubId != null ? 'клубу' : 'пользователю';
                 final reply = await showDialog<String>(
                   context: context,
                   builder: (dialogCtx) => AlertDialog(
-                    title: const Text('Ответить клубу'),
+                    title: Text('Ответить $targetLabel'),
                     content: TextField(
                       controller: replyCtrl,
                       maxLines: 4,
