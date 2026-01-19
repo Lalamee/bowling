@@ -37,6 +37,7 @@ public class PartDto {
     private String diagramUrl;
     private Long equipmentNodeId;
     private List<Long> equipmentNodePath;
+    private String equipmentNodeName;
     private List<String> compatibility;
 
 }

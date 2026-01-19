@@ -291,6 +291,8 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
       itemBuilder: (context, index) {
         final part = _parts[index];
         final name = part.commonName ?? part.officialNameRu ?? part.officialNameEn ?? part.catalogNumber;
+        final categoryLabel = _path.isNotEmpty ? _path.last.displayName : null;
+        final title = (categoryLabel != null && categoryLabel.isNotEmpty) ? '$name ($categoryLabel)' : name;
         final availability = part.availableQuantity ?? 0;
         final serviceLifeParts = <String>[];
         if (part.normalServiceLife != null) {
@@ -322,7 +324,7 @@ class _PartPickerSheetState extends State<PartPickerSheet> {
                   : null,
             ),
             title: Text(
-              name,
+              title,
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             subtitle: Column(

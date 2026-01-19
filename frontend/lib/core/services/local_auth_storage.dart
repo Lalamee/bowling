@@ -12,6 +12,7 @@ class LocalAuthStorage {
   static const String _adminProfileKey = 'admin_profile';
   static const String _registeredRoleKey = 'registered_role';
   static const String _registeredAccountTypeKey = 'registered_account_type';
+  static const String _accessApprovalNoticeKey = 'access_approval_notice_shown';
 
   static Future<void> setMechanicRegistered(bool value) async {
     final sp = await SharedPreferences.getInstance();
@@ -207,6 +208,17 @@ class LocalAuthStorage {
     await sp.remove(_adminProfileKey);
     await sp.remove(_registeredRoleKey);
     await sp.remove(_registeredAccountTypeKey);
+    await sp.remove(_accessApprovalNoticeKey);
+  }
+
+  static Future<bool> hasSeenAccessApprovalNotice() async {
+    final sp = await SharedPreferences.getInstance();
+    return sp.getBool(_accessApprovalNoticeKey) ?? false;
+  }
+
+  static Future<void> setAccessApprovalNoticeSeen() async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setBool(_accessApprovalNoticeKey, true);
   }
 
   static Future<void> _clearRegisteredRoleIfMatches(String role) async {

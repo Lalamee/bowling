@@ -21,6 +21,7 @@ class PartDto {
   final String? diagramUrl;
   final int? equipmentNodeId;
   final List<int> equipmentNodePath;
+  final String? equipmentNodeName;
   final List<String> compatibility;
   final bool? isAvailable;
 
@@ -47,6 +48,7 @@ class PartDto {
     this.diagramUrl,
     this.equipmentNodeId,
     this.equipmentNodePath = const [],
+    this.equipmentNodeName,
     this.compatibility = const [],
     this.isAvailable,
   });
@@ -88,6 +90,7 @@ class PartDto {
               .whereType<int>()
               .toList() ??
           const [],
+      equipmentNodeName: json['equipmentNodeName']?.toString(),
       compatibility: (json['compatibility'] as List?)
               ?.map((e) => e?.toString())
               .whereType<String>()
@@ -121,6 +124,7 @@ class PartDto {
         'diagramUrl': diagramUrl,
         'equipmentNodeId': equipmentNodeId,
         'equipmentNodePath': equipmentNodePath,
+        'equipmentNodeName': equipmentNodeName,
         'compatibility': compatibility,
         'isAvailable': isAvailable,
       };

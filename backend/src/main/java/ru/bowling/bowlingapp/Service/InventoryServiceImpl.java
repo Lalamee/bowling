@@ -12,6 +12,7 @@ import ru.bowling.bowlingapp.DTO.ReservationRequestDto;
 import ru.bowling.bowlingapp.DTO.WarehouseMovementDto;
 import ru.bowling.bowlingapp.DTO.WarehouseSummaryDto;
 import ru.bowling.bowlingapp.Entity.BowlingClub;
+import ru.bowling.bowlingapp.Entity.EquipmentCategory;
 import ru.bowling.bowlingapp.Entity.EquipmentComponent;
 import ru.bowling.bowlingapp.Entity.ManagerProfile;
 import ru.bowling.bowlingapp.Entity.MechanicProfile;
@@ -25,6 +26,7 @@ import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
 import ru.bowling.bowlingapp.Repository.PersonalWarehouseRepository;
 import ru.bowling.bowlingapp.Repository.PartImageRepository;
 import ru.bowling.bowlingapp.Repository.PartsCatalogRepository;
+import ru.bowling.bowlingapp.Repository.EquipmentCategoryRepository;
 import ru.bowling.bowlingapp.Repository.EquipmentComponentRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
 import ru.bowling.bowlingapp.Repository.WarehouseInventoryRepository;
@@ -74,6 +76,9 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Autowired
     private EquipmentComponentRepository equipmentComponentRepository;
+
+    @Autowired
+    private EquipmentCategoryRepository equipmentCategoryRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -163,6 +168,8 @@ public class InventoryServiceImpl implements InventoryService {
                 .orElseThrow(() -> new RuntimeException("Part not found"));
         PartDto dto = convertToDto(part, inventory);
         if (dto == null) {
+            EquipmentCategory category = resolveCategory(part);
+            List<Long> categoryPath = buildCategoryPath(category);
             return PartDto.builder()
                     .inventoryId(inventory.getInventoryId())
                     .catalogId(part.getCatalogId())
@@ -185,8 +192,9 @@ public class InventoryServiceImpl implements InventoryService {
                     .notes(inventory.getNotes())
                     .imageUrl(resolveImageUrl(part))
                     .diagramUrl(null)
-                    .equipmentNodeId(null)
-                    .equipmentNodePath(Collections.emptyList())
+                    .equipmentNodeId(category != null ? category.getId() : null)
+                    .equipmentNodePath(categoryPath)
+                    .equipmentNodeName(category != null ? resolveCategoryName(category) : null)
                     .compatibility(Collections.emptyList())
                     .build();
         }
@@ -572,6 +580,8 @@ public class InventoryServiceImpl implements InventoryService {
         if (quantity == null) {
             quantity = 0;
         }
+        EquipmentCategory category = resolveCategory(part);
+        List<Long> categoryPath = buildCategoryPath(category);
 
         return PartDto.builder()
                 .inventoryId(inventory.getInventoryId())
@@ -595,8 +605,9 @@ public class InventoryServiceImpl implements InventoryService {
                 .notes(inventory.getNotes())
                 .imageUrl(resolveImageUrl(part))
                 .diagramUrl(null)
-                .equipmentNodeId(null)
-                .equipmentNodePath(Collections.emptyList())
+                .equipmentNodeId(category != null ? category.getId() : null)
+                .equipmentNodePath(categoryPath)
+                .equipmentNodeName(category != null ? resolveCategoryName(category) : null)
                 .compatibility(Collections.emptyList())
                 .build();
     }
@@ -606,6 +617,52 @@ public class InventoryServiceImpl implements InventoryService {
             return null;
         }
         return partImageRepository.findFirstByCatalogId(part.getCatalogId()).map(image -> image.getImageUrl()).orElse(null);
+    }
+
+    private EquipmentCategory resolveCategory(PartsCatalog part) {
+        if (part == null) {
+            return null;
+        }
+        String code = part.getCategoryCode();
+        if (code == null || code.isBlank()) {
+            return null;
+        }
+        String trimmed = code.trim();
+        try {
+            Long id = Long.parseLong(trimmed);
+            return equipmentCategoryRepository.findByIdAndIsActiveTrue(id).orElse(null);
+        } catch (NumberFormatException ignored) {
+            return equipmentCategoryRepository.findByCodeIgnoreCaseAndIsActiveTrue(trimmed).orElse(null);
+        }
+    }
+
+    private List<Long> buildCategoryPath(EquipmentCategory category) {
+        if (category == null) {
+            return Collections.emptyList();
+        }
+        List<Long> path = new ArrayList<>();
+        EquipmentCategory current = category;
+        while (current != null) {
+            if (current.getId() != null) {
+                path.add(current.getId());
+            }
+            current = current.getParent();
+        }
+        Collections.reverse(path);
+        return path;
+    }
+
+    private String resolveCategoryName(EquipmentCategory category) {
+        if (category == null) {
+            return null;
+        }
+        if (category.getNameRu() != null && !category.getNameRu().isBlank()) {
+            return category.getNameRu().trim();
+        }
+        if (category.getNameEn() != null && !category.getNameEn().isBlank()) {
+            return category.getNameEn().trim();
+        }
+        return null;
     }
 
     private boolean matchesWarehouse(WarehouseInventory inventory,

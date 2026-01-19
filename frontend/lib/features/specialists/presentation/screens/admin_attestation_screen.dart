@@ -39,7 +39,8 @@ class _AdminAttestationScreenState extends State<AdminAttestationScreen> {
     try {
       setState(() => _loading = true);
       final apps = await _repository.getAttestationApplications(status: _statusFilter);
-      final enriched = await _attachRegions(apps);
+      final attestationOnly = apps.where(_isAttestationApplication).toList();
+      final enriched = await _attachRegions(attestationOnly);
       if (!mounted) return;
       setState(() {
         _applications = _gradeFilter == null
@@ -56,6 +57,10 @@ class _AdminAttestationScreenState extends State<AdminAttestationScreen> {
       });
       showApiError(context, e);
     }
+  }
+
+  bool _isAttestationApplication(AttestationApplication app) {
+    return app.requestedGrade != null || app.approvedGrade != null;
   }
 
   Future<List<AttestationApplication>> _attachRegions(List<AttestationApplication> apps) async {
@@ -276,34 +281,50 @@ class _AdminAttestationScreenState extends State<AdminAttestationScreen> {
     if (region != null) subtitle.add('Регион: $region');
 
     return Card(
-      child: ListTile(
-        title: Text('Заявка #${app.id ?? '—'}'),
-        subtitle: subtitle.isNotEmpty ? Text(subtitle.join('\n')) : null,
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Chip(label: Text(_statusLabel(app.status))),
-            const SizedBox(height: 4),
             Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.check_circle_outline, color: Colors.green),
-                  onPressed: () => _changeDecision(app, AttestationDecisionStatus.approved),
-                  tooltip: 'Одобрить',
+                Expanded(child: Text('Заявка #${app.id ?? '—'}', style: const TextStyle(fontWeight: FontWeight.w700))),
+                Chip(label: Text(_statusLabel(app.status))),
+              ],
+            ),
+            if (subtitle.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(subtitle.join('\n')),
+            ],
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => _changeDecision(app, AttestationDecisionStatus.approved),
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text('Одобрить'),
+                  ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.cancel_outlined, color: Colors.red),
-                  onPressed: () => _changeDecision(app, AttestationDecisionStatus.rejected),
-                  tooltip: 'Отклонить',
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _changeDecision(app, AttestationDecisionStatus.rejected),
+                    icon: const Icon(Icons.cancel_outlined),
+                    label: const Text('Отклонить'),
+                  ),
                 ),
               ],
             ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => _showDetails(app, region: region, resolvedGrade: resolvedGrade),
+                child: const Text('Подробнее'),
+              ),
+            ),
           ],
         ),
-        isThreeLine: true,
-        onTap: () => _showDetails(app, region: region, resolvedGrade: resolvedGrade),
       ),
     );
   }

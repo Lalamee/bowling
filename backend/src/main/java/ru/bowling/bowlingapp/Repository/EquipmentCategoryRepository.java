@@ -19,4 +19,6 @@ public interface EquipmentCategoryRepository extends JpaRepository<EquipmentCate
     List<EquipmentCategory> findByParent_IdAndBrandIgnoreCaseAndIsActiveTrueOrderBySortOrder(Long parentId, String brand);
 
     Optional<EquipmentCategory> findByIdAndIsActiveTrue(Long id);
+
+    Optional<EquipmentCategory> findByCodeIgnoreCaseAndIsActiveTrue(String code);
 }

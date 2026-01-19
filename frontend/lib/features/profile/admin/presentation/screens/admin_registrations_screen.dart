@@ -48,7 +48,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
   };
 
   static const Map<String, String> _accountLabels = {
-    'INDIVIDUAL': 'Механик',
+    'INDIVIDUAL': 'Механик клуба',
     'CLUB_OWNER': 'Владелец',
     'CLUB_MANAGER': 'Менеджер клуба',
     'FREE_MECHANIC_BASIC': 'Свободный механик (базовый)',
@@ -69,7 +69,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     'MANAGER': 'Менеджер клуба',
     'OWNER': 'Владелец клуба',
     'ADMIN': 'Администратор',
-    'INDIVIDUAL': 'Механик',
+    'INDIVIDUAL': 'Механик клуба',
   };
 
   static const Map<String, String> _commonValueLocalizations = {
@@ -81,7 +81,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     'CLUB_MANAGER': 'Менеджер клуба',
     'OWNER': 'Владелец клуба',
     'MANAGER': 'Менеджер клуба',
-    'INDIVIDUAL': 'Механик',
+    'INDIVIDUAL': 'Механик клуба',
     'CLUB': 'Клуб',
     'ADMINISTRATION': 'Администрация',
     'FREE_MECHANIC_BASIC': 'Свободный механик (базовый)',
@@ -567,7 +567,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
                 value: account,
                 decoration: const InputDecoration(labelText: 'Тип аккаунта'),
                 items: const [
-                  DropdownMenuItem(value: 'INDIVIDUAL', child: Text('Механик')),
+                  DropdownMenuItem(value: 'INDIVIDUAL', child: Text('Механик клуба')),
                   DropdownMenuItem(value: 'FREE_MECHANIC_BASIC', child: Text('Свободный механик (базовый)')),
                   DropdownMenuItem(value: 'FREE_MECHANIC_PREMIUM', child: Text('Свободный механик (премиум)')),
                 ],
