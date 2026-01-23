@@ -43,7 +43,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     'ADMIN': 'Администрация',
     'MECHANIC': 'Механик',
     'HEAD_MECHANIC': 'Менеджер',
-    'CLUB_OWNER': 'Владелец клуба',
+    'CLUB_OWNER': 'Владелец клуба/сети клубов',
     'CLUB_MANAGER': 'Менеджер клуба',
   };
 
@@ -67,7 +67,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     'MECHANIC': 'Механик',
     'CLUB': 'Клуб',
     'MANAGER': 'Менеджер клуба',
-    'OWNER': 'Владелец клуба',
+    'OWNER': 'Владелец клуба/сети клубов',
     'ADMIN': 'Администратор',
     'INDIVIDUAL': 'Механик клуба',
   };
@@ -77,9 +77,9 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     'MAIN_ADMIN': 'Администрация сервиса',
     'MECHANIC': 'Механик',
     'HEAD_MECHANIC': 'Менеджер',
-    'CLUB_OWNER': 'Владелец клуба',
+    'CLUB_OWNER': 'Владелец клуба/сети клубов',
     'CLUB_MANAGER': 'Менеджер клуба',
-    'OWNER': 'Владелец клуба',
+    'OWNER': 'Владелец клуба/сети клубов',
     'MANAGER': 'Менеджер клуба',
     'INDIVIDUAL': 'Механик клуба',
     'CLUB': 'Клуб',

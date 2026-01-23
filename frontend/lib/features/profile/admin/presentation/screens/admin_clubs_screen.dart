@@ -109,7 +109,7 @@ class _AdminClubsScreenState extends State<AdminClubsScreen> {
       if (!mounted) return;
       final owner = staff.firstWhere(
         (m) => m.roleKey == 'OWNER',
-        orElse: () => _StaffMemberInfo(roleKey: 'OWNER', displayRole: 'Владелец клуба', name: '', isActive: true),
+        orElse: () => _StaffMemberInfo(roleKey: 'OWNER', displayRole: 'Владелец клуба/сети клубов', name: '', isActive: true),
       );
       setState(() {
         entry.staff = staff;
@@ -605,7 +605,7 @@ class _AdminClubsScreenState extends State<AdminClubsScreen> {
   static String _mapRole(String roleKey) {
     switch (roleKey) {
       case 'OWNER':
-        return 'Владелец клуба';
+        return 'Владелец клуба/сети клубов';
       case 'ADMIN':
         return 'Администратор';
       case 'MANAGER':

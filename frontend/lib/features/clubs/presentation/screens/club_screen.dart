@@ -41,6 +41,7 @@ class _ClubScreenState extends State<ClubScreen> {
   List<UserClub> _clubs = const [];
   int? _selectedIndex;
   UserAccessScope? _scope;
+  static const List<String> _equipmentOptions = ['AMF', 'Brunswick', 'VIA', 'XIMA', 'Другое'];
 
   @override
   void initState() {
@@ -322,6 +323,299 @@ class _ClubScreenState extends State<ClubScreen> {
     );
   }
 
+  Future<void> _openCreateObjectSheet() async {
+    final nameController = TextEditingController();
+    final addressController = TextEditingController();
+    final lanesController = TextEditingController();
+    final customEquipmentController = TextEditingController();
+    String? selectedEquipment;
+    final formKey = GlobalKey<FormState>();
+    bool submitting = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> submit() async {
+              if (!formKey.currentState!.validate()) return;
+              final equipment = selectedEquipment == null
+                  ? null
+                  : selectedEquipment == 'Другое'
+                      ? customEquipmentController.text.trim()
+                      : selectedEquipment;
+              if (equipment == null || equipment.isEmpty) {
+                showSnack(context, 'Укажите производителя');
+                return;
+              }
+              final lanes = int.tryParse(lanesController.text.trim());
+              if (lanes == null || lanes <= 0) {
+                showSnack(context, 'Количество дорожек должно быть положительным числом');
+                return;
+              }
+
+              setModalState(() => submitting = true);
+              try {
+                final message = StringBuffer()
+                  ..writeln('Название объекта: ${nameController.text.trim()}')
+                  ..writeln('Адрес: ${addressController.text.trim()}')
+                  ..writeln('Количество дорожек: $lanes')
+                  ..writeln('Производитель: $equipment');
+                final dto = SupportAppealRequestDto(
+                  subject: 'Создание объекта',
+                  message: message.toString(),
+                );
+                await _supportRepository.submitAppeal(dto);
+                if (!mounted) return;
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Заявка на создание объекта отправлена')),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                showApiError(context, e);
+              } finally {
+                if (mounted) {
+                  setModalState(() => submitting = false);
+                }
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+              ),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Создать объект',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: nameController,
+                      decoration: const InputDecoration(labelText: 'Название объекта'),
+                      validator: (value) => value == null || value.trim().isEmpty ? 'Введите название объекта' : null,
+                      enabled: !submitting,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: addressController,
+                      decoration: const InputDecoration(labelText: 'Адрес'),
+                      validator: (value) => value == null || value.trim().isEmpty ? 'Введите адрес' : null,
+                      enabled: !submitting,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: lanesController,
+                      decoration: const InputDecoration(labelText: 'Количество дорожек'),
+                      keyboardType: TextInputType.number,
+                      validator: (value) => value == null || value.trim().isEmpty ? 'Введите количество дорожек' : null,
+                      enabled: !submitting,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedEquipment,
+                      decoration: const InputDecoration(labelText: 'Производитель'),
+                      items: _equipmentOptions
+                          .map((option) => DropdownMenuItem(value: option, child: Text(option)))
+                          .toList(),
+                      onChanged: submitting
+                          ? null
+                          : (value) => setModalState(() => selectedEquipment = value),
+                    ),
+                    if (selectedEquipment == 'Другое')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: TextFormField(
+                          controller: customEquipmentController,
+                          decoration: const InputDecoration(labelText: 'Уточните производителя'),
+                          validator: (value) => value == null || value.trim().isEmpty ? 'Уточните производителя' : null,
+                          enabled: !submitting,
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: submitting ? null : submit,
+                        child: submitting
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Отправить'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _openAddExistingObjectSheet() async {
+    List<UserClub> publicClubs = [];
+    try {
+      final summaries = await _clubsRepository.getClubs();
+      publicClubs = summaries
+          .map(
+            (club) => UserClub(
+              id: club.id,
+              name: club.name,
+              address: club.address,
+              lanes: club.lanesCount?.toString(),
+              phone: club.contactPhone,
+              email: club.contactEmail,
+            ),
+          )
+          .toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    } catch (e) {
+      if (!mounted) return;
+      showApiError(context, e);
+      return;
+    }
+
+    if (publicClubs.isEmpty) {
+      showSnack(context, 'Список клубов пуст');
+      return;
+    }
+
+    int selectedIndex = 0;
+    bool? isOwner;
+    bool submitting = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> submit() async {
+              if (isOwner == null) {
+                showSnack(context, 'Ответьте на вопрос о владельце клуба');
+                return;
+              }
+              if (!isOwner!) {
+                showSnack(context, 'Добавление доступно только владельцам клуба');
+                return;
+              }
+              setModalState(() => submitting = true);
+              try {
+                final club = publicClubs[selectedIndex];
+                final message = StringBuffer()
+                  ..writeln('Клуб: ${club.name}')
+                  ..writeln('ID: ${club.id}')
+                  ..writeln('Адрес: ${club.address ?? '—'}')
+                  ..writeln('Ответ: Да, являюсь владельцем');
+                final dto = SupportAppealRequestDto(
+                  subject: 'Запрос на добавление объекта',
+                  message: message.toString(),
+                );
+                await _supportRepository.submitAppeal(dto);
+                if (!mounted) return;
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Заявка на добавление объекта отправлена')),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                showApiError(context, e);
+              } finally {
+                if (mounted) {
+                  setModalState(() => submitting = false);
+                }
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Добавить объект из списка',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    value: selectedIndex,
+                    decoration: const InputDecoration(labelText: 'Клуб'),
+                    items: List.generate(
+                      publicClubs.length,
+                      (index) => DropdownMenuItem(
+                        value: index,
+                        child: Text(publicClubs[index].name, overflow: TextOverflow.ellipsis),
+                      ),
+                    ),
+                    onChanged: submitting
+                        ? null
+                        : (value) {
+                            if (value == null) return;
+                            setModalState(() => selectedIndex = value);
+                          },
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Вы являетесь владельцем клуба?',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  RadioListTile<bool>(
+                    value: true,
+                    groupValue: isOwner,
+                    onChanged: submitting ? null : (value) => setModalState(() => isOwner = value),
+                    title: const Text('Да'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  RadioListTile<bool>(
+                    value: false,
+                    groupValue: isOwner,
+                    onChanged: submitting ? null : (value) => setModalState(() => isOwner = value),
+                    title: const Text('Нет'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: submitting ? null : submit,
+                      child: submitting
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Отправить'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   int? _parseLaneCount(String? raw) {
     if (raw == null) return null;
     final trimmed = raw.trim();
@@ -364,9 +658,34 @@ class _ClubScreenState extends State<ClubScreen> {
       );
     }
     if (_clubs.isEmpty) {
+      if (_scope?.role == 'owner') {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'У вас пока нет объектов.',
+                  style: TextStyle(color: AppColors.darkGray),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                CustomButton(text: 'Создать объект', onPressed: _openCreateObjectSheet),
+                const SizedBox(height: 12),
+                CustomButton(
+                  text: 'Добавить объект из списка действующих клубов',
+                  isOutlined: true,
+                  onPressed: _openAddExistingObjectSheet,
+                ),
+              ],
+            ),
+          ),
+        );
+      }
       return const Center(
         child: Text(
-          'Для вашего аккаунта нет привязанных клубов',
+          'Для вашего аккаунта нет привязанных объектов',
           style: TextStyle(color: AppColors.darkGray),
         ),
       );
@@ -384,7 +703,7 @@ class _ClubScreenState extends State<ClubScreen> {
             children: [
               const Expanded(
                 child: Text(
-                  'Клуб',
+                  'Объекты',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textDark),
                 ),
               ),

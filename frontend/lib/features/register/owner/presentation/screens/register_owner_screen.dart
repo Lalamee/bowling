@@ -9,7 +9,6 @@ import '../../../../../core/utils/validators.dart';
 import '../../../../../core/utils/phone_utils.dart';
 import '../../../../../shared/widgets/buttons/custom_button.dart';
 import '../../../../../shared/widgets/chips/radio_group_horizontal.dart';
-import '../../../../../shared/widgets/chips/radio_group_vertical.dart';
 import '../../../../../shared/widgets/inputs/labeled_text_field.dart';
 import '../../../../../shared/widgets/layout/common_ui.dart';
 
@@ -25,37 +24,15 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
   final _fio = TextEditingController();
   final _phone = TextEditingController();
   final _inn = TextEditingController();
-  final _club = TextEditingController();
   final _addr = TextEditingController();
-  final _lanes = TextEditingController();
   final _email = TextEditingController();
-  final _customEquipment = TextEditingController();
   final _password = TextEditingController();
   final _passwordConfirm = TextEditingController();
 
-  int _step = 0;
   String? status;
-  String? selectedEquipment;
-
-  final List<String> _equipmentOptions = ['AMF', 'Brunswick', 'VIA', 'XIMA', 'другое'];
   // обновлено по замечанию: юридическое лицо добавлено, самозанятый скрыт
   final List<String> _statusOptions = ['ИП', 'Юрлицо (ООО, ПАО, АО)'];
-
   GlobalKey<FormState> get formKey => _formKey;
-  int get step => _step;
-  bool get _isLastStep => _step >= 1;
-
-  void nextStep() {
-    if (_step < 1) {
-      setState(() => _step++);
-    }
-  }
-
-  void prevStep() {
-    if (_step > 0) {
-      setState(() => _step--);
-    }
-  }
 
   @override
   @override
@@ -72,11 +49,8 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
       _fio,
       _phone,
       _inn,
-      _club,
       _addr,
-      _lanes,
       _email,
-      _customEquipment,
       _password,
       _passwordConfirm,
     ].forEach((c) => c.dispose());
@@ -87,40 +61,17 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
     showSnack(context, msg, success: success);
   }
 
-  void _nextStepGuarded() {
-    if (!(formKey.currentState?.validate() ?? false)) {
-      _showBar('Заполните обязательные поля');
-      return;
-    }
-    if (step == 0 && (status == null || status!.isEmpty)) {
-      _showBar('Выберите статус');
-      return;
-    }
-    nextStep();
-  }
-
   Future<void> _submit() async {
     if (!formKey.currentState!.validate() || status == null) {
       if (status == null) _showBar('Выберите статус');
       else _showBar('Заполните обязательные поля');
       return;
     }
-    final equipment = selectedEquipment == null
-        ? null
-        : selectedEquipment == 'другое'
-            ? _customEquipment.text.trim()
-            : selectedEquipment;
-    if (equipment == null || equipment.isEmpty) {
-      _showBar('Выберите оборудование');
-      return;
-    }
 
     final trimmedFullName = _fio.text.trim();
     final trimmedInn = _inn.text.trim();
-    final trimmedClub = _club.text.trim();
     final trimmedAddress = _addr.text.trim();
     final trimmedEmail = _email.text.trim();
-    final trimmedLanes = _lanes.text.trim();
     final trimmedStatus = status?.trim();
     final normalizedPhone = PhoneUtils.normalize(_phone.text);
     final password = _password.text.trim();
@@ -140,43 +91,25 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
       return;
     }
 
-    final lanesCount = int.tryParse(trimmedLanes);
-    if (lanesCount == null || lanesCount <= 0) {
-      _showBar('Количество дорожек должно быть положительным числом');
-      return;
-    }
-
     final data = {
       'phone': normalizedPhone,
       'password': password,
       'inn': trimmedInn,
-      'legalName': trimmedClub,
+      'legalName': trimmedFullName,
       'contactPerson': trimmedFullName,
       'contactPhone': normalizedPhone,
       'contactEmail': trimmedEmail,
-      'clubName': trimmedClub,
-      'clubAddress': trimmedAddress,
-      'lanesCount': lanesCount,
-      'clubPhone': normalizedPhone,
+      'address': trimmedAddress,
     };
-
-    final clubs = <String>[];
-    if (trimmedClub.isNotEmpty) {
-      clubs.add(trimmedClub);
-    }
 
     final profileSnapshot = {
       'fullName': trimmedFullName,
       'phone': normalizedPhone,
-      'clubName': trimmedClub,
       'address': trimmedAddress,
-      'status': 'Собственник',
+      'status': 'Владелец',
       if (trimmedStatus != null && trimmedStatus.isNotEmpty) 'businessStatus': trimmedStatus,
-      'clubs': clubs,
       'email': trimmedEmail,
       'inn': trimmedInn,
-      'lanes': trimmedLanes,
-      'equipment': equipment,
       'workplaceVerified': false,
     };
 
@@ -185,28 +118,21 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
       if (!success) {
         throw Exception('Не удалось зарегистрировать владельца. Попробуйте ещё раз.');
       }
-
-      final loginResult = await AuthService.login(phone: normalizedPhone, password: password);
-      if (loginResult == null) {
-        throw Exception('Регистрация выполнена, но не удалось войти. Попробуйте выполнить вход вручную.');
-      }
-
-      await LocalAuthStorage.clearMechanicState();
-      await LocalAuthStorage.saveOwnerProfile(profileSnapshot);
-      await LocalAuthStorage.setOwnerRegistered(true);
-      await LocalAuthStorage.setRegisteredRole('owner');
       return true;
     });
 
     if (result == true && mounted) {
-      Navigator.of(context).pushNamedAndRemoveUntil(Routes.profileOwner, (route) => false);
+      await LocalAuthStorage.clearMechanicState();
+      await LocalAuthStorage.saveOwnerProfile(profileSnapshot);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Заявка отправлена. Дождитесь подтверждения администрацией сервиса.')),
+      );
+      Navigator.of(context).pushNamedAndRemoveUntil(Routes.welcome, (route) => false);
     }
   }
 
   @override
   Widget build(BuildContext ctx) {
-    final steps = [_buildStepOne(ctx), _buildStepTwo(ctx)];
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -234,15 +160,13 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Form(
                   key: formKey,
-                  child: steps[step],
+                  child: _buildForm(ctx),
                 ),
               ),
             ),
             Padding(
               padding: const EdgeInsets.all(24),
-              child: _isLastStep
-                  ? CustomButton(text: 'Зарегистрироваться', onPressed: _submit)
-                  : CustomButton(text: 'Далее', onPressed: _nextStepGuarded),
+              child: CustomButton(text: 'Зарегистрироваться', onPressed: _submit),
             ),
           ],
         ),
@@ -253,13 +177,9 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
   Widget _buildStepBackButton(BuildContext ctx) {
     return TextButton.icon(
       onPressed: () {
-        if (step == 0) {
-          final navigator = Navigator.of(ctx);
-          if (navigator.canPop()) {
-            navigator.pop();
-          }
-        } else {
-          prevStep();
+        final navigator = Navigator.of(ctx);
+        if (navigator.canPop()) {
+          navigator.pop();
         }
       },
       icon: const Icon(Icons.arrow_back, color: AppColors.primary),
@@ -268,22 +188,23 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
     );
   }
 
-  Widget _buildStepOne(BuildContext ctx) {
+  Widget _buildForm(BuildContext ctx) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         formStepTitle('Добро пожаловать!'),
-        formDescription('Это нужно, чтобы мы знали, каким клубом вы управляете, и могли предоставить вам доступ к инструментам управления.'),
+        formDescription('Заполните данные, чтобы мы смогли подтвердить вашу регистрацию.'),
         LabeledTextField(
-            label: 'ФИО/Наименование организации',
-            controller: _fio,
-            validator: Validators.notEmpty,
-            icon: Icons.person,
-            isRequired: true),
+          label: 'ФИО/Наименование организации',
+          controller: _fio,
+          validator: Validators.notEmpty,
+          icon: Icons.person,
+          isRequired: true,
+        ),
         LabeledTextField(label: 'Номер телефона', controller: _phone, validator: Validators.phone, keyboardType: TextInputType.phone, icon: Icons.phone, isRequired: true),
         LabeledTextField(label: 'Email', controller: _email, validator: Validators.email, keyboardType: TextInputType.emailAddress, icon: Icons.email, isRequired: true),
-        LabeledTextField(label: 'ИНН организации', controller: _inn, validator: Validators.notEmpty, keyboardType: TextInputType.number, icon: Icons.badge, isRequired: true),
-        LabeledTextField(label: 'Адрес клуба', controller: _addr, validator: Validators.notEmpty, icon: Icons.location_on, isRequired: true),
+        LabeledTextField(label: 'ИНН организации/ИП', controller: _inn, validator: Validators.notEmpty, keyboardType: TextInputType.number, icon: Icons.badge, isRequired: true),
+        LabeledTextField(label: 'Адрес организации/ИП', controller: _addr, validator: Validators.notEmpty, icon: Icons.location_on, isRequired: true),
         LabeledTextField(
           label: 'Пароль',
           controller: _password,
@@ -314,34 +235,6 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
           groupValue: status,
           onChanged: (v) => setState(() => status = v),
         ),
-      ],
-    );
-  }
-
-  Widget _buildStepTwo(BuildContext ctx) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        sectionTitle('Расскажите о Вашем клубе:'),
-        formDescription('Укажите количество дорожек и установленное оборудование.'),
-        LabeledTextField(label: 'Название клуба', controller: _club, validator: Validators.notEmpty, icon: Icons.sports, isRequired: true),
-        LabeledTextField(label: 'Количество дорожек', controller: _lanes, validator: Validators.integer, keyboardType: TextInputType.number, icon: Icons.format_list_numbered, isRequired: true),
-        formDescription('Какое оборудование стоит в клубе:'),
-        RadioGroupVertical(
-          options: _equipmentOptions,
-          groupValue: selectedEquipment,
-          onChanged: (v) => setState(() => selectedEquipment = v),
-        ),
-        if (selectedEquipment == 'другое')
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: LabeledTextField(
-              label: 'Уточните',
-              controller: _customEquipment,
-              validator: Validators.notEmpty,
-              isRequired: true,
-            ),
-          ),
       ],
     );
   }

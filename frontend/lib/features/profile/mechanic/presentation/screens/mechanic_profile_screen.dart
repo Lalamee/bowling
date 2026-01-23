@@ -847,12 +847,6 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                     ),
                     const SizedBox(height: 10),
                     ProfileTile(
-                      icon: Icons.support_agent_outlined,
-                      text: 'Обращение в администрацию',
-                      onTap: () => Navigator.pushNamed(context, Routes.supportAppeal),
-                    ),
-                    const SizedBox(height: 10),
-                    ProfileTile(
                       icon: Icons.menu_book_rounded,
                       text: 'База знаний',
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen())),

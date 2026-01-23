@@ -276,7 +276,7 @@ class _EditMechanicProfileScreenState extends State<EditMechanicProfileScreen> {
           const Text('Ваш статус:', style: TextStyle(fontSize: 13, color: AppColors.darkGray)),
           const SizedBox(height: 8),
           RadioGroupHorizontal(
-            options: const ['Собственник', 'Механик'],
+            options: const ['Владелец', 'Механик'],
             groupValue: _status,
             onChanged: (v) => setState(() => _status = v ?? _status),
           ),
@@ -325,7 +325,7 @@ class _EditMechanicProfileScreenState extends State<EditMechanicProfileScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: 'Заказы'),
           BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Поиск'),
-          BottomNavigationBarItem(icon: Icon(Icons.storefront_outlined), label: 'Клуб'),
+          BottomNavigationBarItem(icon: Icon(Icons.storefront_outlined), label: 'Объекты'),
           BottomNavigationBarItem(icon: Icon(Icons.account_circle_outlined), label: 'Профиль'),
         ],
       ),

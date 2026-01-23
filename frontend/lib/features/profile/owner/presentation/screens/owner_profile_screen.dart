@@ -29,13 +29,11 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
   final UserRepository _repo = UserRepository();
   final NotificationsBadgeController _notificationsController = NotificationsBadgeController();
   late OwnerProfile profile;
-  static const String _ownerStatusLabel = 'Собственник';
+  static const String _ownerStatusLabel = 'Владелец';
   bool _isLoading = true;
   bool _hasError = false;
   String? email;
   String? inn;
-  String? lanes;
-  String? equipment;
   int _notificationsCount = 0;
 
   @override
@@ -43,7 +41,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
     super.initState();
     _notificationsController.addListener(_handleNotificationsUpdate);
     profile = OwnerProfile(
-      fullName: 'Собственник',
+      fullName: 'Владелец клуба/сети клубов',
       phone: '—',
       clubName: '—',
       clubs: const [],
@@ -124,8 +122,6 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
     String? address;
     String? contactEmail;
     String? contactInn;
-    String? clubEquipment;
-    String? clubLanes;
     String? contactPerson;
     String? contactPhone;
 
@@ -195,8 +191,6 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
       contactPhone = asString(map['contactPhone']);
       contactEmail = asString(map['contactEmail']);
       contactInn = asString(map['inn']);
-      clubEquipment = asString(map['equipment']);
-      clubLanes = asString(map['lanes']);
     }
 
     var fullName = asString(me['fullName']) ?? contactPerson ?? profile.fullName;
@@ -225,8 +219,6 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
       'workplaceVerified': verified,
       'email': contactEmail ?? asString(me['email']),
       'inn': contactInn,
-      'lanes': clubLanes,
-      'equipment': clubEquipment,
     };
   }
 
@@ -259,8 +251,6 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
       profile = updatedProfile;
       email = asString(raw['email']) ?? email;
       inn = asString(raw['inn']) ?? inn;
-      lanes = asString(raw['lanes']) ?? lanes;
-      equipment = asString(raw['equipment']) ?? equipment;
       _isLoading = false;
       _hasError = false;
     });
@@ -371,12 +361,6 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen())),
                     ),
                     const SizedBox(height: 10),
-                    ProfileTile(
-                      icon: Icons.support_agent_outlined,
-                      text: 'Обращение в администрацию',
-                      onTap: () => Navigator.pushNamed(context, Routes.supportAppeal),
-                    ),
-                    const SizedBox(height: 10),
                     if (profile.clubs.isNotEmpty)
                       ...List.generate(profile.clubs.length, (i) {
                         final club = profile.clubs[i];
@@ -391,16 +375,6 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                         );
                       }),
                     const SizedBox(height: 10),
-                    ProfileTile(icon: Icons.location_on_rounded, text: profile.address, onEdit: () => _openEdit(OwnerEditFocus.address)),
-                    if (lanes != null && lanes!.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      ProfileTile(icon: Icons.format_list_numbered, text: 'Дорожек: $lanes'),
-                    ],
-                    if (equipment != null && equipment!.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      ProfileTile(icon: Icons.memory_rounded, text: 'Оборудование: $equipment'),
-                    ],
-                    const SizedBox(height: 10),
                     ProfileTile(
                       icon: Icons.notifications_active_outlined,
                       text: 'Оповещения',
@@ -414,8 +388,6 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                         }
                       },
                     ),
-                    const SizedBox(height: 10),
-                    ProfileTile(icon: Icons.group_outlined, text: 'Сотрудники клуба', onTap: () => Navigator.pushNamed(context, Routes.clubStaff)),
                     const SizedBox(height: 10),
                     ProfileTile(icon: Icons.exit_to_app_rounded, text: 'Выход', danger: true, onTap: _logout),
                   ],

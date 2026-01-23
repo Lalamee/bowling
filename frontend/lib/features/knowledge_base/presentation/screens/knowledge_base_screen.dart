@@ -43,11 +43,16 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
       final me = await _userRepository.me();
       final scope = await UserAccessScope.fromProfile(me);
       final docs = await _repository.load();
+      final filteredDocs = docs.where((doc) {
+        final title = doc.title.toLowerCase();
+        final fileName = (doc.fileName ?? '').toLowerCase();
+        return !(title.contains('шарик') || fileName.contains('шарик'));
+      }).toList();
       if (!mounted) return;
       setState(() {
         _scope = scope;
         _hasPremiumAccess = scope.hasPremiumAccess;
-        _documents = docs;
+        _documents = filteredDocs;
         _loadingDocuments = false;
       });
     } catch (e) {
