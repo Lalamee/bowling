@@ -41,6 +41,7 @@ import '../../features/warehouse/presentation/personal_warehouse_screen.dart';
 
 import '../../features/profile/mechanic/presentation/screens/mechanic_profile_screen.dart';
 import '../../features/profile/mechanic/presentation/screens/edit_mechanic_profile_screen.dart';
+import '../../features/profile/mechanic/presentation/screens/favorites_screen.dart';
 import '../../features/specialists/presentation/screens/attestation_applications_screen.dart';
 import '../../features/specialists/presentation/screens/admin_attestation_screen.dart';
 import '../../features/specialists/presentation/screens/specialists_list_screen.dart';
@@ -182,6 +183,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const OwnerProfileScreen());
       case Routes.editOwnerProfile:
         return MaterialPageRoute(builder: (_) => const EditOwnerProfileScreen());
+      case Routes.favorites:
+        return MaterialPageRoute(builder: (_) => const FavoritesScreen());
 
       case Routes.knowledgeBase:
         return MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen());

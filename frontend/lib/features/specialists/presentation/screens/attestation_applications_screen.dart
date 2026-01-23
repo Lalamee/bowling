@@ -111,12 +111,15 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
       final created = await _repository.submitAttestationApplication(dto);
       if (!mounted) return;
       if (created != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Заявка на аттестацию отправлена')),
-        );
         _experienceCtrl.clear();
         _extraCtrl.clear();
         _selectedGrade = null;
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Заявка успешно отправлена')),
+        );
         await _load();
       } else {
         showApiError(context, 'Не удалось отправить заявку');

@@ -49,6 +49,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
   int? _selectedLane;
   List<UserClub> _clubs = const [];
   Map<int, WarehouseSummaryDto> _warehouses = const {};
+  int? _personalWarehouseId;
   bool _submitting = false;
 
   List<RequestedPartDto> requestedParts = [];
@@ -108,20 +109,32 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     try {
       final items = await _inventoryRepository.getWarehouses();
       if (!mounted) return;
+      final personal = items.firstWhere(
+        (w) => w.warehouseType.toUpperCase() == 'PERSONAL' || w.personalAccess,
+        orElse: () => const WarehouseSummaryDto(
+          warehouseId: 0,
+          title: '',
+          warehouseType: 'CLUB',
+        ),
+      );
       setState(() {
         _warehouses = {for (final w in items) w.warehouseId: w};
+        _personalWarehouseId = personal.warehouseId > 0 ? personal.warehouseId : null;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _warehouses = const {};
+        _personalWarehouseId = null;
       });
     }
   }
 
   Future<void> _refreshAvailability() async {
     final clubId = _selectedClubId;
-    if (clubId == null || requestedParts.isEmpty) {
+    final personalWarehouseId = _personalWarehouseId;
+    final usePersonalWarehouse = clubId == null && personalWarehouseId != null;
+    if ((clubId == null && !usePersonalWarehouse) || requestedParts.isEmpty) {
       setState(() {
         _availability = List.filled(requestedParts.length, null, growable: false);
       });
@@ -130,7 +143,11 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     final results = <PartAvailabilityResult?>[];
     for (final part in requestedParts) {
       try {
-        final matches = await _inventoryRepository.search(query: part.catalogNumber, clubId: clubId);
+        final matches = await _inventoryRepository.search(
+          query: part.catalogNumber,
+          clubId: usePersonalWarehouse ? null : clubId,
+          warehouseId: usePersonalWarehouse ? personalWarehouseId : null,
+        );
         results.add(PartAvailabilityHelper.resolve(part, matches, warehouses: _warehouses));
       } catch (_) {
         results.add(null);
@@ -962,22 +979,11 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       return const SizedBox.shrink();
     }
     final color = status.available ? Colors.green : Colors.orange;
-    final icon = status.available ? Icons.inventory_2 : Icons.shopping_cart_checkout;
-    final buffer = StringBuffer(status.available ? 'Есть на складе' : 'Нужно заказывать');
-    if (status.available) {
-      final scope = status.warehouseType == 'PERSONAL'
-          ? 'Личный склад'
-          : status.warehouseHint;
-      if (scope != null && scope.isNotEmpty) {
-        buffer.write(' · $scope');
-      }
-      final loc = status.location;
-      if (loc != null && loc.isNotEmpty) {
-        buffer.write(' · $loc');
-      }
-    }
-    final text = buffer.toString();
-    final details = status.warehouseHint;
+    final icon = status.available ? Icons.inventory_2 : Icons.inventory_2_outlined;
+    final availableQty = (status.availableQuantity ?? 0).clamp(0, 999999);
+    final text = status.available
+        ? 'на складе $availableQty ед.'
+        : 'отсутствует на складе';
     return Row(
       children: [
         Chip(
@@ -985,10 +991,6 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
           label: Text(text, style: const TextStyle(color: Colors.white)),
           backgroundColor: color,
         ),
-        if (details != null) ...[
-          const SizedBox(width: 6),
-          Text(details, style: const TextStyle(fontSize: 12, color: AppColors.darkGray)),
-        ],
       ],
     );
   }

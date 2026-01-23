@@ -53,6 +53,7 @@ class Routes {
   static const supportAppeal = '/support/appeal';
 
   static const ordersPersonalHistory = '/orders/history-personal';
+  static const favorites = '/profile/favorites';
   static const clubOrdersHistory = '/orders/history-club';
 
   static const supplyAcceptance = '/supply/acceptance';
