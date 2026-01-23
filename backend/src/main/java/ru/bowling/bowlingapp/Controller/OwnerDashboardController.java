@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import ru.bowling.bowlingapp.DTO.ClubAppealRequestDTO;
 import ru.bowling.bowlingapp.DTO.NotificationEvent;
 import ru.bowling.bowlingapp.DTO.ServiceJournalEntryDTO;
+import ru.bowling.bowlingapp.DTO.TechnicalInfoCreateRequestDTO;
 import ru.bowling.bowlingapp.DTO.TechnicalInfoDTO;
 import ru.bowling.bowlingapp.DTO.WarningDTO;
 import ru.bowling.bowlingapp.Entity.enums.WorkLogStatus;
@@ -36,6 +37,13 @@ public class OwnerDashboardController {
     public ResponseEntity<List<TechnicalInfoDTO>> getTechnicalInfo(@AuthenticationPrincipal UserPrincipal principal,
                                                                    @RequestParam(name = "clubId", required = false) Long clubId) {
         return ResponseEntity.ok(ownerDashboardService.getTechnicalInformation(principal.getId(), clubId));
+    }
+
+    @PostMapping("/technical-info")
+    @PreAuthorize("hasAnyRole('CLUB_OWNER','HEAD_MECHANIC','CLUB_MANAGER','ADMIN')")
+    public ResponseEntity<TechnicalInfoDTO> createTechnicalInfo(@AuthenticationPrincipal UserPrincipal principal,
+                                                                @RequestBody TechnicalInfoCreateRequestDTO request) {
+        return ResponseEntity.ok(ownerDashboardService.createTechnicalInfo(principal.getId(), request));
     }
 
     @GetMapping("/service-history")

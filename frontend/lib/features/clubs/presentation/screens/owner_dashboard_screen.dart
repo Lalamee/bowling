@@ -5,6 +5,7 @@ import '../../../../core/repositories/owner_dashboard_repository.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/notifications_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
+import '../../../../core/services/authz/acl.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../core/utils/user_club_resolver.dart';
@@ -12,6 +13,7 @@ import '../../../../core/utils/help_request_status_helper.dart';
 import '../../../../models/notification_event_dto.dart';
 import '../../../../models/club_appeal_request_dto.dart';
 import '../../../../models/service_journal_entry_dto.dart';
+import '../../../../models/technical_info_create_dto.dart';
 import '../../../../models/technical_info_dto.dart';
 import '../../../../models/warning_dto.dart';
 import '../../../../shared/widgets/layout/common_ui.dart';
@@ -63,6 +65,15 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
   List<UserClub> _clubs = const [];
   int? _selectedClubId;
   String? _roleName;
+  UserAccessScope? _accessScope;
+
+  static const List<String> _equipmentOptions = ['AMF', 'Brunswick', 'VIA', 'XIMA', 'Другое'];
+  static const Map<String, List<String>> _equipmentModels = {
+    'AMF': ['82/70XLi', '82/90XLi', 'HVO'],
+    'Brunswick': ['A2', 'GS-X', 'GS-X Lite', 'NXT'],
+    'VIA': ['VIA Vector', 'VIA Edge'],
+    'XIMA': ['XIMA Phoenix', 'XIMA Evo'],
+  };
 
   List<TechnicalInfoDto> _technical = const [];
   List<ServiceJournalEntryDto> _journal = const [];
@@ -113,6 +124,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
     });
     try {
       final me = await _userRepository.me();
+      final scope = await UserAccessScope.fromProfile(me);
       final clubs = resolveUserClubs(me);
       final role = me['role']?.toString() ?? me['roleName']?.toString();
       int? selectedId;
@@ -125,6 +137,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
         _clubs = clubs;
         _selectedClubId = selectedId;
         _roleName = role;
+        _accessScope = scope;
       });
       await _loadData();
     } catch (e) {
@@ -200,6 +213,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
   void _updateStatus(String? value) {
     setState(() => _statusFilter = value?.isEmpty ?? true ? null : value);
     _loadData();
+  }
+
+  bool get _canEditTechnicalInfo {
+    final role = _accessScope?.role;
+    return role == 'admin' || role == 'owner' || role == 'manager';
   }
 
   void _toggleCriticalWarnings(bool? value) {
@@ -455,18 +473,42 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
 
   Widget _buildTechnicalTab() {
     if (_technical.isEmpty) {
-      return const Center(
-        child: Text('Нет данных по оборудованию', style: TextStyle(color: AppColors.darkGray)),
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Нет данных по оборудованию', style: TextStyle(color: AppColors.darkGray)),
+              if (_canEditTechnicalInfo) ...[
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: _openCreateTechnicalInfoSheet,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Добавить техническую информацию'),
+                ),
+              ],
+            ],
+          ),
+        ),
       );
     }
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
-        itemCount: _technical.length,
+        itemCount: _technical.length + (_canEditTechnicalInfo ? 1 : 0),
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (_, i) {
-          final item = _technical[i];
+          if (_canEditTechnicalInfo && i == 0) {
+            return FilledButton.icon(
+              onPressed: _openCreateTechnicalInfoSheet,
+              icon: const Icon(Icons.add),
+              label: const Text('Добавить техническую информацию'),
+            );
+          }
+          final offset = _canEditTechnicalInfo ? 1 : 0;
+          final item = _technical[i - offset];
           return CommonUI.card(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -560,6 +602,243 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> with Single
           );
         },
       ),
+    );
+  }
+
+  Future<void> _openCreateTechnicalInfoSheet() async {
+    final clubId = _selectedClubId;
+    if (clubId == null) {
+      showSnack(context, 'Выберите клуб');
+      return;
+    }
+    final club = _clubs.firstWhere((c) => c.id == clubId, orElse: () => _clubs.first);
+    final equipmentName = club.equipment;
+
+    final modelController = TextEditingController();
+    final customManufacturerController = TextEditingController();
+    final serialController = TextEditingController();
+    final lanesController = TextEditingController(text: club.lanes ?? '');
+    final yearController = TextEditingController();
+    final conditionController = TextEditingController();
+    String? selectedEquipment = _equipmentOptions.contains(equipmentName) ? equipmentName : null;
+    String? selectedModel;
+    bool submitting = false;
+    final formKey = GlobalKey<FormState>();
+    DateTime? purchaseDate;
+    DateTime? warrantyUntil;
+    DateTime? lastMaintenanceDate;
+    DateTime? nextMaintenanceDate;
+
+    Future<void> pickDate(ValueChanged<DateTime?> onPicked, DateTime? current) async {
+      final now = DateTime.now();
+      final initial = current ?? now;
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: initial,
+        firstDate: DateTime(now.year - 20),
+        lastDate: DateTime(now.year + 20),
+      );
+      onPicked(picked);
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> submit() async {
+              if (!formKey.currentState!.validate()) return;
+              setModalState(() => submitting = true);
+              try {
+                final manufacturer = selectedEquipment == 'Другое'
+                    ? customManufacturerController.text.trim()
+                    : selectedEquipment;
+                final model = selectedEquipment == 'Другое'
+                    ? modelController.text.trim()
+                    : (selectedModel ?? modelController.text.trim());
+                final dto = TechnicalInfoCreateDto(
+                  clubId: clubId,
+                  manufacturer: manufacturer,
+                  equipmentType: manufacturer,
+                  model: model,
+                  serialNumber: serialController.text.trim().isEmpty ? null : serialController.text.trim(),
+                  lanesCount: int.tryParse(lanesController.text.trim()),
+                  productionYear: int.tryParse(yearController.text.trim()),
+                  conditionPercentage: int.tryParse(conditionController.text.trim()),
+                  purchaseDate: purchaseDate,
+                  warrantyUntil: warrantyUntil,
+                  lastMaintenanceDate: lastMaintenanceDate,
+                  nextMaintenanceDate: nextMaintenanceDate,
+                );
+                await _repository.createTechnicalInfo(dto);
+                if (!mounted) return;
+                Navigator.pop(ctx);
+                _loadData();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Техническая информация добавлена')),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                showApiError(context, e);
+              } finally {
+                if (mounted) {
+                  setModalState(() => submitting = false);
+                }
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+              ),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Добавить техническую информацию',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedEquipment,
+                      decoration: const InputDecoration(labelText: 'Производитель'),
+                      items: _equipmentOptions
+                          .map((option) => DropdownMenuItem(value: option, child: Text(option)))
+                          .toList(),
+                      validator: (value) => value == null || value.trim().isEmpty ? 'Выберите производителя' : null,
+                      onChanged: submitting
+                          ? null
+                          : (value) => setModalState(() {
+                                selectedEquipment = value;
+                                selectedModel = null;
+                                modelController.clear();
+                                customManufacturerController.clear();
+                              }),
+                    ),
+                    if (selectedEquipment != null && selectedEquipment != 'Другое')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: DropdownButtonFormField<String>(
+                          value: selectedModel,
+                          decoration: const InputDecoration(labelText: 'Модель оборудования'),
+                          items: (_equipmentModels[selectedEquipment] ?? const [])
+                              .map((model) => DropdownMenuItem(value: model, child: Text(model)))
+                              .toList(),
+                          validator: (value) => value == null || value.trim().isEmpty ? 'Выберите модель оборудования' : null,
+                          onChanged: submitting ? null : (value) => setModalState(() => selectedModel = value),
+                        ),
+                      ),
+                    if (selectedEquipment == 'Другое')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: TextFormField(
+                          controller: customManufacturerController,
+                          decoration: const InputDecoration(labelText: 'Производитель (другое)'),
+                          validator: (value) => value == null || value.trim().isEmpty ? 'Укажите производителя' : null,
+                          enabled: !submitting,
+                        ),
+                      ),
+                    if (selectedEquipment == 'Другое')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: TextFormField(
+                          controller: modelController,
+                          decoration: const InputDecoration(labelText: 'Модель оборудования'),
+                          validator: (value) => value == null || value.trim().isEmpty ? 'Укажите модель оборудования' : null,
+                          enabled: !submitting,
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: serialController,
+                      decoration: const InputDecoration(labelText: 'Серийный номер'),
+                      enabled: !submitting,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: lanesController,
+                      decoration: const InputDecoration(labelText: 'Количество дорожек'),
+                      keyboardType: TextInputType.number,
+                      enabled: !submitting,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: yearController,
+                      decoration: const InputDecoration(labelText: 'Год выпуска'),
+                      keyboardType: TextInputType.number,
+                      enabled: !submitting,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: conditionController,
+                      decoration: const InputDecoration(labelText: 'Состояние, %'),
+                      keyboardType: TextInputType.number,
+                      enabled: !submitting,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: 'Дата покупки',
+                        hintText: purchaseDate != null ? _formatDate(purchaseDate!) : 'Не указано',
+                      ),
+                      onTap: submitting ? null : () => pickDate((picked) => setModalState(() => purchaseDate = picked), purchaseDate),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: 'Гарантия до',
+                        hintText: warrantyUntil != null ? _formatDate(warrantyUntil!) : 'Не указано',
+                      ),
+                      onTap: submitting ? null : () => pickDate((picked) => setModalState(() => warrantyUntil = picked), warrantyUntil),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: 'Последнее ТО',
+                        hintText: lastMaintenanceDate != null ? _formatDate(lastMaintenanceDate!) : 'Не указано',
+                      ),
+                      onTap: submitting ? null : () => pickDate((picked) => setModalState(() => lastMaintenanceDate = picked), lastMaintenanceDate),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: 'Следующее ТО',
+                        hintText: nextMaintenanceDate != null ? _formatDate(nextMaintenanceDate!) : 'Не указано',
+                      ),
+                      onTap: submitting ? null : () => pickDate((picked) => setModalState(() => nextMaintenanceDate = picked), nextMaintenanceDate),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: submitting ? null : submit,
+                        child: submitting
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Сохранить'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

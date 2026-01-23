@@ -22,7 +22,7 @@ public class ServiceHistoryController {
     private final ServiceHistoryService serviceHistoryService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'CLUB_OWNER', 'HEAD_MECHANIC', 'CLUB_MANAGER', 'STAFF')")
     public ResponseEntity<ServiceHistoryDTO> createServiceHistory(@RequestBody ServiceHistoryDTO dto, @AuthenticationPrincipal UserPrincipal userPrincipal) {
         ServiceHistory serviceHistory = serviceHistoryService.createServiceRecord(convertToEntity(dto), userPrincipal.getId());
         return ResponseEntity.ok(convertToDto(serviceHistory));
