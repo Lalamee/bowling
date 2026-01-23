@@ -169,12 +169,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
               if (_isMechanic) _buildMechanicEventBlock(),
-              if (_isMechanic) ...[
-                const SizedBox(height: 12),
-                _SupportAppealCard(
-                  onPressed: () => Navigator.pushNamed(context, Routes.supportAppeal),
-                ),
-              ],
+              const SizedBox(height: 12),
+              _SupportAppealCard(
+                onPressed: () => Navigator.pushNamed(context, Routes.supportAppeal),
+              ),
               if (hasOrders) ...[
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8.0, top: 8),

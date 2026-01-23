@@ -22,7 +22,7 @@ class EditOwnerProfileScreen extends StatefulWidget {
 
 class _EditOwnerProfileScreenState extends State<EditOwnerProfileScreen> {
   final UserRepository _repo = UserRepository();
-  static const String _ownerStatusLabel = 'Собственник';
+  static const String _ownerStatusLabel = 'Владелец';
   String fullName = '—';
   String phone = '—';
   String email = '';
@@ -274,7 +274,7 @@ class _EditOwnerProfileScreenState extends State<EditOwnerProfileScreen> {
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Собственник',
+                    'Владелец',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
                   ),
                 ),
@@ -311,7 +311,7 @@ class _EditOwnerProfileScreenState extends State<EditOwnerProfileScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: 'Заказы'),
           BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Поиск'),
-          BottomNavigationBarItem(icon: Icon(Icons.storefront_outlined), label: 'Клуб'),
+          BottomNavigationBarItem(icon: Icon(Icons.storefront_outlined), label: 'Объекты'),
           BottomNavigationBarItem(icon: Icon(Icons.account_circle_outlined), label: 'Профиль'),
         ],
       ),

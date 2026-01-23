@@ -357,7 +357,7 @@ class _ClubStaffScreenState extends State<ClubStaffScreen> {
         return 'Механик';
       case 'CLUB_OWNER':
       case 'OWNER':
-        return 'Владелец клуба';
+        return 'Владелец клуба/сети клубов';
       default:
         return 'Механик';
     }
@@ -917,9 +917,9 @@ class _EmployeeCardState extends State<_EmployeeCard> {
               alignment: Alignment.centerLeft,
               child: RadioGroupHorizontal(
                 options: widget.employee.isOwner
-                    ? const ['Владелец клуба']
+                    ? const ['Владелец клуба/сети клубов']
                     : const ['Механик', 'Менеджер', 'Администратор'],
-                groupValue: widget.employee.isOwner ? 'Владелец клуба' : widget.employee.roleLabel,
+                groupValue: widget.employee.isOwner ? 'Владелец клуба/сети клубов' : widget.employee.roleLabel,
                 onChanged: widget.employee.canModify
                     ? (v) {
                         if (v == null) return;
@@ -1004,7 +1004,7 @@ class _EmployeeCardState extends State<_EmployeeCard> {
             if (!widget.employee.canModify) ...[
               const SizedBox(height: 6),
               const Text(
-                'Владелец клуба не может быть удалён из списка сотрудников.',
+                'Владелец клуба/сети клубов не может быть удалён из списка сотрудников.',
                 style: TextStyle(fontSize: 12, color: AppColors.darkGray),
               ),
             ],

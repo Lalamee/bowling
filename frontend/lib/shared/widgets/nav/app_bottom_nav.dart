@@ -24,7 +24,7 @@ class AppBottomNav extends StatelessWidget {
       items: const [
         BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: 'Заказы'),
         BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Поиск'),
-        BottomNavigationBarItem(icon: Icon(Icons.storefront_outlined), label: 'Клуб'),
+        BottomNavigationBarItem(icon: Icon(Icons.storefront_outlined), label: 'Объекты'),
         BottomNavigationBarItem(icon: Icon(Icons.account_circle_outlined), label: 'Профиль'),
       ],
     );
