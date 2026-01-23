@@ -170,6 +170,12 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
           ),
           const SizedBox(height: 10),
           ProfileTile(
+            icon: Icons.post_add_outlined,
+            text: 'Инструменты наполнения',
+            onTap: () => Navigator.pushNamed(context, Routes.adminContentTools),
+          ),
+          const SizedBox(height: 10),
+          ProfileTile(
             icon: Icons.handyman_outlined,
             text: 'База свободных агентов',
             onTap: () => Navigator.pushNamed(context, Routes.adminMechanics),

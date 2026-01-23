@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:bowling_market/features/orders/presentation/screens/admin_orders_screen.dart';
 import 'package:bowling_market/features/profile/admin/presentation/screens/admin_clubs_screen.dart';
+import 'package:bowling_market/features/profile/admin/presentation/screens/admin_content_tools_screen.dart';
+import 'package:bowling_market/features/profile/admin/presentation/screens/admin_knowledge_base_upload_screen.dart';
 import 'package:bowling_market/features/profile/admin/presentation/screens/admin_mechanics_screen.dart';
+import 'package:bowling_market/features/profile/admin/presentation/screens/admin_parts_catalog_create_screen.dart';
 import 'package:bowling_market/features/profile/admin/presentation/screens/admin_profile_screen.dart';
 import 'package:bowling_market/features/profile/admin/presentation/screens/admin_registrations_screen.dart';
 import 'package:bowling_market/features/orders/notifications/admin_appeals_screen.dart';
@@ -247,6 +250,12 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const AdminComplaintsScreen());
       case Routes.adminAppeals:
         return MaterialPageRoute(builder: (_) => const AdminAppealsScreen());
+      case Routes.adminContentTools:
+        return MaterialPageRoute(builder: (_) => const AdminContentToolsScreen());
+      case Routes.adminKnowledgeBaseUpload:
+        return MaterialPageRoute(builder: (_) => const AdminKnowledgeBaseUploadScreen());
+      case Routes.adminPartsCatalogCreate:
+        return MaterialPageRoute(builder: (_) => const AdminPartsCatalogCreateScreen());
 
       case Routes.maintenanceRequests:
         return MaterialPageRoute(builder: (_) => const MaintenanceRequestsScreen());

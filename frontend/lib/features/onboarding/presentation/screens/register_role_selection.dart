@@ -42,7 +42,7 @@ class RegisterRoleSelectionScreen extends StatelessWidget {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                 ),
                 child: const Text(
-                  'Я МЕХАНИК',
+                  'Я – механик',
                   style: TextStyle(fontSize: 16, color: Colors.white),
                 ),
               ),
@@ -51,14 +51,40 @@ class RegisterRoleSelectionScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32.0),
               child: ElevatedButton(
-                onPressed: () => _showClubRoleOptions(context),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const RegisterOwnerScreen()),
+                  );
+                },
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size.fromHeight(60),
                   backgroundColor: const Color(0xFFB2002D),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                 ),
                 child: const Text(
-                  'Я ВЛАДЕЛЕЦ (МЕНЕДЖЕР) КЛУБА',
+                  'Я – владелец',
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32.0),
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const RegisterManagerScreen()),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(60),
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                ),
+                child: const Text(
+                  'Я – менеджер',
                   style: TextStyle(fontSize: 16, color: Colors.white),
                 ),
               ),
@@ -73,45 +99,4 @@ class RegisterRoleSelectionScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-void _showClubRoleOptions(BuildContext context) {
-  showModalBottomSheet(
-    context: context,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (ctx) {
-      return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.business_outlined),
-              title: const Text('Я владелец клуба'),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RegisterOwnerScreen()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.badge_outlined),
-              title: const Text('Я менеджер клуба'),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RegisterManagerScreen()),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-          ],
-        ),
-      );
-    },
-  );
 }

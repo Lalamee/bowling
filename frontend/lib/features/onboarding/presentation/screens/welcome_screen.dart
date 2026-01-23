@@ -77,14 +77,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               padding: EdgeInsets.symmetric(horizontal: 24),
               child: BowlingMarketTitle(fontSize: 28),
             ),
-            const SizedBox(height: 24),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                'Здесь широкий спектр услуг и товаров для инвесторов, собственников и механиков.',
-                style: TextStyle(fontSize: 14, height: 1.4, color: Color(0xFF23262F)),
-              ),
-            ),
             const SizedBox(height: 32),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32.0),

@@ -23,11 +23,11 @@ class BowlingMarketTitle extends StatelessWidget {
       text: TextSpan(
         children: [
           TextSpan(
-            text: 'BOWLING ',
+            text: 'Bowling ',
             style: style.copyWith(color: AppColors.black),
           ),
           TextSpan(
-            text: 'Market',
+            text: 'Manager',
             style: style.copyWith(color: AppColors.primary),
           ),
         ],

@@ -5,14 +5,20 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.bowling.bowlingapp.DTO.KnowledgeBaseDocumentCreateDTO;
 import ru.bowling.bowlingapp.DTO.KnowledgeBaseDocumentDTO;
 import ru.bowling.bowlingapp.Entity.*;
+import ru.bowling.bowlingapp.Repository.AccessLevelRepository;
+import ru.bowling.bowlingapp.Repository.BowlingClubRepository;
 import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
+import ru.bowling.bowlingapp.Repository.DocumentTypeRepository;
+import ru.bowling.bowlingapp.Repository.ManufacturerRepository;
 import ru.bowling.bowlingapp.Repository.TechnicalDocumentRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
 import ru.bowling.bowlingapp.Repository.projection.KnowledgeBaseDocumentContent;
 import ru.bowling.bowlingapp.Repository.projection.KnowledgeBaseDocumentSummary;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -23,6 +29,10 @@ public class KnowledgeBaseService {
     private final TechnicalDocumentRepository technicalDocumentRepository;
     private final UserRepository userRepository;
     private final ClubStaffRepository clubStaffRepository;
+    private final BowlingClubRepository bowlingClubRepository;
+    private final DocumentTypeRepository documentTypeRepository;
+    private final ManufacturerRepository manufacturerRepository;
+    private final AccessLevelRepository accessLevelRepository;
 
     @Transactional(readOnly = true)
     public List<KnowledgeBaseDocumentDTO> getDocumentsForUser(Long userId) {
@@ -76,6 +86,63 @@ public class KnowledgeBaseService {
                 .orElse((long) data.length);
 
         return new DocumentContent(data, fileName, actualSize);
+    }
+
+    @Transactional
+    public KnowledgeBaseDocumentDTO createDocument(KnowledgeBaseDocumentCreateDTO request, Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+
+        if (!isAdmin(user)) {
+            throw new AccessDeniedException("Only admins can upload documents");
+        }
+
+        BowlingClub club = bowlingClubRepository.findById(request.getClubId())
+                .orElseThrow(() -> new EntityNotFoundException("Club not found"));
+
+        byte[] fileData = decodeBase64(request.getFileBase64());
+        if (fileData.length == 0) {
+            throw new IllegalArgumentException("File data is empty");
+        }
+
+        String fileName = Optional.ofNullable(request.getFileName())
+                .filter(name -> !name.isBlank())
+                .orElseGet(() -> buildFileName(request.getTitle()));
+
+        TechnicalDocument document = TechnicalDocument.builder()
+                .club(club)
+                .title(request.getTitle().trim())
+                .description(trim(request.getDescription()))
+                .documentType(resolveDocumentType(request.getDocumentType()))
+                .manufacturer(resolveManufacturer(request.getManufacturer()))
+                .equipmentModel(trim(request.getEquipmentModel()))
+                .language(trim(request.getLanguage()))
+                .fileName(fileName)
+                .fileSize((long) fileData.length)
+                .fileData(fileData)
+                .uploadDate(LocalDateTime.now())
+                .uploadedBy(userId)
+                .accessLevel(resolveAccessLevel(request.getAccessLevel()))
+                .build();
+
+        TechnicalDocument saved = technicalDocumentRepository.save(document);
+
+        return KnowledgeBaseDocumentDTO.builder()
+                .documentId(saved.getDocumentId())
+                .clubId(club.getClubId())
+                .clubName(club.getName())
+                .title(saved.getTitle())
+                .description(saved.getDescription())
+                .documentType(saved.getDocumentType() != null ? saved.getDocumentType().getName() : null)
+                .manufacturer(saved.getManufacturer() != null ? saved.getManufacturer().getName() : null)
+                .equipmentModel(saved.getEquipmentModel())
+                .language(saved.getLanguage())
+                .fileName(saved.getFileName())
+                .fileSize(saved.getFileSize())
+                .uploadDate(saved.getUploadDate())
+                .downloadUrl(buildDownloadUrl(saved.getDocumentId()))
+                .accessLevel(saved.getAccessLevel() != null ? saved.getAccessLevel().getName() : null)
+                .build();
     }
 
     private KnowledgeBaseDocumentDTO mapToDto(KnowledgeBaseDocumentSummary summary) {
@@ -207,6 +274,63 @@ public class KnowledgeBaseService {
                 .filter(title -> !title.isBlank())
                 .orElse("document");
         return base.replaceAll("\\s+", "_") + ".pdf";
+    }
+
+    private String buildFileName(String title) {
+        String base = Optional.ofNullable(title)
+                .filter(value -> !value.isBlank())
+                .orElse("document");
+        return base.replaceAll("\\s+", "_") + ".pdf";
+    }
+
+    private String trim(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private byte[] decodeBase64(String raw) {
+        String normalized = Optional.ofNullable(raw).orElse("").trim();
+        if (normalized.startsWith("data:")) {
+            int commaIndex = normalized.indexOf(',');
+            if (commaIndex >= 0) {
+                normalized = normalized.substring(commaIndex + 1);
+            }
+        }
+        try {
+            return Base64.getDecoder().decode(normalized);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid base64 content", e);
+        }
+    }
+
+    private DocumentType resolveDocumentType(String name) {
+        String normalized = trim(name);
+        if (normalized == null) {
+            return null;
+        }
+        return documentTypeRepository.findByNameIgnoreCase(normalized)
+                .orElseGet(() -> documentTypeRepository.save(DocumentType.builder().name(normalized).build()));
+    }
+
+    private Manufacturer resolveManufacturer(String name) {
+        String normalized = trim(name);
+        if (normalized == null) {
+            return null;
+        }
+        return manufacturerRepository.findByNameIgnoreCase(normalized)
+                .orElseGet(() -> manufacturerRepository.save(Manufacturer.builder().name(normalized).build()));
+    }
+
+    private AccessLevel resolveAccessLevel(String name) {
+        String normalized = trim(name);
+        if (normalized == null) {
+            return null;
+        }
+        return accessLevelRepository.findByNameIgnoreCase(normalized)
+                .orElseGet(() -> accessLevelRepository.save(AccessLevel.builder().name(normalized).build()));
     }
 
     public record DocumentContent(byte[] data, String fileName, long fileSize) {
