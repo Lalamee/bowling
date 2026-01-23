@@ -4,6 +4,8 @@ import '../../../../api/api_core.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/service_history_repository.dart';
 import '../../../../core/repositories/clubs_repository.dart';
+import '../../../../core/repositories/user_repository.dart';
+import '../../../../core/services/authz/acl.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
@@ -27,6 +29,7 @@ class _ClubLanesScreenState extends State<ClubLanesScreen> {
   final _serviceHistoryRepository = ServiceHistoryRepository();
   final _maintenanceRepository = MaintenanceRepository();
   final _clubsRepository = ClubsRepository();
+  final _userRepository = UserRepository();
 
   bool _isLoading = true;
   bool _hasError = false;
@@ -34,6 +37,15 @@ class _ClubLanesScreenState extends State<ClubLanesScreen> {
   int? _selectedLaneNumber;
   bool _requestsRestricted = false;
   int? _resolvedLaneCount;
+  bool _canEdit = false;
+  int? _currentUserId;
+
+  static const Map<String, String> _serviceTypeLabels = {
+    'SCHEDULED_MAINTENANCE': 'Плановое ТО',
+    'INSPECTION': 'Инспекция',
+    'REPAIR': 'Ремонт',
+    'EMERGENCY_SERVICE': 'Аварийное обслуживание',
+  };
 
   @override
   void initState() {
@@ -50,6 +62,10 @@ class _ClubLanesScreenState extends State<ClubLanesScreen> {
     });
 
     try {
+      final me = await _userRepository.me();
+      final scope = await UserAccessScope.fromProfile(me);
+      final canEdit = scope.role == 'admin' || scope.role == 'owner' || scope.role == 'manager';
+      final userId = (me['id'] as num?)?.toInt() ?? (me['userId'] as num?)?.toInt();
       final laneCount = await _resolveLaneCount();
       final history = await _serviceHistoryRepository.getByClub(widget.clubId);
       List<MaintenanceRequestResponseDto> requests = const [];
@@ -72,6 +88,8 @@ class _ClubLanesScreenState extends State<ClubLanesScreen> {
         _isLoading = false;
         _requestsRestricted = restricted;
         _resolvedLaneCount = laneCount;
+        _canEdit = canEdit;
+        _currentUserId = userId;
       });
     } catch (e) {
       if (!mounted) return;
@@ -158,6 +176,166 @@ class _ClubLanesScreenState extends State<ClubLanesScreen> {
     setState(() => _selectedLaneNumber = lane);
   }
 
+  Future<void> _openAddServiceEntry() async {
+    final laneNumber = _selectedLaneNumber;
+    if (laneNumber == null) {
+      showSnack(context, 'Выберите дорожку');
+      return;
+    }
+    if (_currentUserId == null) {
+      showSnack(context, 'Не удалось определить пользователя');
+      return;
+    }
+
+    final descriptionController = TextEditingController();
+    final notesController = TextEditingController();
+    DateTime? serviceDate = DateTime.now();
+    DateTime? nextServiceDue;
+    String selectedType = _serviceTypeLabels.keys.first;
+    bool submitting = false;
+    final formKey = GlobalKey<FormState>();
+
+    Future<void> pickDate(ValueChanged<DateTime?> onPicked, DateTime? current) async {
+      final now = DateTime.now();
+      final initial = current ?? now;
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: initial,
+        firstDate: DateTime(now.year - 10),
+        lastDate: DateTime(now.year + 10),
+      );
+      onPicked(picked);
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> submit() async {
+              if (!formKey.currentState!.validate()) return;
+              setModalState(() => submitting = true);
+              try {
+                final dto = ServiceHistoryDto(
+                  clubId: widget.clubId,
+                  laneNumber: laneNumber,
+                  serviceType: selectedType,
+                  serviceDate: serviceDate,
+                  description: descriptionController.text.trim(),
+                  performedByMechanicId: _currentUserId!,
+                  serviceNotes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+                  nextServiceDue: nextServiceDue,
+                );
+                await _serviceHistoryRepository.create(dto);
+                if (!mounted) return;
+                Navigator.pop(ctx);
+                _load();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Данные по дорожке сохранены')),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                showApiError(context, e);
+              } finally {
+                if (mounted) {
+                  setModalState(() => submitting = false);
+                }
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+              ),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Добавить данные по дорожке',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedType,
+                      decoration: const InputDecoration(labelText: 'Тип работ'),
+                      items: _serviceTypeLabels.entries
+                          .map((entry) => DropdownMenuItem(value: entry.key, child: Text(entry.value)))
+                          .toList(),
+                      onChanged: submitting ? null : (value) => setModalState(() => selectedType = value ?? selectedType),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: 'Дата работ',
+                        hintText: serviceDate != null ? _formatDate(serviceDate!) : 'Выберите дату',
+                      ),
+                      onTap: submitting
+                          ? null
+                          : () => pickDate((picked) {
+                                if (picked == null) return;
+                                setModalState(() => serviceDate = picked);
+                              }, serviceDate),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: descriptionController,
+                      decoration: const InputDecoration(labelText: 'Описание работ'),
+                      validator: (value) => value == null || value.trim().isEmpty ? 'Добавьте описание работ' : null,
+                      maxLines: 2,
+                      enabled: !submitting,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: 'Дата следующего ТО',
+                        hintText: nextServiceDue != null ? _formatDate(nextServiceDue!) : 'Не выбрано',
+                      ),
+                      onTap: submitting
+                          ? null
+                          : () => pickDate((picked) {
+                                setModalState(() => nextServiceDue = picked);
+                              }, nextServiceDue),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: notesController,
+                      decoration: const InputDecoration(labelText: 'Примечания'),
+                      maxLines: 2,
+                      enabled: !submitting,
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: submitting ? null : submit,
+                        child: submitting
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Сохранить'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   _LaneTechInfo? get _selectedLane {
     if (_selectedLaneNumber == null || _lanes.isEmpty) return null;
     return _lanes.firstWhere((lane) => lane.laneNumber == _selectedLaneNumber, orElse: () => _lanes.first);
@@ -222,6 +400,17 @@ class _ClubLanesScreenState extends State<ClubLanesScreen> {
             selectedLane: _selectedLaneNumber,
             onSelect: _selectLane,
           ),
+          if (_canEdit) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _openAddServiceEntry,
+                icon: const Icon(Icons.edit_note),
+                label: const Text('Добавить данные по дорожке'),
+              ),
+            ),
+          ],
           if (_requestsRestricted) ...[
             const SizedBox(height: 12),
             const _LimitedAccessBanner(),

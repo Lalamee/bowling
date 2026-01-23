@@ -29,6 +29,9 @@ public class OwnerDashboardService {
     private final ClubEquipmentRepository clubEquipmentRepository;
     private final EquipmentComponentRepository equipmentComponentRepository;
     private final EquipmentMaintenanceScheduleRepository equipmentMaintenanceScheduleRepository;
+    private final EquipmentTypeRepository equipmentTypeRepository;
+    private final ManufacturerRepository manufacturerRepository;
+    private final BowlingClubRepository bowlingClubRepository;
     private final WorkLogRepository workLogRepository;
     private final WorkLogPartUsageRepository workLogPartUsageRepository;
     private final ServiceHistoryPartRepository serviceHistoryPartRepository;
@@ -69,27 +72,86 @@ public class OwnerDashboardService {
                 .toList();
 
         return clubEquipmentRepository.findByClubClubId(resolvedClubId).stream()
-                .map(eq -> TechnicalInfoDTO.builder()
-                        .equipmentId(eq.getEquipmentId())
-                        .model(eq.getModel())
-                        .serialNumber(eq.getSerialNumber())
-                        .equipmentType(eq.getEquipmentType() != null ? eq.getEquipmentType().getName() : null)
-                        .manufacturer(eq.getManufacturer() != null ? eq.getManufacturer().getName() : eq.getOtherManufacturerName())
-                        .productionYear(eq.getProductionYear())
-                        .lanesCount(eq.getLanesCount())
-                        .conditionPercentage(eq.getConditionPercentage())
-                        .purchaseDate(eq.getPurchaseDate())
-                        .warrantyUntil(eq.getWarrantyUntil())
-                        .status(eq.getStatus())
-                        .lastMaintenanceDate(eq.getLastMaintenanceDate())
-                        .nextMaintenanceDate(eq.getNextMaintenanceDate())
-                        .components(components)
-                        .schedules(equipmentMaintenanceScheduleRepository.findByEquipmentEquipmentId(eq.getEquipmentId()).stream()
-                                .map(this::toScheduleDto)
-                                .toList())
-                        .build())
+                .map(eq -> toTechnicalInfoDto(eq, components))
                 .sorted(Comparator.comparing(TechnicalInfoDTO::getEquipmentId))
                 .toList();
+    }
+
+    @Transactional
+    public TechnicalInfoDTO createTechnicalInfo(Long userId, TechnicalInfoCreateRequestDTO request) {
+        if (request == null || request.getModel() == null || request.getModel().isBlank()) {
+            throw new IllegalArgumentException("Модель оборудования обязательна");
+        }
+        Long resolvedClubId = resolveClubForUser(userId, request.getClubId());
+        BowlingClub club = bowlingClubRepository.findById(resolvedClubId)
+                .orElseThrow(() -> new IllegalArgumentException("Клуб не найден"));
+
+        ClubEquipment equipment = new ClubEquipment();
+        equipment.setClub(club);
+        equipment.setModel(request.getModel().trim());
+        equipment.setSerialNumber(blankToNull(request.getSerialNumber()));
+        equipment.setLanesCount(request.getLanesCount());
+        equipment.setProductionYear(request.getProductionYear());
+        equipment.setConditionPercentage(request.getConditionPercentage());
+        equipment.setPurchaseDate(request.getPurchaseDate());
+        equipment.setWarrantyUntil(request.getWarrantyUntil());
+        equipment.setStatus(blankToNull(request.getStatus()));
+        equipment.setLastMaintenanceDate(request.getLastMaintenanceDate());
+        equipment.setNextMaintenanceDate(request.getNextMaintenanceDate());
+
+        String manufacturerName = blankToNull(request.getManufacturer());
+        if (manufacturerName != null) {
+            Manufacturer manufacturer = manufacturerRepository.findByNameIgnoreCase(manufacturerName)
+                    .orElse(null);
+            if (manufacturer != null) {
+                equipment.setManufacturer(manufacturer);
+            } else {
+                equipment.setOtherManufacturerName(manufacturerName);
+            }
+        }
+
+        String equipmentTypeName = blankToNull(request.getEquipmentType());
+        if (equipmentTypeName != null) {
+            EquipmentType equipmentType = equipmentTypeRepository.findByNameIgnoreCase(equipmentTypeName)
+                    .orElseGet(() -> equipmentTypeRepository.save(EquipmentType.builder().name(equipmentTypeName).build()));
+            equipment.setEquipmentType(equipmentType);
+        }
+
+        ClubEquipment saved = clubEquipmentRepository.save(equipment);
+        List<EquipmentComponentDTO> components = equipmentComponentRepository.findAll().stream()
+                .map(this::toComponentDto)
+                .toList();
+        return toTechnicalInfoDto(saved, components);
+    }
+
+    private TechnicalInfoDTO toTechnicalInfoDto(ClubEquipment equipment, List<EquipmentComponentDTO> components) {
+        return TechnicalInfoDTO.builder()
+                .equipmentId(equipment.getEquipmentId())
+                .model(equipment.getModel())
+                .serialNumber(equipment.getSerialNumber())
+                .equipmentType(equipment.getEquipmentType() != null ? equipment.getEquipmentType().getName() : null)
+                .manufacturer(equipment.getManufacturer() != null ? equipment.getManufacturer().getName() : equipment.getOtherManufacturerName())
+                .productionYear(equipment.getProductionYear())
+                .lanesCount(equipment.getLanesCount())
+                .conditionPercentage(equipment.getConditionPercentage())
+                .purchaseDate(equipment.getPurchaseDate())
+                .warrantyUntil(equipment.getWarrantyUntil())
+                .status(equipment.getStatus())
+                .lastMaintenanceDate(equipment.getLastMaintenanceDate())
+                .nextMaintenanceDate(equipment.getNextMaintenanceDate())
+                .components(components)
+                .schedules(equipmentMaintenanceScheduleRepository.findByEquipmentEquipmentId(equipment.getEquipmentId()).stream()
+                        .map(this::toScheduleDto)
+                        .toList())
+                .build();
+    }
+
+    private String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     @Transactional(readOnly = true)

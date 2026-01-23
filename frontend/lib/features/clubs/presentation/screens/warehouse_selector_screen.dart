@@ -141,23 +141,13 @@ class _WarehouseSelectorScreenState extends State<WarehouseSelectorScreen> {
                         if (item.totalPositions != null) ...[
                           const SizedBox(height: 6),
                           Text('Позиций: ${item.totalPositions}', style: const TextStyle(color: AppColors.darkGray)),
-                        ]
-                        else ...[
-                          const SizedBox(height: 6),
-                          const Text('TODO: требуется totalPositions из API', style: TextStyle(color: AppColors.darkGray)),
                         ],
                         if (item.lowStockPositions != null)
                           Text('Низкий остаток: ${item.lowStockPositions}',
-                              style: const TextStyle(fontSize: 12, color: AppColors.darkGray))
-                        else
-                          const Text('TODO: нужен lowStockPositions из API',
-                              style: TextStyle(fontSize: 12, color: AppColors.darkGray)),
+                              style: const TextStyle(fontSize: 12, color: AppColors.darkGray)),
                         if (item.reservedPositions != null)
                           Text('В резерве: ${item.reservedPositions}',
-                              style: const TextStyle(fontSize: 12, color: AppColors.darkGray))
-                        else
-                          const Text('TODO: нужен reservedPositions из API',
-                              style: TextStyle(fontSize: 12, color: AppColors.darkGray)),
+                              style: const TextStyle(fontSize: 12, color: AppColors.darkGray)),
                       ],
                     ),
                   ),

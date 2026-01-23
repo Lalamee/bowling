@@ -33,6 +33,7 @@ import '../models/purchase_order_acceptance_request_dto.dart';
 import '../models/supplier_review_request_dto.dart';
 import '../models/supplier_complaint_request_dto.dart';
 import '../models/supplier_complaint_status_update_dto.dart';
+import '../models/technical_info_create_dto.dart';
 import '../models/technical_info_dto.dart';
 import '../models/service_journal_entry_dto.dart';
 import '../models/warning_dto.dart';
@@ -636,6 +637,11 @@ class ApiService {
     return (response.data as List)
         .map((e) => TechnicalInfoDto.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
+  }
+
+  Future<TechnicalInfoDto> createTechnicalInfo(TechnicalInfoCreateDto request) async {
+    final response = await _dio.post('/api/owner-dashboard/technical-info', data: request.toJson());
+    return TechnicalInfoDto.fromJson(Map<String, dynamic>.from(response.data as Map));
   }
 
   Future<List<ServiceJournalEntryDto>> getServiceJournal({

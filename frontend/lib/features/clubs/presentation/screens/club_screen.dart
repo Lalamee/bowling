@@ -39,9 +39,16 @@ class _ClubScreenState extends State<ClubScreen> {
   bool _isLoading = true;
   bool _hasError = false;
   List<UserClub> _clubs = const [];
+  List<UserClub> _availableClubs = const [];
   int? _selectedIndex;
   UserAccessScope? _scope;
   static const List<String> _equipmentOptions = ['AMF', 'Brunswick', 'VIA', 'XIMA', 'Другое'];
+  static const Map<String, List<String>> _equipmentModels = {
+    'AMF': ['82/70XLi', '82/90XLi', 'HVO'],
+    'Brunswick': ['A2', 'GS-X', 'GS-X Lite', 'NXT'],
+    'VIA': ['VIA Vector', 'VIA Edge'],
+    'XIMA': ['XIMA Phoenix', 'XIMA Evo'],
+  };
 
   @override
   void initState() {
@@ -85,10 +92,29 @@ class _ClubScreenState extends State<ClubScreen> {
         }
       }
 
+      List<UserClub> availableClubs = const [];
+      if (scope.isMechanic && clubs.isEmpty) {
+        final summaries = await _clubsRepository.getClubs();
+        availableClubs = summaries
+            .map(
+              (club) => UserClub(
+                id: club.id,
+                name: club.name,
+                address: club.address,
+                lanes: club.lanesCount?.toString(),
+                phone: club.contactPhone,
+                email: club.contactEmail,
+              ),
+            )
+            .toList()
+          ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      }
+
       setState(() {
         _clubs = clubs;
         _selectedIndex = selectedIndex ?? (clubs.isNotEmpty ? 0 : null);
         _scope = scope;
+        _availableClubs = availableClubs;
         _isLoading = false;
       });
     } catch (e) {
@@ -192,7 +218,8 @@ class _ClubScreenState extends State<ClubScreen> {
   }
 
   Future<void> _openClubRequestSheet() async {
-    if (_clubs.isEmpty) {
+    final clubOptions = _clubs.isNotEmpty ? _clubs : _availableClubs;
+    if (clubOptions.isEmpty) {
       showSnack(context, 'Список клубов пуст');
       return;
     }
@@ -203,6 +230,9 @@ class _ClubScreenState extends State<ClubScreen> {
       'Временный доступ к технической информации',
     ];
     int selectedIndex = _selectedIndex ?? 0;
+    if (selectedIndex >= clubOptions.length) {
+      selectedIndex = 0;
+    }
     String selectedType = types.first;
     bool submitting = false;
 
@@ -232,10 +262,10 @@ class _ClubScreenState extends State<ClubScreen> {
                     value: selectedIndex,
                     decoration: const InputDecoration(labelText: 'Клуб'),
                     items: List.generate(
-                      _clubs.length,
+                      clubOptions.length,
                       (index) => DropdownMenuItem(
                         value: index,
-                        child: Text(_clubs[index].name, overflow: TextOverflow.ellipsis),
+                        child: Text(clubOptions[index].name, overflow: TextOverflow.ellipsis),
                       ),
                     ),
                     onChanged: submitting
@@ -276,7 +306,7 @@ class _ClubScreenState extends State<ClubScreen> {
                       onPressed: submitting
                           ? null
                           : () async {
-                              final club = _clubs[selectedIndex];
+                              final club = clubOptions[selectedIndex];
                               setModalState(() => submitting = true);
                               try {
                                 final message = StringBuffer()
@@ -328,7 +358,9 @@ class _ClubScreenState extends State<ClubScreen> {
     final addressController = TextEditingController();
     final lanesController = TextEditingController();
     final customEquipmentController = TextEditingController();
+    final customModelController = TextEditingController();
     String? selectedEquipment;
+    String? selectedModel;
     final formKey = GlobalKey<FormState>();
     bool submitting = false;
 
@@ -349,6 +381,15 @@ class _ClubScreenState extends State<ClubScreen> {
                 showSnack(context, 'Укажите производителя');
                 return;
               }
+              final model = selectedEquipment == null
+                  ? null
+                  : selectedEquipment == 'Другое'
+                      ? customModelController.text.trim()
+                      : selectedModel;
+              if (model == null || model.isEmpty) {
+                showSnack(context, 'Укажите модель оборудования');
+                return;
+              }
               final lanes = int.tryParse(lanesController.text.trim());
               if (lanes == null || lanes <= 0) {
                 showSnack(context, 'Количество дорожек должно быть положительным числом');
@@ -361,7 +402,8 @@ class _ClubScreenState extends State<ClubScreen> {
                   ..writeln('Название объекта: ${nameController.text.trim()}')
                   ..writeln('Адрес: ${addressController.text.trim()}')
                   ..writeln('Количество дорожек: $lanes')
-                  ..writeln('Производитель: $equipment');
+                  ..writeln('Производитель: $equipment')
+                  ..writeln('Модель: $model');
                 final dto = SupportAppealRequestDto(
                   subject: 'Создание объекта',
                   message: message.toString(),
@@ -430,8 +472,24 @@ class _ClubScreenState extends State<ClubScreen> {
                           .toList(),
                       onChanged: submitting
                           ? null
-                          : (value) => setModalState(() => selectedEquipment = value),
+                          : (value) => setModalState(() {
+                                selectedEquipment = value;
+                                selectedModel = null;
+                              }),
                     ),
+                    if (selectedEquipment != null && selectedEquipment != 'Другое')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: DropdownButtonFormField<String>(
+                          value: selectedModel,
+                          decoration: const InputDecoration(labelText: 'Модель оборудования'),
+                          items: (_equipmentModels[selectedEquipment] ?? const [])
+                              .map((model) => DropdownMenuItem(value: model, child: Text(model)))
+                              .toList(),
+                          validator: (value) => value == null || value.trim().isEmpty ? 'Выберите модель оборудования' : null,
+                          onChanged: submitting ? null : (value) => setModalState(() => selectedModel = value),
+                        ),
+                      ),
                     if (selectedEquipment == 'Другое')
                       Padding(
                         padding: const EdgeInsets.only(top: 12),
@@ -439,6 +497,16 @@ class _ClubScreenState extends State<ClubScreen> {
                           controller: customEquipmentController,
                           decoration: const InputDecoration(labelText: 'Уточните производителя'),
                           validator: (value) => value == null || value.trim().isEmpty ? 'Уточните производителя' : null,
+                          enabled: !submitting,
+                        ),
+                      ),
+                    if (selectedEquipment == 'Другое')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: TextFormField(
+                          controller: customModelController,
+                          decoration: const InputDecoration(labelText: 'Модель оборудования'),
+                          validator: (value) => value == null || value.trim().isEmpty ? 'Укажите модель оборудования' : null,
                           enabled: !submitting,
                         ),
                       ),
@@ -683,10 +751,24 @@ class _ClubScreenState extends State<ClubScreen> {
           ),
         );
       }
-      return const Center(
-        child: Text(
-          'Для вашего аккаунта нет привязанных объектов',
-          style: TextStyle(color: AppColors.darkGray),
+      final canRequestClub = _scope?.isMechanic == true;
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Для вашего аккаунта нет привязанных объектов',
+                style: TextStyle(color: AppColors.darkGray),
+                textAlign: TextAlign.center,
+              ),
+              if (canRequestClub) ...[
+                const SizedBox(height: 16),
+                CustomButton(text: 'Подать заявку в клуб', onPressed: _openClubRequestSheet),
+              ],
+            ],
+          ),
         ),
       );
     }
@@ -723,8 +805,10 @@ class _ClubScreenState extends State<ClubScreen> {
         const SizedBox(height: 16),
         if (selectedClub != null) _ClubDetailsCard(club: selectedClub),
         const SizedBox(height: 20),
-        CustomButton(text: 'Подать заявку в клуб', onPressed: _openClubRequestSheet),
-        const SizedBox(height: 12),
+        if (_scope?.isMechanic == true && _clubs.isEmpty) ...[
+          CustomButton(text: 'Подать заявку в клуб', onPressed: _openClubRequestSheet),
+          const SizedBox(height: 12),
+        ],
         if (_scope?.role == 'owner' || _scope?.role == 'manager' || _scope?.role == 'admin') ...[
           CustomButton(text: 'Техинформация и ТО', onPressed: _openOwnerDashboard),
           const SizedBox(height: 12),
