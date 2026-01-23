@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/repositories/maintenance_repository.dart';
+import '../../../../../core/repositories/user_repository.dart';
 import '../../../../../core/services/favorites_storage.dart';
+import '../../../../../core/services/authz/acl.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../orders/presentation/screens/order_summary_screen.dart';
 import '../../../../../models/maintenance_request_response_dto.dart';
@@ -16,6 +18,7 @@ class FavoritesScreen extends StatefulWidget {
 class _FavoritesScreenState extends State<FavoritesScreen> {
   final FavoritesStorage _storage = FavoritesStorage();
   final MaintenanceRepository _maintenanceRepository = MaintenanceRepository();
+  final UserRepository _userRepository = UserRepository();
 
   bool _loadingOrders = true;
   bool _loadingParts = true;
@@ -36,13 +39,59 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Future<void> _loadFavoriteOrders() async {
     setState(() => _loadingOrders = true);
     final ids = await _storage.loadFavoriteOrders();
-    final orders = <MaintenanceRequestResponseDto>[];
+    if (ids.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _orderIds = ids;
+        _orders = const [];
+        _loadingOrders = false;
+      });
+      return;
+    }
+
+    final resolved = <int, MaintenanceRequestResponseDto>{};
+    try {
+      final me = await _userRepository.me();
+      final scope = await UserAccessScope.fromProfile(me);
+      if (scope.isAdmin) {
+        final all = await _maintenanceRepository.getAllRequests();
+        for (final order in all) {
+          if (ids.contains(order.requestId)) {
+            resolved[order.requestId] = order;
+          }
+        }
+      } else if (scope.isMechanic && scope.mechanicProfileId != null) {
+        final own = await _maintenanceRepository.requestsForMechanic(scope.mechanicProfileId!);
+        for (final order in own) {
+          if (ids.contains(order.requestId)) {
+            resolved[order.requestId] = order;
+          }
+        }
+      } else if (scope.accessibleClubIds.isNotEmpty) {
+        for (final clubId in scope.accessibleClubIds) {
+          final clubOrders = await _maintenanceRepository.getRequestsByClub(clubId);
+          for (final order in clubOrders) {
+            if (ids.contains(order.requestId)) {
+              resolved[order.requestId] = order;
+            }
+          }
+        }
+      }
+    } catch (_) {
+      resolved.clear();
+    }
+
     for (final id in ids) {
-      final order = await _maintenanceRepository.getById(id);
-      if (order != null) {
-        orders.add(order);
+      if (!resolved.containsKey(id)) {
+        final order = await _maintenanceRepository.getById(id);
+        if (order != null) {
+          resolved[id] = order;
+        }
       }
     }
+
+    final orders = resolved.values.toList()
+      ..sort((a, b) => b.requestId.compareTo(a.requestId));
     if (!mounted) return;
     setState(() {
       _orderIds = ids;

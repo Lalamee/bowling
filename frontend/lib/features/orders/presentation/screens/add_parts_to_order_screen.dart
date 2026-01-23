@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/repositories/inventory_repository.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/theme/colors.dart';
+import '../../../../core/utils/part_availability_helper.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../models/maintenance_request_response_dto.dart';
 import '../../../../models/part_request_dto.dart';
@@ -29,6 +30,7 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
   final _inventoryRepository = InventoryRepository();
 
   final List<RequestedPartDto> _pendingParts = [];
+  List<PartAvailabilityResult?> _availability = const [];
   bool _isSubmitting = false;
   bool _isSearchingParts = false;
   List<PartDto> _partSuggestions = const [];
@@ -110,7 +112,12 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          if (_pendingParts.isNotEmpty) _PendingPartsList(parts: _pendingParts, onRemove: _removePart),
+          if (_pendingParts.isNotEmpty)
+            _PendingPartsList(
+              parts: _pendingParts,
+              availability: _availability,
+              onRemove: _removePart,
+            ),
           if (_pendingParts.isNotEmpty) const SizedBox(height: 24),
           CustomButton(
             text: 'Сохранить изменения',
@@ -163,12 +170,44 @@ class _AddPartsToOrderScreenState extends State<AddPartsToOrderScreen> {
       _quantityController.clear();
       _selectedCatalogPart = null;
       _partSuggestions = const [];
+      _availability = List.filled(_pendingParts.length, null, growable: false);
     });
+    _refreshAvailability();
   }
 
   void _removePart(int index) {
     setState(() {
       _pendingParts.removeAt(index);
+      if (_availability.length > index) {
+        _availability = List.of(_availability)..removeAt(index);
+      }
+    });
+    _refreshAvailability();
+  }
+
+  Future<void> _refreshAvailability() async {
+    final clubId = order.clubId;
+    if (clubId == null || _pendingParts.isEmpty) {
+      setState(() {
+        _availability = List.filled(_pendingParts.length, null, growable: false);
+      });
+      return;
+    }
+    final results = <PartAvailabilityResult?>[];
+    for (final part in _pendingParts) {
+      try {
+        final matches = await _inventoryRepository.search(
+          query: part.catalogNumber,
+          clubId: clubId,
+        );
+        results.add(PartAvailabilityHelper.resolve(part, matches));
+      } catch (_) {
+        results.add(null);
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _availability = results;
     });
   }
 
@@ -511,9 +550,14 @@ class _ExistingPartsList extends StatelessWidget {
 
 class _PendingPartsList extends StatelessWidget {
   final List<RequestedPartDto> parts;
+  final List<PartAvailabilityResult?> availability;
   final void Function(int index) onRemove;
 
-  const _PendingPartsList({required this.parts, required this.onRemove});
+  const _PendingPartsList({
+    required this.parts,
+    required this.availability,
+    required this.onRemove,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -527,6 +571,7 @@ class _PendingPartsList extends StatelessWidget {
         const SizedBox(height: 12),
         ...List.generate(parts.length, (index) {
           final part = parts[index];
+          final status = availability.length > index ? availability[index] : null;
           return Container(
             margin: EdgeInsets.only(bottom: index == parts.length - 1 ? 0 : 8),
             padding: const EdgeInsets.all(12),
@@ -553,6 +598,10 @@ class _PendingPartsList extends StatelessWidget {
                         const SizedBox(height: 4),
                       ],
                       Text('Количество: ${part.quantity}', style: const TextStyle(color: AppColors.darkGray)),
+                      if (status != null) ...[
+                        const SizedBox(height: 6),
+                        _AvailabilityBadge(status: status),
+                      ],
                     ],
                   ),
                 ),
@@ -564,6 +613,29 @@ class _PendingPartsList extends StatelessWidget {
             ),
           );
         }),
+      ],
+    );
+  }
+}
+
+class _AvailabilityBadge extends StatelessWidget {
+  final PartAvailabilityResult status;
+
+  const _AvailabilityBadge({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = status.available ? Colors.green : Colors.orange;
+    final icon = status.available ? Icons.inventory_2 : Icons.inventory_2_outlined;
+    final availableQty = (status.availableQuantity ?? 0).clamp(0, 999999);
+    final text = status.available ? 'на складе $availableQty ед.' : 'отсутствует на складе';
+    return Row(
+      children: [
+        Chip(
+          avatar: Icon(icon, color: Colors.white, size: 18),
+          label: Text(text, style: const TextStyle(color: Colors.white)),
+          backgroundColor: color,
+        ),
       ],
     );
   }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../api/api_core.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/service_history_repository.dart';
+import '../../../../core/repositories/clubs_repository.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
@@ -25,16 +26,19 @@ class ClubLanesScreen extends StatefulWidget {
 class _ClubLanesScreenState extends State<ClubLanesScreen> {
   final _serviceHistoryRepository = ServiceHistoryRepository();
   final _maintenanceRepository = MaintenanceRepository();
+  final _clubsRepository = ClubsRepository();
 
   bool _isLoading = true;
   bool _hasError = false;
   List<_LaneTechInfo> _lanes = const [];
   int? _selectedLaneNumber;
   bool _requestsRestricted = false;
+  int? _resolvedLaneCount;
 
   @override
   void initState() {
     super.initState();
+    _resolvedLaneCount = widget.lanesCount;
     _load();
   }
 
@@ -46,6 +50,7 @@ class _ClubLanesScreenState extends State<ClubLanesScreen> {
     });
 
     try {
+      final laneCount = await _resolveLaneCount();
       final history = await _serviceHistoryRepository.getByClub(widget.clubId);
       List<MaintenanceRequestResponseDto> requests = const [];
       bool restricted = false;
@@ -59,13 +64,14 @@ class _ClubLanesScreenState extends State<ClubLanesScreen> {
         }
       }
 
-      final lanes = _buildLaneInfos(history, requests);
+      final lanes = _buildLaneInfos(history, requests, laneCount);
       if (!mounted) return;
       setState(() {
         _lanes = lanes;
         _selectedLaneNumber = lanes.isNotEmpty ? lanes.first.laneNumber : null;
         _isLoading = false;
         _requestsRestricted = restricted;
+        _resolvedLaneCount = laneCount;
       });
     } catch (e) {
       if (!mounted) return;
@@ -78,13 +84,30 @@ class _ClubLanesScreenState extends State<ClubLanesScreen> {
     }
   }
 
+  Future<int?> _resolveLaneCount() async {
+    if (_resolvedLaneCount != null && _resolvedLaneCount! > 0) {
+      return _resolvedLaneCount;
+    }
+    try {
+      final clubs = await _clubsRepository.getClubs();
+      final match = clubs.where((club) => club.id == widget.clubId).toList();
+      if (match.isNotEmpty && (match.first.lanesCount ?? 0) > 0) {
+        return match.first.lanesCount;
+      }
+    } catch (_) {
+      return _resolvedLaneCount;
+    }
+    return _resolvedLaneCount;
+  }
+
   List<_LaneTechInfo> _buildLaneInfos(
     List<ServiceHistoryDto> history,
     List<MaintenanceRequestResponseDto> requests,
+    int? lanesCount,
   ) {
     final laneNumbers = <int>{};
-    if (widget.lanesCount != null && widget.lanesCount! > 0) {
-      for (var i = 1; i <= widget.lanesCount!; i++) {
+    if (lanesCount != null && lanesCount > 0) {
+      for (var i = 1; i <= lanesCount; i++) {
         laneNumbers.add(i);
       }
     }
@@ -177,7 +200,7 @@ class _ClubLanesScreenState extends State<ClubLanesScreen> {
     if (_lanes.isEmpty) {
       return _EmptyPlaceholder(
         title: 'Нет данных по дорожкам',
-        subtitle: widget.lanesCount == null
+        subtitle: _resolvedLaneCount == null
             ? 'Для выбранного клуба не удалось определить количество дорожек. Добавьте данные или обратитесь в поддержку.'
             : 'Для дорожек пока нет истории обслуживания или заявок.',
       );
