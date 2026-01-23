@@ -26,7 +26,9 @@ class InventoryRepository {
     String? category,
     int? componentId,
   }) async {
-    final params = <String, dynamic>{'query': query};
+    final params = <String, dynamic>{
+      if (query.trim().isNotEmpty) 'query': query,
+    };
     if (warehouseId != null) {
       params['warehouseId'] = warehouseId;
     }
