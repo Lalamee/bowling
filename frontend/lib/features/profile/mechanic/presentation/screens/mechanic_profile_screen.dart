@@ -719,9 +719,11 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final visibleClubs = profile.clubs.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-    final showClubPlaceholder = _clubAccesses.isEmpty && _isFreeMechanic && visibleClubs.isEmpty;
-    final clubsToDisplay =
-        visibleClubs.isNotEmpty ? visibleClubs : (showClubPlaceholder ? ['Клубы и доступы'] : []);
+    final canShowClubs = _isFreeMechanic;
+    final showClubPlaceholder = canShowClubs && _clubAccesses.isEmpty && visibleClubs.isEmpty;
+    final clubsToDisplay = canShowClubs
+        ? (visibleClubs.isNotEmpty ? visibleClubs : (showClubPlaceholder ? ['Клубы и доступы'] : []))
+        : const <String>[];
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -801,7 +803,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    if (_clubAccesses.isNotEmpty || showClubPlaceholder)
+                    if (canShowClubs && (_clubAccesses.isNotEmpty || showClubPlaceholder))
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -830,7 +832,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                           ],
                         ),
                       ),
-                    if (_clubAccesses.isNotEmpty || showClubPlaceholder)
+                    if (canShowClubs && (_clubAccesses.isNotEmpty || showClubPlaceholder))
                       const SizedBox(height: 10),
                     ProfileTile(
                       icon: Icons.warehouse_outlined,

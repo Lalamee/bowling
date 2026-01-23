@@ -320,15 +320,7 @@ class _ManagerProfileScreenState extends State<ManagerProfileScreen> {
             onTap: () => Navigator.pushNamed(context, Routes.supportAppeal),
           ),
           const SizedBox(height: 10),
-          ProfileTile(icon: Icons.location_searching_rounded, text: clubName, onTap: () {}),
-          const SizedBox(height: 10),
           ProfileTile(icon: Icons.location_on_rounded, text: address, onEdit: () {}),
-          const SizedBox(height: 10),
-          ProfileTile(
-            icon: Icons.history_rounded,
-            text: 'История заказов',
-            onTap: () => Navigator.pushNamed(context, Routes.managerOrdersHistory),
-          ),
           const SizedBox(height: 10),
           ProfileTile(
             icon: Icons.inventory_2_outlined,

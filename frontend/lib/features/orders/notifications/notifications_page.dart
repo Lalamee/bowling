@@ -7,6 +7,7 @@ import '../../../core/repositories/notifications_repository.dart';
 import '../../../core/services/authz/acl.dart';
 import '../../../core/services/local_auth_storage.dart';
 import '../../../core/theme/colors.dart';
+import '../../../core/routing/routes.dart';
 import '../../../core/models/order_status.dart';
 import '../../../core/utils/net_ui.dart';
 import '../../../core/utils/user_club_resolver.dart';
@@ -168,6 +169,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
               if (_isMechanic) _buildMechanicEventBlock(),
+              if (_isMechanic) ...[
+                const SizedBox(height: 12),
+                _SupportAppealCard(
+                  onPressed: () => Navigator.pushNamed(context, Routes.supportAppeal),
+                ),
+              ],
               if (hasOrders) ...[
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8.0, top: 8),
@@ -476,6 +483,52 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
 
     return latest;
+  }
+}
+
+class _SupportAppealCard extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const _SupportAppealCard({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.lightGray),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Создать обращение',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Опишите вопрос в свободной форме — ответ придёт в оповещения.',
+            style: TextStyle(color: AppColors.darkGray),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onPressed,
+              icon: const Icon(Icons.edit_note_outlined, color: AppColors.primary),
+              label: const Text('Создать обращение', style: TextStyle(color: AppColors.primary)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.primary),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

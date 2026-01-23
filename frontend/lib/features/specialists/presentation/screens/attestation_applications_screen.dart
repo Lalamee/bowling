@@ -30,6 +30,7 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
   MechanicGrade? _selectedGrade;
   final TextEditingController _experienceCtrl = TextEditingController();
   final TextEditingController _extraCtrl = TextEditingController();
+  BuildContext? _formContext;
 
   @override
   void initState() {
@@ -114,9 +115,11 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
         _experienceCtrl.clear();
         _extraCtrl.clear();
         _selectedGrade = null;
-        if (Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
+        final formContext = _formContext;
+        if (formContext != null && Navigator.of(formContext).canPop()) {
+          Navigator.of(formContext).pop();
         }
+        _formContext = null;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Заявка успешно отправлена')),
         );
@@ -137,81 +140,84 @@ class _AttestationApplicationsScreenState extends State<AttestationApplicationsS
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-          left: 16,
-          right: 16,
-          top: 16,
-        ),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Аттестация тех. специалиста',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<MechanicGrade>(
-                value: _selectedGrade,
-                decoration: const InputDecoration(labelText: 'Желаемый грейд'),
-                items: MechanicGrade.values
-                    .map(
-                      (g) => DropdownMenuItem(
-                        value: g,
-                        child: Text(_gradeLabel(g)),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) => setState(() => _selectedGrade = value),
-                validator: (value) => value == null ? 'Выберите грейд' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _experienceCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Описание опыта и компетенций',
-                  hintText: 'Укажите опыт, ключевые навыки и сильные стороны',
-                ),
-                maxLines: 4,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Добавьте описание опыта';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _extraCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Дополнительные сведения (при необходимости)',
-                  hintText: 'Ссылки на дипломы, сертификаты, ссылки на работы',
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _submitting ? null : _submitApplication,
-                  child: _submitting
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Подать заявку'),
-                ),
-              ),
-            ],
+      builder: (ctx) {
+        _formContext = ctx;
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+            left: 16,
+            right: 16,
+            top: 16,
           ),
-        ),
-      ),
-    );
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Аттестация тех. специалиста',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<MechanicGrade>(
+                  value: _selectedGrade,
+                  decoration: const InputDecoration(labelText: 'Желаемый грейд'),
+                  items: MechanicGrade.values
+                      .map(
+                        (g) => DropdownMenuItem(
+                          value: g,
+                          child: Text(_gradeLabel(g)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() => _selectedGrade = value),
+                  validator: (value) => value == null ? 'Выберите грейд' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _experienceCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Описание опыта и компетенций',
+                    hintText: 'Укажите опыт, ключевые навыки и сильные стороны',
+                  ),
+                  maxLines: 4,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Добавьте описание опыта';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _extraCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Дополнительные сведения (при необходимости)',
+                    hintText: 'Ссылки на дипломы, сертификаты, ссылки на работы',
+                  ),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _submitting ? null : _submitApplication,
+                    child: _submitting
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Подать заявку'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ).whenComplete(() => _formContext = null);
   }
 
   @override
