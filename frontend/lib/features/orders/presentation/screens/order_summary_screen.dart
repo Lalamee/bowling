@@ -4,6 +4,7 @@ import '../../../../../core/repositories/user_repository.dart';
 import '../../../../../core/services/authz/acl.dart';
 import '../../../../../core/repositories/maintenance_repository.dart';
 import '../../../../../core/repositories/notifications_repository.dart';
+import '../../../../../core/services/favorites_storage.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/theme/typography_extension.dart';
 import '../../../../../models/maintenance_request_response_dto.dart';
@@ -48,6 +49,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
   final _userRepository = UserRepository();
   final _maintenanceRepository = MaintenanceRepository();
   final _notificationsRepository = NotificationsRepository();
+  final FavoritesStorage _favoritesStorage = FavoritesStorage();
   MaintenanceRequestResponseDto? _currentRequest;
   bool _isSubmitting = false;
   bool _isCompleting = false;
@@ -63,6 +65,8 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
   HelpResponseDecision _decision = HelpResponseDecision.approved;
   List<NotificationEventDto> _helpEvents = const [];
   UserAccessScope? _scope;
+  bool _isFavoriteOrder = false;
+  Set<String> _favoritePartKeys = <String>{};
 
   String get _title {
     if (widget.orderNumber != null && widget.orderNumber!.isNotEmpty) return widget.orderNumber!;
@@ -151,6 +155,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
     _prefillAvailability();
     _selectedHelpPartIds = _partIds.toSet();
     _guardAccess();
+    _loadFavorites();
   }
 
   @override
@@ -159,6 +164,37 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
     _helpCommentController.dispose();
     _reassignController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadFavorites() async {
+    final orders = await _favoritesStorage.loadFavoriteOrders();
+    final parts = await _favoritesStorage.loadFavoriteParts();
+    if (!mounted) return;
+    setState(() {
+      final requestId = _request?.requestId;
+      _isFavoriteOrder = requestId != null && orders.contains(requestId);
+      _favoritePartKeys = parts.map((part) => part.key).toSet();
+    });
+  }
+
+  Future<void> _toggleFavoriteOrder() async {
+    final requestId = _request?.requestId;
+    if (requestId == null) return;
+    await _favoritesStorage.toggleFavoriteOrder(requestId);
+    await _loadFavorites();
+  }
+
+  Future<void> _toggleFavoritePart(RequestPartResponseDto part) async {
+    final key = FavoritesStorage.partKey(partId: part.partId, catalogNumber: part.catalogNumber);
+    final name = part.partName ?? part.catalogNumber ?? 'Деталь ${part.partId}';
+    await _favoritesStorage.toggleFavoritePart(
+      FavoritePart(
+        key: key,
+        name: name,
+        catalogNumber: part.catalogNumber,
+      ),
+    );
+    await _loadFavorites();
   }
 
   @override
@@ -212,6 +248,12 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
       appBar: AppBar(
         leading: const BackButton(),
         title: Text(_title, style: t.sectionTitle),
+        actions: [
+          IconButton(
+            icon: Icon(_isFavoriteOrder ? Icons.star : Icons.star_border, color: Colors.amber),
+            onPressed: _toggleFavoriteOrder,
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -290,6 +332,17 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
                             part.partName ?? part.catalogNumber ?? 'Неизвестная деталь',
                             style: t.formLabel,
                           ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            _favoritePartKeys.contains(
+                              FavoritesStorage.partKey(partId: part.partId, catalogNumber: part.catalogNumber),
+                            )
+                                ? Icons.star
+                                : Icons.star_border,
+                            color: Colors.amber,
+                          ),
+                          onPressed: () => _toggleFavoritePart(part),
                         ),
                       ],
                     ),

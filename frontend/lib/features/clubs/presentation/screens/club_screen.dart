@@ -4,6 +4,7 @@ import '../../../../core/models/order_status.dart';
 import '../../../../core/models/user_club.dart';
 import '../../../../core/repositories/clubs_repository.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
+import '../../../../core/repositories/support_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/routing/route_args.dart';
 import '../../../../core/routing/routes.dart';
@@ -14,6 +15,7 @@ import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../core/utils/user_club_resolver.dart';
 import '../../../../models/maintenance_request_response_dto.dart';
+import '../../../../models/support_appeal_request_dto.dart';
 import '../../../../shared/widgets/buttons/custom_button.dart';
 import '../../../../shared/widgets/layout/common_ui.dart';
 import '../../../../shared/widgets/layout/section_list.dart';
@@ -32,6 +34,7 @@ class ClubScreen extends StatefulWidget {
 class _ClubScreenState extends State<ClubScreen> {
   final _userRepository = UserRepository();
   final _clubsRepository = ClubsRepository();
+  final _supportRepository = SupportRepository();
 
   bool _isLoading = true;
   bool _hasError = false;
@@ -187,6 +190,138 @@ class _ClubScreenState extends State<ClubScreen> {
     Navigator.pushNamed(context, Routes.ownerDashboard, arguments: selected.id);
   }
 
+  Future<void> _openClubRequestSheet() async {
+    if (_clubs.isEmpty) {
+      showSnack(context, 'Список клубов пуст');
+      return;
+    }
+
+    final commentController = TextEditingController();
+    final types = <String>[
+      'Аккредитация (переход в клубные механики)',
+      'Временный доступ к технической информации',
+    ];
+    int selectedIndex = _selectedIndex ?? 0;
+    String selectedType = types.first;
+    bool submitting = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Заявка в клуб',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    value: selectedIndex,
+                    decoration: const InputDecoration(labelText: 'Клуб'),
+                    items: List.generate(
+                      _clubs.length,
+                      (index) => DropdownMenuItem(
+                        value: index,
+                        child: Text(_clubs[index].name, overflow: TextOverflow.ellipsis),
+                      ),
+                    ),
+                    onChanged: submitting
+                        ? null
+                        : (value) {
+                            if (value == null) return;
+                            setModalState(() => selectedIndex = value);
+                          },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: selectedType,
+                    decoration: const InputDecoration(labelText: 'Тип заявки'),
+                    items: types
+                        .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+                        .toList(),
+                    onChanged: submitting
+                        ? null
+                        : (value) {
+                            if (value == null) return;
+                            setModalState(() => selectedType = value);
+                          },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: commentController,
+                    decoration: const InputDecoration(
+                      labelText: 'Комментарий (опционально)',
+                      hintText: 'Опишите пожелания или сроки',
+                    ),
+                    maxLines: 3,
+                    enabled: !submitting,
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: submitting
+                          ? null
+                          : () async {
+                              final club = _clubs[selectedIndex];
+                              setModalState(() => submitting = true);
+                              try {
+                                final message = StringBuffer()
+                                  ..writeln('Клуб: ${club.name}')
+                                  ..writeln('Тип заявки: $selectedType');
+                                final comment = commentController.text.trim();
+                                if (comment.isNotEmpty) {
+                                  message.writeln('Комментарий: $comment');
+                                }
+                                final dto = SupportAppealRequestDto(
+                                  subject: 'Заявка в клуб',
+                                  message: message.toString(),
+                                );
+                                await _supportRepository.submitAppeal(dto);
+                                if (!mounted) return;
+                                Navigator.pop(ctx);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Заявка отправлена')),
+                                );
+                              } catch (e) {
+                                if (!mounted) return;
+                                showApiError(context, e);
+                              } finally {
+                                if (mounted) {
+                                  setModalState(() => submitting = false);
+                                }
+                              }
+                            },
+                      child: submitting
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Отправить заявку'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   int? _parseLaneCount(String? raw) {
     if (raw == null) return null;
     final trimmed = raw.trim();
@@ -269,6 +404,8 @@ class _ClubScreenState extends State<ClubScreen> {
         const SizedBox(height: 16),
         if (selectedClub != null) _ClubDetailsCard(club: selectedClub),
         const SizedBox(height: 20),
+        CustomButton(text: 'Подать заявку в клуб', onPressed: _openClubRequestSheet),
+        const SizedBox(height: 12),
         if (_scope?.role == 'owner' || _scope?.role == 'manager' || _scope?.role == 'admin') ...[
           CustomButton(text: 'Техинформация и ТО', onPressed: _openOwnerDashboard),
           const SizedBox(height: 12),
@@ -520,4 +657,3 @@ class _InfoRow extends StatelessWidget {
     );
   }
 }
-

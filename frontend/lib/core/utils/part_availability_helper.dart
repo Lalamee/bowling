@@ -4,6 +4,7 @@ import '../../models/warehouse_summary_dto.dart';
 
 class PartAvailabilityResult {
   final bool available;
+  final int? availableQuantity;
   final String? location;
   final String? warehouseHint;
   final int? warehouseId;
@@ -11,6 +12,7 @@ class PartAvailabilityResult {
 
   const PartAvailabilityResult({
     required this.available,
+    this.availableQuantity,
     this.location,
     this.warehouseHint,
     this.warehouseId,
@@ -71,6 +73,7 @@ class PartAvailabilityHelper {
     final location = match.location ?? warehouse?.locationReference ?? request.location;
     return PartAvailabilityResult(
       available: available,
+      availableQuantity: freeQty,
       location: location,
       warehouseHint: warehouseHint,
       warehouseId: warehouseId,

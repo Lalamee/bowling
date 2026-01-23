@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/routing/routes.dart';
-import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/favorites_storage.dart';
 import '../../../../core/services/local_auth_storage.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
@@ -26,6 +26,7 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen> {
   final _maintenanceRepository = MaintenanceRepository();
   final _userRepository = UserRepository();
+  final _favoritesStorage = FavoritesStorage();
 
   bool _isLoading = true;
   bool _hasError = false;
@@ -37,6 +38,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   _OrdersFilter _filter = _OrdersFilter.all;
   String? _role;
   final Set<int> _pendingRequestIds = <int>{};
+  Set<int> _favoriteOrderIds = <int>{};
 
   bool get _isMechanic => (_role ?? 'mechanic') == 'mechanic';
   bool get _isManagerLike =>
@@ -104,35 +106,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               ),
                               child: const Text('Повторить попытку'),
                             ),
-                            TextButton(
-                              onPressed: _logout,
-                              child: const Text('Выйти из аккаунта'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                }
-                if (_clubs.isEmpty) {
-                  return ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    children: [
-                      const SizedBox(height: 200),
-                      Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              'Вы не привязаны ни к одному клубу',
-                              style: TextStyle(color: AppColors.darkGray, fontSize: 16),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            TextButton(
-                              onPressed: _logout,
-                              child: const Text('Выйти из аккаунта'),
-                            ),
                           ],
                         ),
                       ),
@@ -171,7 +144,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 return ListView(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   children: [
-                    _clubDropdown(),
+                    if (_clubs.isNotEmpty) _clubDropdown(),
                     if (_laneOptions.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       _laneDropdown(),
@@ -195,12 +168,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           canConfirm: canConfirm,
                           canComplete: canComplete,
                           actionInProgress: actionInProgress,
+                          isFavorite: _favoriteOrderIds.contains(request.requestId),
                           onToggle: () {
                             setState(() {
                               _expandedIndex = isExpanded ? null : index;
                             });
                           },
                           onOpenSummary: () => _openSummary(request),
+                          onToggleFavorite: () => _toggleFavorite(request.requestId),
                           onConfirm: canConfirm ? () => _openSummary(request) : null,
                           onComplete: canComplete
                               ? () {
@@ -235,6 +210,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
   void initState() {
     super.initState();
     _load();
+    _loadFavorites();
+  }
+
+  Future<void> _loadFavorites() async {
+    final ids = await _favoritesStorage.loadFavoriteOrders();
+    if (!mounted) return;
+    setState(() {
+      _favoriteOrderIds = ids;
+    });
   }
 
   Future<void> _load() async {
@@ -296,15 +280,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
-  Future<void> _logout() async {
-    await AuthService.logout();
-    if (!mounted) return;
-    Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
-  }
-
   Future<void> _openCreateRequest() async {
     if (_clubs.isEmpty) {
-      showSnack(context, 'Вы не привязаны ни к одному клубу');
+      showSnack(context, 'Нет доступных клубов для создания заявки');
       return;
     }
 
@@ -317,6 +295,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
     if (result == true) {
       await _load();
     }
+  }
+
+  Future<void> _toggleFavorite(int orderId) async {
+    await _favoritesStorage.toggleFavoriteOrder(orderId);
+    await _loadFavorites();
   }
 
   List<int> get _laneOptions {
@@ -351,7 +334,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   List<MaintenanceRequestResponseDto> get _requestsForSelectedClub {
     final clubId = _selectedClubId;
     if (clubId == null) {
-      return const [];
+      return _allRequests;
     }
     return _allRequests.where((element) => element.clubId == clubId).toList();
   }
@@ -788,8 +771,10 @@ class _OrderCard extends StatelessWidget {
   final bool canConfirm;
   final bool canComplete;
   final bool actionInProgress;
+  final bool isFavorite;
   final VoidCallback onToggle;
   final VoidCallback onOpenSummary;
+  final VoidCallback onToggleFavorite;
   final VoidCallback? onConfirm;
   final VoidCallback? onComplete;
 
@@ -800,8 +785,10 @@ class _OrderCard extends StatelessWidget {
     required this.canConfirm,
     required this.canComplete,
     required this.actionInProgress,
+    required this.isFavorite,
     required this.onToggle,
     required this.onOpenSummary,
+    required this.onToggleFavorite,
     this.onConfirm,
     this.onComplete,
   });
@@ -835,6 +822,13 @@ class _OrderCard extends StatelessWidget {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                IconButton(
+                  icon: Icon(
+                    isFavorite ? Icons.star : Icons.star_border,
+                    color: isFavorite ? Colors.amber : AppColors.darkGray,
+                  ),
+                  onPressed: onToggleFavorite,
+                ),
                 OrderStatusBadge(category: statusCategory),
                 if (request.requestedParts.any((part) => part.helpRequested == true)) ...[
                   const SizedBox(width: 6),

@@ -401,8 +401,6 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                       ProfileTile(icon: Icons.memory_rounded, text: 'Оборудование: $equipment'),
                     ],
                     const SizedBox(height: 10),
-                    ProfileTile(icon: Icons.history_rounded, text: 'История заказов', onTap: () => Navigator.pushNamed(context, Routes.ordersPersonalHistory)),
-                    const SizedBox(height: 10),
                     ProfileTile(
                       icon: Icons.notifications_active_outlined,
                       text: 'Оповещения',

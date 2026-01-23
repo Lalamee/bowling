@@ -875,8 +875,6 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                       onEdit: _canEditProfile ? () => _openEdit(EditFocus.address) : null,
                     ),
                     const SizedBox(height: 10),
-                    ProfileTile(icon: Icons.history_rounded, text: 'История заказов', onTap: () => Navigator.pushNamed(context, Routes.ordersPersonalHistory)),
-                    const SizedBox(height: 10),
                     ProfileTile(
                       icon: Icons.notifications_active_outlined,
                       text: 'Оповещения',
@@ -891,7 +889,11 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                       },
                     ),
                     const SizedBox(height: 10),
-                    ProfileTile(icon: Icons.star_border_rounded, text: 'Избранные заказы/детали', onTap: () {}),
+                    ProfileTile(
+                      icon: Icons.star_border_rounded,
+                      text: 'Избранные заказы/детали',
+                      onTap: () => Navigator.pushNamed(context, Routes.favorites),
+                    ),
                     const SizedBox(height: 10),
                     ProfileTile(icon: Icons.exit_to_app_rounded, text: 'Выход', danger: true, onTap: _logout),
                   ],
