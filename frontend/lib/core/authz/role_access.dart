@@ -65,7 +65,7 @@ class RoleAccessMatrix {
   static RoleAccessConfig resolve(RoleName role, AccountTypeName? type) {
     switch (role) {
       case RoleName.admin:
-        final isMainAdmin = type == AccountTypeName.mainAdmin;
+        final isMainAdmin = type == AccountTypeName.mainAdmin || type == null;
         return RoleAccessConfig(
           // Администраторов всегда отправляем на их профиль, чтобы избежать
           // загрузки механического кабинета при отсутствии типа аккаунта в кеше.
@@ -146,10 +146,12 @@ class RoleAccessMatrix {
         return RoleName.admin;
       case 'MECHANIC':
         return RoleName.mechanic;
+      case 'HEADMECHANIC':
       case 'HEAD_MECHANIC':
       case 'CLUB_MANAGER':
       case 'MANAGER':
         return RoleName.headMechanic;
+      case 'CLUBOWNER':
       case 'CLUB_OWNER':
       case 'OWNER':
         return RoleName.clubOwner;
@@ -162,14 +164,19 @@ class RoleAccessMatrix {
     switch (normalized) {
       case 'INDIVIDUAL':
         return AccountTypeName.individual;
+      case 'CLUBOWNER':
       case 'CLUB_OWNER':
         return AccountTypeName.clubOwner;
+      case 'CLUBMANAGER':
       case 'CLUB_MANAGER':
         return AccountTypeName.clubManager;
+      case 'FREEMECHANICBASIC':
       case 'FREE_MECHANIC_BASIC':
         return AccountTypeName.freeMechanicBasic;
+      case 'FREEMECHANICPREMIUM':
       case 'FREE_MECHANIC_PREMIUM':
         return AccountTypeName.freeMechanicPremium;
+      case 'MAINADMIN':
       case 'MAIN_ADMIN':
         return AccountTypeName.mainAdmin;
     }

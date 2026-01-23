@@ -46,7 +46,7 @@ class AuthService {
       // (см. данные продовой БД: CLUB_OWNER -> role.id = 44, account_type.id = 64).
       BowlingClubDto? club;
       final String? clubName = nullableString(data['clubName']);
-      final String? clubAddress = nullableString(data['clubAddress']) ?? nullableString(data['address']);
+      final String? clubAddress = nullableString(data['clubAddress']);
       final dynamic rawLanes = data['lanesCount'] ?? data['lanes'];
       final int? lanesCount =
           rawLanes is int ? rawLanes : int.tryParse(rawLanes?.toString() ?? '');
