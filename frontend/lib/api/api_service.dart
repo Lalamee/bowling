@@ -26,6 +26,7 @@ import '../models/close_request_dto.dart';
 import '../models/equipment_component_dto.dart';
 import '../models/equipment_category_dto.dart';
 import '../models/club_summary_dto.dart';
+import '../models/club_create_dto.dart';
 import '../models/purchase_order_summary_dto.dart';
 import '../models/purchase_order_detail_dto.dart';
 import '../models/purchase_order_acceptance_request_dto.dart';
@@ -83,6 +84,12 @@ class ApiService {
     return (response.data as List)
         .map((e) => ClubSummaryDto.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// POST /api/admin/clubs - Добавление клуба администратором
+  Future<ClubSummaryDto> createClub(ClubCreateDto request) async {
+    final response = await _dio.post('/api/admin/clubs', data: request.toJson());
+    return ClubSummaryDto.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// POST /api/auth/refresh - Обновление токена

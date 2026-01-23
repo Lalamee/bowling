@@ -9,6 +9,7 @@ import '../../../../../core/routing/route_args.dart';
 import '../../../../../core/routing/routes.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../core/utils/net_ui.dart';
+import 'admin_club_create_screen.dart';
 
 class AdminClubsScreen extends StatefulWidget {
   const AdminClubsScreen({super.key});
@@ -200,6 +201,18 @@ class _AdminClubsScreenState extends State<AdminClubsScreen> {
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textDark),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.add_business_outlined, color: AppColors.primary),
+            onPressed: () async {
+              final created = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdminClubCreateScreen()),
+              );
+              if (created != null) {
+                _loadClubs();
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
             onPressed: _loadClubs,
