@@ -65,7 +65,7 @@ class RoleAccessMatrix {
   static RoleAccessConfig resolve(RoleName role, AccountTypeName? type) {
     switch (role) {
       case RoleName.admin:
-        final isMainAdmin = type == AccountTypeName.mainAdmin;
+        final isMainAdmin = type == AccountTypeName.mainAdmin || type == null;
         return RoleAccessConfig(
           // Администраторов всегда отправляем на их профиль, чтобы избежать
           // загрузки механического кабинета при отсутствии типа аккаунта в кеше.
