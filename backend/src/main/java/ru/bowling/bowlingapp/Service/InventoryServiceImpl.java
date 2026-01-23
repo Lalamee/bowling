@@ -236,7 +236,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<WarehouseSummaryDto> getAccessibleWarehouses(Long userId) {
         if (userId == null) {
             return Collections.emptyList();

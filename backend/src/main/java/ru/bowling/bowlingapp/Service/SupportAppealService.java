@@ -48,7 +48,7 @@ public class SupportAppealService {
         if (user == null || role == null) {
             return null;
         }
-        if (role == RoleName.CLUB_OWNER || role == RoleName.HEAD_MECHANIC || role == RoleName.CLUB_MANAGER) {
+        if (role == RoleName.CLUB_OWNER || role == RoleName.HEAD_MECHANIC) {
             List<Long> clubs = userClubAccessService.resolveAccessibleClubIds(user);
             return clubs.stream().filter(Objects::nonNull).findFirst().orElse(null);
         }

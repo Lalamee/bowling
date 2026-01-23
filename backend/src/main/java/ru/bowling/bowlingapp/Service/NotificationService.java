@@ -157,7 +157,7 @@ public class NotificationService {
                 .clubId(clubId)
                 .payload(payload)
                 .createdAt(LocalDateTime.now())
-                .audiences(Set.of(RoleName.CLUB_OWNER, RoleName.HEAD_MECHANIC, RoleName.CLUB_MANAGER))
+                .audiences(Set.of(RoleName.CLUB_OWNER, RoleName.HEAD_MECHANIC))
                 .build();
         notifications.add(event);
         return event;
