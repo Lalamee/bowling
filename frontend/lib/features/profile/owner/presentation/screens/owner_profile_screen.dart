@@ -7,6 +7,7 @@ import '../../../../../core/routing/routes.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/authz/acl.dart';
 import '../../../../../core/services/local_auth_storage.dart';
+import '../../../../../api/api_core.dart';
 import '../../../../../core/theme/colors.dart';
 import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../../shared/widgets/tiles/profile_tile.dart';
@@ -90,6 +91,15 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
       }
     } catch (e, s) {
       log('Failed to load owner profile: $e', stackTrace: s);
+      if (e is ApiException &&
+          (e.statusCode == 401 || e.statusCode == 403) &&
+          e.errorType != 'missing_token') {
+        await AuthService.logout();
+        await LocalAuthStorage.clearOwnerState();
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(context, Routes.welcome, (route) => false);
+        return;
+      }
       if (mounted) {
         setState(() {
           _isLoading = false;

@@ -10,7 +10,7 @@ class UserRepository {
     try {
       final token = await ApiCore().getAccessToken();
       if (token == null || token.isEmpty) {
-        throw ApiException('Требуется авторизация', statusCode: 401);
+        throw ApiException('Требуется авторизация', statusCode: 401, errorType: 'missing_token');
       }
 
       final response = await _dio.get(
