@@ -57,7 +57,7 @@ class LocalAuthStorage {
     await sp.remove(_mechanicRegisteredKey);
     await sp.remove(_mechanicProfileKey);
     await sp.remove(_mechanicApplicationKey);
-    await _clearRegisteredRoleIfMatches('mechanic');
+    await _clearRegisteredRoleIfMatchesAny(['mechanic', 'headMechanic']);
   }
 
   static Future<void> saveMechanicApplication(Map<String, dynamic> data) async {
@@ -116,7 +116,7 @@ class LocalAuthStorage {
     final sp = await SharedPreferences.getInstance();
     await sp.remove(_ownerRegisteredKey);
     await sp.remove(_ownerProfileKey);
-    await _clearRegisteredRoleIfMatches('owner');
+    await _clearRegisteredRoleIfMatchesAny(['owner', 'clubOwner']);
   }
 
   static Future<void> saveManagerProfile(Map<String, dynamic> data) async {
@@ -139,7 +139,7 @@ class LocalAuthStorage {
   static Future<void> clearManagerState() async {
     final sp = await SharedPreferences.getInstance();
     await sp.remove(_managerProfileKey);
-    await _clearRegisteredRoleIfMatches('manager');
+    await _clearRegisteredRoleIfMatchesAny(['manager', 'clubOwner']);
   }
 
   static Future<void> saveAdminProfile(Map<String, dynamic> data) async {
@@ -162,7 +162,7 @@ class LocalAuthStorage {
   static Future<void> clearAdminState() async {
     final sp = await SharedPreferences.getInstance();
     await sp.remove(_adminProfileKey);
-    await _clearRegisteredRoleIfMatches('admin');
+    await _clearRegisteredRoleIfMatchesAny(['admin']);
   }
 
   static Future<void> setRegisteredRole(String role) async {
@@ -221,12 +221,14 @@ class LocalAuthStorage {
     await sp.setBool(_accessApprovalNoticeKey, true);
   }
 
-  static Future<void> _clearRegisteredRoleIfMatches(String role) async {
+  static Future<void> _clearRegisteredRoleIfMatchesAny(List<String> roles) async {
     final sp = await SharedPreferences.getInstance();
     final current = sp.getString(_registeredRoleKey);
-    if (current != null && current.toLowerCase() == role.toLowerCase()) {
-      await sp.remove(_registeredRoleKey);
-      await sp.remove(_registeredAccountTypeKey);
-    }
+    if (current == null || current.trim().isEmpty) return;
+    final normalized = current.trim().toLowerCase();
+    final matches = roles.any((role) => normalized == role.trim().toLowerCase());
+    if (!matches) return;
+    await sp.remove(_registeredRoleKey);
+    await sp.remove(_registeredAccountTypeKey);
   }
 }
