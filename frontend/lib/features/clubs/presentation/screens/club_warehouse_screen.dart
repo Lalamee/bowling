@@ -123,11 +123,12 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
   }
 
   void _applyInventory(List<PartDto> data) {
-    PartDto? selected = _resolveSelected(data);
+    final filtered = _filterConfirmedRequests(data);
+    PartDto? selected = _resolveSelected(filtered);
     if (_initialSelectionPending) {
       final targetId = widget.initialInventoryId;
       if (targetId != null) {
-        for (final part in data) {
+        for (final part in filtered) {
           if (part.inventoryId == targetId) {
             selected = part;
             break;
@@ -137,13 +138,20 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
       _initialSelectionPending = false;
     }
     setState(() {
-      _inventory = data;
+      _inventory = filtered;
       _selectedPart = selected;
       _selectedItem = selected != null ? _partDisplayName(selected) : '';
       _isLoading = false;
       _hasError = false;
     });
     _fillControllers(selected);
+  }
+
+  List<PartDto> _filterConfirmedRequests(List<PartDto> data) {
+    if (widget.warehouseType == 'PERSONAL') {
+      return data;
+    }
+    return data.where((part) => (part.reservedQuantity ?? 0) > 0).toList();
   }
 
   PartDto? _resolveSelected(List<PartDto> data) {
@@ -374,11 +382,6 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
                                   const SizedBox(height: 12),
                                 ],
                                 ..._buildInventoryCards(),
-                                const SizedBox(height: 16),
-                                const Text(
-                                  'TODO: требуется API истории движения склада (дата, тип операции, количество, инициатор)',
-                                  style: TextStyle(fontSize: 12, color: AppColors.darkGray),
-                                ),
                               ],
                             ),
             ),
@@ -461,10 +464,6 @@ class _InventoryItemTile extends StatelessWidget {
                     : 'Статус: ${part.placementStatus}',
                 style: subtitleStyle,
               ),
-            ]
-            else ...[
-              const SizedBox(height: 4),
-              const Text('TODO: требуется placementStatus из API', style: subtitleStyle),
             ],
           ],
         ),
