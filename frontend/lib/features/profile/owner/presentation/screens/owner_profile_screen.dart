@@ -91,7 +91,9 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
       }
     } catch (e, s) {
       log('Failed to load owner profile: $e', stackTrace: s);
-      if (e is ApiException && (e.statusCode == 401 || e.statusCode == 403)) {
+      if (e is ApiException &&
+          (e.statusCode == 401 || e.statusCode == 403) &&
+          e.errorType != 'missing_token') {
         await AuthService.logout();
         await LocalAuthStorage.clearOwnerState();
         if (!mounted) return;
