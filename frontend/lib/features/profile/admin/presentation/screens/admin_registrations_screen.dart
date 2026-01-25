@@ -137,22 +137,13 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
       _error = false;
     });
     try {
-      final results = await Future.wait([
-        _repository.getRegistrations(),
-        _clubsRepository.getClubs(),
-      ]);
-      final apps = results[0] as List<AdminRegistrationApplicationDto>;
-      final clubs = results[1] as List<ClubSummaryDto>;
+      final apps = await _repository.getRegistrations();
       if (!mounted) return;
       setState(() {
-        _applications = apps
-            .where(
-              (app) => app.isVerified == false || app.isProfileVerified == false || _resolveStatus(app) == 'PENDING',
-            )
-            .toList();
-        _clubs = clubs;
+        _applications = apps.where(_shouldDisplay).toList();
         _loading = false;
       });
+      _loadClubs();
     } catch (e, s) {
       log('Failed to load registrations: $e', stackTrace: s);
       if (!mounted) return;
@@ -161,6 +152,18 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
         _error = true;
       });
       showApiError(context, e);
+    }
+  }
+
+  Future<void> _loadClubs() async {
+    try {
+      final clubs = await _clubsRepository.getClubs();
+      if (!mounted) return;
+      setState(() {
+        _clubs = clubs;
+      });
+    } catch (e, s) {
+      log('Failed to load clubs: $e', stackTrace: s);
     }
   }
 
@@ -256,7 +259,10 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
 
   void _replace(AdminRegistrationApplicationDto updated) {
     setState(() {
-      _applications = _applications.map((e) => e.userId == updated.userId ? updated : e).toList();
+      _applications = _applications
+          .map((e) => e.userId == updated.userId ? updated : e)
+          .where(_shouldDisplay)
+          .toList();
     });
   }
 
@@ -394,6 +400,17 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
                   label: Text(_to == null ? 'По' : 'По: ${_to!.toLocal().toString().split(' ').first}'),
                 ),
               ),
+              if (_from != null || _to != null) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: () => setState(() {
+                    _from = null;
+                    _to = null;
+                  }),
+                  tooltip: 'Сбросить даты',
+                  icon: const Icon(Icons.close, color: AppColors.darkGray),
+                ),
+              ],
             ],
           ),
         ),
@@ -525,6 +542,16 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     if (app.isVerified == true) return 'APPROVED';
     if (app.isActive == false || app.isVerified == false) return 'PENDING';
     return 'DRAFT';
+  }
+
+  bool _shouldDisplay(AdminRegistrationApplicationDto app) {
+    final status = _resolveStatus(app);
+    final isFreeMechanic = (app.accountType ?? '').toUpperCase().contains('FREE_MECHANIC');
+    final needsClub = isFreeMechanic && app.clubId == null;
+    return app.isVerified == false ||
+        app.isProfileVerified == false ||
+        status == 'PENDING' ||
+        needsClub;
   }
 
   Future<void> _pickDate({required bool isFrom}) async {

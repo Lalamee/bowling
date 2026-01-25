@@ -19,6 +19,7 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
   bool _loading = true;
   bool _error = false;
   List<AdminAppealDto> _items = [];
+  final Set<String> _archivedIds = <String>{};
   String? _typeFilter;
   final TextEditingController _searchCtrl = TextEditingController();
 
@@ -111,33 +112,30 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
     }
 
     final items = _filtered;
+    final activeItems = items.where((item) => !_isArchived(item)).toList();
+    final archivedItems = items.where(_isArchived).toList();
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: Row(
+          child: Column(
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchCtrl,
-                  decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Поиск'),
-                  onChanged: (_) => setState(() {}),
-                ),
+              TextField(
+                controller: _searchCtrl,
+                decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Поиск'),
+                onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 170,
-                child: DropdownButtonFormField<String?>(
-                  value: _typeFilter,
-                  decoration: const InputDecoration(labelText: 'Тип события'),
-                  items: [
-                    const DropdownMenuItem(value: null, child: Text('Все')),
-                    ..._typeLabels.entries
-                        .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
-                        .toList(),
-                  ],
-                  onChanged: (v) => setState(() => _typeFilter = v),
-                ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String?>(
+                value: _typeFilter,
+                decoration: const InputDecoration(labelText: 'Тип события'),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Все')),
+                  ..._typeLabels.entries
+                      .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                      .toList(),
+                ],
+                onChanged: (v) => setState(() => _typeFilter = v),
               ),
             ],
           ),
@@ -145,11 +143,36 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
-            child: ListView.separated(
+            child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              itemBuilder: (_, i) => _buildCard(items[i]),
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemCount: items.length,
+              children: [
+                if (activeItems.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: Text('Горящие обращения отсутствуют')),
+                  )
+                else
+                  ...activeItems.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildCard(item),
+                    ),
+                  ),
+                if (archivedItems.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  ExpansionTile(
+                    title: Text('Архив (${archivedItems.length})'),
+                    children: archivedItems
+                        .map(
+                          (item) => Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                            child: _buildCard(item, archived: true),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+              ],
             ),
           ),
         ),
@@ -157,7 +180,7 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
     );
   }
 
-  Widget _buildCard(AdminAppealDto item) {
+  Widget _buildCard(AdminAppealDto item, {bool archived = false}) {
     final subtitle = <String>[];
     if (item.requestId != null) subtitle.add('Заявка: ${item.requestId}');
     if (item.clubId != null) subtitle.add('Клуб: ${item.clubId}');
@@ -169,76 +192,88 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
       child: ListTile(
         title: Text(item.message ?? 'Оповещение ${item.id ?? ''}'),
         subtitle: subtitle.isNotEmpty ? Text(subtitle.join('\n')) : null,
-        trailing: Chip(label: Text(_typeLabel(item.type))),
+        trailing: archived ? const Chip(label: Text('Ответ отправлен')) : Chip(label: Text(_typeLabel(item.type))),
         onTap: () => _showDetails(item),
       ),
     );
   }
 
   void _showDetails(AdminAppealDto item) {
-    final replyCtrl = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(_typeLabel(item.type)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (item.message != null) Text(item.message!),
-            if (item.payloadText != null && item.payloadText!.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(item.payloadText!),
+        title: const Text('Обращение'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Chip(label: Text(_typeLabel(item.type))),
+                  if (item.requestId != null) Chip(label: Text('Заявка #${item.requestId}')),
+                  if (item.clubId != null) Chip(label: Text('Клуб #${item.clubId}')),
+                  if (item.mechanicId != null) Chip(label: Text('Механик #${item.mechanicId}')),
+                ],
+              ),
+              if (item.createdAt != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Создано: ${item.createdAt!.toLocal().toString().split('.').first}',
+                  style: const TextStyle(color: AppColors.darkGray),
+                ),
+              ],
+              if (item.message != null && item.message!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Text('Сообщение', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.lightGray),
+                  ),
+                  child: Text(item.message!),
+                ),
+              ],
+              if (item.payloadText != null && item.payloadText!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Text('Комментарий', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.lightGray),
+                  ),
+                  child: Text(item.payloadText!),
+                ),
+              ],
+              if (item.payload != null && item.payload!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Text('Данные обращения', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                ...item.payload!.entries.map(
+                  (e) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text('${e.key}: ${e.value}'),
+                  ),
+                ),
+              ],
             ],
-            if (item.payload != null && item.payload!.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              const Text('Данные обращения:'),
-              const SizedBox(height: 4),
-              ...item.payload!.entries.map((e) => Text('${e.key}: ${e.value}')),
-            ],
-          ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть')),
           if (item.id != null && (item.clubId != null || item.mechanicId != null))
             FilledButton(
-              onPressed: () async {
-                final targetLabel = item.clubId != null ? 'клубу' : 'пользователю';
-                final reply = await showDialog<String>(
-                  context: context,
-                  builder: (dialogCtx) => AlertDialog(
-                    title: Text('Ответить $targetLabel'),
-                    content: TextField(
-                      controller: replyCtrl,
-                      maxLines: 4,
-                      decoration: const InputDecoration(hintText: 'Введите текст ответа'),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(dialogCtx).pop(),
-                        child: const Text('Отмена'),
-                      ),
-                      FilledButton(
-                        onPressed: () => Navigator.of(dialogCtx).pop(replyCtrl.text.trim()),
-                        child: const Text('Отправить'),
-                      ),
-                    ],
-                  ),
-                );
-                replyCtrl.dispose();
-                if (reply == null || reply.isEmpty) return;
-                try {
-                  await _repository.replyToAppeal(appealId: item.id!, message: reply);
-                  if (!mounted) return;
-                  Navigator.of(ctx).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Ответ отправлен')),
-                  );
-                } catch (e) {
-                  if (!mounted) return;
-                  showApiError(context, e);
-                }
-              },
+              onPressed: () => _replyToAppeal(item, ctx),
               child: const Text('Ответить'),
             ),
         ],
@@ -246,8 +281,73 @@ class _AdminAppealsScreenState extends State<AdminAppealsScreen> {
     );
   }
 
+  Future<void> _replyToAppeal(AdminAppealDto item, BuildContext parentCtx) async {
+    final controller = TextEditingController();
+    final targetLabel = item.clubId != null ? 'клубу' : 'пользователю';
+    final reply = await showDialog<String>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: Text('Ответить $targetLabel'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                hintText: 'Введите текст ответа',
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Ответ будет отправлен в оповещения пользователя.',
+              style: TextStyle(color: AppColors.darkGray, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(controller.text.trim()),
+            child: const Text('Отправить'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (reply == null || reply.isEmpty) return;
+    try {
+      await _repository.replyToAppeal(appealId: item.id!, message: reply);
+      if (!mounted) return;
+      if (item.id != null) {
+        setState(() => _archivedIds.add(item.id!));
+      }
+      Navigator.of(parentCtx).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ответ отправлен')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showApiError(context, e);
+    }
+  }
+
   String _typeLabel(String? type) {
     if (type == null) return '—';
     return _typeLabels[type.trim().toUpperCase()] ?? type;
+  }
+
+  bool _isArchived(AdminAppealDto item) {
+    final id = item.id;
+    if (id != null && _archivedIds.contains(id)) return true;
+    final payload = item.payload ?? const {};
+    const keys = ['reply', 'answer', 'response', 'adminReply', 'replyMessage'];
+    final hasKey = keys.any((key) => payload.containsKey(key));
+    if (hasKey) return true;
+    final payloadText = item.payloadText ?? '';
+    return payloadText.toLowerCase().contains('ответ:');
   }
 }

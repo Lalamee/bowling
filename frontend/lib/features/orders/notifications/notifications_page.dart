@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -307,9 +309,18 @@ class _NotificationsPageState extends State<NotificationsPage> {
             event.isAccessRequest ||
             event.isAdminReply ||
             event.isFreeMechanicEvent) {
+          final payloadText = _extractPayloadText(event.payload);
+          final sanitized = _sanitizeMessage(event.message);
+          String? description = payloadText ?? sanitized;
+          if (description.trim().isEmpty) {
+            description = null;
+          } else if (description.toLowerCase().startsWith('ответ на обращение')) {
+            description = payloadText ??
+                'Ответ от администрации. Откройте обращение, чтобы прочитать текст.';
+          }
           events.add(_MechanicEvent(
             title: event.typeKey.label(),
-            description: event.payload?.isNotEmpty == true ? event.payload : event.message,
+            description: description?.isNotEmpty == true ? description : null,
             createdAt: event.createdAt,
           ));
         }
@@ -322,7 +333,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             parts.add('доступ: ${club.accessLevel}');
           }
           if (club.accessExpiresAt != null) {
-            parts.add('до ${_dateFormatter.format(club.accessExpiresAt!)}');
+            parts.add('до ${_formatDateTime(club.accessExpiresAt!)}');
           }
           if (club.infoAccessRestricted) {
             parts.add('техинфо ограничена');
@@ -432,7 +443,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
-                          _dateFormatter.format(event.createdAt!),
+                          _formatDateTime(event.createdAt!),
                           style: const TextStyle(color: AppColors.darkGray, fontSize: 12),
                         ),
                       ),
@@ -457,7 +468,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       parts.add(describeOrderStatus(order.status));
     }
     if (updatedAt != null) {
-      parts.add(_dateFormatter.format(updatedAt));
+      parts.add(_formatDateTime(updatedAt));
     }
     return parts.join(' • ');
   }
@@ -481,6 +492,58 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
 
     return latest;
+  }
+
+  String _formatDateTime(DateTime date) => _dateFormatter.format(date.toLocal());
+
+  String? _extractPayloadText(String? payload) {
+    if (payload == null) return null;
+    final trimmed = payload.trim();
+    if (trimmed.isEmpty) return null;
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        final decoded = jsonDecode(trimmed);
+        if (decoded is Map) {
+          const keys = [
+            'message',
+            'reply',
+            'answer',
+            'text',
+            'comment',
+            'content',
+            'replyMessage',
+            'adminReply',
+            'response',
+            'replyText',
+            'responseText',
+            'answerText',
+            'messageText',
+            'body',
+          ];
+          for (final key in keys) {
+            final value = decoded[key];
+            if (value is String && value.trim().isNotEmpty) {
+              return value.trim();
+            }
+          }
+        }
+      } catch (_) {
+        final match = RegExp(
+                r'(message|reply|answer|text|comment|content|replyText|responseText|answerText|messageText|body)\s*[:=]\s*([^,}]+)')
+            .firstMatch(trimmed);
+        if (match != null) {
+          return match.group(2)?.trim();
+        }
+      }
+    }
+    return trimmed;
+  }
+
+  String _sanitizeMessage(String message) {
+    final trimmed = message.trim();
+    if (trimmed.isEmpty) return trimmed;
+    final cleaned = trimmed.replaceAll(RegExp(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', caseSensitive: false), '');
+    return cleaned.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
   }
 }
 

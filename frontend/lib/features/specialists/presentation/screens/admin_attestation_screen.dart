@@ -104,7 +104,7 @@ class _AdminAttestationScreenState extends State<AdminAttestationScreen> {
       showApiError(context, 'Не найден идентификатор заявки');
       return;
     }
-    MechanicGrade? grade = app.requestedGrade;
+    final MechanicGrade? grade = app.requestedGrade;
     final commentCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
@@ -118,22 +118,13 @@ class _AdminAttestationScreenState extends State<AdminAttestationScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (status == AttestationDecisionStatus.approved)
-                  DropdownButtonFormField<MechanicGrade?>(
-                    value: grade,
-                    decoration: const InputDecoration(labelText: 'Подтверждённый грейд'),
-                    items: MechanicGrade.values
-                        .map(
-                          (g) => DropdownMenuItem<MechanicGrade?>(
-                            value: g,
-                            child: Text(g.toApiValue()),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) => grade = value,
-                    validator: (value) => value == null ? 'Укажите грейд' : null,
+                if (status == AttestationDecisionStatus.approved) ...[
+                  Text(
+                    'Запрошенный грейд: ${grade?.toApiValue() ?? '—'}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                const SizedBox(height: 8),
+                  const SizedBox(height: 8),
+                ],
                 TextFormField(
                   controller: commentCtrl,
                   decoration: const InputDecoration(labelText: 'Комментарий'),

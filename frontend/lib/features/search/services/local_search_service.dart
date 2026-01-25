@@ -7,8 +7,16 @@ class InventorySearchEntry {
   final PartDto part;
   final int? clubId;
   final String? clubName;
+  final String? sourceLabel;
+  final bool isPersonal;
 
-  const InventorySearchEntry({required this.part, this.clubId, this.clubName});
+  const InventorySearchEntry({
+    required this.part,
+    this.clubId,
+    this.clubName,
+    this.sourceLabel,
+    this.isPersonal = false,
+  });
 }
 
 class ProfileSearchEntry {
@@ -146,7 +154,7 @@ class LocalSearchService {
         ..write(' ')
         ..write(part.quantity ?? '')
         ..write(' ')
-        ..write(entry.clubName ?? '');
+        ..write(entry.sourceLabel ?? entry.clubName ?? '');
       final haystack = _normalize(buffer.toString());
       return haystack.contains(normalizedQuery);
     }).toList();

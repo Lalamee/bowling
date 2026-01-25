@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/repositories/maintenance_repository.dart';
+import '../../../../core/repositories/clubs_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/routing/routes.dart';
 import '../../../../core/services/favorites_storage.dart';
@@ -11,6 +12,7 @@ import '../../../../core/utils/net_ui.dart';
 import '../../../../core/utils/user_club_resolver.dart';
 import '../../../../core/models/user_club.dart';
 import '../../../../models/maintenance_request_response_dto.dart';
+import '../../../../models/club_summary_dto.dart';
 import '../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../domain/order_status.dart';
 import '../widgets/order_status_badge.dart';
@@ -26,12 +28,14 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen> {
   final _maintenanceRepository = MaintenanceRepository();
   final _userRepository = UserRepository();
+  final _clubsRepository = ClubsRepository();
   final _favoritesStorage = FavoritesStorage();
 
   bool _isLoading = true;
   bool _hasError = false;
   List<MaintenanceRequestResponseDto> _allRequests = [];
   List<UserClub> _clubs = const [];
+  List<ClubSummaryDto> _availableClubs = const [];
   int? _selectedClubId;
   int? _selectedLane;
   int? _expandedIndex;
@@ -191,7 +195,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             ),
           ),
         ),
-        floatingActionButton: (!_isMechanic || _clubs.isEmpty)
+        floatingActionButton: (!_isMechanic || (_clubs.isEmpty && _availableClubs.isEmpty))
             ? null
             : FloatingActionButton(
                 onPressed: _openCreateRequest,
@@ -231,12 +235,16 @@ class _OrdersScreenState extends State<OrdersScreen> {
       final resolvedRole = await _resolveRole(me);
       if (!mounted) return;
       final clubs = resolveUserClubs(me);
+      final availableClubs = resolvedRole == 'mechanic' && clubs.isEmpty
+          ? await _clubsRepository.getClubs()
+          : const <ClubSummaryDto>[];
       final selectedClubId = _resolveSelectedClubId(clubs, _selectedClubId);
       final requests = await _fetchRequestsForClubs(clubs);
       if (!mounted) return;
       setState(() {
         _role = resolvedRole;
         _clubs = clubs;
+        _availableClubs = availableClubs;
         _selectedClubId = selectedClubId;
         _allRequests = requests;
         final lanes = _laneOptions;
@@ -281,20 +289,52 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Future<void> _openCreateRequest() async {
+    int? selectedClubId = _selectedClubId;
     if (_clubs.isEmpty) {
-      showSnack(context, 'Нет доступных клубов для создания заявки');
-      return;
+      if (_availableClubs.isEmpty) {
+        showSnack(context, 'Нет доступных клубов для создания заявки');
+        return;
+      }
+      selectedClubId = await _pickClubForRequest();
+      if (selectedClubId == null) return;
     }
 
     final result = await Navigator.pushNamed(
       context,
       Routes.createMaintenanceRequest,
-      arguments: {'clubId': _selectedClubId},
+      arguments: {'clubId': selectedClubId},
     );
 
     if (result == true) {
       await _load();
     }
+  }
+
+  Future<int?> _pickClubForRequest() async {
+    int? selectedId = _availableClubs.isNotEmpty ? _availableClubs.first.id : null;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Выберите клуб'),
+        content: DropdownButtonFormField<int?>(
+          value: selectedId,
+          decoration: const InputDecoration(labelText: 'Клуб'),
+          items: _availableClubs
+              .map((club) => DropdownMenuItem<int?>(
+                    value: club.id,
+                    child: Text(club.name ?? 'Клуб ${club.id}'),
+                  ))
+              .toList(),
+          onChanged: (value) => selectedId = value,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Продолжить')),
+        ],
+      ),
+    );
+    if (confirmed != true) return null;
+    return selectedId;
   }
 
   Future<void> _toggleFavorite(int orderId) async {
