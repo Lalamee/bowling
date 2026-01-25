@@ -80,6 +80,7 @@ class FreeMechanicApplicationServiceTest {
                 .fullName("Иван Свободный")
                 .birthDate(LocalDate.of(1992, 3, 4))
                 .educationLevelId(1)
+                .educationalInstitution("Технический колледж")
                 .totalExperienceYears(6)
                 .bowlingExperienceYears(4)
                 .isEntrepreneur(true)
@@ -125,4 +126,3 @@ class FreeMechanicApplicationServiceTest {
         assertThat(cabinet.get("mechanicProfile")).isNotNull();
     }
 }
-

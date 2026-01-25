@@ -1,12 +1,12 @@
 class PartRequestDto {
-  final int clubId;
+  final int? clubId;
   final int? laneNumber;
   final int mechanicId;
   final String reason;
   final List<RequestedPartDto> requestedParts;
 
   PartRequestDto({
-    required this.clubId,
+    this.clubId,
     this.laneNumber,
     required this.mechanicId,
     required this.reason,
@@ -15,11 +15,13 @@ class PartRequestDto {
 
   Map<String, dynamic> toJson() {
     final data = <String, dynamic>{
-      'clubId': clubId,
       'mechanicId': mechanicId,
       'reason': reason,
       'requestedParts': requestedParts.map((e) => e.toJson()).toList(),
     };
+    if (clubId != null) {
+      data['clubId'] = clubId;
+    }
     if (laneNumber != null) {
       data['laneNumber'] = laneNumber;
     }
@@ -28,7 +30,7 @@ class PartRequestDto {
 
   factory PartRequestDto.fromJson(Map<String, dynamic> json) {
     return PartRequestDto(
-      clubId: (json['clubId'] as num).toInt(),
+      clubId: (json['clubId'] as num?)?.toInt(),
       laneNumber: (json['laneNumber'] as num?)?.toInt(),
       mechanicId: (json['mechanicId'] as num).toInt(),
       reason: (json['reason'] ?? '').toString(),
