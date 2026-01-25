@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import '../../../../../api/api_core.dart';
 import '../../../../../core/repositories/user_repository.dart';
+import '../../../../../core/repositories/specialists_repository.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../../core/routing/routes.dart';
@@ -31,6 +32,7 @@ class MechanicProfileScreen extends StatefulWidget {
 
 class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   final UserRepository _repo = UserRepository();
+  final SpecialistsRepository _specialistsRepository = SpecialistsRepository();
   late MechanicProfile profile;
   bool _isLoading = true;
   bool _hasError = false;
@@ -141,6 +143,15 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       }
       final scope = await UserAccessScope.fromProfile(me);
       await _notificationsController.ensureInitialized(scope);
+      String? attestationStatus;
+      if (scope.mechanicProfileId != null) {
+        try {
+          final detail = await _specialistsRepository.getDetail(scope.mechanicProfileId!);
+          attestationStatus = detail?.attestationStatus;
+        } catch (_) {
+          // ignore attestation errors
+        }
+      }
       final remoteRole = me['role']?.toString();
       final allowEditing = _roleAllowsEditing(remoteRole) || _roleAllowsEditing(_localRole);
       if (_canEditProfile != allowEditing) {
@@ -149,7 +160,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         });
       }
       final accessClubs = resolveUserClubs(me);
-      final cache = _mapApiToCache(me);
+      final cache = _mapApiToCache(me, attestationStatus: attestationStatus);
       final normalized = _normalizeProfileData(cache);
       await LocalAuthStorage.saveMechanicProfile(normalized);
       if (!mounted) return;
@@ -172,7 +183,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     }
   }
 
-  Map<String, dynamic> _mapApiToCache(Map<String, dynamic> me) {
+  Map<String, dynamic> _mapApiToCache(Map<String, dynamic> me, {String? attestationStatus}) {
     String? _asString(dynamic value) {
       if (value == null) return null;
       final str = value.toString().trim();
@@ -189,17 +200,20 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
 
     if (profileData is Map) {
       final map = Map<String, dynamic>.from(profileData);
-      final workPlaces = map['workPlaces'];
-      if (workPlaces is String) {
-        clubs.addAll(workPlaces
-            .split(',')
-            .map((e) => e.trim())
-            .where((element) => element.isNotEmpty));
-      } else if (workPlaces is Iterable) {
-        clubs.addAll(workPlaces.map((e) => e.toString().trim()).where((e) => e.isNotEmpty));
-      }
-
       final profileClub = _asString(map['clubName']);
+      final hasClubContext = profileClub != null || map['clubId'] != null;
+      final workPlaces = map['workPlaces'];
+      if (hasClubContext) {
+        if (workPlaces is String) {
+          clubs.addAll(workPlaces
+              .split(',')
+              .map((e) => e.trim())
+              .where((element) => element.isNotEmpty));
+        } else if (workPlaces is Iterable) {
+          clubs.addAll(workPlaces.map((e) => e.toString().trim()).where((e) => e.isNotEmpty));
+        }
+      }
+      final normalizedAttestation = attestationStatus?.trim();
       if (profileClub != null) {
         clubName = profileClub;
         if (!clubs.contains(profileClub)) {
@@ -226,6 +240,13 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
           status = 'ИП';
         } else if (isEntrepreneur is bool) {
           status = 'Самозанятый';
+        }
+      }
+      if (normalizedAttestation != null && normalizedAttestation.isNotEmpty) {
+        if (status == null || status.trim().isEmpty) {
+          status = normalizedAttestation;
+        } else if (!status!.toLowerCase().contains(normalizedAttestation.toLowerCase())) {
+          status = '${status!}, $normalizedAttestation';
         }
       }
 
