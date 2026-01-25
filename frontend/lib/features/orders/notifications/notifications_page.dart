@@ -514,6 +514,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
             'replyMessage',
             'adminReply',
             'response',
+            'replyText',
+            'responseText',
+            'answerText',
+            'messageText',
+            'body',
           ];
           for (final key in keys) {
             final value = decoded[key];
@@ -523,7 +528,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
           }
         }
       } catch (_) {
-        final match = RegExp(r'(message|reply|answer|text|comment|content)\s*[:=]\s*([^,}]+)')
+        final match = RegExp(
+                r'(message|reply|answer|text|comment|content|replyText|responseText|answerText|messageText|body)\s*[:=]\s*([^,}]+)')
             .firstMatch(trimmed);
         if (match != null) {
           return match.group(2)?.trim();

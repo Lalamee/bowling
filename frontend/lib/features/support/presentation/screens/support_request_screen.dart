@@ -117,6 +117,11 @@ class _SupportRequestScreenState extends State<SupportRequestScreen> {
             'replyMessage',
             'adminReply',
             'response',
+            'replyText',
+            'responseText',
+            'answerText',
+            'messageText',
+            'body',
           ];
           for (final key in keys) {
             final value = decoded[key];
@@ -126,7 +131,8 @@ class _SupportRequestScreenState extends State<SupportRequestScreen> {
           }
         }
       } catch (_) {
-        final match = RegExp(r'(message|reply|answer|text|comment|content)\s*[:=]\s*([^,}]+)')
+        final match = RegExp(
+                r'(message|reply|answer|text|comment|content|replyText|responseText|answerText|messageText|body)\s*[:=]\s*([^,}]+)')
             .firstMatch(trimmed);
         if (match != null) {
           return match.group(2)?.trim();
