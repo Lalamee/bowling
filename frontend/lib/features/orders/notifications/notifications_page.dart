@@ -310,7 +310,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
             event.isAdminReply ||
             event.isFreeMechanicEvent) {
           final payloadText = _extractPayloadText(event.payload);
-          final description = payloadText ?? _sanitizeMessage(event.message);
+          final sanitized = _sanitizeMessage(event.message);
+          String? description = payloadText ?? sanitized;
+          if (description.trim().isEmpty) {
+            description = null;
+          } else if (description.toLowerCase().startsWith('ответ на обращение')) {
+            description = payloadText ??
+                'Ответ от администрации. Откройте обращение, чтобы прочитать текст.';
+          }
           events.add(_MechanicEvent(
             title: event.typeKey.label(),
             description: description.isNotEmpty ? description : null,
@@ -497,7 +504,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
       try {
         final decoded = jsonDecode(trimmed);
         if (decoded is Map) {
-          const keys = ['message', 'reply', 'answer', 'text', 'comment', 'content'];
+          const keys = [
+            'message',
+            'reply',
+            'answer',
+            'text',
+            'comment',
+            'content',
+            'replyMessage',
+            'adminReply',
+            'response',
+          ];
           for (final key in keys) {
             final value = decoded[key];
             if (value is String && value.trim().isNotEmpty) {

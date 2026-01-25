@@ -107,7 +107,17 @@ class _SupportRequestScreenState extends State<SupportRequestScreen> {
       try {
         final decoded = jsonDecode(trimmed);
         if (decoded is Map) {
-          const keys = ['message', 'reply', 'answer', 'text', 'comment', 'content'];
+          const keys = [
+            'message',
+            'reply',
+            'answer',
+            'text',
+            'comment',
+            'content',
+            'replyMessage',
+            'adminReply',
+            'response',
+          ];
           for (final key in keys) {
             final value = decoded[key];
             if (value is String && value.trim().isNotEmpty) {
