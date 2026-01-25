@@ -547,9 +547,9 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Список доступен только для просмотра',
-            style: TextStyle(fontSize: 12, color: AppColors.darkGray),
+          Text(
+            _clubOptions.isEmpty ? 'Список доступен только для просмотра' : 'Можно назначить клуб свободному агенту',
+            style: const TextStyle(fontSize: 12, color: AppColors.darkGray),
           ),
           const SizedBox(height: 12),
           for (var i = 0; i < freeAgents.length; i++) ...[
@@ -628,6 +628,19 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
             children: statusChips,
           ),
           const SizedBox(height: 8),
+          if (mechanic.mechanicProfileId != null) ...[
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _clubOptions.isEmpty
+                    ? () => _showMissingClubsNotice()
+                    : () => _attachFreeMechanicToClub(mechanic),
+                icon: const Icon(Icons.add_business),
+                label: const Text('Назначить клуб'),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -717,6 +730,52 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
           TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть')),
         ],
       ),
+    );
+  }
+
+  Future<void> _attachFreeMechanicToClub(FreeMechanicApplicationResponseDto mechanic) async {
+    if (mechanic.mechanicProfileId == null) return;
+    int? selected = _clubOptions.isNotEmpty ? _clubOptions.first.id : null;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Назначить клуб'),
+        content: DropdownButtonFormField<int?>(
+          value: selected,
+          decoration: const InputDecoration(labelText: 'Клуб'),
+          items: _clubOptions
+              .map((c) => DropdownMenuItem<int?>(
+                    value: c.id,
+                    child: Text(c.name ?? 'Клуб ${c.id}'),
+                  ))
+              .toList(),
+          onChanged: (v) => selected = v,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Сохранить')),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    try {
+      await _cabinetRepository.changeMechanicClubLink(
+        mechanic.mechanicProfileId!,
+        MechanicClubLinkRequestDto(clubId: selected, attach: true),
+      );
+      await _loadData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Клуб назначен')));
+    } catch (e) {
+      if (!mounted) return;
+      showApiError(context, e);
+    }
+  }
+
+  void _showMissingClubsNotice() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Список клубов пуст. Добавьте клуб, чтобы назначить механика.')),
     );
   }
 

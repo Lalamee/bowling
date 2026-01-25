@@ -253,11 +253,6 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     if (selectedClubName != null && selectedClubName.isNotEmpty) {
       profileClubs.add(selectedClubName);
     }
-    for (final place in places) {
-      if (!profileClubs.contains(place)) {
-        profileClubs.add(place);
-      }
-    }
 
     final trimmedStatus = _status?.trim();
     final normalizedPhone = PhoneUtils.normalize(_phone.text);
@@ -335,7 +330,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
     final profileData = {
       'fullName': _fio.text.trim(),
       'phone': normalizedPhone,
-      'clubName': selectedClubName ?? (profileClubs.isNotEmpty ? profileClubs.first : ''),
+      'clubName': selectedClubName ?? '',
       'address': selectedClub?.address ?? '',
       'status': normalizedStatus,
       'birthDate': birthDate?.toIso8601String(),
