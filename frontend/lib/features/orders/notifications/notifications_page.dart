@@ -431,24 +431,36 @@ class _NotificationsPageState extends State<NotificationsPage> {
           const SizedBox(height: 10),
           ..._mechanicEvents.map((event) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(event.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    if (event.description != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(event.description!, style: const TextStyle(color: AppColors.darkGray)),
-                      ),
-                    if (event.createdAt != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          _formatDateTime(event.createdAt!),
-                          style: const TextStyle(color: AppColors.darkGray, fontSize: 12),
-                        ),
-                      ),
-                  ],
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: event.description?.isNotEmpty == true ? () => _showMechanicEventDetails(event) : null,
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(event.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        if (event.description != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              event.description!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: AppColors.darkGray),
+                            ),
+                          ),
+                        if (event.createdAt != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              _formatDateTime(event.createdAt!),
+                              style: const TextStyle(color: AppColors.darkGray, fontSize: 12),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               )),
         ],
@@ -496,6 +508,60 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   String _formatDateTime(DateTime date) => _dateFormatter.format(date.toLocal());
+
+  void _showMechanicEventDetails(_MechanicEvent event) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 6)),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(event.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                if (event.createdAt != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      _formatDateTime(event.createdAt!),
+                      style: const TextStyle(color: AppColors.darkGray, fontSize: 12),
+                    ),
+                  ),
+                if (event.description != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: SelectableText(
+                      event.description!,
+                      style: const TextStyle(color: AppColors.textDark, height: 1.4),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Закрыть'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   String? _extractPayloadText(String? payload) {
     if (payload == null) return null;
