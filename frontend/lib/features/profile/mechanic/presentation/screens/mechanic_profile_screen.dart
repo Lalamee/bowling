@@ -144,6 +144,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       final scope = await UserAccessScope.fromProfile(me);
       await _notificationsController.ensureInitialized(scope);
       String? attestationStatus;
+      String? gradeLabel;
       if (scope.mechanicProfileId != null) {
         try {
           final detail = await _specialistsRepository.getDetail(scope.mechanicProfileId!);
@@ -151,6 +152,32 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         } catch (_) {
           // ignore attestation errors
         }
+      }
+      try {
+        final applications = await _specialistsRepository.getAttestationApplications();
+        final profileId = scope.mechanicProfileId;
+        final userId = scope.userId;
+        final matching = applications.where((app) {
+          final matchesProfile = profileId != null && app.mechanicProfileId == profileId;
+          final matchesUser = userId != null && app.userId == userId;
+          return matchesProfile || matchesUser;
+        }).toList();
+        if (matching.isNotEmpty) {
+          matching.sort((a, b) {
+            final aDate = a.updatedAt ?? a.submittedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final bDate = b.updatedAt ?? b.submittedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return bDate.compareTo(aDate);
+          });
+          final latest = matching.first;
+          if (latest.status == AttestationDecisionStatus.approved) {
+            final grade = latest.approvedGrade ?? latest.requestedGrade;
+            if (grade != null) {
+              gradeLabel = _gradeLabel(grade);
+            }
+          }
+        }
+      } catch (_) {
+        // ignore attestation lookup errors
       }
       final remoteRole = me['role']?.toString();
       final allowEditing = _roleAllowsEditing(remoteRole) || _roleAllowsEditing(_localRole);
@@ -160,7 +187,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         });
       }
       final accessClubs = resolveUserClubs(me);
-      final cache = _mapApiToCache(me, attestationStatus: attestationStatus);
+      final cache = _mapApiToCache(me, attestationStatus: attestationStatus, gradeLabel: gradeLabel);
       final normalized = _normalizeProfileData(cache);
       await LocalAuthStorage.saveMechanicProfile(normalized);
       if (!mounted) return;
@@ -183,7 +210,11 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     }
   }
 
-  Map<String, dynamic> _mapApiToCache(Map<String, dynamic> me, {String? attestationStatus}) {
+  Map<String, dynamic> _mapApiToCache(
+    Map<String, dynamic> me, {
+    String? attestationStatus,
+    String? gradeLabel,
+  }) {
     String? _asString(dynamic value) {
       if (value == null) return null;
       final str = value.toString().trim();
@@ -214,6 +245,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         }
       }
       final normalizedAttestation = attestationStatus?.trim();
+      final normalizedGrade = gradeLabel?.trim();
       if (profileClub != null) {
         clubName = profileClub;
         if (!clubs.contains(profileClub)) {
@@ -247,6 +279,14 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
           status = normalizedAttestation;
         } else if (!status!.toLowerCase().contains(normalizedAttestation.toLowerCase())) {
           status = '${status!}, $normalizedAttestation';
+        }
+      }
+      if (normalizedGrade != null && normalizedGrade.isNotEmpty) {
+        final gradeValue = 'механик $normalizedGrade';
+        if (status == null || status.trim().isEmpty) {
+          status = gradeValue;
+        } else if (!status!.toLowerCase().contains(gradeValue.toLowerCase())) {
+          status = '${status!}, $gradeValue';
         }
       }
 
@@ -328,6 +368,19 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         missing(current.phone) ||
         missing(current.address) ||
         missing(current.status);
+  }
+
+  String _gradeLabel(MechanicGrade grade) {
+    switch (grade) {
+      case MechanicGrade.junior:
+        return 'junior';
+      case MechanicGrade.middle:
+        return 'middle';
+      case MechanicGrade.senior:
+        return 'senior';
+      case MechanicGrade.lead:
+        return 'lead';
+    }
   }
 
   Map<String, dynamic> _normalizeProfileData(Map<String, dynamic> raw) {
