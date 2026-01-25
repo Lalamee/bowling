@@ -35,6 +35,7 @@ public class FreeMechanicApplicationService {
     private final MechanicProfileRepository mechanicProfileRepository;
     private final AttestationApplicationRepository attestationApplicationRepository;
     private final PersonalWarehouseRepository personalWarehouseRepository;
+    private final BowlingClubRepository bowlingClubRepository;
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
 
@@ -92,9 +93,16 @@ public class FreeMechanicApplicationService {
         userRepository.save(user);
         mechanicProfileRepository.save(profile);
 
+        BowlingClub selectedClub = null;
+        if (request.getClubId() != null) {
+            selectedClub = bowlingClubRepository.findById(request.getClubId())
+                    .orElseThrow(() -> new IllegalArgumentException("Club not found"));
+        }
+
         AttestationApplication application = AttestationApplication.builder()
                 .user(user)
                 .mechanicProfile(profile)
+                .club(selectedClub)
                 .status(AttestationStatus.PENDING)
                 .comment("Заявка свободного механика ожидает подтверждения администрацией и выбора аккаунта (Базовый/Премиум)")
                 .submittedAt(LocalDateTime.now())
@@ -293,8 +301,23 @@ public class FreeMechanicApplicationService {
         if (request.getIsEntrepreneur() == null) {
             throw new IllegalArgumentException("Entrepreneur flag is required");
         }
+        if (request.getEducationLevelId() == null) {
+            throw new IllegalArgumentException("Education level is required");
+        }
+        if (request.getEducationalInstitution() == null || request.getEducationalInstitution().trim().isEmpty()) {
+            throw new IllegalArgumentException("Educational institution is required");
+        }
+        if (request.getSpecializationId() == null) {
+            throw new IllegalArgumentException("Specialization is required");
+        }
         if (request.getRegion() == null || request.getRegion().trim().isEmpty()) {
-            request.setRegion("Не указан");
+            throw new IllegalArgumentException("Region is required");
+        }
+        if (request.getSkills() == null || request.getSkills().trim().isEmpty()) {
+            throw new IllegalArgumentException("Skills are required");
+        }
+        if (request.getAdvantages() == null || request.getAdvantages().trim().isEmpty()) {
+            throw new IllegalArgumentException("Advantages are required");
         }
     }
 
@@ -342,6 +365,7 @@ public class FreeMechanicApplicationService {
 
         User user = application.getUser();
         MechanicProfile profile = application.getMechanicProfile();
+        BowlingClub club = application.getClub();
 
         return FreeMechanicApplicationResponseDTO.builder()
                 .applicationId(application.getApplicationId())
@@ -352,6 +376,8 @@ public class FreeMechanicApplicationService {
                 .status(application.getStatus())
                 .comment(application.getComment())
                 .accountType(user != null && user.getAccountType() != null ? user.getAccountType().getName() : null)
+                .clubId(club != null ? club.getClubId() : null)
+                .clubName(club != null ? club.getName() : null)
                 .isActive(user != null ? user.getIsActive() : null)
                 .isVerified(user != null ? user.getIsVerified() : null)
                 .isProfileVerified(profile != null ? profile.getIsDataVerified() : null)

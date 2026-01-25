@@ -89,7 +89,8 @@ public class MaintenanceController {
                 MaintenanceRequestResponseDTO response = maintenanceRequestService.approveRequest(
                                 requestId,
                                 request.getManagerNotes(),
-                                request.getPartsAvailability());
+                                request.getPartsAvailability(),
+                                authentication.getName());
 		return ResponseEntity.ok(response);
 	}
 
