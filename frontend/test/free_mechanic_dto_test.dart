@@ -10,10 +10,15 @@ void main() {
         password: 'StrongPass1',
         fullName: 'Иван Мастер',
         birthDate: DateTime(1990, 5, 10),
+        educationLevelId: 1,
+        educationalInstitution: 'Боулинг колледж',
         totalExperienceYears: 5,
         bowlingExperienceYears: 3,
         isEntrepreneur: true,
+        specializationId: 1,
         region: 'Москва',
+        skills: 'Диагностика, обслуживание',
+        advantages: 'Быстро реагирую',
       );
 
       final json = req.toJson();
@@ -21,6 +26,8 @@ void main() {
       expect(json['birthDate'], '1990-05-10');
       expect(json['isEntrepreneur'], isTrue);
       expect(json['region'], 'Москва');
+      expect(json['educationLevelId'], 1);
+      expect(json['educationalInstitution'], 'Боулинг колледж');
     });
 
     test('response parsing keeps status and account type', () {

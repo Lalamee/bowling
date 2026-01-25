@@ -25,8 +25,10 @@ public class FreeMechanicApplicationRequestDTO {
     @NotNull
     private LocalDate birthDate;
 
+    @NotNull
     private Integer educationLevelId;
 
+    @NotBlank
     private String educationalInstitution;
 
     @NotNull
@@ -40,17 +42,21 @@ public class FreeMechanicApplicationRequestDTO {
     @NotNull
     private Boolean isEntrepreneur;
 
+    @NotNull
     private Integer specializationId;
 
     @NotBlank
     private String region;
 
+    @NotBlank
     private String skills;
 
+    @NotBlank
     private String advantages;
+
+    private Long clubId;
 
     private List<MechanicCertificationDTO> certifications;
 
     private List<MechanicWorkHistoryDTO> workHistory;
 }
-
