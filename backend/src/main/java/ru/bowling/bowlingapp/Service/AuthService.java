@@ -186,6 +186,7 @@ public class AuthService implements UserDetailsService {
             ownerProfile = OwnerProfile.builder()
                     .user(user)
                     .inn(ownerDto.getInn())
+                    .address(trimOrNull(ownerDto.getAddress()))
                     .legalName(ownerDto.getLegalName())
                     .contactPerson(ownerDto.getContactPerson())
                     .contactPhone(ownerDto.getContactPhone())
@@ -381,15 +382,16 @@ public class AuthService implements UserDetailsService {
                 throw new IllegalArgumentException("Club selection is required for manager profile");
             }
         } else if (isOwnerAccountType(accountTypeName)) {
-            if (ownerDto == null) {
-                throw new IllegalArgumentException("Owner profile data is required for club owner account type");
-            }
-            if (ownerDto.getInn() == null || ownerDto.getInn().trim().isEmpty()) {
-                throw new IllegalArgumentException("INN is required for owner profile");
-            }
-            if (clubDto == null) {
-                throw new IllegalArgumentException("Club data is required for club owner account type");
-            }
+        if (ownerDto == null) {
+            throw new IllegalArgumentException("Owner profile data is required for club owner account type");
+        }
+        if (ownerDto.getInn() == null || ownerDto.getInn().trim().isEmpty()) {
+            throw new IllegalArgumentException("INN is required for owner profile");
+        }
+        if (ownerDto.getAddress() == null || ownerDto.getAddress().trim().isEmpty()) {
+            throw new IllegalArgumentException("Address is required for owner profile");
+        }
+        if (clubDto != null) {
             if (clubDto.getName() == null || clubDto.getName().trim().isEmpty()) {
                 throw new IllegalArgumentException("Club name is required");
             }
@@ -399,6 +401,7 @@ public class AuthService implements UserDetailsService {
             if (clubDto.getLanesCount() == null || clubDto.getLanesCount() <= 0) {
                 throw new IllegalArgumentException("Club lanes count must be greater than zero");
             }
+        }
         }
     }
 
@@ -546,6 +549,7 @@ public class AuthService implements UserDetailsService {
         result.put("contactPhone", trimOrNull(profile.getContactPhone()));
         result.put("contactEmail", trimOrNull(profile.getContactEmail()));
         result.put("inn", trimOrNull(profile.getInn()));
+        result.put("address", trimOrNull(profile.getAddress()));
         result.put("isVerified", profile.getIsDataVerified());
         result.put("workplaceVerified", Boolean.TRUE.equals(profile.getIsDataVerified()));
 
@@ -582,7 +586,7 @@ public class AuthService implements UserDetailsService {
                 .filter(this::isNotBlank)
                 .map(String::trim)
                 .findFirst()
-                .orElse(null);
+                .orElseGet(() -> trimOrNull(profile.getAddress()));
 
         if (address != null) {
             result.put("address", address);

@@ -8,7 +8,6 @@ import '../../../../../core/utils/net_ui.dart';
 import '../../../../../core/utils/validators.dart';
 import '../../../../../core/utils/phone_utils.dart';
 import '../../../../../shared/widgets/buttons/custom_button.dart';
-import '../../../../../shared/widgets/chips/radio_group_horizontal.dart';
 import '../../../../../shared/widgets/inputs/labeled_text_field.dart';
 import '../../../../../shared/widgets/layout/common_ui.dart';
 
@@ -21,20 +20,14 @@ class RegisterOwnerScreen extends StatefulWidget {
 
 class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _fio = TextEditingController();
   final _phone = TextEditingController();
   final _inn = TextEditingController();
   final _addr = TextEditingController();
-  final _email = TextEditingController();
   final _password = TextEditingController();
   final _passwordConfirm = TextEditingController();
 
-  String? status;
-  // обновлено по замечанию: юридическое лицо добавлено, самозанятый скрыт
-  final List<String> _statusOptions = ['ИП', 'Юрлицо (ООО, ПАО, АО)'];
   GlobalKey<FormState> get formKey => _formKey;
 
-  @override
   @override
   void initState() {
     super.initState();
@@ -46,11 +39,9 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
   @override
   void dispose() {
     [
-      _fio,
       _phone,
       _inn,
       _addr,
-      _email,
       _password,
       _passwordConfirm,
     ].forEach((c) => c.dispose());
@@ -62,17 +53,13 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
   }
 
   Future<void> _submit() async {
-    if (!formKey.currentState!.validate() || status == null) {
-      if (status == null) _showBar('Выберите статус');
-      else _showBar('Заполните обязательные поля');
+    if (!formKey.currentState!.validate()) {
+      _showBar('Заполните обязательные поля');
       return;
     }
 
-    final trimmedFullName = _fio.text.trim();
     final trimmedInn = _inn.text.trim();
     final trimmedAddress = _addr.text.trim();
-    final trimmedEmail = _email.text.trim();
-    final trimmedStatus = status?.trim();
     final normalizedPhone = PhoneUtils.normalize(_phone.text);
     final password = _password.text.trim();
     final confirmPassword = _passwordConfirm.text.trim();
@@ -95,20 +82,15 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
       'phone': normalizedPhone,
       'password': password,
       'inn': trimmedInn,
-      'legalName': trimmedFullName,
-      'contactPerson': trimmedFullName,
       'contactPhone': normalizedPhone,
-      'contactEmail': trimmedEmail,
       'address': trimmedAddress,
     };
 
     final profileSnapshot = {
-      'fullName': trimmedFullName,
+      'fullName': 'Владелец',
       'phone': normalizedPhone,
       'address': trimmedAddress,
       'status': 'Владелец',
-      if (trimmedStatus != null && trimmedStatus.isNotEmpty) 'businessStatus': trimmedStatus,
-      'email': trimmedEmail,
       'inn': trimmedInn,
       'workplaceVerified': false,
     };
@@ -194,15 +176,7 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
       children: [
         formStepTitle('Добро пожаловать!'),
         formDescription('Заполните данные, чтобы мы смогли подтвердить вашу регистрацию.'),
-        LabeledTextField(
-          label: 'ФИО/Наименование организации',
-          controller: _fio,
-          validator: Validators.notEmpty,
-          icon: Icons.person,
-          isRequired: true,
-        ),
         LabeledTextField(label: 'Номер телефона', controller: _phone, validator: Validators.phone, keyboardType: TextInputType.phone, icon: Icons.phone, isRequired: true),
-        LabeledTextField(label: 'Email', controller: _email, validator: Validators.email, keyboardType: TextInputType.emailAddress, icon: Icons.email, isRequired: true),
         LabeledTextField(label: 'ИНН организации/ИП', controller: _inn, validator: Validators.notEmpty, keyboardType: TextInputType.number, icon: Icons.badge, isRequired: true),
         LabeledTextField(label: 'Адрес организации/ИП', controller: _addr, validator: Validators.notEmpty, icon: Icons.location_on, isRequired: true),
         LabeledTextField(
@@ -228,12 +202,6 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
           obscureText: true,
           icon: Icons.lock_outline,
           isRequired: true,
-        ),
-        formDescription('Ваш статус:'),
-        RadioGroupHorizontal(
-          options: _statusOptions,
-          groupValue: status,
-          onChanged: (v) => setState(() => status = v),
         ),
       ],
     );

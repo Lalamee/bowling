@@ -14,6 +14,7 @@ import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Entity.enums.MaintenanceRequestStatus;
 import ru.bowling.bowlingapp.Entity.enums.PartStatus;
 import ru.bowling.bowlingapp.Enum.AccountTypeName;
+import ru.bowling.bowlingapp.Enum.RoleName;
 import ru.bowling.bowlingapp.Repository.*;
 
 import java.time.LocalDateTime;
@@ -535,12 +536,22 @@ public class MaintenanceRequestService {
         public MaintenanceRequestResponseDTO approveRequest(Long requestId,
                                                            String managerNotes,
                                                            List<ApproveRejectRequestDTO.PartAvailabilityDTO> availabilityUpdates) {
+                return approveRequest(requestId, managerNotes, availabilityUpdates, null);
+        }
+
+        public MaintenanceRequestResponseDTO approveRequest(Long requestId,
+                                                           String managerNotes,
+                                                           List<ApproveRejectRequestDTO.PartAvailabilityDTO> availabilityUpdates,
+                                                           String requestedByLogin) {
                 Optional<MaintenanceRequest> requestOpt = maintenanceRequestRepository.findById(requestId);
                 if (requestOpt.isEmpty()) {
                         throw new IllegalArgumentException("Request not found");
                 }
 
                 MaintenanceRequest request = requestOpt.get();
+                if (requestedByLogin != null && request.getClub() == null) {
+                        validateSelfApproval(request, requestedByLogin);
+                }
                 request.setStatus(MaintenanceRequestStatus.APPROVED);
                 request.setManagerNotes(managerNotes);
                 request.setManagerDecisionDate(LocalDateTime.now());
@@ -570,6 +581,36 @@ public class MaintenanceRequestService {
                 });
 
                 return convertToResponseDTO(savedRequest, parts);
+        }
+
+        private void validateSelfApproval(MaintenanceRequest request, String requestedByLogin) {
+                if (request == null || requestedByLogin == null || requestedByLogin.isBlank()) {
+                        throw new IllegalArgumentException("Requester is required");
+                }
+                User requester = userRepository.findByPhone(requestedByLogin)
+                        .orElseThrow(() -> new IllegalArgumentException("Requester not found"));
+                RoleName roleName = requester.getRole() != null ? RoleName.from(requester.getRole().getName()) : null;
+                if (roleName == RoleName.ADMIN) {
+                        return;
+                }
+                if (roleName != RoleName.MECHANIC) {
+                        throw new IllegalArgumentException("Only admin or mechanic can approve this request");
+                }
+                AccountTypeName accountType = requester.getAccountType() != null
+                        ? AccountTypeName.from(requester.getAccountType().getName())
+                        : AccountTypeName.INDIVIDUAL;
+                if (accountType != AccountTypeName.FREE_MECHANIC_BASIC
+                        && accountType != AccountTypeName.FREE_MECHANIC_PREMIUM) {
+                        throw new IllegalArgumentException("Only free mechanics can approve self requests");
+                }
+                MechanicProfile requesterProfile = requester.getMechanicProfile();
+                Long requesterProfileId = requesterProfile != null ? requesterProfile.getProfileId() : null;
+                MechanicProfile requestMechanic = request.getMechanic();
+                Long requestMechanicId = requestMechanic != null ? requestMechanic.getProfileId() : null;
+                if (requesterProfileId == null || requestMechanicId == null
+                        || !requesterProfileId.equals(requestMechanicId)) {
+                        throw new IllegalArgumentException("Only the request author can approve self requests");
+                }
         }
 
         @Transactional

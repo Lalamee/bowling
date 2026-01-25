@@ -41,6 +41,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   int? _expandedIndex;
   _OrdersFilter _filter = _OrdersFilter.all;
   String? _role;
+  int? _mechanicProfileId;
   bool _isFreeMechanic = false;
   final Set<int> _pendingRequestIds = <int>{};
   Set<int> _favoriteOrderIds = <int>{};
@@ -237,6 +238,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       if (!mounted) return;
       final clubs = resolveUserClubs(me);
       final isFreeMechanic = _resolveFreeMechanicFlag(me);
+      final mechanicProfileId = _extractMechanicProfileId(me);
       final availableClubs = resolvedRole == 'mechanic' && clubs.isEmpty
           ? await _clubsRepository.getClubs()
           : const <ClubSummaryDto>[];
@@ -249,6 +251,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         _availableClubs = availableClubs;
         _selectedClubId = selectedClubId;
         _isFreeMechanic = isFreeMechanic;
+        _mechanicProfileId = mechanicProfileId;
         _allRequests = requests;
         final lanes = _laneOptions;
         if (!lanes.contains(_selectedLane)) {
@@ -402,8 +405,34 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   bool _canConfirmRequest(MaintenanceRequestResponseDto request) {
-    if (!_isManagerLike) return false;
-    return mapOrderStatus(request.status) == OrderStatusCategory.pending;
+    if (mapOrderStatus(request.status) != OrderStatusCategory.pending) {
+      return false;
+    }
+    if (_isManagerLike) return true;
+    if (!_isFreeMechanic) return false;
+    if (request.clubId != null) return false;
+    if (_mechanicProfileId == null) return false;
+    return request.mechanicId == _mechanicProfileId;
+  }
+
+  int? _extractMechanicProfileId(Map<String, dynamic>? me) {
+    if (me == null) return null;
+    final direct = me['mechanicProfileId'];
+    if (direct is num) return direct.toInt();
+    if (direct is String) return int.tryParse(direct);
+    final profile = me['mechanicProfile'];
+    if (profile is Map) {
+      final map = Map<String, dynamic>.from(profile);
+      final candidates = [map['profileId'], map['id']];
+      for (final candidate in candidates) {
+        if (candidate is num) return candidate.toInt();
+        if (candidate is String) {
+          final parsed = int.tryParse(candidate);
+          if (parsed != null) return parsed;
+        }
+      }
+    }
+    return null;
   }
 
   bool _canCompleteRequest(MaintenanceRequestResponseDto request) {

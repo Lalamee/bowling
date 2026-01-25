@@ -42,32 +42,13 @@ class AuthService {
         throw ApiException('Введите пароль');
       }
 
+      final String? address = nullableString(data['address']);
+      if (address == null || address.isEmpty) {
+        throw ApiException('Укажите адрес организации/ИП');
+      }
+
       // IDs должны соответствовать фактическим значениям в таблицах role и account_type
       // (см. данные продовой БД: CLUB_OWNER -> role.id = 44, account_type.id = 64).
-      BowlingClubDto? club;
-      final String? clubName = nullableString(data['clubName']);
-      final String? clubAddress = nullableString(data['clubAddress']);
-      final dynamic rawLanes = data['lanesCount'] ?? data['lanes'];
-      final int? lanesCount =
-          rawLanes is int ? rawLanes : int.tryParse(rawLanes?.toString() ?? '');
-      if (clubName != null || clubAddress != null || lanesCount != null) {
-        if (clubName == null || clubName.isEmpty) {
-          throw ApiException('Укажите название клуба');
-        }
-        if (clubAddress == null || clubAddress.isEmpty) {
-          throw ApiException('Укажите адрес клуба');
-        }
-        if (lanesCount == null || lanesCount <= 0) {
-          throw ApiException('Количество дорожек должно быть положительным числом');
-        }
-        club = BowlingClubDto(
-          name: clubName,
-          address: clubAddress,
-          lanesCount: lanesCount,
-          contactPhone: nullableString(data['clubPhone']) ?? nullableString(data['contactPhone']),
-          contactEmail: nullableString(data['contactEmail']),
-        );
-      }
 
       final request = RegisterRequestDto(
         user: RegisterUserDto(
@@ -78,12 +59,12 @@ class AuthService {
         ),
         ownerProfile: OwnerProfileDto(
           inn: nullableString(data['inn']) ?? '',
+          address: address,
           legalName: nullableString(data['legalName']),
           contactPerson: nullableString(data['contactPerson']),
           contactPhone: nullableString(data['contactPhone']),
           contactEmail: nullableString(data['contactEmail']),
         ),
-        club: club,
       );
       final response = await _api.register(request);
       if (!response.isSuccess) {
