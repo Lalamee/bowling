@@ -44,6 +44,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
 
   bool _isLoading = true;
   bool _hasError = false;
+  bool _isFreeMechanic = false;
   int? _mechanicProfileId;
   int? _selectedClubId;
   int? _selectedLane;
@@ -86,12 +87,14 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       if (!mounted) return;
       final clubs = resolveUserClubs(me);
       final mechanicProfileId = _extractMechanicProfileId(me);
-      final resolvedClubId = _resolveInitialClubId(clubs, widget.initialClubId);
+      final isFreeMechanic = _resolveFreeMechanicFlag(me);
+      final resolvedClubId = _resolveInitialClubId(clubs, widget.initialClubId, isFreeMechanic);
       setState(() {
         _mechanicProfileId = mechanicProfileId;
         _clubs = clubs;
         _selectedClubId = resolvedClubId;
         _selectedLane = null;
+        _isFreeMechanic = isFreeMechanic;
         _isLoading = false;
       });
       await _loadWarehouses();
@@ -373,7 +376,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
   Future<void> _submit({required bool publish}) async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_selectedClubId == null) {
+    if (_selectedClubId == null && !_isFreeMechanic) {
       showSnack(context, 'Выберите клуб, к которому вы привязаны');
       return;
     }
@@ -385,6 +388,11 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
 
     if (requestedParts.isEmpty) {
       showSnack(context, 'Добавьте хотя бы одну запчасть');
+      return;
+    }
+
+    if (_selectedClubId == null && !_isFreeMechanic) {
+      showSnack(context, 'Выберите клуб');
       return;
     }
 
@@ -403,7 +411,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     }
 
     final request = PartRequestDto(
-      clubId: _selectedClubId!,
+      clubId: _selectedClubId,
       mechanicId: _mechanicProfileId!,
       laneNumber: lane,
       reason: _reasonController.text.trim(),
@@ -488,6 +496,9 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       );
     }
     if (_clubs.isEmpty) {
+      if (_isFreeMechanic) {
+        return _buildForm();
+      }
       return ListView(
         padding: const EdgeInsets.all(24),
         children: const [
@@ -519,6 +530,10 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       );
     }
 
+    return _buildForm();
+  }
+
+  Widget _buildForm() {
     return Form(
       key: _formKey,
       child: ListView(
@@ -527,43 +542,47 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Text(
-              'Эта заявка отправляется менеджеру клуба для выдачи запчастей со склада. '
-              'Укажите дорожку и нужное количество для каждой позиции.',
+              _selectedClubId == null
+                  ? 'Эта заявка создаётся для вашего профиля. При выборе клуба заявка будет отправлена менеджеру клуба.'
+                  : 'Эта заявка отправляется менеджеру клуба для выдачи запчастей со склада. '
+                      'Укажите дорожку и нужное количество для каждой позиции.',
               style: const TextStyle(color: AppColors.darkGray, fontSize: 14),
             ),
           ),
           // TODO: добавить выбор типа заявки, когда на бэке появится поле requestType (ISSUE_FROM_STOCK)
-          const Text(
-            'Клуб *',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark),
-          ),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<int>(
-            value: _selectedClubId,
-            decoration: _inputDecoration(),
-            items: _clubs
-                .map(
-                  (club) => DropdownMenuItem<int>(
-                    value: club.id,
-                    child: Text(
-                      club.name,
-                      overflow: TextOverflow.ellipsis,
+          if (!_isFreeMechanic) ...[
+            const Text(
+              'Клуб',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<int?>(
+              value: _selectedClubId,
+              decoration: _inputDecoration(),
+              items: _clubs
+                  .map(
+                    (club) => DropdownMenuItem<int?>(
+                      value: club.id,
+                      child: Text(
+                        club.name,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                )
-                .toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedClubId = value;
-                _selectedLane = null;
-                _laneController.clear();
-                _refreshAvailability();
-              });
-              _loadWarehouses();
-            },
-            validator: (value) => value == null ? 'Выберите клуб' : null,
-          ),
-          const SizedBox(height: 16),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedClubId = value;
+                  _selectedLane = null;
+                  _laneController.clear();
+                  _refreshAvailability();
+                });
+                _loadWarehouses();
+              },
+              validator: (value) => value == null ? 'Выберите клуб' : null,
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // Номер дорожки
           _buildLaneField(),
@@ -1085,7 +1104,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     return null;
   }
 
-  int? _resolveInitialClubId(List<UserClub> clubs, int? desiredId) {
+  int? _resolveInitialClubId(List<UserClub> clubs, int? desiredId, bool isFreeMechanic) {
     if (clubs.isEmpty) {
       return null;
     }
@@ -1096,6 +1115,11 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
         }
       }
     }
-    return clubs.first.id;
+    return isFreeMechanic ? null : clubs.first.id;
+  }
+
+  bool _resolveFreeMechanicFlag(Map<String, dynamic>? me) {
+    final accountType = me?['accountType']?.toString().toUpperCase();
+    return accountType != null && accountType.contains('FREE_MECHANIC');
   }
 }

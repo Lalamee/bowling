@@ -19,6 +19,8 @@ public class FreeMechanicApplicationResponseDTO {
     private AttestationStatus status;
     private String comment;
     private String accountType;
+    private Long clubId;
+    private String clubName;
     private Boolean isActive;
     private Boolean isVerified;
     private Boolean isProfileVerified;
@@ -26,4 +28,3 @@ public class FreeMechanicApplicationResponseDTO {
     private LocalDateTime submittedAt;
     private LocalDateTime updatedAt;
 }
-
