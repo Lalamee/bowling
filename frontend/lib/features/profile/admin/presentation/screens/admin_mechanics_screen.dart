@@ -628,11 +628,13 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
             children: statusChips,
           ),
           const SizedBox(height: 8),
-          if (mechanic.mechanicProfileId != null && _clubOptions.isNotEmpty) ...[
+          if (mechanic.mechanicProfileId != null) ...[
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: () => _attachFreeMechanicToClub(mechanic),
+                onPressed: _clubOptions.isEmpty
+                    ? () => _showMissingClubsNotice()
+                    : () => _attachFreeMechanicToClub(mechanic),
                 icon: const Icon(Icons.add_business),
                 label: const Text('Назначить клуб'),
               ),
@@ -769,6 +771,12 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       if (!mounted) return;
       showApiError(context, e);
     }
+  }
+
+  void _showMissingClubsNotice() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Список клубов пуст. Добавьте клуб, чтобы назначить механика.')),
+    );
   }
 
   List<Widget> _buildFreeMechanicStatusChips(

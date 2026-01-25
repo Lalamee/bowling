@@ -545,7 +545,13 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
   }
 
   bool _shouldDisplay(AdminRegistrationApplicationDto app) {
-    return app.isVerified == false || app.isProfileVerified == false || _resolveStatus(app) == 'PENDING';
+    final status = _resolveStatus(app);
+    final isFreeMechanic = (app.accountType ?? '').toUpperCase().contains('FREE_MECHANIC');
+    final needsClub = isFreeMechanic && app.clubId == null;
+    return app.isVerified == false ||
+        app.isProfileVerified == false ||
+        status == 'PENDING' ||
+        needsClub;
   }
 
   Future<void> _pickDate({required bool isFrom}) async {
