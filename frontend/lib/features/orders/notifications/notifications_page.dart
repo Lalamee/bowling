@@ -315,8 +315,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
           if (description.trim().isEmpty) {
             description = null;
           } else if (description.toLowerCase().startsWith('ответ на обращение')) {
-            description = payloadText ??
-                'Ответ от администрации. Откройте обращение, чтобы прочитать текст.';
+            description = event.isAdminReply && sanitized.isNotEmpty
+                ? sanitized
+                : (payloadText ?? 'Ответ от администрации. Откройте обращение, чтобы прочитать текст.');
           }
           events.add(_MechanicEvent(
             title: event.typeKey.label(),
