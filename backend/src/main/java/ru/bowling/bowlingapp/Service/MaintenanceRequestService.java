@@ -55,12 +55,11 @@ public class MaintenanceRequestService {
                         throw new IllegalArgumentException("Mechanic not found");
                 }
 
-                if (requestDTO.getClubId() == null) {
-                        throw new IllegalArgumentException("Club is required");
+                BowlingClub club = null;
+                if (requestDTO.getClubId() != null) {
+                        club = bowlingClubRepository.findById(requestDTO.getClubId())
+                                        .orElseThrow(() -> new IllegalArgumentException("Club not found"));
                 }
-
-                BowlingClub club = bowlingClubRepository.findById(requestDTO.getClubId())
-                                .orElseThrow(() -> new IllegalArgumentException("Club not found"));
 
                 MechanicProfile mechanicProfile = mechanic.get();
                 User mechanicUser = mechanicProfile.getUser();
@@ -69,6 +68,7 @@ public class MaintenanceRequestService {
                         : AccountTypeName.INDIVIDUAL;
 
                 if ((accountTypeName == AccountTypeName.FREE_MECHANIC_BASIC || accountTypeName == AccountTypeName.FREE_MECHANIC_PREMIUM)
+                        && club != null
                         && !mechanicWorksInClub(mechanicProfile, club.getClubId())) {
                         throw new IllegalArgumentException("Free mechanic has no granted access to the specified club");
                 }
@@ -77,8 +77,18 @@ public class MaintenanceRequestService {
                         throw new IllegalStateException("Basic free mechanics cannot create maintenance requests without upgrade");
                 }
 
-                if (accountTypeName == AccountTypeName.INDIVIDUAL && !mechanicWorksInClub(mechanicProfile, club.getClubId())) {
-                        throw new IllegalArgumentException("Mechanic is not assigned to the specified club");
+                if (accountTypeName == AccountTypeName.INDIVIDUAL) {
+                        if (club == null) {
+                                throw new IllegalArgumentException("Club is required for club mechanics");
+                        }
+                        if (!mechanicWorksInClub(mechanicProfile, club.getClubId())) {
+                                throw new IllegalArgumentException("Mechanic is not assigned to the specified club");
+                        }
+                }
+
+                if (club == null && accountTypeName != AccountTypeName.FREE_MECHANIC_BASIC
+                        && accountTypeName != AccountTypeName.FREE_MECHANIC_PREMIUM) {
+                        throw new IllegalArgumentException("Club is required for this account type");
                 }
 
                 validateRequestedParts(requestDTO.getRequestedParts());
@@ -436,6 +446,9 @@ public class MaintenanceRequestService {
                 || accountTypeName == AccountTypeName.FREE_MECHANIC_PREMIUM;
 
         if (freeMechanic) {
+            if (request.getClub() != null && request.getClub().getClubId() != null) {
+                candidateWarehouses.add(Math.toIntExact(request.getClub().getClubId()));
+            }
             if (mechanic != null && mechanic.getProfileId() != null) {
                 personalWarehouseRepository.findByMechanicProfile_ProfileIdAndIsActiveTrue(mechanic.getProfileId())
                         .forEach(wh -> candidateWarehouses.add(wh.getWarehouseId()));
