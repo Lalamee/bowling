@@ -320,7 +320,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           }
           events.add(_MechanicEvent(
             title: event.typeKey.label(),
-            description: description.isNotEmpty ? description : null,
+            description: description?.isNotEmpty == true ? description : null,
             createdAt: event.createdAt,
           ));
         }

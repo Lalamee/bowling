@@ -17,6 +17,7 @@ import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.da
 import '../../../../orders/notifications/notifications_badge_controller.dart';
 import '../../../../orders/notifications/notifications_page.dart';
 import '../../domain/mechanic_profile.dart';
+import '../../../../../models/mechanic_directory_models.dart';
 import '../../../../../core/models/user_club.dart';
 import '../../../../../core/services/authz/acl.dart';
 import 'edit_mechanic_profile_screen.dart';
@@ -381,6 +382,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       case MechanicGrade.lead:
         return 'lead';
     }
+    return '—';
   }
 
   Map<String, dynamic> _normalizeProfileData(Map<String, dynamic> raw) {
