@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/repositories/notifications_repository.dart';
@@ -97,6 +99,36 @@ class _SupportRequestScreenState extends State<SupportRequestScreen> {
     }
   }
 
+  String? _extractPayloadText(String? payload) {
+    if (payload == null) return null;
+    final trimmed = payload.trim();
+    if (trimmed.isEmpty) return null;
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        final decoded = jsonDecode(trimmed);
+        if (decoded is Map) {
+          const keys = ['message', 'reply', 'answer', 'text', 'comment', 'content'];
+          for (final key in keys) {
+            final value = decoded[key];
+            if (value is String && value.trim().isNotEmpty) {
+              return value.trim();
+            }
+          }
+        }
+      } catch (_) {
+        // ignore parsing errors
+      }
+    }
+    return trimmed;
+  }
+
+  String _sanitizeMessage(String message) {
+    final trimmed = message.trim();
+    if (trimmed.isEmpty) return trimmed;
+    final cleaned = trimmed.replaceAll(RegExp(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', caseSensitive: false), '');
+    return cleaned.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -193,8 +225,11 @@ class _SupportRequestScreenState extends State<SupportRequestScreen> {
               ),
             )
           else
-            ..._replies.map(
-              (reply) => Padding(
+            ..._replies.map((reply) {
+              final payloadText = _extractPayloadText(reply.payload);
+              final header = reply.isAdminReply ? 'Ответ администрации' : reply.message;
+              final body = payloadText ?? (reply.isAdminReply ? _sanitizeMessage(reply.message) : null);
+              return Padding(
                 padding: const EdgeInsets.only(top: 10),
                 child: Container(
                   padding: const EdgeInsets.all(12),
@@ -207,18 +242,18 @@ class _SupportRequestScreenState extends State<SupportRequestScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        reply.message,
+                        header,
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
-                      if (reply.payload != null && reply.payload!.isNotEmpty) ...[
+                      if (body != null && body.isNotEmpty) ...[
                         const SizedBox(height: 6),
-                        Text(reply.payload!, style: const TextStyle(color: AppColors.darkGray)),
+                        Text(body, style: const TextStyle(color: AppColors.darkGray)),
                       ],
                     ],
                   ),
                 ),
-              ),
-            ),
+              );
+            }),
         ],
       ),
     );
