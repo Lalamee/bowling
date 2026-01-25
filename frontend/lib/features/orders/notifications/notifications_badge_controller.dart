@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../api/api_core.dart';
 import '../../../core/repositories/maintenance_repository.dart';
+import '../../../core/repositories/notifications_repository.dart';
 import '../../../core/services/authz/acl.dart';
 import '../../../core/services/notifications/local_notification_service.dart';
 import '../../../core/services/storage/last_seen_storage.dart';
@@ -21,8 +22,10 @@ class NotificationsBadgeController extends ChangeNotifier {
 
   final MaintenanceRepository _maintenanceRepository = MaintenanceRepository();
   final LocalNotificationService _notificationService = LocalNotificationService();
+  final NotificationsRepository _notificationsRepository = NotificationsRepository();
 
   final List<MaintenanceRequestResponseDto> _pending = <MaintenanceRequestResponseDto>[];
+  int _extraNotifications = 0;
   Timer? _pollingTimer;
   UserAccessScope? _scope;
   DateTime? _lastSeen;
@@ -30,7 +33,7 @@ class NotificationsBadgeController extends ChangeNotifier {
 
   UnmodifiableListView<MaintenanceRequestResponseDto> get newOrders => UnmodifiableListView(_pending);
 
-  int get badgeCount => _pending.length;
+  int get badgeCount => _pending.length + _extraNotifications;
 
   DateTime? get lastSeen => _lastSeen;
 
@@ -92,6 +95,7 @@ class NotificationsBadgeController extends ChangeNotifier {
       _pending
         ..clear()
         ..addAll(fresh);
+      _extraNotifications = await _countExtraNotifications(scope);
       notifyListeners();
       await _notifyAboutNewOrders(newItems);
     } on DioException catch (error, stackTrace) {
@@ -123,8 +127,11 @@ class NotificationsBadgeController extends ChangeNotifier {
     await LastSeenStorage.setLastSeen(scope.storageKeySuffix, now);
     if (_pending.isNotEmpty) {
       _pending.clear();
-      notifyListeners();
     }
+    if (_extraNotifications != 0) {
+      _extraNotifications = 0;
+    }
+    notifyListeners();
   }
 
   void stop() {
@@ -151,6 +158,28 @@ class NotificationsBadgeController extends ChangeNotifier {
   void _startPolling() {
     _pollingTimer?.cancel();
     _pollingTimer = Timer.periodic(const Duration(seconds: 30), (_) => refresh());
+  }
+
+  Future<int> _countExtraNotifications(UserAccessScope scope) async {
+    try {
+      final events = await _notificationsRepository.fetchNotifications(role: scope.role);
+      final threshold = _lastSeen ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final accessibleClubIds = scope.accessibleClubIds;
+      final filtered = events.where((event) {
+        final created = event.createdAt;
+        if (created == null || created.isBefore(threshold)) return false;
+        if (event.clubId != null && accessibleClubIds.isNotEmpty && !accessibleClubIds.contains(event.clubId!)) {
+          return false;
+        }
+        if (event.mechanicId != null && scope.mechanicProfileId != null && event.mechanicId != scope.mechanicProfileId) {
+          return false;
+        }
+        return true;
+      }).toList();
+      return filtered.length;
+    } catch (_) {
+      return 0;
+    }
   }
 
   Future<void> _notifyAboutNewOrders(List<MaintenanceRequestResponseDto> newOrders) async {

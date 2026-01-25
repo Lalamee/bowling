@@ -304,6 +304,7 @@ class AuthService {
       await _api.logout();
     } catch (_) {}
     await _api.clearTokens();
+    await LocalAuthStorage.clearAllState();
   }
 
   static Future<UserInfoDto?> currentUser() async {

@@ -1,12 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-
-import '../../../../core/models/order_status.dart';
 import '../../../../core/repositories/clubs_repository.dart';
 import '../../../../core/repositories/inventory_repository.dart';
-import '../../../../core/repositories/maintenance_repository.dart';
 import '../../../../core/repositories/user_repository.dart';
 import '../../../../core/routing/route_args.dart';
 import '../../../../core/routing/routes.dart';
@@ -15,7 +11,7 @@ import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../models/club_summary_dto.dart';
-import '../../../../models/maintenance_request_response_dto.dart';
+import '../../../../models/warehouse_summary_dto.dart';
 import '../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../services/local_search_service.dart';
 
@@ -27,28 +23,22 @@ class GlobalSearchScreen extends StatefulWidget {
 }
 
 class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
-  final _maintenanceRepository = MaintenanceRepository();
   final _clubsRepository = ClubsRepository();
   final _userRepository = UserRepository();
   final _inventoryRepository = InventoryRepository();
   final _localSearchService = const LocalSearchService();
 
   final _searchCtrl = TextEditingController();
-  final _dateFormatter = DateFormat('dd.MM.yyyy HH:mm');
-
   Timer? _debounce;
   bool _isLoading = true;
   bool _hasError = false;
   UserAccessScope? _scope;
 
-  List<MaintenanceRequestResponseDto> _ordersCache = const <MaintenanceRequestResponseDto>[];
   List<ClubSummaryDto> _clubsCache = const <ClubSummaryDto>[];
-  List<MaintenanceRequestResponseDto> _ordersFiltered = const <MaintenanceRequestResponseDto>[];
-  List<ClubSummaryDto> _clubsFiltered = const <ClubSummaryDto>[];
-  List<InventorySearchEntry> _inventoryCache = const <InventorySearchEntry>[];
-  List<ProfileSearchEntry> _profilesCache = const <ProfileSearchEntry>[];
-  List<InventorySearchEntry> _inventoryFiltered = const <InventorySearchEntry>[];
-  List<ProfileSearchEntry> _profilesFiltered = const <ProfileSearchEntry>[];
+  List<InventorySearchEntry> _personalInventoryCache = const <InventorySearchEntry>[];
+  List<InventorySearchEntry> _clubInventoryCache = const <InventorySearchEntry>[];
+  List<InventorySearchEntry> _personalInventoryFiltered = const <InventorySearchEntry>[];
+  List<InventorySearchEntry> _clubInventoryFiltered = const <InventorySearchEntry>[];
 
   @override
   void initState() {
@@ -72,27 +62,22 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
       final me = await _userRepository.me();
       final scope = await UserAccessScope.fromProfile(me);
       final responses = await Future.wait([
-        _maintenanceRepository.getAllRequests(),
         _clubsRepository.getClubs(),
+        _inventoryRepository.getWarehouses(),
       ]);
       if (!mounted) return;
-      final rawOrders = responses[0] as List<MaintenanceRequestResponseDto>;
-      final rawClubs = responses[1] as List<ClubSummaryDto>;
+      final rawClubs = responses[0] as List<ClubSummaryDto>;
+      final warehouses = responses[1] as List<WarehouseSummaryDto>;
 
-      final filteredOrders = scope.isAdmin
-          ? rawOrders
-          : rawOrders.where(scope.canViewOrder).toList();
       final filteredClubs = scope.isAdmin
           ? rawClubs
           : rawClubs.where((club) => scope.canViewClubId(club.id)).toList();
 
-      final inventoryEntries = await _loadInventoryEntries(scope, filteredClubs);
-      final profileEntries = _buildProfileEntries(me, scope);
+      final inventoryBuckets = await _loadInventoryEntries(scope, filteredClubs, warehouses);
 
-      _ordersCache = filteredOrders;
       _clubsCache = filteredClubs;
-      _inventoryCache = inventoryEntries;
-      _profilesCache = profileEntries;
+      _personalInventoryCache = inventoryBuckets.personal;
+      _clubInventoryCache = inventoryBuckets.club;
       _scope = scope;
       _isLoading = false;
       _hasError = false;
@@ -112,32 +97,20 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     final scope = _scope;
     if (scope == null) return;
     final allowed = scope.isAdmin ? null : scope.accessibleClubIds;
-    final orders = _localSearchService.searchOrders(
-      _ordersCache,
+    final personal = _localSearchService.searchInventory(
+      _personalInventoryCache,
       query,
       allowedClubIds: allowed,
       includeAll: scope.isAdmin,
     );
-    final clubs = _localSearchService.searchClubs(
-      _clubsCache,
+    final club = _localSearchService.searchInventory(
+      _clubInventoryCache,
       query,
       allowedClubIds: allowed,
       includeAll: scope.isAdmin,
     );
-    final inventory = _localSearchService.searchInventory(
-      _inventoryCache,
-      query,
-      allowedClubIds: allowed,
-      includeAll: scope.isAdmin,
-    );
-    final profiles = _localSearchService.searchProfiles(
-      _profilesCache,
-      query,
-    );
-    _ordersFiltered = orders;
-    _clubsFiltered = clubs;
-    _inventoryFiltered = inventory;
-    _profilesFiltered = profiles;
+    _personalInventoryFiltered = personal;
+    _clubInventoryFiltered = club;
     if (notify && mounted) {
       setState(() {});
     }
@@ -156,11 +129,13 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     _applySearch('');
   }
 
-  Future<List<InventorySearchEntry>> _loadInventoryEntries(
+  Future<_InventoryBuckets> _loadInventoryEntries(
     UserAccessScope scope,
     List<ClubSummaryDto> clubs,
+    List<WarehouseSummaryDto> warehouses,
   ) async {
-    final entries = <InventorySearchEntry>[];
+    final personalEntries = <InventorySearchEntry>[];
+    final clubEntries = <InventorySearchEntry>[];
     final seen = <String>{};
     final clubNames = <int, String>{
       for (final club in clubs) club.id: club.name,
@@ -170,10 +145,6 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
         ? clubNames.keys.toList()
         : scope.accessibleClubIds.where((id) => clubNames.containsKey(id)).toList();
 
-    if (ids.isEmpty) {
-      return entries;
-    }
-
     for (final id in ids) {
       try {
         final parts = await _inventoryRepository.search(query: '', clubId: id);
@@ -181,7 +152,14 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
         for (final part in parts) {
           final key = '$id-${part.inventoryId}';
           if (seen.add(key)) {
-            entries.add(InventorySearchEntry(part: part, clubId: id, clubName: clubName));
+            clubEntries.add(
+              InventorySearchEntry(
+                part: part,
+                clubId: id,
+                clubName: clubName,
+                sourceLabel: clubName,
+              ),
+            );
           }
         }
       } catch (_) {
@@ -189,79 +167,44 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
       }
     }
 
-    return entries;
-  }
+    final personalWarehouses = warehouses.where((w) {
+      final type = w.warehouseType.toUpperCase();
+      return type == 'PERSONAL' || w.personalAccess;
+    }).toList();
 
-  List<ProfileSearchEntry> _buildProfileEntries(Map<String, dynamic> me, UserAccessScope scope) {
-    String? asString(dynamic value) {
-      if (value == null) return null;
-      final str = value.toString().trim();
-      return str.isEmpty ? null : str;
+    for (final warehouse in personalWarehouses) {
+      try {
+        final parts = await _inventoryRepository.getWarehouseInventory(
+          warehouseId: warehouse.warehouseId,
+          query: '',
+        );
+        for (final part in parts) {
+          final key = 'personal-${warehouse.warehouseId}-${part.inventoryId}';
+          if (seen.add(key)) {
+            personalEntries.add(
+              InventorySearchEntry(
+                part: part,
+                clubId: warehouse.clubId,
+                clubName: warehouse.title,
+                sourceLabel: warehouse.title.isNotEmpty ? warehouse.title : 'Личный ZIP-склад',
+                isPersonal: true,
+              ),
+            );
+          }
+        }
+      } catch (_) {
+        // ignore personal warehouse errors
+      }
     }
 
-    final displayName =
-        asString(me['fullName']) ?? asString(me['name']) ?? asString(me['phone']) ?? 'Профиль';
-    final phone = asString(me['phone']);
-    final email = asString(me['email']);
-    final route = _profileRouteForRole(scope.role);
-    if (route == null) {
-      return const [];
-    }
-
-    return [
-      ProfileSearchEntry(
-        displayName: displayName,
-        phone: phone,
-        email: email,
-        route: route,
-        roleLabel: _roleLabelForRole(scope.role),
-      ),
-    ];
-  }
-
-  String? _profileRouteForRole(String role) {
-    switch (role) {
-      case 'admin':
-        return Routes.profileAdmin;
-      case 'manager':
-        return Routes.profileManager;
-      case 'owner':
-        return Routes.profileOwner;
-      case 'mechanic':
-        return Routes.profileMechanic;
-      default:
-        return null;
-    }
-  }
-
-  String _roleLabelForRole(String role) {
-    switch (role) {
-      case 'admin':
-        return 'Администратор';
-      case 'manager':
-        return 'Менеджер';
-      case 'owner':
-        return 'Владелец';
-      case 'mechanic':
-        return 'Механик';
-      default:
-        return role;
-    }
-  }
-
-  void _openOrder(MaintenanceRequestResponseDto order) {
-    Navigator.pushNamed(
-      context,
-      Routes.orderSummary,
-      arguments: OrderSummaryArgs(order: order, orderNumber: 'Заявка №${order.requestId}'),
-    );
-  }
-
-  void _openClub(ClubSummaryDto club) {
-    Navigator.pushNamed(context, Routes.club, arguments: club.id);
+    return _InventoryBuckets(personal: personalEntries, club: clubEntries);
   }
 
   void _openInventory(InventorySearchEntry entry) {
+    if (entry.isPersonal) {
+      Navigator.pushNamed(context, Routes.personalWarehouse);
+      return;
+    }
     final clubId = entry.clubId;
     if (clubId == null) {
       _showMessage('Не удалось определить клуб для выбранной позиции');
@@ -278,10 +221,6 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
         searchQuery: entry.part.commonName ?? entry.part.catalogNumber,
       ),
     );
-  }
-
-  void _openProfile(ProfileSearchEntry entry) {
-    Navigator.pushNamed(context, entry.route, arguments: entry.arguments);
   }
 
   void _showMessage(String text) {
@@ -328,7 +267,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
                       controller: _searchCtrl,
                       onChanged: _onSearchChanged,
                       decoration: const InputDecoration(
-                        hintText: 'Введите запрос по заявкам или клубам',
+                        hintText: 'Введите запрос по запчастям',
                         border: InputBorder.none,
                       ),
                     ),
@@ -383,10 +322,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
       );
     }
 
-    if (_ordersFiltered.isEmpty &&
-        _clubsFiltered.isEmpty &&
-        _inventoryFiltered.isEmpty &&
-        _profilesFiltered.isEmpty) {
+    if (_personalInventoryFiltered.isEmpty && _clubInventoryFiltered.isEmpty) {
       return RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(
@@ -411,33 +347,14 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         children: [
-          if (_ordersFiltered.isNotEmpty) ...[
-            _SectionHeader(title: 'Заявки', icon: Icons.assignment_outlined, count: _ordersFiltered.length),
-            const SizedBox(height: 8),
-            ..._ordersFiltered.map(
-              (order) => _OrderSearchTile(
-                order: order,
-                formatter: _dateFormatter,
-                onTap: () => _openOrder(order),
-              ),
+          if (_personalInventoryFiltered.isNotEmpty) ...[
+            _SectionHeader(
+              title: 'Личный ZIP-склад',
+              icon: Icons.inventory_2_outlined,
+              count: _personalInventoryFiltered.length,
             ),
-            const SizedBox(height: 20),
-          ],
-          if (_clubsFiltered.isNotEmpty) ...[
-            _SectionHeader(title: 'Клубы', icon: Icons.storefront_outlined, count: _clubsFiltered.length),
             const SizedBox(height: 8),
-            ..._clubsFiltered.map(
-              (club) => _ClubSearchTile(
-                club: club,
-                onTap: () => _openClub(club),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-          if (_inventoryFiltered.isNotEmpty) ...[
-            _SectionHeader(title: 'Склад', icon: Icons.inventory_2_outlined, count: _inventoryFiltered.length),
-            const SizedBox(height: 8),
-            ..._inventoryFiltered.map(
+            ..._personalInventoryFiltered.map(
               (entry) => _InventorySearchTile(
                 entry: entry,
                 onTap: () => _openInventory(entry),
@@ -445,20 +362,32 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
             ),
             const SizedBox(height: 20),
           ],
-          if (_profilesFiltered.isNotEmpty) ...[
-            _SectionHeader(title: 'Пользователи', icon: Icons.person_outline, count: _profilesFiltered.length),
+          if (_clubInventoryFiltered.isNotEmpty) ...[
+            _SectionHeader(
+              title: 'Склад клуба',
+              icon: Icons.storefront_outlined,
+              count: _clubInventoryFiltered.length,
+            ),
             const SizedBox(height: 8),
-            ..._profilesFiltered.map(
-              (entry) => _ProfileSearchTile(
+            ..._clubInventoryFiltered.map(
+              (entry) => _InventorySearchTile(
                 entry: entry,
-                onTap: () => _openProfile(entry),
+                onTap: () => _openInventory(entry),
               ),
             ),
+            const SizedBox(height: 20),
           ],
         ],
       ),
     );
   }
+}
+
+class _InventoryBuckets {
+  final List<InventorySearchEntry> personal;
+  final List<InventorySearchEntry> club;
+
+  const _InventoryBuckets({required this.personal, required this.club});
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -496,165 +425,6 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _OrderSearchTile extends StatelessWidget {
-  final MaintenanceRequestResponseDto order;
-  final DateFormat formatter;
-  final VoidCallback onTap;
-
-  const _OrderSearchTile({required this.order, required this.formatter, required this.onTap});
-
-  DateTime? get _lastUpdate {
-    DateTime? latest;
-    void consider(DateTime? value) {
-      if (value == null) return;
-      if (latest == null || value.isAfter(latest!)) {
-        latest = value;
-      }
-    }
-
-    consider(order.managerDecisionDate);
-    consider(order.completionDate);
-    consider(order.requestDate);
-    for (final part in order.requestedParts) {
-      consider(part.deliveryDate);
-      consider(part.issueDate);
-      consider(part.orderDate);
-    }
-    return latest;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final subtitle = <String>[];
-    if (order.clubName != null && order.clubName!.isNotEmpty) {
-      subtitle.add(order.clubName!);
-    }
-    subtitle.add(describeOrderStatus(order.status));
-    final updated = _lastUpdate;
-    if (updated != null) {
-      subtitle.add(formatter.format(updated));
-    }
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-          border: Border.all(color: const Color(0xFFEDEDED), width: 1.2),
-        ),
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Заявка №${order.requestId}',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    describeOrderStatus(order.status),
-                    style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle.join(' • '),
-              style: const TextStyle(color: AppColors.darkGray, fontSize: 13),
-            ),
-            if (order.managerNotes != null && order.managerNotes!.trim().isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(
-                order.managerNotes!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppColors.darkGray, fontSize: 13),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ClubSearchTile extends StatelessWidget {
-  final ClubSummaryDto club;
-
-  final VoidCallback onTap;
-
-  const _ClubSearchTile({required this.club, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final details = <String>[];
-    if (club.address != null && club.address!.isNotEmpty) {
-      details.add(club.address!);
-    }
-    if (club.contactPhone != null && club.contactPhone!.isNotEmpty) {
-      details.add(club.contactPhone!);
-    }
-    if (club.contactEmail != null && club.contactEmail!.isNotEmpty) {
-      details.add(club.contactEmail!);
-    }
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-          border: Border.all(color: const Color(0xFFEDEDED), width: 1.2),
-        ),
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              club.name,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              details.isEmpty ? 'Контакты не указаны' : details.join(' • '),
-              style: const TextStyle(color: AppColors.darkGray, fontSize: 13),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _InventorySearchTile extends StatelessWidget {
   final InventorySearchEntry entry;
   final VoidCallback onTap;
@@ -680,7 +450,9 @@ class _InventorySearchTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final part = entry.part;
     final info = <String>[];
-    if (entry.clubName != null && entry.clubName!.isNotEmpty) {
+    if (entry.sourceLabel != null && entry.sourceLabel!.isNotEmpty) {
+      info.add(entry.sourceLabel!);
+    } else if (entry.clubName != null && entry.clubName!.isNotEmpty) {
       info.add(entry.clubName!);
     }
     if (part.catalogNumber.isNotEmpty) {
@@ -721,62 +493,6 @@ class _InventorySearchTile extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               info.isEmpty ? 'Детали отсутствуют' : info.join(' • '),
-              style: const TextStyle(color: AppColors.darkGray, fontSize: 13),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileSearchTile extends StatelessWidget {
-  final ProfileSearchEntry entry;
-  final VoidCallback onTap;
-
-  const _ProfileSearchTile({required this.entry, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final details = <String>[];
-    if (entry.roleLabel != null && entry.roleLabel!.isNotEmpty) {
-      details.add(entry.roleLabel!);
-    }
-    if (entry.phone != null && entry.phone!.isNotEmpty) {
-      details.add(entry.phone!);
-    }
-    if (entry.email != null && entry.email!.isNotEmpty) {
-      details.add(entry.email!);
-    }
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-          border: Border.all(color: const Color(0xFFEDEDED), width: 1.2),
-        ),
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              entry.displayName,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textDark),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              details.isEmpty ? 'Контакты отсутствуют' : details.join(' • '),
               style: const TextStyle(color: AppColors.darkGray, fontSize: 13),
             ),
           ],
