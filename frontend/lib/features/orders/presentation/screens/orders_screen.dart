@@ -41,6 +41,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   int? _expandedIndex;
   _OrdersFilter _filter = _OrdersFilter.all;
   String? _role;
+  bool _isFreeMechanic = false;
   final Set<int> _pendingRequestIds = <int>{};
   Set<int> _favoriteOrderIds = <int>{};
 
@@ -235,6 +236,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       final resolvedRole = await _resolveRole(me);
       if (!mounted) return;
       final clubs = resolveUserClubs(me);
+      final isFreeMechanic = _resolveFreeMechanicFlag(me);
       final availableClubs = resolvedRole == 'mechanic' && clubs.isEmpty
           ? await _clubsRepository.getClubs()
           : const <ClubSummaryDto>[];
@@ -246,6 +248,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         _clubs = clubs;
         _availableClubs = availableClubs;
         _selectedClubId = selectedClubId;
+        _isFreeMechanic = isFreeMechanic;
         _allRequests = requests;
         final lanes = _laneOptions;
         if (!lanes.contains(_selectedLane)) {
@@ -291,12 +294,16 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Future<void> _openCreateRequest() async {
     int? selectedClubId = _selectedClubId;
     if (_clubs.isEmpty) {
-      if (_availableClubs.isEmpty) {
+      if (_isFreeMechanic) {
+        selectedClubId = null;
+      } else if (_availableClubs.isEmpty) {
         showSnack(context, 'Нет доступных клубов для создания заявки');
         return;
       }
-      selectedClubId = await _pickClubForRequest();
-      if (selectedClubId == null) return;
+      if (!_isFreeMechanic) {
+        selectedClubId = await _pickClubForRequest();
+        if (selectedClubId == null) return;
+      }
     }
 
     final result = await Navigator.pushNamed(
@@ -387,6 +394,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
       return current;
     }
     return clubs.first.id;
+  }
+
+  bool _resolveFreeMechanicFlag(Map<String, dynamic>? me) {
+    final accountType = me?['accountType']?.toString().toUpperCase();
+    return accountType != null && accountType.contains('FREE_MECHANIC');
   }
 
   bool _canConfirmRequest(MaintenanceRequestResponseDto request) {

@@ -550,39 +550,47 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
             ),
           ),
           // TODO: добавить выбор типа заявки, когда на бэке появится поле requestType (ISSUE_FROM_STOCK)
-          if (!_isFreeMechanic) ...[
-            const Text(
-              'Клуб',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark),
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<int?>(
-              value: _selectedClubId,
-              decoration: _inputDecoration(),
-              items: _clubs
-                  .map(
-                    (club) => DropdownMenuItem<int?>(
-                      value: club.id,
-                      child: Text(
-                        club.name,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedClubId = value;
-                  _selectedLane = null;
-                  _laneController.clear();
-                  _refreshAvailability();
-                });
-                _loadWarehouses();
-              },
-              validator: (value) => value == null ? 'Выберите клуб' : null,
-            ),
-            const SizedBox(height: 16),
-          ],
+          const Text(
+            'Клуб',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textDark),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<int?>(
+            value: _selectedClubId,
+            decoration: _inputDecoration(),
+            items: [
+              if (_isFreeMechanic)
+                const DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text('Самостоятельно'),
+                ),
+              ..._clubs.map(
+                (club) => DropdownMenuItem<int?>(
+                  value: club.id,
+                  child: Text(
+                    club.name,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ],
+            onChanged: (value) {
+              setState(() {
+                _selectedClubId = value;
+                _selectedLane = null;
+                _laneController.clear();
+                _refreshAvailability();
+              });
+              _loadWarehouses();
+            },
+            validator: (value) {
+              if (_isFreeMechanic) {
+                return null;
+              }
+              return value == null ? 'Выберите клуб' : null;
+            },
+          ),
+          const SizedBox(height: 16),
 
           // Номер дорожки
           _buildLaneField(),
