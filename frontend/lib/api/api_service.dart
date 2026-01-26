@@ -294,8 +294,14 @@ class ApiService {
   }
 
   /// GET /api/admin/registrations - заявки на регистрацию
-  Future<List<AdminRegistrationApplicationDto>> getAdminRegistrations() async {
-    final response = await _dio.get('/api/admin/registrations');
+  Future<List<AdminRegistrationApplicationDto>> getAdminRegistrations({int page = 0, int size = 50}) async {
+    final response = await _dio.get(
+      '/api/admin/registrations',
+      queryParameters: {
+        'page': page,
+        'size': size,
+      },
+    );
     return (response.data as List)
         .map((e) => AdminRegistrationApplicationDto.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
