@@ -14,6 +14,7 @@ import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Entity.enums.MaintenanceRequestStatus;
 import ru.bowling.bowlingapp.Entity.enums.PartStatus;
 import ru.bowling.bowlingapp.Enum.AccountTypeName;
+import ru.bowling.bowlingapp.Enum.RoleName;
 import ru.bowling.bowlingapp.Repository.*;
 
 import java.time.LocalDateTime;
@@ -55,12 +56,11 @@ public class MaintenanceRequestService {
                         throw new IllegalArgumentException("Mechanic not found");
                 }
 
-                if (requestDTO.getClubId() == null) {
-                        throw new IllegalArgumentException("Club is required");
+                BowlingClub club = null;
+                if (requestDTO.getClubId() != null) {
+                        club = bowlingClubRepository.findById(requestDTO.getClubId())
+                                        .orElseThrow(() -> new IllegalArgumentException("Club not found"));
                 }
-
-                BowlingClub club = bowlingClubRepository.findById(requestDTO.getClubId())
-                                .orElseThrow(() -> new IllegalArgumentException("Club not found"));
 
                 MechanicProfile mechanicProfile = mechanic.get();
                 User mechanicUser = mechanicProfile.getUser();
@@ -69,16 +69,23 @@ public class MaintenanceRequestService {
                         : AccountTypeName.INDIVIDUAL;
 
                 if ((accountTypeName == AccountTypeName.FREE_MECHANIC_BASIC || accountTypeName == AccountTypeName.FREE_MECHANIC_PREMIUM)
+                        && club != null
                         && !mechanicWorksInClub(mechanicProfile, club.getClubId())) {
                         throw new IllegalArgumentException("Free mechanic has no granted access to the specified club");
                 }
 
-                if (accountTypeName == AccountTypeName.FREE_MECHANIC_BASIC) {
-                        throw new IllegalStateException("Basic free mechanics cannot create maintenance requests without upgrade");
+                if (accountTypeName == AccountTypeName.INDIVIDUAL) {
+                        if (club == null) {
+                                throw new IllegalArgumentException("Club is required for club mechanics");
+                        }
+                        if (!mechanicWorksInClub(mechanicProfile, club.getClubId())) {
+                                throw new IllegalArgumentException("Mechanic is not assigned to the specified club");
+                        }
                 }
 
-                if (accountTypeName == AccountTypeName.INDIVIDUAL && !mechanicWorksInClub(mechanicProfile, club.getClubId())) {
-                        throw new IllegalArgumentException("Mechanic is not assigned to the specified club");
+                if (club == null && accountTypeName != AccountTypeName.FREE_MECHANIC_BASIC
+                        && accountTypeName != AccountTypeName.FREE_MECHANIC_PREMIUM) {
+                        throw new IllegalArgumentException("Club is required for this account type");
                 }
 
                 validateRequestedParts(requestDTO.getRequestedParts());
@@ -436,6 +443,9 @@ public class MaintenanceRequestService {
                 || accountTypeName == AccountTypeName.FREE_MECHANIC_PREMIUM;
 
         if (freeMechanic) {
+            if (request.getClub() != null && request.getClub().getClubId() != null) {
+                candidateWarehouses.add(Math.toIntExact(request.getClub().getClubId()));
+            }
             if (mechanic != null && mechanic.getProfileId() != null) {
                 personalWarehouseRepository.findByMechanicProfile_ProfileIdAndIsActiveTrue(mechanic.getProfileId())
                         .forEach(wh -> candidateWarehouses.add(wh.getWarehouseId()));
@@ -522,12 +532,22 @@ public class MaintenanceRequestService {
         public MaintenanceRequestResponseDTO approveRequest(Long requestId,
                                                            String managerNotes,
                                                            List<ApproveRejectRequestDTO.PartAvailabilityDTO> availabilityUpdates) {
+                return approveRequest(requestId, managerNotes, availabilityUpdates, null);
+        }
+
+        public MaintenanceRequestResponseDTO approveRequest(Long requestId,
+                                                           String managerNotes,
+                                                           List<ApproveRejectRequestDTO.PartAvailabilityDTO> availabilityUpdates,
+                                                           String requestedByLogin) {
                 Optional<MaintenanceRequest> requestOpt = maintenanceRequestRepository.findById(requestId);
                 if (requestOpt.isEmpty()) {
                         throw new IllegalArgumentException("Request not found");
                 }
 
                 MaintenanceRequest request = requestOpt.get();
+                if (requestedByLogin != null && request.getClub() == null) {
+                        validateSelfApproval(request, requestedByLogin);
+                }
                 request.setStatus(MaintenanceRequestStatus.APPROVED);
                 request.setManagerNotes(managerNotes);
                 request.setManagerDecisionDate(LocalDateTime.now());
@@ -557,6 +577,36 @@ public class MaintenanceRequestService {
                 });
 
                 return convertToResponseDTO(savedRequest, parts);
+        }
+
+        private void validateSelfApproval(MaintenanceRequest request, String requestedByLogin) {
+                if (request == null || requestedByLogin == null || requestedByLogin.isBlank()) {
+                        throw new IllegalArgumentException("Requester is required");
+                }
+                User requester = userRepository.findByPhone(requestedByLogin)
+                        .orElseThrow(() -> new IllegalArgumentException("Requester not found"));
+                RoleName roleName = requester.getRole() != null ? RoleName.from(requester.getRole().getName()) : null;
+                if (roleName == RoleName.ADMIN) {
+                        return;
+                }
+                if (roleName != RoleName.MECHANIC) {
+                        throw new IllegalArgumentException("Only admin or mechanic can approve this request");
+                }
+                AccountTypeName accountType = requester.getAccountType() != null
+                        ? AccountTypeName.from(requester.getAccountType().getName())
+                        : AccountTypeName.INDIVIDUAL;
+                if (accountType != AccountTypeName.FREE_MECHANIC_BASIC
+                        && accountType != AccountTypeName.FREE_MECHANIC_PREMIUM) {
+                        throw new IllegalArgumentException("Only free mechanics can approve self requests");
+                }
+                MechanicProfile requesterProfile = requester.getMechanicProfile();
+                Long requesterProfileId = requesterProfile != null ? requesterProfile.getProfileId() : null;
+                MechanicProfile requestMechanic = request.getMechanic();
+                Long requestMechanicId = requestMechanic != null ? requestMechanic.getProfileId() : null;
+                if (requesterProfileId == null || requestMechanicId == null
+                        || !requesterProfileId.equals(requestMechanicId)) {
+                        throw new IllegalArgumentException("Only the request author can approve self requests");
+                }
         }
 
         @Transactional

@@ -36,6 +36,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
   String? email;
   String? inn;
   int _notificationsCount = 0;
+  bool _isVerified = false;
 
   @override
   void initState() {
@@ -203,7 +204,8 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
 
     var fullName = asString(me['fullName']) ?? contactPerson ?? profile.fullName;
     var phone = asString(me['phone']) ?? contactPhone ?? profile.phone;
-    final verified = me['isVerified'] is bool ? me['isVerified'] as bool : profile.workplaceVerified;
+    final profileVerified = ownerProfile is Map ? (ownerProfile['isVerified'] as bool?) : null;
+    final verified = profileVerified ?? (me['isVerified'] is bool ? me['isVerified'] as bool : profile.workplaceVerified);
 
     if (clubName == null && clubs.isEmpty) {
       final fallbackClub = asString(me['company']) ?? asString(me['clubName']);
@@ -225,6 +227,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
       'status': _ownerStatusLabel,
       'clubs': clubs,
       'workplaceVerified': verified,
+      'isVerified': verified,
       'email': contactEmail ?? asString(me['email']),
       'inn': contactInn,
     };
@@ -259,6 +262,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
       profile = updatedProfile;
       email = asString(raw['email']) ?? email;
       inn = asString(raw['inn']) ?? inn;
+      _isVerified = raw['isVerified'] as bool? ?? _isVerified;
       _isLoading = false;
       _hasError = false;
     });
@@ -326,6 +330,39 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   children: [
+                    if (!_isVerified)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.lightGray),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.lock_clock_rounded, color: AppColors.primary),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: const [
+                                  Text(
+                                    'Ограниченный доступ',
+                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textDark),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'Функционал откроется после подтверждения регистрации администрацией.',
+                                    style: TextStyle(fontSize: 13, color: AppColors.darkGray, height: 1.3),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ProfileTile(icon: Icons.person, text: profile.fullName, onEdit: () => _openEdit(OwnerEditFocus.name)),
                     const SizedBox(height: 10),
                     ProfileTile(icon: Icons.phone, text: profile.phone, onEdit: () => _openEdit(OwnerEditFocus.phone)),
@@ -363,40 +400,42 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                       ProfileTile(icon: Icons.numbers_rounded, text: 'ИНН: $inn'),
                     ],
                     const SizedBox(height: 10),
-                    ProfileTile(
-                      icon: Icons.menu_book_rounded,
-                      text: 'База знаний',
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen())),
-                    ),
-                    const SizedBox(height: 10),
-                    if (profile.clubs.isNotEmpty)
-                      ...List.generate(profile.clubs.length, (i) {
-                        final club = profile.clubs[i];
-                        return Padding(
-                          padding: EdgeInsets.only(bottom: i == profile.clubs.length - 1 ? 0 : 10),
-                          child: ProfileTile(
-                            icon: Icons.location_searching_rounded,
-                            text: club,
-                            showAlertBadge: false,
-                            onTap: () => _openEdit(OwnerEditFocus.none),
-                          ),
-                        );
-                      }),
-                    const SizedBox(height: 10),
-                    ProfileTile(
-                      icon: Icons.notifications_active_outlined,
-                      text: 'Оповещения',
-                      badgeCount: _notificationsCount,
-                      onTap: () async {
-                        await Navigator.pushNamed(context, Routes.managerNotifications);
-                        if (mounted) {
-                          setState(() {
-                            _notificationsCount = _notificationsController.badgeCount;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 10),
+                    if (_isVerified) ...[
+                      ProfileTile(
+                        icon: Icons.menu_book_rounded,
+                        text: 'База знаний',
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen())),
+                      ),
+                      const SizedBox(height: 10),
+                      if (profile.clubs.isNotEmpty)
+                        ...List.generate(profile.clubs.length, (i) {
+                          final club = profile.clubs[i];
+                          return Padding(
+                            padding: EdgeInsets.only(bottom: i == profile.clubs.length - 1 ? 0 : 10),
+                            child: ProfileTile(
+                              icon: Icons.location_searching_rounded,
+                              text: club,
+                              showAlertBadge: false,
+                              onTap: () => _openEdit(OwnerEditFocus.none),
+                            ),
+                          );
+                        }),
+                      const SizedBox(height: 10),
+                      ProfileTile(
+                        icon: Icons.notifications_active_outlined,
+                        text: 'Оповещения',
+                        badgeCount: _notificationsCount,
+                        onTap: () async {
+                          await Navigator.pushNamed(context, Routes.managerNotifications);
+                          if (mounted) {
+                            setState(() {
+                              _notificationsCount = _notificationsController.badgeCount;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     ProfileTile(icon: Icons.exit_to_app_rounded, text: 'Выход', danger: true, onTap: _logout),
                   ],
                 ),

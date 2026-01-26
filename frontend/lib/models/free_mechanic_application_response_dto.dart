@@ -7,6 +7,8 @@ class FreeMechanicApplicationResponseDto {
   final String? status;
   final String? comment;
   final String? accountType;
+  final int? clubId;
+  final String? clubName;
   final bool? isActive;
   final bool? isVerified;
   final bool? isProfileVerified;
@@ -23,6 +25,8 @@ class FreeMechanicApplicationResponseDto {
     this.status,
     this.comment,
     this.accountType,
+    this.clubId,
+    this.clubName,
     this.isActive,
     this.isVerified,
     this.isProfileVerified,
@@ -42,6 +46,8 @@ class FreeMechanicApplicationResponseDto {
       status: json['status']?.toString(),
       comment: json['comment'] as String?,
       accountType: json['accountType']?.toString(),
+      clubId: (json['clubId'] as num?)?.toInt(),
+      clubName: json['clubName'] as String?,
       isActive: json['isActive'] as bool?,
       isVerified: json['isVerified'] as bool?,
       isProfileVerified: json['isProfileVerified'] as bool?,
@@ -60,6 +66,8 @@ class FreeMechanicApplicationResponseDto {
         'status': status,
         'comment': comment,
         'accountType': accountType,
+        'clubId': clubId,
+        'clubName': clubName,
         'isActive': isActive,
         'isVerified': isVerified,
         'isProfileVerified': isProfileVerified,

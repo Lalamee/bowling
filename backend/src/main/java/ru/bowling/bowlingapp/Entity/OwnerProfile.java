@@ -26,6 +26,9 @@ public class OwnerProfile {
     @Column(name = "inn")
     private String inn;
 
+    @Column(name = "address")
+    private String address;
+
     @Column(name = "legal_name")
     private String legalName;
 

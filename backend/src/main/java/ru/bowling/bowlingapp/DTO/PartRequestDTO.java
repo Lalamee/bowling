@@ -16,7 +16,6 @@ import java.util.List;
 @NoArgsConstructor
 public class PartRequestDTO {
 
-    @NotNull(message = "Club ID is required")
     private Long clubId;
 
     private Integer laneNumber;
