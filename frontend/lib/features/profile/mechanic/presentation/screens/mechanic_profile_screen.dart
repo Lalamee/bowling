@@ -21,6 +21,7 @@ import '../../../../../models/mechanic_directory_models.dart';
 import '../../../../../core/models/user_club.dart';
 import '../../../../../core/services/authz/acl.dart';
 import 'edit_mechanic_profile_screen.dart';
+import 'free_mechanic_questionnaire_screen.dart';
 
 enum EditFocus { none, name, phone, address }
 
@@ -628,33 +629,38 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   }
 
   Future<void> _openQuestionnaire() async {
-    final updated = await Navigator.push<MechanicProfile>(
+    final application = await LocalAuthStorage.loadMechanicApplication();
+    final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
-        builder: (_) => EditMechanicProfileScreen(
+        builder: (_) => FreeMechanicQuestionnaireScreen(
           initial: profile,
-          focus: EditFocus.none,
-          showClubFields: false,
+          initialRegion: _region,
+          initialApplication: application,
         ),
       ),
     );
-    if (updated == null) return;
-    final cache = {
-      'fullName': updated.fullName,
-      'phone': updated.phone,
-      'status': updated.status,
-      'clubs': updated.clubs,
-      'clubName': updated.clubName,
-      'address': updated.address,
-      'region': _region,
-      'birthDate': updated.birthDate.toIso8601String(),
-      'workplaceVerified': profile.workplaceVerified,
-    };
-    await LocalAuthStorage.saveMechanicProfile(cache);
+    if (result == null) return;
+    final profileData = Map<String, dynamic>.from(result['profile'] as Map);
+    final applicationData = Map<String, dynamic>.from(result['application'] as Map);
+    await LocalAuthStorage.saveMechanicProfile(profileData);
+    await LocalAuthStorage.saveMechanicApplication(applicationData);
     if (!mounted) return;
     setState(() {
+      final updated = profile.copyWith(
+        fullName: profileData['fullName']?.toString() ?? profile.fullName,
+        phone: profileData['phone']?.toString() ?? profile.phone,
+        clubName: profileData['clubName']?.toString() ?? profile.clubName,
+        address: profileData['address']?.toString() ?? profile.address,
+        status: profileData['status']?.toString() ?? profile.status,
+        birthDate: profileData['birthDate'] != null
+            ? DateTime.tryParse(profileData['birthDate'].toString()) ?? profile.birthDate
+            : profile.birthDate,
+        clubs: (profileData['clubs'] as List?)?.map((e) => e.toString()).toList(),
+      );
       profile = updated;
-      _cachedRawProfile = Map<String, dynamic>.from(cache);
+      _region = profileData['region']?.toString() ?? _region;
+      _cachedRawProfile = Map<String, dynamic>.from(profileData);
       _needsFreeMechanicQuestionnaire = _computeFreeMechanicQuestionnaireNeeded(updated);
     });
   }
@@ -811,6 +817,42 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     );
   }
 
+  Widget _buildQuestionnaireEntry() {
+    if (!_isFreeMechanic || _needsFreeMechanicQuestionnaire) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.lightGray),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Анкета механика',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textDark),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Заполните анкету свободного механика со всеми обязательными полями.',
+            style: TextStyle(fontSize: 13, color: AppColors.darkGray, height: 1.3),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _openQuestionnaire,
+              icon: const Icon(Icons.assignment_outlined),
+              label: const Text('Заполнить анкету'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final visibleClubs = profile.clubs.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
@@ -871,6 +913,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                     _buildApplicationBanner(),
                     _buildPendingApprovalNotice(),
                     _buildQuestionnaireNotice(),
+                    _buildQuestionnaireEntry(),
                     ProfileTile(
                       icon: Icons.person,
                       text: profile.fullName,

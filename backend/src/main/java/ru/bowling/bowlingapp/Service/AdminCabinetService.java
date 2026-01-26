@@ -173,6 +173,9 @@ public class AdminCabinetService {
 
     @Transactional
     public AdminRegistrationApplicationDTO changeMechanicClubLink(Long profileId, MechanicClubLinkRequestDTO request) {
+        if (request == null || request.getClubId() == null) {
+            throw new IllegalArgumentException("Club id is required");
+        }
         MechanicProfile profile = mechanicProfileRepository.findById(profileId)
                 .orElseThrow(() -> new IllegalArgumentException("Mechanic profile not found"));
         User user = profile.getUser();
