@@ -1,5 +1,6 @@
 import 'dart:developer';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -325,6 +326,10 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
 
   Future<void> _attachToClub(_MechanicInfo mechanic) async {
     if (mechanic.profileId == null) return;
+    if (_clubOptions.isEmpty) {
+      _showMissingClubsNotice();
+      return;
+    }
     int? selected = _clubOptions.isNotEmpty ? _clubOptions.first.id : null;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -349,6 +354,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     );
 
     if (confirmed != true) return;
+    if (!_isValidClubSelection(selected)) return;
     try {
       await _cabinetRepository.changeMechanicClubLink(
         mechanic.profileId!,
@@ -359,7 +365,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Механик назначен в клуб')));
     } catch (e) {
       if (!mounted) return;
-      showApiError(context, e);
+      _showClubLinkError(e);
     }
   }
 
@@ -735,6 +741,10 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
 
   Future<void> _attachFreeMechanicToClub(FreeMechanicApplicationResponseDto mechanic) async {
     if (mechanic.mechanicProfileId == null) return;
+    if (_clubOptions.isEmpty) {
+      _showMissingClubsNotice();
+      return;
+    }
     int? selected = _clubOptions.isNotEmpty ? _clubOptions.first.id : null;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -759,6 +769,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
     );
 
     if (confirmed != true) return;
+    if (!_isValidClubSelection(selected)) return;
     try {
       await _cabinetRepository.changeMechanicClubLink(
         mechanic.mechanicProfileId!,
@@ -769,8 +780,35 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Клуб назначен')));
     } catch (e) {
       if (!mounted) return;
-      showApiError(context, e);
+      _showClubLinkError(e);
     }
+  }
+
+  bool _isValidClubSelection(int? selected) {
+    final isValid = selected != null && _clubOptions.any((club) => club.id == selected);
+    if (!isValid) {
+      showSnack(context, 'Выберите клуб из списка');
+    }
+    return isValid;
+  }
+
+  void _showClubLinkError(Object error) {
+    if (error is DioException) {
+      final code = error.response?.statusCode;
+      if (code == 404) {
+        showSnack(context, 'Профиль или клуб не найден. Обновите список и попробуйте снова.');
+        return;
+      }
+      if (code == 400) {
+        showSnack(context, 'Проверьте выбранный клуб и повторите попытку.');
+        return;
+      }
+      if (code == 500) {
+        showSnack(context, 'Сервер не смог обработать запрос. Попробуйте позже.');
+        return;
+      }
+    }
+    showApiError(context, error);
   }
 
   void _showMissingClubsNotice() {

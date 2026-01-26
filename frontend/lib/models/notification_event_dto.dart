@@ -163,16 +163,10 @@ class NotificationEventDto {
   bool get isFreeMechanicEvent => typeKey == NotificationEventType.freeMechanicApproved;
 
   factory NotificationEventDto.fromJson(Map<String, dynamic> json) {
-    String _normalizeBackendDate(String raw) {
-      final trimmed = raw.trim();
-      final hasTimezone = trimmed.endsWith('Z') || RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(trimmed);
-      if (hasTimezone) return trimmed;
-      return '${trimmed}Z';
-    }
-
     DateTime? _parseDate(dynamic value) {
       if (value is! String || value.isEmpty) return null;
-      final normalized = _normalizeBackendDate(value);
+      final trimmed = value.trim();
+      final normalized = trimmed.contains(' ') ? trimmed.replaceFirst(' ', 'T') : trimmed;
       return DateTime.tryParse(normalized);
     }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
@@ -31,6 +32,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
   bool _loadingMore = false;
   bool _hasMore = true;
   List<AdminRegistrationApplicationDto> _applications = [];
+  List<AdminRegistrationApplicationDto> _visibleApplications = [];
   List<ClubSummaryDto> _clubs = [];
   String? _roleFilter;
   String? _accountFilter;
@@ -41,6 +43,8 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
   DateTime? _from;
   DateTime? _to;
   final TextEditingController _searchCtrl = TextEditingController();
+  Timer? _searchDebounce;
+  Timer? _scrollDebounce;
   int _page = 0;
 
   static const int _pageSize = 50;
@@ -135,6 +139,8 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _scrollDebounce?.cancel();
     _scrollController.dispose();
     _searchCtrl.dispose();
     super.dispose();
@@ -148,6 +154,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
       _hasMore = true;
       _page = 0;
       _applications = [];
+      _visibleApplications = [];
     });
     await _loadPage(0, replace: true);
     _loadClubs();
@@ -167,11 +174,9 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
       if (!mounted) return;
       final filtered = apps.where(_shouldDisplay).toList();
       setState(() {
-        if (replace) {
-          _applications = filtered;
-        } else {
-          _applications = [..._applications, ...filtered];
-        }
+        final updated = replace ? filtered : [..._applications, ...filtered];
+        _applications = updated;
+        _visibleApplications = _applyFilters(updated);
         _page = page;
         _hasMore = apps.length == _pageSize;
         _loading = false;
@@ -193,11 +198,15 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
 
   void _handleScroll() {
     if (!_scrollController.hasClients) return;
-    final maxScroll = _scrollController.position.maxScrollExtent;
-    final offset = _scrollController.position.pixels;
-    if (maxScroll - offset <= _loadMoreThreshold) {
-      _loadMore();
-    }
+    if (_scrollDebounce?.isActive ?? false) return;
+    _scrollDebounce = Timer(const Duration(milliseconds: 200), () {
+      if (!_scrollController.hasClients) return;
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      final offset = _scrollController.position.pixels;
+      if (maxScroll - offset <= _loadMoreThreshold) {
+        _loadMore();
+      }
+    });
   }
 
   Future<void> _loadClubs() async {
@@ -212,9 +221,9 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     }
   }
 
-  List<AdminRegistrationApplicationDto> get _filtered {
+  List<AdminRegistrationApplicationDto> _applyFilters(List<AdminRegistrationApplicationDto> source) {
     final query = _searchCtrl.text.trim().toLowerCase();
-    final filtered = _applications.where((app) {
+    final filtered = source.where((app) {
       final matchesRole = _roleFilter == null || app.role?.toLowerCase() == _roleFilter?.toLowerCase();
       final matchesAcc = _accountFilter == null || app.accountType?.toLowerCase() == _accountFilter?.toLowerCase();
       final matchesStatus = _statusFilter == null || app.status?.toLowerCase() == _statusFilter?.toLowerCase();
@@ -304,10 +313,8 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
 
   void _replace(AdminRegistrationApplicationDto updated) {
     setState(() {
-      _applications = _applications
-          .map((e) => e.userId == updated.userId ? updated : e)
-          .where(_shouldDisplay)
-          .toList();
+      _applications = _applications.map((e) => e.userId == updated.userId ? updated : e).where(_shouldDisplay).toList();
+      _visibleApplications = _applyFilters(_applications);
     });
   }
 
@@ -358,6 +365,12 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     );
     if (confirmed != true) return;
 
+    if (attach && selectedClub == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Выберите клуб')));
+      return;
+    }
+
     try {
       final updated = await _repository.changeMechanicClubLink(
         app.profileId!,
@@ -403,7 +416,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
       );
     }
 
-    final items = _filtered;
+    final items = _visibleApplications;
     return Column(
       children: [
         Padding(
@@ -414,7 +427,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
                 child: TextField(
                   controller: _searchCtrl,
                   decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Поиск'),
-                  onChanged: (_) => setState(() {}),
+                  onChanged: _onSearchChanged,
                 ),
               ),
               const SizedBox(width: 8),
@@ -451,6 +464,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
                   onPressed: () => setState(() {
                     _from = null;
                     _to = null;
+                    _visibleApplications = _applyFilters(_applications);
                   }),
                   tooltip: 'Сбросить даты',
                   icon: const Icon(Icons.close, color: AppColors.darkGray),
@@ -637,8 +651,19 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
         } else {
           _to = selected;
         }
+        _visibleApplications = _applyFilters(_applications);
       });
     }
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      setState(() {
+        _visibleApplications = _applyFilters(_applications);
+      });
+    });
   }
 
   Future<AdminMechanicAccountChangeDto?> _askAccountChange(String? currentAccount, {bool allowClub = false, int? initialClubId}) async {
@@ -815,6 +840,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
                             _typeFilter = null;
                             _sortField = _SortField.status;
                             _sortAsc = true;
+                            _visibleApplications = _applyFilters(_applications);
                           });
                           Navigator.of(ctx).pop();
                         },
@@ -832,6 +858,7 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
                             _typeFilter = type;
                             _sortField = sortField;
                             _sortAsc = sortAsc;
+                            _visibleApplications = _applyFilters(_applications);
                           });
                           Navigator.of(ctx).pop();
                         },
