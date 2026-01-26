@@ -332,6 +332,7 @@ class _RegisterMechanicScreenState extends State<RegisterMechanicScreen> {
       'phone': normalizedPhone,
       'clubName': selectedClubName ?? '',
       'address': selectedClub?.address ?? '',
+      'region': _region.text.trim(),
       'status': normalizedStatus,
       'birthDate': birthDate?.toIso8601String(),
       'clubs': profileClubs,

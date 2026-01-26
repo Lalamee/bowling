@@ -45,6 +45,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   String? _applicationStatus;
   String? _applicationComment;
   String? _applicationAccountType;
+  String? _region;
   bool _needsFreeMechanicQuestionnaire = false;
   bool _ownerApprovalRequired = false;
   List<UserClub> _clubAccesses = const [];
@@ -229,6 +230,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     String? status;
     String? clubName;
     String? address;
+    String? region;
 
     if (profileData is Map) {
       final map = Map<String, dynamic>.from(profileData);
@@ -257,6 +259,11 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       final profileAddress = _asString(map['address']);
       if (profileAddress != null) {
         address = profileAddress;
+      }
+
+      final profileRegion = _asString(map['region']);
+      if (profileRegion != null) {
+        region = profileRegion;
       }
 
       final birth = map['birthDate'];
@@ -315,6 +322,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       'clubs': clubs,
       'clubName': clubName ?? (clubs.isNotEmpty ? clubs.first : profile.clubName),
       'address': address ?? (clubs.isNotEmpty ? clubs.first : profile.address),
+      'region': region ?? _asString(me['region']) ?? _asString(me['city']),
       'birthDate': birthDate?.toIso8601String(),
       'workplaceVerified': workplaceVerified ?? profile.workplaceVerified,
       'ownerApprovalRequired': _ownerApprovalRequired,
@@ -354,6 +362,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         workplaceVerified: raw['workplaceVerified'] as bool? ?? profile.workplaceVerified,
         birthDate: birthDate ?? profile.birthDate,
       );
+      _region = _asString(raw['region']) ?? _region;
       _ownerApprovalRequired = rawOwnerApproval is bool ? rawOwnerApproval : _ownerApprovalRequired;
       _isLoading = false;
       _hasError = false;
@@ -365,9 +374,16 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
   bool _computeFreeMechanicQuestionnaireNeeded(MechanicProfile current) {
     if (!_isFreeMechanic || !current.workplaceVerified) return false;
     bool missing(String value) => value.trim().isEmpty || value.trim() == '—';
+    var addressValue = current.address;
+    if (addressValue.trim().isEmpty) {
+      final regionValue = _region?.trim();
+      if (regionValue != null && regionValue.isNotEmpty) {
+        addressValue = regionValue;
+      }
+    }
     return missing(current.fullName) ||
         missing(current.phone) ||
-        missing(current.address) ||
+        missing(addressValue) ||
         missing(current.status);
   }
 
@@ -576,6 +592,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     }
 
     final resolvedAddress = _resolveAddress() ?? '';
+    final resolvedRegion = _asString(raw['region']) ?? _asString(previous?['region']) ?? _region;
 
     final resolvedStatus = _asString(raw['status']) ??
         _asString(previous?['status']) ??
@@ -592,6 +609,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       'clubs': mergedClubs,
       'clubName': resolvedClubName,
       'address': resolvedAddress,
+      'region': resolvedRegion,
       'birthDate': resolvedBirth.toIso8601String(),
       'workplaceVerified': resolvedVerified,
     };
@@ -628,6 +646,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
       'clubs': updated.clubs,
       'clubName': updated.clubName,
       'address': updated.address,
+      'region': _region,
       'birthDate': updated.birthDate.toIso8601String(),
       'workplaceVerified': profile.workplaceVerified,
     };
@@ -800,6 +819,10 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     final clubsToDisplay = canShowClubs
         ? (visibleClubs.isNotEmpty ? visibleClubs : (showClubPlaceholder ? ['Клубы и доступы'] : []))
         : const <String>[];
+    final region = _region?.trim();
+    final resolvedAddress = profile.address.trim().isNotEmpty
+        ? profile.address
+        : (_isFreeMechanic && region != null && region.isNotEmpty ? region : profile.address);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -943,7 +966,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
                     const SizedBox(height: 10),
                     ProfileTile(
                       icon: Icons.location_on_rounded,
-                      text: profile.address,
+                      text: resolvedAddress,
                       onEdit: _canEditProfile ? () => _openEdit(EditFocus.address) : null,
                     ),
                     const SizedBox(height: 10),
