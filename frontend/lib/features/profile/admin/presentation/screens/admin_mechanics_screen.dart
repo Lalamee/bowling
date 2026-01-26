@@ -734,35 +734,57 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
   }
 
   Future<void> _attachFreeMechanicToClub(FreeMechanicApplicationResponseDto mechanic) async {
-    if (mechanic.mechanicProfileId == null) return;
+    if (mechanic.userId == null) return;
     int? selected = _clubOptions.isNotEmpty ? _clubOptions.first.id : null;
+    final formKey = GlobalKey<FormState>();
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Назначить клуб'),
-        content: DropdownButtonFormField<int?>(
-          value: selected,
-          decoration: const InputDecoration(labelText: 'Клуб'),
-          items: _clubOptions
-              .map((c) => DropdownMenuItem<int?>(
-                    value: c.id,
-                    child: Text(c.name ?? 'Клуб ${c.id}'),
-                  ))
-              .toList(),
-          onChanged: (v) => selected = v,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Назначить клуб'),
+          content: Form(
+            key: formKey,
+            child: DropdownButtonFormField<int?>(
+              value: selected,
+              decoration: const InputDecoration(labelText: 'Клуб'),
+              items: _clubOptions
+                  .map((c) => DropdownMenuItem<int?>(
+                        value: c.id,
+                        child: Text(c.name ?? 'Клуб ${c.id}'),
+                      ))
+                  .toList(),
+              onChanged: (v) => setState(() => selected = v),
+              validator: (value) => value == null ? 'Выберите клуб' : null,
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
+            FilledButton(
+              onPressed: () {
+                if (!formKey.currentState!.validate()) return;
+                Navigator.of(ctx).pop(true);
+              },
+              child: const Text('Сохранить'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Сохранить')),
-        ],
       ),
     );
 
     if (confirmed != true) return;
+    if (selected == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Выберите клуб')));
+      return;
+    }
     try {
-      await _cabinetRepository.changeMechanicClubLink(
-        mechanic.mechanicProfileId!,
-        MechanicClubLinkRequestDto(clubId: selected, attach: true),
+      await _cabinetRepository.convertMechanicAccount(
+        mechanic.userId!,
+        AdminMechanicAccountChangeDto(
+          accountTypeName: 'INDIVIDUAL',
+          clubId: selected,
+          attachToClub: true,
+        ),
       );
       await _loadData();
       if (!mounted) return;
