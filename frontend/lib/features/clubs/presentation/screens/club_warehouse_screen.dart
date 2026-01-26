@@ -295,8 +295,16 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
           children: [
             Row(
               children: [
-                Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textDark)),
-                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.maybePop(context),
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textDark),
+                ),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textDark),
+                  ),
+                ),
                 IconButton(onPressed: _loadInventory, icon: const Icon(Icons.sync, color: AppColors.primary)),
               ],
             ),

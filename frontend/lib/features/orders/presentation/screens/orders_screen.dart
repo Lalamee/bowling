@@ -47,8 +47,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Set<int> _favoriteOrderIds = <int>{};
 
   bool get _isMechanic => (_role ?? 'mechanic') == 'mechanic';
-  bool get _isManagerLike =>
-      _role == 'manager' || _role == 'owner' || _role == 'admin';
+  bool get _isManagerLike => _role == 'manager' || _role == 'owner';
 
   @override
   Widget build(BuildContext context) {
@@ -247,6 +246,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         clubs,
         mechanicProfileId,
         includeMechanicRequests: isFreeMechanic,
+        loadAllRequests: resolvedRole == 'admin',
       );
       if (!mounted) return;
       setState(() {
@@ -412,11 +412,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
     if (mapOrderStatus(request.status) != OrderStatusCategory.pending) {
       return false;
     }
-    if (_isManagerLike) return true;
-    if (!_isFreeMechanic) return false;
-    if (request.clubId != null) return false;
-    if (_mechanicProfileId == null) return false;
-    return request.mechanicId == _mechanicProfileId;
+    if (_role == 'admin') return true;
+    if (_isManagerLike) return request.clubId != null;
+    return false;
   }
 
   int? _extractMechanicProfileId(Map<String, dynamic>? me) {
@@ -626,7 +624,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
     List<UserClub> clubs,
     int? mechanicProfileId, {
     bool includeMechanicRequests = false,
+    bool loadAllRequests = false,
   }) async {
+    if (loadAllRequests) {
+      final response = await _maintenanceRepository.getAllRequests();
+      _sortRequests(response);
+      return response;
+    }
     final includeMechanic = includeMechanicRequests && mechanicProfileId != null;
     if (clubs.isEmpty) {
       if (!includeMechanic) {
