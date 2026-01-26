@@ -243,7 +243,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ? await _clubsRepository.getClubs()
           : const <ClubSummaryDto>[];
       final selectedClubId = _resolveSelectedClubId(clubs, _selectedClubId);
-      final requests = await _fetchRequestsForClubs(clubs);
+      final requests = await _fetchRequestsForClubs(clubs, mechanicProfileId);
       if (!mounted) return;
       setState(() {
         _role = resolvedRole;
@@ -618,9 +618,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
     });
   }
 
-  Future<List<MaintenanceRequestResponseDto>> _fetchRequestsForClubs(List<UserClub> clubs) async {
+  Future<List<MaintenanceRequestResponseDto>> _fetchRequestsForClubs(
+    List<UserClub> clubs,
+    int? mechanicProfileId,
+  ) async {
     if (clubs.isEmpty) {
-      return const [];
+      if (mechanicProfileId == null) {
+        return const [];
+      }
+      final response = await _maintenanceRepository.requestsForMechanic(mechanicProfileId);
+      _sortRequests(response);
+      return response;
     }
 
     final responses = await Future.wait(

@@ -106,10 +106,12 @@ class _RegisterOwnerScreenState extends State<RegisterOwnerScreen> {
     if (result == true && mounted) {
       await LocalAuthStorage.clearMechanicState();
       await LocalAuthStorage.saveOwnerProfile(profileSnapshot);
+      await AuthService.login(phone: normalizedPhone, password: password);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Заявка отправлена. Дождитесь подтверждения администрацией сервиса.')),
       );
-      Navigator.of(context).pushNamedAndRemoveUntil(Routes.welcome, (route) => false);
+      Navigator.of(context).pushNamedAndRemoveUntil(Routes.profileOwner, (route) => false);
     }
   }
 

@@ -74,10 +74,6 @@ public class MaintenanceRequestService {
                         throw new IllegalArgumentException("Free mechanic has no granted access to the specified club");
                 }
 
-                if (accountTypeName == AccountTypeName.FREE_MECHANIC_BASIC) {
-                        throw new IllegalStateException("Basic free mechanics cannot create maintenance requests without upgrade");
-                }
-
                 if (accountTypeName == AccountTypeName.INDIVIDUAL) {
                         if (club == null) {
                                 throw new IllegalArgumentException("Club is required for club mechanics");

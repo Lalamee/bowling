@@ -805,9 +805,11 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Сохраните черновик, чтобы дополнить позже, или сразу отправьте менеджеру для согласования и выдачи.',
-            style: TextStyle(color: AppColors.darkGray),
+          Text(
+            _isFreeMechanic
+                ? 'Сохраните черновик, чтобы дополнить позже, или сразу оформить заявку.'
+                : 'Сохраните черновик, чтобы дополнить позже, или сразу отправьте менеджеру для согласования и выдачи.',
+            style: const TextStyle(color: AppColors.darkGray),
           ),
           const SizedBox(height: 12),
           Row(
@@ -827,7 +829,9 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
               const SizedBox(width: 12),
               Expanded(
                 child: CustomButton(
-                  text: _submitting ? 'Отправка...' : 'Отправить менеджеру',
+                  text: _submitting
+                      ? 'Отправка...'
+                      : (_isFreeMechanic ? 'Оформить' : 'Отправить менеджеру'),
                   onPressed: _submitting ? null : () => _submit(publish: true),
                 ),
               ),
