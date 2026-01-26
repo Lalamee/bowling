@@ -166,7 +166,8 @@ class NotificationEventDto {
     DateTime? _parseDate(dynamic value) {
       if (value is! String || value.isEmpty) return null;
       final trimmed = value.trim();
-      return DateTime.tryParse(trimmed);
+      final normalized = trimmed.contains(' ') ? trimmed.replaceFirst(' ', 'T') : trimmed;
+      return DateTime.tryParse(normalized);
     }
 
     final rawType = json['type']?.toString();
