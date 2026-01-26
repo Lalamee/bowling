@@ -198,7 +198,9 @@ public class AdminCabinetService {
             throw new IllegalStateException("Free mechanics cannot be detached from clubs through staff links");
         }
 
-        List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs()).orElseGet(ArrayList::new);
+        List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs())
+                .map(ArrayList::new)
+                .orElseGet(ArrayList::new);
         if (request.isAttach()) {
             if (clubs.stream().noneMatch(c -> Objects.equals(c.getClubId(), clubId))) {
                 clubs.add(club);
@@ -213,9 +215,10 @@ public class AdminCabinetService {
                 });
             }
         } else {
-            profile.setClubs(clubs.stream()
+            List<BowlingClub> updatedClubs = clubs.stream()
                     .filter(c -> !Objects.equals(c.getClubId(), clubId))
-                    .toList());
+                    .collect(Collectors.toCollection(ArrayList::new));
+            profile.setClubs(updatedClubs);
             clubStaffRepository.findByClubAndUser(club, user).ifPresent(staff -> {
                 staff.setIsActive(false);
                 clubStaffRepository.save(staff);
@@ -333,6 +336,7 @@ public class AdminCabinetService {
                         .orElseThrow(() -> new IllegalArgumentException("Club not found"));
                 if (user.getMechanicProfile() != null) {
                     List<BowlingClub> clubs = Optional.ofNullable(user.getMechanicProfile().getClubs())
+                            .map(ArrayList::new)
                             .orElseGet(ArrayList::new);
                     if (clubs.stream().noneMatch(c -> Objects.equals(c.getClubId(), club.getClubId()))) {
                         clubs.add(club);
