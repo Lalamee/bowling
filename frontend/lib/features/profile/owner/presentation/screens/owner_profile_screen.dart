@@ -9,6 +9,7 @@ import '../../../../../core/services/authz/acl.dart';
 import '../../../../../core/services/local_auth_storage.dart';
 import '../../../../../api/api_core.dart';
 import '../../../../../core/theme/colors.dart';
+import '../../../../../core/utils/net_ui.dart';
 import '../../../../../shared/widgets/nav/app_bottom_nav.dart';
 import '../../../../../shared/widgets/tiles/profile_tile.dart';
 import '../../../../knowledge_base/presentation/screens/knowledge_base_screen.dart';
@@ -441,7 +442,16 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                 ),
       bottomNavigationBar: AppBottomNav(
         currentIndex: 3,
-        onTap: (i) => BottomNavDirect.go(context, 3, i),
+        onTap: (i) {
+          if (!_isVerified && i != 3) {
+            showSnack(
+              context,
+              'Функционал откроется после подтверждения регистрации администрацией.',
+            );
+            return;
+          }
+          BottomNavDirect.go(context, 3, i);
+        },
       ),
     );
   }

@@ -243,7 +243,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ? await _clubsRepository.getClubs()
           : const <ClubSummaryDto>[];
       final selectedClubId = _resolveSelectedClubId(clubs, _selectedClubId);
-      final requests = await _fetchRequestsForClubs(clubs, mechanicProfileId);
+      final requests = await _fetchRequestsForClubs(
+        clubs,
+        mechanicProfileId,
+        includeMechanicRequests: isFreeMechanic,
+      );
       if (!mounted) return;
       setState(() {
         _role = resolvedRole;
@@ -620,20 +624,25 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Future<List<MaintenanceRequestResponseDto>> _fetchRequestsForClubs(
     List<UserClub> clubs,
-    int? mechanicProfileId,
-  ) async {
+    int? mechanicProfileId, {
+    bool includeMechanicRequests = false,
+  }) async {
+    final includeMechanic = includeMechanicRequests && mechanicProfileId != null;
     if (clubs.isEmpty) {
-      if (mechanicProfileId == null) {
+      if (!includeMechanic) {
         return const [];
       }
-      final response = await _maintenanceRepository.requestsForMechanic(mechanicProfileId);
+      final response = await _maintenanceRepository.requestsForMechanic(mechanicProfileId!);
       _sortRequests(response);
       return response;
     }
 
-    final responses = await Future.wait(
-      clubs.map((club) => _maintenanceRepository.getRequestsByClub(club.id)),
-    );
+    final futures = <Future<List<MaintenanceRequestResponseDto>>>[
+      ...clubs.map((club) => _maintenanceRepository.getRequestsByClub(club.id)),
+      if (includeMechanic) _maintenanceRepository.requestsForMechanic(mechanicProfileId!),
+    ];
+
+    final responses = await Future.wait(futures);
 
     final combined = <MaintenanceRequestResponseDto>[];
     final seen = <int>{};
