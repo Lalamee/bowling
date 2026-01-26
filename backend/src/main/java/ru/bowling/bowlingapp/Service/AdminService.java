@@ -15,6 +15,7 @@ import ru.bowling.bowlingapp.Repository.UserRepository;
 import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -203,7 +204,11 @@ public class AdminService {
         if (date == null || date.isEmpty()) {
             return null;
         }
-        return LocalDate.parse(date);
+        try {
+            return LocalDate.parse(date);
+        } catch (DateTimeParseException ex) {
+            return null;
+        }
     }
 
     private static class ClubMechanicsAggregate {

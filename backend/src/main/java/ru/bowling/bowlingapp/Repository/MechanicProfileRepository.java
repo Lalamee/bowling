@@ -17,8 +17,6 @@ public interface MechanicProfileRepository extends JpaRepository<MechanicProfile
             FROM MechanicProfile mp
             LEFT JOIN FETCH mp.user u
             LEFT JOIN FETCH mp.clubs c
-            LEFT JOIN FETCH mp.certifications cert
-            LEFT JOIN FETCH mp.workHistoryEntries history
             """)
     List<MechanicProfile> findAllWithUserAndClubs();
 
@@ -33,4 +31,3 @@ public interface MechanicProfileRepository extends JpaRepository<MechanicProfile
             """)
     Optional<MechanicProfile> findDetailedById(@Param("profileId") Long profileId);
 }
-
