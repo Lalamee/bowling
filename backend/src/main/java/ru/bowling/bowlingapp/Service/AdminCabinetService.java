@@ -1,6 +1,8 @@
 package ru.bowling.bowlingapp.Service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.DTO.*;
@@ -14,7 +16,6 @@ import ru.bowling.bowlingapp.Repository.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -43,9 +44,15 @@ public class AdminCabinetService {
 
     @Transactional(readOnly = true)
     public List<AdminRegistrationApplicationDTO> listRegistrationApplications() {
-        return userRepository.findAll().stream()
+        return listRegistrationApplications(0, 50);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminRegistrationApplicationDTO> listRegistrationApplications(int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = clampSize(size);
+        return userRepository.findAll(PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "registrationDate"))).stream()
                 .map(this::mapUserToRegistration)
-                .sorted(Comparator.comparing(AdminRegistrationApplicationDTO::getSubmittedAt, Comparator.nullsLast(String::compareTo)))
                 .collect(Collectors.toList());
     }
 
@@ -516,6 +523,13 @@ public class AdminCabinetService {
             return Boolean.TRUE.equals(user.getAdministratorProfile().getIsDataVerified());
         }
         return false;
+    }
+
+    private int clampSize(int size) {
+        if (size <= 0) {
+            return 50;
+        }
+        return Math.min(size, 200);
     }
 
     private BowlingClub resolvePrimaryClub(User user) {

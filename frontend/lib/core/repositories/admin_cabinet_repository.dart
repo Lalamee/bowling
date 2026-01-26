@@ -13,8 +13,8 @@ import '../../models/free_mechanic_application_response_dto.dart';
 class AdminCabinetRepository {
   final ApiService _api = ApiService();
 
-  Future<List<AdminRegistrationApplicationDto>> getRegistrations() {
-    return _api.getAdminRegistrations();
+  Future<List<AdminRegistrationApplicationDto>> getRegistrations({int page = 0, int size = 50}) {
+    return _api.getAdminRegistrations(page: page, size: size);
   }
 
   Future<List<AdminAppealDto>> listAppeals() {

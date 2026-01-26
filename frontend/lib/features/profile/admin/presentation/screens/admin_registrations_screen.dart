@@ -24,9 +24,12 @@ class AdminRegistrationsScreen extends StatefulWidget {
 class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
   final AdminCabinetRepository _repository = AdminCabinetRepository();
   final ClubsRepository _clubsRepository = ClubsRepository();
+  final ScrollController _scrollController = ScrollController();
 
   bool _loading = true;
   bool _error = false;
+  bool _loadingMore = false;
+  bool _hasMore = true;
   List<AdminRegistrationApplicationDto> _applications = [];
   List<ClubSummaryDto> _clubs = [];
   String? _roleFilter;
@@ -38,6 +41,10 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
   DateTime? _from;
   DateTime? _to;
   final TextEditingController _searchCtrl = TextEditingController();
+  int _page = 0;
+
+  static const int _pageSize = 50;
+  static const double _loadMoreThreshold = 200;
 
   static const Map<String, String> _roleLabels = {
     'ADMIN': 'Администрация',
@@ -122,11 +129,13 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_handleScroll);
     _load();
   }
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -135,23 +144,59 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
     setState(() {
       _loading = true;
       _error = false;
+      _loadingMore = false;
+      _hasMore = true;
+      _page = 0;
+      _applications = [];
     });
+    await _loadPage(0, replace: true);
+    _loadClubs();
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore || _loading) return;
+    setState(() {
+      _loadingMore = true;
+    });
+    await _loadPage(_page + 1, replace: false);
+  }
+
+  Future<void> _loadPage(int page, {required bool replace}) async {
     try {
-      final apps = await _repository.getRegistrations();
+      final apps = await _repository.getRegistrations(page: page, size: _pageSize);
       if (!mounted) return;
+      final filtered = apps.where(_shouldDisplay).toList();
       setState(() {
-        _applications = apps.where(_shouldDisplay).toList();
+        if (replace) {
+          _applications = filtered;
+        } else {
+          _applications = [..._applications, ...filtered];
+        }
+        _page = page;
+        _hasMore = apps.length == _pageSize;
         _loading = false;
+        _loadingMore = false;
       });
-      _loadClubs();
     } catch (e, s) {
       log('Failed to load registrations: $e', stackTrace: s);
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = true;
+        _loadingMore = false;
+        if (replace) {
+          _error = true;
+        }
       });
       showApiError(context, e);
+    }
+  }
+
+  void _handleScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final offset = _scrollController.position.pixels;
+    if (maxScroll - offset <= _loadMoreThreshold) {
+      _loadMore();
     }
   }
 
@@ -418,15 +463,37 @@ class _AdminRegistrationsScreenState extends State<AdminRegistrationsScreen> {
           child: RefreshIndicator(
             onRefresh: _load,
             child: ListView.separated(
+              controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              itemBuilder: (_, i) => _buildCard(items[i]),
+              itemBuilder: (_, i) {
+                if (i >= items.length) {
+                  return _buildLoadMoreFooter();
+                }
+                return _buildCard(items[i]);
+              },
               separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemCount: items.length,
+              itemCount: items.length + (_hasMore || _loadingMore ? 1 : 0),
             ),
           ),
         ),
       ],
     );
+  }
+
+  Widget _buildLoadMoreFooter() {
+    if (_loadingMore) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_hasMore) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: Text('Загружаем ещё заявки...')),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   Widget _buildCard(AdminRegistrationApplicationDto app) {

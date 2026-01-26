@@ -43,8 +43,11 @@ public class AdminController {
     }
 
     @GetMapping("/registrations")
-    public ResponseEntity<List<AdminRegistrationApplicationDTO>> listRegistrations() {
-        return ResponseEntity.ok(adminCabinetService.listRegistrationApplications());
+    public ResponseEntity<List<AdminRegistrationApplicationDTO>> listRegistrations(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size
+    ) {
+        return ResponseEntity.ok(adminCabinetService.listRegistrationApplications(page, size));
     }
 
     @PostMapping("/registrations/{userId}/approve")
