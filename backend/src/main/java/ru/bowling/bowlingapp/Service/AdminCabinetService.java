@@ -187,8 +187,15 @@ public class AdminCabinetService {
         AccountTypeName accountType = user.getAccountType() != null
                 ? AccountTypeName.from(user.getAccountType().getName())
                 : AccountTypeName.INDIVIDUAL;
-        if (accountType == AccountTypeName.FREE_MECHANIC_BASIC || accountType == AccountTypeName.FREE_MECHANIC_PREMIUM) {
-            throw new IllegalStateException("Free mechanics cannot be attached to clubs through staff links");
+        boolean isFreeMechanic = accountType == AccountTypeName.FREE_MECHANIC_BASIC
+                || accountType == AccountTypeName.FREE_MECHANIC_PREMIUM;
+        if (isFreeMechanic && request.isAttach()) {
+            AccountType targetAccountType = accountTypeRepository.findByNameIgnoreCase(AccountTypeName.INDIVIDUAL.name())
+                    .orElseThrow(() -> new IllegalStateException("Account type not configured: " + AccountTypeName.INDIVIDUAL));
+            user.setAccountType(targetAccountType);
+            user.setLastModified(LocalDateTime.now());
+        } else if (isFreeMechanic) {
+            throw new IllegalStateException("Free mechanics cannot be detached from clubs through staff links");
         }
 
         List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs()).orElseGet(ArrayList::new);
@@ -198,6 +205,13 @@ public class AdminCabinetService {
                 profile.setClubs(clubs);
             }
             upsertStaff(user, club);
+            if (isFreeMechanic) {
+                clubStaffRepository.findByClubAndUser(club, user).ifPresent(staff -> {
+                    staff.setInfoAccessRestricted(false);
+                    staff.setIsActive(true);
+                    clubStaffRepository.save(staff);
+                });
+            }
         } else {
             profile.setClubs(clubs.stream()
                     .filter(c -> !Objects.equals(c.getClubId(), clubId))
