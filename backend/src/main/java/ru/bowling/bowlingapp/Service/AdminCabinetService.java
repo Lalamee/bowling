@@ -148,7 +148,7 @@ public class AdminCabinetService {
             throw new IllegalArgumentException("User is not a mechanic");
         }
 
-        AccountType accountType = accountTypeRepository.findByNameIgnoreCase(target.name())
+        AccountType accountType = accountTypeRepository.findFirstByNameIgnoreCaseOrderByAccountTypeIdAsc(target.name())
                 .orElseThrow(() -> new IllegalStateException("Account type not configured: " + target.name()));
 
         user.setAccountType(accountType);
@@ -195,7 +195,8 @@ public class AdminCabinetService {
         boolean isFreeMechanic = accountType == AccountTypeName.FREE_MECHANIC_BASIC
                 || accountType == AccountTypeName.FREE_MECHANIC_PREMIUM;
         if (isFreeMechanic && request.isAttach()) {
-            AccountType targetAccountType = accountTypeRepository.findByNameIgnoreCase(AccountTypeName.INDIVIDUAL.name())
+            AccountType targetAccountType = accountTypeRepository
+                    .findFirstByNameIgnoreCaseOrderByAccountTypeIdAsc(AccountTypeName.INDIVIDUAL.name())
                     .orElseThrow(() -> new IllegalStateException("Account type not configured: " + AccountTypeName.INDIVIDUAL));
             user.setAccountType(targetAccountType);
             user.setLastModified(LocalDateTime.now());
@@ -268,7 +269,8 @@ public class AdminCabinetService {
         String rawAccountType = currentAccountType != null ? currentAccountType.getName() : null;
         boolean isFreeMechanic = rawAccountType != null && rawAccountType.toUpperCase().contains("FREE_MECHANIC");
         if (currentAccountType == null || isFreeMechanic) {
-            AccountType targetAccountType = accountTypeRepository.findByNameIgnoreCase(AccountTypeName.INDIVIDUAL.name())
+            AccountType targetAccountType = accountTypeRepository
+                    .findFirstByNameIgnoreCaseOrderByAccountTypeIdAsc(AccountTypeName.INDIVIDUAL.name())
                     .orElseThrow(() -> new IllegalStateException("Account type not configured: " + AccountTypeName.INDIVIDUAL));
             user.setAccountType(targetAccountType);
             user.setLastModified(LocalDateTime.now());
@@ -379,7 +381,7 @@ public class AdminCabinetService {
         }
 
         AccountTypeName target = AccountTypeName.from(change.getAccountTypeName());
-        AccountType accountType = accountTypeRepository.findByNameIgnoreCase(target.name())
+        AccountType accountType = accountTypeRepository.findFirstByNameIgnoreCaseOrderByAccountTypeIdAsc(target.name())
                 .orElseThrow(() -> new IllegalStateException("Account type not configured: " + target.name()));
 
         user.setAccountType(accountType);
