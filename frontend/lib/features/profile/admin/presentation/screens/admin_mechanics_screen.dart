@@ -734,7 +734,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
   }
 
   Future<void> _attachFreeMechanicToClub(FreeMechanicApplicationResponseDto mechanic) async {
-    if (mechanic.mechanicProfileId == null) return;
+    if (mechanic.userId == null) return;
     int? selected = _clubOptions.isNotEmpty ? _clubOptions.first.id : null;
     final formKey = GlobalKey<FormState>();
     final confirmed = await showDialog<bool>(
@@ -778,9 +778,13 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       return;
     }
     try {
-      await _cabinetRepository.changeMechanicClubLink(
-        mechanic.mechanicProfileId!,
-        MechanicClubLinkRequestDto(clubId: selected, attach: true),
+      await _cabinetRepository.convertMechanicAccount(
+        mechanic.userId!,
+        AdminMechanicAccountChangeDto(
+          accountTypeName: 'INDIVIDUAL',
+          clubId: selected,
+          attachToClub: true,
+        ),
       );
     } catch (e, s) {
       if (mechanic.userId == null) {
