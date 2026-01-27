@@ -51,7 +51,7 @@ public class AdminCabinetService {
     public List<AdminRegistrationApplicationDTO> listRegistrationApplications(int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = clampSize(size);
-        return userRepository.findAll(PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "registrationDate"))).stream()
+        return userRepository.findAllWithProfiles(PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "registrationDate"))).stream()
                 .map(this::mapUserToRegistration)
                 .collect(Collectors.toList());
     }

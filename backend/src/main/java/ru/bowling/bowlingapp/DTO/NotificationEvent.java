@@ -4,7 +4,7 @@ import lombok.Builder;
 import lombok.Value;
 import ru.bowling.bowlingapp.Enum.RoleName;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -21,6 +21,6 @@ public class NotificationEvent {
     Long clubId;
     List<Long> partIds;
     String payload;
-    LocalDateTime createdAt;
+    OffsetDateTime createdAt;
     Set<RoleName> audiences;
 }
