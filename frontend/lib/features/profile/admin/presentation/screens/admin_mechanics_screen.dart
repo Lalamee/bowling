@@ -16,6 +16,7 @@ import '../../../../../models/admin_mechanic_status_change_dto.dart';
 import '../../../../../models/admin_staff_status_update_dto.dart';
 import '../../../../../models/admin_mechanic_account_change_dto.dart';
 import '../../../../../models/free_mechanic_application_response_dto.dart';
+import '../../../../../models/free_mechanic_club_assign_request_dto.dart';
 import '../../../../../models/club_summary_dto.dart';
 import '../../../../../models/mechanic_directory_models.dart';
 
@@ -735,6 +736,10 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
 
   Future<void> _attachFreeMechanicToClub(FreeMechanicApplicationResponseDto mechanic) async {
     if (mechanic.userId == null) return;
+    if (_clubOptions.isEmpty) {
+      _showMissingClubsNotice();
+      return;
+    }
     int? selected = _clubOptions.isNotEmpty ? _clubOptions.first.id : null;
     final formKey = GlobalKey<FormState>();
     final confirmed = await showDialog<bool>(
@@ -778,42 +783,14 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       return;
     }
     try {
-      if (mechanic.mechanicProfileId != null) {
-        await _cabinetRepository.changeMechanicClubLink(
-          mechanic.mechanicProfileId!,
-          MechanicClubLinkRequestDto(clubId: selected, attach: true),
-        );
-      } else {
-        await _cabinetRepository.convertMechanicAccount(
-          mechanic.userId!,
-          AdminMechanicAccountChangeDto(
-            accountTypeName: 'INDIVIDUAL',
-            clubId: selected,
-            attachToClub: true,
-          ),
-        );
-      }
-    } catch (e, s) {
-      if (mechanic.userId == null || mechanic.mechanicProfileId == null) {
-        if (!mounted) return;
-        showApiError(context, e);
-        return;
-      }
-      log('Failed to attach free mechanic via profile link, retrying via account change: $e', stackTrace: s);
-      try {
-        await _cabinetRepository.convertMechanicAccount(
-          mechanic.userId!,
-          AdminMechanicAccountChangeDto(
-            accountTypeName: 'INDIVIDUAL',
-            clubId: selected,
-            attachToClub: true,
-          ),
-        );
-      } catch (fallbackError) {
-        if (!mounted) return;
-        showApiError(context, fallbackError);
-        return;
-      }
+      await _cabinetRepository.assignFreeMechanicToClub(
+        mechanic.userId!,
+        FreeMechanicClubAssignRequestDto(clubId: selected),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showApiError(context, e);
+      return;
     }
     try {
       await _loadData();

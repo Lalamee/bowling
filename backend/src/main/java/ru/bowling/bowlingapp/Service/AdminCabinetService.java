@@ -1,6 +1,7 @@
 package ru.bowling.bowlingapp.Service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AdminCabinetService {
 
     private final UserRepository userRepository;
@@ -230,6 +232,65 @@ public class AdminCabinetService {
 
         mechanicProfileRepository.save(profile);
         return mapUserToRegistration(userRepository.save(user));
+    }
+
+    @Transactional
+    public AdminRegistrationApplicationDTO assignFreeMechanicToClub(Long userId, FreeMechanicClubAssignRequestDTO request) {
+        if (request == null || request.getClubId() == null) {
+            throw new IllegalArgumentException("Club id is required");
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        Role userRole = user.getRole();
+        if (userRole == null) {
+            Role mechanicRole = roleRepository.findByNameIgnoreCase(RoleName.MECHANIC.name())
+                    .orElseThrow(() -> new IllegalStateException("Mechanic role not configured"));
+            user.setRole(mechanicRole);
+            userRole = mechanicRole;
+        }
+        if (RoleName.from(userRole.getName()) != RoleName.MECHANIC) {
+            throw new IllegalArgumentException("User is not a mechanic");
+        }
+
+        MechanicProfile profile = user.getMechanicProfile();
+        if (profile == null) {
+            profile = mechanicProfileRepository.findByUser_UserId(userId)
+                    .orElseThrow(() -> new IllegalStateException("Mechanic profile not found"));
+        }
+
+        BowlingClub club = bowlingClubRepository.findById(request.getClubId())
+                .orElseThrow(() -> new IllegalArgumentException("Club not found"));
+
+        AccountType currentAccountType = user.getAccountType();
+        String rawAccountType = currentAccountType != null ? currentAccountType.getName() : null;
+        boolean isFreeMechanic = rawAccountType != null && rawAccountType.toUpperCase().contains("FREE_MECHANIC");
+        if (currentAccountType == null || isFreeMechanic) {
+            AccountType targetAccountType = accountTypeRepository.findByNameIgnoreCase(AccountTypeName.INDIVIDUAL.name())
+                    .orElseThrow(() -> new IllegalStateException("Account type not configured: " + AccountTypeName.INDIVIDUAL));
+            user.setAccountType(targetAccountType);
+            user.setLastModified(LocalDateTime.now());
+        }
+
+        List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs())
+                .map(ArrayList::new)
+                .orElseGet(ArrayList::new);
+        if (clubs.stream().noneMatch(c -> Objects.equals(c.getClubId(), club.getClubId()))) {
+            clubs.add(club);
+        }
+        profile.setClubs(clubs);
+        upsertStaff(user, club);
+        clubStaffRepository.findByClubAndUser(club, user).ifPresent(staff -> {
+            staff.setInfoAccessRestricted(false);
+            staff.setIsActive(true);
+            clubStaffRepository.save(staff);
+        });
+        ensurePersonalWarehouse(profile);
+        profile.setUpdatedAt(LocalDate.now());
+
+        mechanicProfileRepository.save(profile);
+        userRepository.save(user);
+        log.info("Assigned free mechanic user {} to club {}", userId, club.getClubId());
+        return mapUserToRegistration(user);
     }
 
     @Transactional(readOnly = true)
