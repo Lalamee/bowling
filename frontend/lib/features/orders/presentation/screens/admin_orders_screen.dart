@@ -7,6 +7,7 @@ import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../models/club_summary_dto.dart';
 import '../../../../models/maintenance_request_response_dto.dart';
+import '../../domain/order_status.dart';
 import '../widgets/order_status_badge.dart';
 import 'order_summary_screen.dart';
 
@@ -280,12 +281,19 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ListTile(
         onTap: () {
+          final canConfirm = mapOrderStatus(request.status) == OrderStatusCategory.pending;
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => OrderSummaryScreen(
                 order: request,
                 orderNumber: 'Заявка №${request.requestId}',
+                canConfirm: canConfirm,
+                onConfirm: canConfirm
+                    ? ({required Map<int, bool> availability, String? comment}) =>
+                        _confirmRequest(request, availability: availability, comment: comment)
+                    : null,
+                onOrderUpdated: _replaceOrder,
               ),
             ),
           );
@@ -321,6 +329,100 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       if (aDate == null) return 1;
       if (bDate == null) return -1;
       return bDate.compareTo(aDate);
+    });
+  }
+
+  Future<bool> _confirmRequest(
+    MaintenanceRequestResponseDto request, {
+    required Map<int, bool> availability,
+    String? comment,
+  }) async {
+    final noteParts = <String>[];
+    if (availability.isNotEmpty) {
+      final partsById = {for (final part in request.requestedParts) part.partId: part};
+      final available = <String>[];
+      final unavailable = <String>[];
+      availability.forEach((partId, isAvailable) {
+        final part = partsById[partId];
+        final name = part?.partName ?? part?.catalogNumber ?? 'Деталь $partId';
+        if (isAvailable) {
+          available.add(name);
+        } else {
+          unavailable.add(name);
+        }
+      });
+      if (available.isNotEmpty && unavailable.isEmpty) {
+        noteParts.add('Все детали в наличии');
+      } else if (unavailable.isNotEmpty && available.isEmpty) {
+        noteParts.add('Деталей нет в наличии');
+      } else {
+        if (available.isNotEmpty) {
+          noteParts.add('В наличии: ${available.join(', ')}');
+        }
+        if (unavailable.isNotEmpty) {
+          noteParts.add('Нет: ${unavailable.join(', ')}');
+        }
+      }
+    }
+    if (comment != null && comment.trim().isNotEmpty) {
+      noteParts.add(comment.trim());
+    }
+    final payload = noteParts.isEmpty ? null : noteParts.join('. ');
+
+    try {
+      final updated = await _maintenanceRepository.approve(request.requestId, availability, payload);
+      if (!mounted) return true;
+      if (updated != null) {
+        _replaceOrder(updated);
+      }
+      if (mounted) {
+        showSnack(context, 'Заказ подтверждён');
+      }
+      return true;
+    } catch (e) {
+      if (mounted) {
+        showApiError(context, e);
+      }
+      return false;
+    }
+  }
+
+  void _replaceOrder(MaintenanceRequestResponseDto updated) {
+    final updatedId = updated.requestId;
+    final updatedClubId = updated.clubId;
+    final updatedClubName = _resolveClubName(updatedClubId, updated.clubName);
+    setState(() {
+      _ClubOrdersSection? sourceSection;
+      for (final section in _sections) {
+        final index = section.orders.indexWhere((order) => order.requestId == updatedId);
+        if (index != -1) {
+          section.orders.removeAt(index);
+          sourceSection = section;
+          break;
+        }
+      }
+      if (sourceSection != null && sourceSection.orders.isEmpty) {
+        sourceSection.isOpen = false;
+      }
+      final target = _sections.firstWhere(
+        (section) => section.clubId == updatedClubId,
+        orElse: () {
+          final created = _ClubOrdersSection(
+            clubId: updatedClubId,
+            clubName: updatedClubName,
+            orders: [],
+            isOpen: true,
+          );
+          _sections.add(created);
+          return created;
+        },
+      );
+      if (target.clubName.trim().isEmpty || target.clubName.startsWith('Клуб #')) {
+        target.clubName = updatedClubName;
+      }
+      target.orders.add(updated);
+      _sortRequests(target.orders);
+      _sections.sort((a, b) => a.clubName.toLowerCase().compareTo(b.clubName.toLowerCase()));
     });
   }
 
