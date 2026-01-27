@@ -788,17 +788,25 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       );
     } catch (e, s) {
       if (mechanic.userId == null) {
-        rethrow;
+        if (!mounted) return;
+        showApiError(context, e);
+        return;
       }
       log('Failed to attach free mechanic by profile link, retrying via account change: $e', stackTrace: s);
-      await _cabinetRepository.convertMechanicAccount(
-        mechanic.userId!,
-        AdminMechanicAccountChangeDto(
-          accountTypeName: 'INDIVIDUAL',
-          clubId: selected,
-          attachToClub: true,
-        ),
-      );
+      try {
+        await _cabinetRepository.convertMechanicAccount(
+          mechanic.userId!,
+          AdminMechanicAccountChangeDto(
+            accountTypeName: 'INDIVIDUAL',
+            clubId: selected,
+            attachToClub: true,
+          ),
+        );
+      } catch (fallbackError) {
+        if (!mounted) return;
+        showApiError(context, fallbackError);
+        return;
+      }
     }
     try {
       await _loadData();
