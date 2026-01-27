@@ -18,6 +18,8 @@ import ru.bowling.bowlingapp.Repository.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -280,7 +282,7 @@ public class OwnerDashboardService {
                     .type(NotificationEventType.MAINTENANCE_WARNING)
                     .message(warning.getMessage())
                     .clubId(resolvedClubId)
-                    .createdAt(LocalDateTime.now())
+                    .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
                     .payload(warning.getType())
                     .audiences(Set.of(RoleName.ADMIN, RoleName.CLUB_OWNER, RoleName.HEAD_MECHANIC))
                     .build()));
