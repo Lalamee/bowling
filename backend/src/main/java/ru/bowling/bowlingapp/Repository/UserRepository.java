@@ -14,9 +14,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "role",
             "accountType",
             "mechanicProfile",
-            "mechanicProfile.clubs",
             "ownerProfile",
-            "ownerProfile.clubs",
             "managerProfile",
             "managerProfile.club",
             "administratorProfile"
