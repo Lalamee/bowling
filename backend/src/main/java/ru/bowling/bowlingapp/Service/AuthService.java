@@ -260,7 +260,7 @@ public class AuthService implements UserDetailsService {
 
         if (mechanicClub != null) {
             BowlingClub finalMechanicClub = mechanicClub;
-            ClubStaff clubStaff = clubStaffRepository.findByClubAndUser(mechanicClub, user)
+            ClubStaff clubStaff = clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(mechanicClub, user)
                     .orElseGet(() -> ClubStaff.builder()
                             .club(finalMechanicClub)
                             .user(user)
@@ -280,7 +280,7 @@ public class AuthService implements UserDetailsService {
 
         if (managerClub != null) {
             BowlingClub finalManagerClub = managerClub;
-            ClubStaff clubStaff = clubStaffRepository.findByClubAndUser(managerClub, user)
+            ClubStaff clubStaff = clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(managerClub, user)
                     .orElseGet(() -> ClubStaff.builder()
                             .club(finalManagerClub)
                             .user(user)
@@ -748,7 +748,7 @@ public class AuthService implements UserDetailsService {
         User user = profile.getUser();
         return clubs.stream()
                 .anyMatch(club -> club != null
-                        && clubStaffRepository.findByClubAndUser(club, user)
+                        && clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, user)
                                 .map(ClubStaff::getIsActive)
                                 .map(active -> !active)
                                 .orElse(true));
@@ -765,7 +765,7 @@ public class AuthService implements UserDetailsService {
         if (!Boolean.TRUE.equals(profile.getIsDataVerified())) {
             return true;
         }
-        return clubStaffRepository.findByClubAndUser(club, profile.getUser())
+        return clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, profile.getUser())
                 .map(ClubStaff::getIsActive)
                 .map(active -> !active)
                 .orElse(true);

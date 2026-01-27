@@ -46,7 +46,7 @@ public class AdminService {
                     if (club == null) {
                         continue;
                     }
-                    clubStaffRepository.findByClubAndUser(club, user)
+                    clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, user)
                             .ifPresent(staff -> {
                                 if (!Boolean.TRUE.equals(staff.getIsActive())) {
                                     staff.setIsActive(true);

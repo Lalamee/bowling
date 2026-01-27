@@ -213,7 +213,7 @@ public class AdminCabinetService {
             }
             upsertStaff(user, club);
             if (isFreeMechanic) {
-                clubStaffRepository.findByClubAndUser(club, user).ifPresent(staff -> {
+                clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, user).ifPresent(staff -> {
                     staff.setInfoAccessRestricted(false);
                     staff.setIsActive(true);
                     clubStaffRepository.save(staff);
@@ -224,7 +224,7 @@ public class AdminCabinetService {
                     .filter(c -> !Objects.equals(c.getClubId(), clubId))
                     .collect(Collectors.toCollection(ArrayList::new));
             profile.setClubs(updatedClubs);
-            clubStaffRepository.findByClubAndUser(club, user).ifPresent(staff -> {
+            clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, user).ifPresent(staff -> {
                 staff.setIsActive(false);
                 clubStaffRepository.save(staff);
             });
@@ -282,7 +282,7 @@ public class AdminCabinetService {
         }
         profile.setClubs(clubs);
         upsertStaff(user, club);
-        clubStaffRepository.findByClubAndUser(club, user).ifPresent(staff -> {
+        clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, user).ifPresent(staff -> {
             staff.setInfoAccessRestricted(false);
             staff.setIsActive(true);
             clubStaffRepository.save(staff);
@@ -677,7 +677,7 @@ public class AdminCabinetService {
                 : roleRepository.findByNameIgnoreCase(RoleName.MECHANIC.name()).orElse(null);
         Role roleToApply = resolvedRole;
 
-        ClubStaff staff = clubStaffRepository.findByClubAndUser(club, user)
+        ClubStaff staff = clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, user)
                 .orElseGet(() -> ClubStaff.builder()
                         .club(club)
                         .user(user)
