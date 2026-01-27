@@ -9,6 +9,7 @@ import '../../models/admin_mechanic_status_change_dto.dart';
 import '../../models/admin_staff_status_update_dto.dart';
 import '../../models/mechanic_club_link_request_dto.dart';
 import '../../models/free_mechanic_application_response_dto.dart';
+import '../../models/free_mechanic_club_assign_request_dto.dart';
 
 class AdminCabinetRepository {
   final ApiService _api = ApiService();
@@ -38,6 +39,13 @@ class AdminCabinetRepository {
     AdminAccountUpdateDto update,
   ) {
     return _api.updateFreeMechanicAccount(userId, update);
+  }
+
+  Future<AdminRegistrationApplicationDto> assignFreeMechanicToClub(
+    int userId,
+    FreeMechanicClubAssignRequestDto request,
+  ) {
+    return _api.assignFreeMechanicToClub(userId, request);
   }
 
   Future<AdminRegistrationApplicationDto> convertMechanicAccount(
