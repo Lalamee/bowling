@@ -157,7 +157,8 @@ class BottomNavDirect {
       case 2:
         return ctx.access.allows(AccessSection.clubEquipment) ||
             ctx.access.allows(AccessSection.technicalInfo) ||
-            ctx.access.allows(AccessSection.freeWarehouse);
+            ctx.access.allows(AccessSection.freeWarehouse) ||
+            ctx.role == RoleName.admin;
       case 3:
         return true;
       default:
