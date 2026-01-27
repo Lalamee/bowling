@@ -8,7 +8,8 @@ import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Entity.enums.WorkLogStatus;
 import ru.bowling.bowlingapp.Enum.RoleName;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -62,7 +63,7 @@ public class NotificationService {
                 .message("Свободный механик ожидает подтверждения")
                 .mechanicId(mechanicProfile.getProfileId())
                 .payload(mechanicProfile.getFullName())
-                .createdAt(LocalDateTime.now())
+                .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
                 .audiences(Set.of(RoleName.ADMIN))
                 .build();
         notifications.add(event);
@@ -83,7 +84,7 @@ public class NotificationService {
                 .message("Администрация подтвердила регистрацию свободного механика. Заполните анкету профиля.")
                 .mechanicId(mechanicProfile.getProfileId())
                 .payload(mechanicProfile.getFullName())
-                .createdAt(LocalDateTime.now())
+                .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
                 .audiences(Set.of(RoleName.MECHANIC))
                 .build();
         notifications.add(event);
@@ -110,7 +111,7 @@ public class NotificationService {
                 .clubId(clubId)
                 .requestId(requestId)
                 .payload(senderName != null ? "Отправитель: " + senderName : null)
-                .createdAt(LocalDateTime.now())
+                .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
                 .audiences(Set.of(RoleName.ADMIN))
                 .build();
         notifications.add(event);
@@ -135,7 +136,7 @@ public class NotificationService {
                 .clubId(clubId)
                 .mechanicId(mechanicId)
                 .payload(payload)
-                .createdAt(LocalDateTime.now())
+                .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
                 .audiences(Set.of(RoleName.ADMIN))
                 .build();
         notifications.add(event);
@@ -156,7 +157,7 @@ public class NotificationService {
                 .message(message.trim())
                 .clubId(clubId)
                 .payload(payload)
-                .createdAt(LocalDateTime.now())
+                .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
                 .audiences(Set.of(RoleName.CLUB_OWNER, RoleName.HEAD_MECHANIC))
                 .build();
         notifications.add(event);
@@ -177,7 +178,7 @@ public class NotificationService {
                 .message(message.trim())
                 .mechanicId(mechanicId)
                 .payload(payload)
-                .createdAt(LocalDateTime.now())
+                .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
                 .audiences(Set.of(RoleName.MECHANIC))
                 .build();
         notifications.add(event);
@@ -271,7 +272,7 @@ public class NotificationService {
                 .clubId(request != null && request.getClub() != null ? request.getClub().getClubId() : null)
                 .partIds(partIds(parts))
                 .payload(payload)
-                .createdAt(LocalDateTime.now())
+                .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
                 .audiences(audiences)
                 .build();
     }

@@ -3,7 +3,7 @@ package ru.bowling.bowlingapp.DTO;
 import lombok.Builder;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Data
@@ -17,5 +17,5 @@ public class AdminAppealDTO {
     private Long clubId;
     private List<Long> partIds;
     private String payload;
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 }
