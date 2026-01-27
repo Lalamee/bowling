@@ -232,6 +232,58 @@ public class AdminCabinetService {
         return mapUserToRegistration(userRepository.save(user));
     }
 
+    @Transactional
+    public AdminRegistrationApplicationDTO assignFreeMechanicToClub(Long userId, FreeMechanicClubAssignRequestDTO request) {
+        if (request == null || request.getClubId() == null) {
+            throw new IllegalArgumentException("Club id is required");
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        if (user.getRole() == null || RoleName.from(user.getRole().getName()) != RoleName.MECHANIC) {
+            throw new IllegalArgumentException("User is not a mechanic");
+        }
+        AccountType currentAccountType = user.getAccountType();
+        if (currentAccountType == null) {
+            throw new IllegalStateException("Account type is required");
+        }
+        AccountTypeName accountTypeName = AccountTypeName.from(currentAccountType.getName());
+        if (accountTypeName != AccountTypeName.FREE_MECHANIC_BASIC && accountTypeName != AccountTypeName.FREE_MECHANIC_PREMIUM) {
+            throw new IllegalArgumentException("User is not a free mechanic");
+        }
+
+        MechanicProfile profile = user.getMechanicProfile();
+        if (profile == null) {
+            throw new IllegalStateException("Mechanic profile not found");
+        }
+
+        BowlingClub club = bowlingClubRepository.findById(request.getClubId())
+                .orElseThrow(() -> new IllegalArgumentException("Club not found"));
+
+        AccountType targetAccountType = accountTypeRepository.findByNameIgnoreCase(AccountTypeName.INDIVIDUAL.name())
+                .orElseThrow(() -> new IllegalStateException("Account type not configured: " + AccountTypeName.INDIVIDUAL));
+        user.setAccountType(targetAccountType);
+        user.setLastModified(LocalDateTime.now());
+
+        List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs())
+                .map(ArrayList::new)
+                .orElseGet(ArrayList::new);
+        if (clubs.stream().noneMatch(c -> Objects.equals(c.getClubId(), club.getClubId()))) {
+            clubs.add(club);
+        }
+        profile.setClubs(clubs);
+        upsertStaff(user, club);
+        clubStaffRepository.findByClubAndUser(club, user).ifPresent(staff -> {
+            staff.setInfoAccessRestricted(false);
+            staff.setIsActive(true);
+            clubStaffRepository.save(staff);
+        });
+        ensurePersonalWarehouse(profile);
+
+        mechanicProfileRepository.save(profile);
+        userRepository.save(user);
+        return mapUserToRegistration(user);
+    }
+
     @Transactional(readOnly = true)
     public List<AttestationApplicationDTO> listAttestationApplications() {
         return attestationApplicationRepository.findAllByOrderBySubmittedAtDesc().stream()

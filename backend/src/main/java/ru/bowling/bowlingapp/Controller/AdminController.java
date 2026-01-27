@@ -17,6 +17,7 @@ import ru.bowling.bowlingapp.DTO.AdminAppealReplyDTO;
 import ru.bowling.bowlingapp.DTO.AttestationApplicationDTO;
 import ru.bowling.bowlingapp.DTO.AttestationDecisionDTO;
 import ru.bowling.bowlingapp.DTO.FreeMechanicApplicationResponseDTO;
+import ru.bowling.bowlingapp.DTO.FreeMechanicClubAssignRequestDTO;
 import ru.bowling.bowlingapp.DTO.MechanicApplicationDecisionDTO;
 import ru.bowling.bowlingapp.DTO.MechanicClubLinkRequestDTO;
 import ru.bowling.bowlingapp.DTO.NotificationEvent;
@@ -88,6 +89,14 @@ public class AdminController {
             @RequestBody AdminAccountUpdateDTO update
     ) {
         return ResponseEntity.ok(adminCabinetService.updateFreeMechanicAccount(userId, update));
+    }
+
+    @PostMapping("/free-mechanics/{userId}/assign-club")
+    public ResponseEntity<AdminRegistrationApplicationDTO> assignFreeMechanicToClub(
+            @PathVariable Long userId,
+            @RequestBody FreeMechanicClubAssignRequestDTO request
+    ) {
+        return ResponseEntity.ok(adminCabinetService.assignFreeMechanicToClub(userId, request));
     }
 
     @PatchMapping("/mechanics/{userId}/account")
