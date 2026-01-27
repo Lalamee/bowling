@@ -786,6 +786,21 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
           attachToClub: true,
         ),
       );
+    } catch (e, s) {
+      if (mechanic.userId == null) {
+        rethrow;
+      }
+      log('Failed to attach free mechanic by profile link, retrying via account change: $e', stackTrace: s);
+      await _cabinetRepository.convertMechanicAccount(
+        mechanic.userId!,
+        AdminMechanicAccountChangeDto(
+          accountTypeName: 'INDIVIDUAL',
+          clubId: selected,
+          attachToClub: true,
+        ),
+      );
+    }
+    try {
       await _loadData();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Клуб назначен')));
