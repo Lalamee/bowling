@@ -793,6 +793,14 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       return;
     }
     try {
+      if (mounted) {
+        setState(() {
+          _freeMechanics = _freeMechanics.where((m) => m.userId != mechanic.userId).toList();
+          if (mechanic.mechanicProfileId != null) {
+            _freeMechanicDetails.remove(mechanic.mechanicProfileId);
+          }
+        });
+      }
       await _loadData();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Клуб назначен')));

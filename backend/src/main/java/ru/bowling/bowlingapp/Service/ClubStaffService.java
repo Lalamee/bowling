@@ -971,7 +971,7 @@ public class ClubStaffService {
                 if (name == null) {
                     continue;
                 }
-                Optional<AccountType> byName = accountTypeRepository.findByNameIgnoreCase(name);
+                Optional<AccountType> byName = accountTypeRepository.findFirstByNameIgnoreCaseOrderByAccountTypeIdAsc(name);
                 if (byName.isPresent()) {
                     return byName.get();
                 }
@@ -992,7 +992,7 @@ public class ClubStaffService {
             if (trimmed.isEmpty()) {
                 continue;
             }
-            Optional<AccountType> byName = accountTypeRepository.findByNameIgnoreCase(trimmed);
+            Optional<AccountType> byName = accountTypeRepository.findFirstByNameIgnoreCaseOrderByAccountTypeIdAsc(trimmed);
             if (byName.isPresent()) {
                 return byName.get();
             }
@@ -1019,8 +1019,8 @@ public class ClubStaffService {
 
     private AccountType resolveIndividualAccountType() {
         return accountTypeRepository.findById(ACCOUNT_TYPE_INDIVIDUAL_ID)
-                .or(() -> accountTypeRepository.findByNameIgnoreCase("INDIVIDUAL"))
-                .or(() -> accountTypeRepository.findByNameIgnoreCase("Физическое лицо"))
+                .or(() -> accountTypeRepository.findFirstByNameIgnoreCaseOrderByAccountTypeIdAsc("INDIVIDUAL"))
+                .or(() -> accountTypeRepository.findFirstByNameIgnoreCaseOrderByAccountTypeIdAsc("Физическое лицо"))
                 .orElseThrow(() -> new IllegalStateException(
                         "Individual account type (id=" + ACCOUNT_TYPE_INDIVIDUAL_ID + ") is not configured"));
     }

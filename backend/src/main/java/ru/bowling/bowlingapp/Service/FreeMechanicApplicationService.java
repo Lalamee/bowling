@@ -55,7 +55,8 @@ public class FreeMechanicApplicationService {
         Role mechanicRole = roleRepository.findByNameIgnoreCase(RoleName.MECHANIC.name())
                 .orElseThrow(() -> new IllegalStateException("MECHANIC role not configured"));
 
-        AccountType accountType = accountTypeRepository.findByNameIgnoreCase(AccountTypeName.FREE_MECHANIC_BASIC.name())
+        AccountType accountType = accountTypeRepository
+                .findFirstByNameIgnoreCaseOrderByAccountTypeIdAsc(AccountTypeName.FREE_MECHANIC_BASIC.name())
                 .orElseThrow(() -> new IllegalStateException("Account type FREE_MECHANIC_BASIC not configured"));
 
         User user = User.builder()
@@ -142,7 +143,7 @@ public class FreeMechanicApplicationService {
             throw new IllegalArgumentException("Free mechanic can only be approved with FREE_MECHANIC account types");
         }
 
-        AccountType accountType = accountTypeRepository.findByNameIgnoreCase(targetAccountType.name())
+        AccountType accountType = accountTypeRepository.findFirstByNameIgnoreCaseOrderByAccountTypeIdAsc(targetAccountType.name())
                 .orElseThrow(() -> new IllegalStateException("Account type not configured: " + targetAccountType.name()));
 
         User user = application.getUser();
