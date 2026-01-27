@@ -121,7 +121,7 @@ public class ClubStaffService {
         for (MechanicProfile mechanic : mechanics) {
             User mechanicUser = mechanic.getUser();
             ClubStaff clubStaff = mechanicUser != null
-                    ? clubStaffRepository.findByClubAndUser(club, mechanicUser).orElse(null)
+                    ? clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, mechanicUser).orElse(null)
                     : null;
             staff.add(ClubStaffMemberDTO.builder()
                     .userId(mechanicUser != null ? mechanicUser.getUserId() : null)
@@ -182,7 +182,7 @@ public class ClubStaffService {
             throw new IllegalArgumentException("Club owner cannot change activation status");
         }
 
-        ClubStaff clubStaff = clubStaffRepository.findByClubAndUser(club, targetUser)
+        ClubStaff clubStaff = clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, targetUser)
                 .orElseThrow(() -> new IllegalArgumentException("Staff member is not assigned to this club"));
 
         targetUser.setIsActive(active);
@@ -229,7 +229,7 @@ public class ClubStaffService {
             throw new IllegalArgumentException("Target user is not a mechanic");
         }
 
-        ClubStaff clubStaff = clubStaffRepository.findByClubAndUser(club, targetUser)
+        ClubStaff clubStaff = clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, targetUser)
                 .orElseThrow(() -> new IllegalArgumentException("Mechanic is not assigned to this club"));
 
         // Ограничиваем доступ только в рамках конкретного clubId
@@ -286,7 +286,7 @@ public class ClubStaffService {
             throw new IllegalArgumentException("Club owner cannot be removed from staff");
         }
 
-        clubStaffRepository.findByClubAndUser(club, user)
+        clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, user)
                 .ifPresent(clubStaffRepository::delete);
 
         detachProfilesFromClub(club, user);
@@ -302,7 +302,7 @@ public class ClubStaffService {
             ensureClubAccess(club, requestedBy);
         }
 
-        ClubStaff staff = clubStaffRepository.findByClubAndUser(club,
+        ClubStaff staff = clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club,
                         userRepository.findById(userId)
                                 .orElseThrow(() -> new IllegalArgumentException("User not found")))
                 .orElseThrow(() -> new IllegalArgumentException("Staff member is not assigned to this club"));
@@ -635,7 +635,7 @@ public class ClubStaffService {
             return;
         }
 
-        ClubStaff clubStaff = clubStaffRepository.findByClubAndUser(club, user)
+        ClubStaff clubStaff = clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, user)
                 .orElseGet(() -> ClubStaff.builder()
                         .club(club)
                         .user(user)
@@ -659,7 +659,7 @@ public class ClubStaffService {
             return defaultValue != null ? defaultValue : Boolean.TRUE;
         }
 
-        return clubStaffRepository.findByClubAndUser(club, user)
+        return clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, user)
                 .map(ClubStaff::getIsActive)
                 .filter(Objects::nonNull)
                 .orElseGet(() -> {

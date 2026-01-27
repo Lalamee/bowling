@@ -55,7 +55,7 @@ public class InvitationService {
             if (mechanicProfile.getClubs().stream().noneMatch(c -> c.getClubId().equals(club.getClubId()))) {
                 mechanicProfile.getClubs().add(club);
             }
-            clubStaffRepository.findByClubAndUser(club, mechanicUser)
+            clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, mechanicUser)
                     .orElseGet(() -> clubStaffRepository.save(ClubStaff.builder()
                             .club(club)
                             .user(mechanicUser)
