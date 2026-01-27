@@ -47,7 +47,8 @@ public class UserClubAccessService {
 
         Set<Long> clubIds = new LinkedHashSet<>();
 
-        MechanicProfile mechanicProfile = mechanicProfileRepository.findByUser_UserId(user.getUserId()).orElse(null);
+        List<MechanicProfile> mechanicProfiles = mechanicProfileRepository.findAllByUser_UserIdOrderByProfileIdDesc(user.getUserId());
+        MechanicProfile mechanicProfile = mechanicProfiles.isEmpty() ? null : mechanicProfiles.get(0);
         OwnerProfile ownerProfile = ownerProfileRepository.findByUser_UserId(user.getUserId()).orElse(null);
         ManagerProfile managerProfile = managerProfileRepository.findByUser_UserId(user.getUserId()).orElse(null);
 

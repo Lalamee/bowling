@@ -67,7 +67,8 @@ public class GlobalSearchService {
                 ? user.getRole().getName().trim().toUpperCase(Locale.ROOT)
                 : "";
 
-        MechanicProfile mechanicProfile = mechanicProfileRepository.findByUser_UserId(userId).orElse(null);
+        List<MechanicProfile> mechanicProfiles = mechanicProfileRepository.findAllByUser_UserIdOrderByProfileIdDesc(userId);
+        MechanicProfile mechanicProfile = mechanicProfiles.isEmpty() ? null : mechanicProfiles.get(0);
         ManagerProfile managerProfile = managerProfileRepository.findByUser_UserId(userId).orElse(null);
         OwnerProfile ownerProfile = ownerProfileRepository.findByUser_UserId(userId).orElse(null);
 

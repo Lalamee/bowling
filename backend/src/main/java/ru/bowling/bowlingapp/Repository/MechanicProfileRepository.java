@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface MechanicProfileRepository extends JpaRepository<MechanicProfile, Long> {
-    Optional<MechanicProfile> findByUser_UserId(Long userId);
+    List<MechanicProfile> findAllByUser_UserIdOrderByProfileIdDesc(Long userId);
     List<MechanicProfile> findByClubs_ClubId(Long clubId);
 
     @Query("""

@@ -254,8 +254,11 @@ public class AdminCabinetService {
 
         MechanicProfile profile = user.getMechanicProfile();
         if (profile == null) {
-            profile = mechanicProfileRepository.findByUser_UserId(userId)
-                    .orElseThrow(() -> new IllegalStateException("Mechanic profile not found"));
+            List<MechanicProfile> profiles = mechanicProfileRepository.findAllByUser_UserIdOrderByProfileIdDesc(userId);
+            if (profiles.isEmpty()) {
+                throw new IllegalStateException("Mechanic profile not found");
+            }
+            profile = profiles.get(0);
         }
 
         BowlingClub club = bowlingClubRepository.findById(request.getClubId())
