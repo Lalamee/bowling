@@ -8,12 +8,15 @@ import java.util.List;
 
 @Entity
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@ToString(exclude = {"user", "clubs"})
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "club_owners")
 public class OwnerProfile {
 
+    @EqualsAndHashCode.Include
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "owner_id")

@@ -11,11 +11,14 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "users")
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@ToString(exclude = {"mechanicProfile", "ownerProfile", "managerProfile", "administratorProfile"})
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
 public class User {
 
+    @EqualsAndHashCode.Include
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_id")
