@@ -725,17 +725,20 @@ public class ClubStaffService {
     }
 
     private void detachMechanicFromClub(BowlingClub club, Long userId) {
-        mechanicProfileRepository.findByUser_UserId(userId).ifPresent(profile -> {
-            List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs())
-                    .map(ArrayList::new)
-                    .orElseGet(ArrayList::new);
-            boolean removed = clubs.removeIf(existingClub -> existingClub != null
-                    && Objects.equals(existingClub.getClubId(), club.getClubId()));
-            if (removed) {
-                profile.setClubs(clubs);
-                mechanicProfileRepository.save(profile);
-            }
-        });
+        List<MechanicProfile> profiles = mechanicProfileRepository.findAllByUser_UserIdOrderByProfileIdDesc(userId);
+        if (profiles.isEmpty()) {
+            return;
+        }
+        MechanicProfile profile = profiles.get(0);
+        List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs())
+                .map(ArrayList::new)
+                .orElseGet(ArrayList::new);
+        boolean removed = clubs.removeIf(existingClub -> existingClub != null
+                && Objects.equals(existingClub.getClubId(), club.getClubId()));
+        if (removed) {
+            profile.setClubs(clubs);
+            mechanicProfileRepository.save(profile);
+        }
     }
 
     private User prepareUser(String phone, String rawPassword, Role role, AccountType accountType) {

@@ -10,6 +10,7 @@ import '../models/standard_response_dto.dart';
 import '../models/maintenance_request_response_dto.dart';
 import '../models/free_mechanic_application_request_dto.dart';
 import '../models/free_mechanic_application_response_dto.dart';
+import '../models/free_mechanic_club_assign_request_dto.dart';
 import '../models/part_request_dto.dart';
 import '../models/approve_reject_request_dto.dart';
 import '../models/parts_catalog_response_dto.dart';
@@ -337,6 +338,18 @@ class ApiService {
   ) async {
     final response = await _dio.patch(
       '/api/admin/free-mechanics/$userId/account',
+      data: request.toJson(),
+    );
+    return AdminRegistrationApplicationDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  /// POST /api/admin/free-mechanics/{userId}/assign-club - назначение клуба свободному механику
+  Future<AdminRegistrationApplicationDto> assignFreeMechanicToClub(
+    int userId,
+    FreeMechanicClubAssignRequestDto request,
+  ) async {
+    final response = await _dio.post(
+      '/api/admin/free-mechanics/$userId/assign-club',
       data: request.toJson(),
     );
     return AdminRegistrationApplicationDto.fromJson(Map<String, dynamic>.from(response.data as Map));
