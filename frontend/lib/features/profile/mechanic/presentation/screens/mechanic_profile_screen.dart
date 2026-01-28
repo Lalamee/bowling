@@ -262,7 +262,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         address = profileAddress;
       }
 
-      final profileRegion = _asString(map['region']);
+      final profileRegion = _asString(map['region']) ?? _asString(map['city']);
       if (profileRegion != null) {
         region = profileRegion;
       }
@@ -363,7 +363,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         workplaceVerified: raw['workplaceVerified'] as bool? ?? profile.workplaceVerified,
         birthDate: birthDate ?? profile.birthDate,
       );
-      _region = _asString(raw['region']) ?? _region;
+      _region = _asString(raw['region']) ?? _asString(raw['city']) ?? _region;
       _ownerApprovalRequired = rawOwnerApproval is bool ? rawOwnerApproval : _ownerApprovalRequired;
       _isLoading = false;
       _hasError = false;
@@ -593,7 +593,11 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
     }
 
     final resolvedAddress = _resolveAddress() ?? '';
-    final resolvedRegion = _asString(raw['region']) ?? _asString(previous?['region']) ?? _region;
+    final resolvedRegion = _asString(raw['region']) ??
+        _asString(raw['city']) ??
+        _asString(previous?['region']) ??
+        _asString(previous?['city']) ??
+        _region;
 
     final resolvedStatus = _asString(raw['status']) ??
         _asString(previous?['status']) ??
@@ -659,7 +663,7 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         clubs: (profileData['clubs'] as List?)?.map((e) => e.toString()).toList(),
       );
       profile = updated;
-      _region = profileData['region']?.toString() ?? _region;
+      _region = profileData['region']?.toString() ?? profileData['city']?.toString() ?? _region;
       _cachedRawProfile = Map<String, dynamic>.from(profileData);
       _needsFreeMechanicQuestionnaire = _computeFreeMechanicQuestionnaireNeeded(updated);
     });
