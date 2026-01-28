@@ -9,6 +9,7 @@ import '../../../../core/services/authz/acl.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/utils/net_ui.dart';
+import '../../../../core/utils/user_club_resolver.dart';
 import '../../../../models/maintenance_request_response_dto.dart';
 import '../../../../models/service_history_dto.dart';
 import '../../../../shared/widgets/layout/common_ui.dart';
@@ -66,7 +67,7 @@ class _ClubLanesScreenState extends State<ClubLanesScreen> {
       final scope = await UserAccessScope.fromProfile(me);
       final canEdit = scope.role == 'admin' || scope.role == 'owner' || scope.role == 'manager';
       final userId = (me['id'] as num?)?.toInt() ?? (me['userId'] as num?)?.toInt();
-      final laneCount = await _resolveLaneCount();
+      final laneCount = await _resolveLaneCount(profile: me);
       final history = await _serviceHistoryRepository.getByClub(widget.clubId);
       List<MaintenanceRequestResponseDto> requests = const [];
       bool restricted = false;
@@ -102,9 +103,19 @@ class _ClubLanesScreenState extends State<ClubLanesScreen> {
     }
   }
 
-  Future<int?> _resolveLaneCount() async {
+  Future<int?> _resolveLaneCount({Map<String, dynamic>? profile}) async {
     if (_resolvedLaneCount != null && _resolvedLaneCount! > 0) {
       return _resolvedLaneCount;
+    }
+    if (profile != null) {
+      final clubs = resolveUserClubs(profile);
+      final match = clubs.where((club) => club.id == widget.clubId).toList();
+      if (match.isNotEmpty) {
+        final parsed = _parseLaneCount(match.first.lanes);
+        if (parsed != null && parsed > 0) {
+          return parsed;
+        }
+      }
     }
     try {
       final clubs = await _clubsRepository.getClubs();
@@ -116,6 +127,17 @@ class _ClubLanesScreenState extends State<ClubLanesScreen> {
       return _resolvedLaneCount;
     }
     return _resolvedLaneCount;
+  }
+
+  int? _parseLaneCount(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value > 0 ? value : null;
+    if (value is num) return value.toInt() > 0 ? value.toInt() : null;
+    if (value is String) {
+      final parsed = int.tryParse(value.trim());
+      if (parsed != null && parsed > 0) return parsed;
+    }
+    return null;
   }
 
   List<_LaneTechInfo> _buildLaneInfos(
@@ -590,6 +612,20 @@ class _LaneSelector extends StatelessWidget {
                 color: isSelected ? AppColors.textDark : AppColors.darkGray,
               ),
             ),
+            if (info.requests.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  'есть заявка',
+                  style: TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
           ],
         ),
       ),
