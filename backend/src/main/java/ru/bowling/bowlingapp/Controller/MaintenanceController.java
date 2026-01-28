@@ -105,8 +105,12 @@ public class MaintenanceController {
 	}
 
 	@PutMapping("/requests/{id}/publish")
-	public ResponseEntity<?> publish(@PathVariable("id") Long id) {
-		return ResponseEntity.ok(maintenanceRequestService.publishRequest(id));
+	public ResponseEntity<?> publish(@PathVariable("id") Long id, Authentication authentication) {
+		if (authentication == null || !authentication.isAuthenticated()) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+					.body(StandardResponseDTO.builder().message("User not authenticated").status("error").build());
+		}
+		return ResponseEntity.ok(maintenanceRequestService.publishRequest(id, authentication.getName()));
 	}
 
 	@PutMapping("/requests/{id}/assign/{agentId}")
@@ -140,8 +144,21 @@ public class MaintenanceController {
                         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                                         .body(StandardResponseDTO.builder().message("User not authenticated").status("error").build());
                 }
-                MaintenanceRequestResponseDTO response = maintenanceRequestService.completeRequest(id);
+                MaintenanceRequestResponseDTO response = maintenanceRequestService.completeRequest(id, authentication.getName());
                 return ResponseEntity.ok(response);
+        }
+
+        @GetMapping("/requests/{id}/export")
+        public ResponseEntity<byte[]> exportRequest(@PathVariable("id") Long id, Authentication authentication) {
+                if (authentication == null || !authentication.isAuthenticated()) {
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+                }
+                byte[] fileBytes = maintenanceRequestService.exportRequestToExcel(id);
+                return ResponseEntity.ok()
+                                .header("Content-Disposition", "attachment; filename=order-" + id + ".xlsx")
+                                .header("Content-Type",
+                                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                                .body(fileBytes);
         }
 
         @PutMapping("/requests/{id}/unrepairable")

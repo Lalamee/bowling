@@ -1,6 +1,10 @@
 package ru.bowling.bowlingapp.Service;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.DTO.ApproveRejectRequestDTO;
@@ -14,11 +18,13 @@ import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Entity.enums.MaintenanceRequestStatus;
 import ru.bowling.bowlingapp.Entity.enums.PartStatus;
 import ru.bowling.bowlingapp.Enum.AccountTypeName;
-import ru.bowling.bowlingapp.Enum.RoleName;
 import ru.bowling.bowlingapp.Repository.*;
 
 import java.time.LocalDateTime;
+import java.io.ByteArrayOutputStream;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -67,8 +73,10 @@ public class MaintenanceRequestService {
                 AccountTypeName accountTypeName = mechanicUser != null && mechanicUser.getAccountType() != null
                         ? AccountTypeName.from(mechanicUser.getAccountType().getName())
                         : AccountTypeName.INDIVIDUAL;
+                boolean isFreeMechanic = accountTypeName == AccountTypeName.FREE_MECHANIC_BASIC
+                        || accountTypeName == AccountTypeName.FREE_MECHANIC_PREMIUM;
 
-                if ((accountTypeName == AccountTypeName.FREE_MECHANIC_BASIC || accountTypeName == AccountTypeName.FREE_MECHANIC_PREMIUM)
+                if (isFreeMechanic
                         && club != null
                         && !mechanicWorksInClub(mechanicProfile, club.getClubId())) {
                         throw new IllegalArgumentException("Free mechanic has no granted access to the specified club");
@@ -83,8 +91,7 @@ public class MaintenanceRequestService {
                         }
                 }
 
-                if (club == null && accountTypeName != AccountTypeName.FREE_MECHANIC_BASIC
-                        && accountTypeName != AccountTypeName.FREE_MECHANIC_PREMIUM) {
+                if (club == null && !isFreeMechanic) {
                         throw new IllegalArgumentException("Club is required for this account type");
                 }
 
@@ -99,12 +106,16 @@ public class MaintenanceRequestService {
                         throw new IllegalArgumentException("Lane number must be > 0 when provided");
                 }
 
+                MaintenanceRequestStatus initialStatus = isFreeMechanic
+                        ? MaintenanceRequestStatus.NEW
+                        : MaintenanceRequestStatus.UNDER_REVIEW;
+
                 MaintenanceRequest request = MaintenanceRequest.builder()
                                 .club(club)
                                 .laneNumber(requestDTO.getLaneNumber())
                                 .mechanic(mechanicProfile)
                                 .requestDate(LocalDateTime.now())
-                                .status(MaintenanceRequestStatus.UNDER_REVIEW)
+                                .status(initialStatus)
                                 // заметки менеджера заполняются на стадии решения заявки, не механиком
                                 .verificationStatus("NOT_VERIFIED")
                                 .requestReason(reason)
@@ -116,7 +127,9 @@ public class MaintenanceRequestService {
                                 .map(partDTO -> requestPartRepository.save(buildRequestPart(savedRequest, partDTO)))
                                 .collect(Collectors.toList());
 
-                notifyClubTeamAboutRequest(savedRequest);
+                if (!isFreeMechanic) {
+                        notifyClubTeamAboutRequest(savedRequest);
+                }
 
                 return convertToResponseDTO(savedRequest, requestParts);
         }
@@ -138,6 +151,93 @@ public class MaintenanceRequestService {
                                 .orElseThrow(() -> new IllegalArgumentException("Request not found"));
                 List<RequestPart> parts = requestPartRepository.findByRequestRequestId(requestId);
                 return convertToResponseDTO(request, parts);
+        }
+
+        @Transactional(readOnly = true)
+        public byte[] exportRequestToExcel(Long requestId) {
+                MaintenanceRequestResponseDTO request = getRequestById(requestId);
+
+                try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                        Sheet infoSheet = workbook.createSheet("Заявка");
+                        int rowIndex = 0;
+                        List<List<String>> rows = Arrays.asList(
+                                        Arrays.asList("Номер заявки", safeValue(request.getRequestId())),
+                                        Arrays.asList("Статус", safeValue(request.getStatus())),
+                                        Arrays.asList("Клуб", safeValue(request.getClubName())),
+                                        Arrays.asList("ID клуба", safeValue(request.getClubId())),
+                                        Arrays.asList("Дорожка", safeValue(request.getLaneNumber())),
+                                        Arrays.asList("Механик", safeValue(request.getMechanicName())),
+                                        Arrays.asList("ID механика", safeValue(request.getMechanicId())),
+                                        Arrays.asList("Причина", safeValue(request.getReason())),
+                                        Arrays.asList("Дата заявки", formatDate(request.getRequestDate())),
+                                        Arrays.asList("Дата решения", formatDate(request.getManagerDecisionDate())),
+                                        Arrays.asList("Дата завершения", formatDate(request.getCompletionDate())),
+                                        Arrays.asList("Верификация", safeValue(request.getVerificationStatus())),
+                                        Arrays.asList("Заметки менеджера", safeValue(request.getManagerNotes()))
+                        );
+
+                        for (List<String> rowValues : rows) {
+                                Row row = infoSheet.createRow(rowIndex++);
+                                row.createCell(0).setCellValue(rowValues.get(0));
+                                row.createCell(1).setCellValue(rowValues.get(1));
+                        }
+
+                        Sheet partsSheet = workbook.createSheet("Запчасти");
+                        List<String> headers = Arrays.asList(
+                                        "ID позиции",
+                                        "Название",
+                                        "Каталожный номер",
+                                        "Количество",
+                                        "Статус",
+                                        "Доступность",
+                                        "Принято",
+                                        "Комментарий приемки",
+                                        "Дата приемки",
+                                        "Поставщик",
+                                        "ID поставщика",
+                                        "Дата заказа",
+                                        "Дата доставки",
+                                        "Дата выдачи",
+                                        "Локация",
+                                        "ID склада"
+                        );
+                        Row headerRow = partsSheet.createRow(0);
+                        for (int i = 0; i < headers.size(); i++) {
+                                headerRow.createCell(i).setCellValue(headers.get(i));
+                        }
+
+                        int partRowIndex = 1;
+                        List<MaintenanceRequestResponseDTO.RequestPartResponseDTO> parts =
+                                        Optional.ofNullable(request.getRequestedParts()).orElse(List.of());
+                        for (MaintenanceRequestResponseDTO.RequestPartResponseDTO part : parts) {
+                                Row partRow = partsSheet.createRow(partRowIndex++);
+                                int col = 0;
+                                partRow.createCell(col++).setCellValue(safeValue(part.getPartId()));
+                                partRow.createCell(col++).setCellValue(safeValue(part.getPartName()));
+                                partRow.createCell(col++).setCellValue(safeValue(part.getCatalogNumber()));
+                                partRow.createCell(col++).setCellValue(safeValue(part.getQuantity()));
+                                partRow.createCell(col++).setCellValue(safeValue(part.getStatus()));
+                                partRow.createCell(col++).setCellValue(safeValue(part.getAvailable()));
+                                partRow.createCell(col++).setCellValue(safeValue(part.getAcceptedQuantity()));
+                                partRow.createCell(col++).setCellValue(safeValue(part.getAcceptanceComment()));
+                                partRow.createCell(col++).setCellValue(formatDate(part.getAcceptanceDate()));
+                                partRow.createCell(col++).setCellValue(safeValue(part.getSupplierName()));
+                                partRow.createCell(col++).setCellValue(safeValue(part.getSupplierId()));
+                                partRow.createCell(col++).setCellValue(formatDate(part.getOrderDate()));
+                                partRow.createCell(col++).setCellValue(formatDate(part.getDeliveryDate()));
+                                partRow.createCell(col++).setCellValue(formatDate(part.getIssueDate()));
+                                partRow.createCell(col++).setCellValue(safeValue(part.getInventoryLocation()));
+                                partRow.createCell(col++).setCellValue(safeValue(part.getWarehouseId()));
+                        }
+
+                        autoSizeColumns(infoSheet, 2);
+                        autoSizeColumns(partsSheet, headers.size());
+
+                        workbook.write(outputStream);
+                        return outputStream.toByteArray();
+                } catch (Exception ex) {
+                        throw new IllegalStateException("Не удалось сформировать Excel файл", ex);
+                }
         }
 
         @Transactional(readOnly = true)
@@ -282,6 +382,13 @@ public class MaintenanceRequestService {
                 return null;
         }
 
+        private boolean isFreeMechanic(User user) {
+                if (user == null || user.getAccountType() == null || user.getAccountType().getName() == null) {
+                        return false;
+                }
+                return user.getAccountType().getName().toUpperCase(Locale.ROOT).contains("FREE_MECHANIC");
+        }
+
         private String normalizePhone(String rawPhone) {
                 if (rawPhone == null) {
                         return null;
@@ -297,6 +404,23 @@ public class MaintenanceRequestService {
                         return null;
                 }
                 return "+" + digits.charAt(0) + digits.substring(1);
+        }
+
+        private String formatDate(LocalDateTime dateTime) {
+                if (dateTime == null) {
+                        return "";
+                }
+                return DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").format(dateTime);
+        }
+
+        private String safeValue(Object value) {
+                return value == null ? "" : String.valueOf(value);
+        }
+
+        private void autoSizeColumns(Sheet sheet, int columnCount) {
+                for (int i = 0; i < columnCount; i++) {
+                        sheet.autoSizeColumn(i);
+                }
         }
 
         private void validateRequestedParts(List<PartRequestDTO.RequestedPartDTO> parts) {
@@ -546,7 +670,7 @@ public class MaintenanceRequestService {
 
                 MaintenanceRequest request = requestOpt.get();
                 if (requestedByLogin != null && request.getClub() == null) {
-                        validateSelfApproval(request, requestedByLogin);
+                        throw new IllegalArgumentException("Черновики свободных механиков нельзя подтверждать");
                 }
                 request.setStatus(MaintenanceRequestStatus.APPROVED);
                 request.setManagerNotes(managerNotes);
@@ -577,36 +701,6 @@ public class MaintenanceRequestService {
                 });
 
                 return convertToResponseDTO(savedRequest, parts);
-        }
-
-        private void validateSelfApproval(MaintenanceRequest request, String requestedByLogin) {
-                if (request == null || requestedByLogin == null || requestedByLogin.isBlank()) {
-                        throw new IllegalArgumentException("Requester is required");
-                }
-                User requester = userRepository.findByPhone(requestedByLogin)
-                        .orElseThrow(() -> new IllegalArgumentException("Requester not found"));
-                RoleName roleName = requester.getRole() != null ? RoleName.from(requester.getRole().getName()) : null;
-                if (roleName == RoleName.ADMIN) {
-                        return;
-                }
-                if (roleName != RoleName.MECHANIC) {
-                        throw new IllegalArgumentException("Only admin or mechanic can approve this request");
-                }
-                AccountTypeName accountType = requester.getAccountType() != null
-                        ? AccountTypeName.from(requester.getAccountType().getName())
-                        : AccountTypeName.INDIVIDUAL;
-                if (accountType != AccountTypeName.FREE_MECHANIC_BASIC
-                        && accountType != AccountTypeName.FREE_MECHANIC_PREMIUM) {
-                        throw new IllegalArgumentException("Only free mechanics can approve self requests");
-                }
-                MechanicProfile requesterProfile = requester.getMechanicProfile();
-                Long requesterProfileId = requesterProfile != null ? requesterProfile.getProfileId() : null;
-                MechanicProfile requestMechanic = request.getMechanic();
-                Long requestMechanicId = requestMechanic != null ? requestMechanic.getProfileId() : null;
-                if (requesterProfileId == null || requestMechanicId == null
-                        || !requesterProfileId.equals(requestMechanicId)) {
-                        throw new IllegalArgumentException("Only the request author can approve self requests");
-                }
         }
 
         @Transactional
@@ -937,9 +1031,14 @@ public class MaintenanceRequestService {
         }
 
         @Transactional
-        public MaintenanceRequestResponseDTO completeRequest(Long requestId) {
+        public MaintenanceRequestResponseDTO completeRequest(Long requestId, String requestedByLogin) {
                 MaintenanceRequest req = maintenanceRequestRepository.findById(requestId)
                                 .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+
+                User requester = findUserByLogin(requestedByLogin);
+                if (isFreeMechanic(requester)) {
+                        throw new IllegalArgumentException("Свободные механики не подтверждают собственные заявки");
+                }
 
                 MaintenanceRequestStatus currentStatus = req.getStatus();
                 if (currentStatus == null) {
@@ -979,11 +1078,18 @@ public class MaintenanceRequestService {
 	}
 
 	@Transactional
-	public MaintenanceRequestResponseDTO publishRequest(Long requestId) {
+	public MaintenanceRequestResponseDTO publishRequest(Long requestId, String requestedByLogin) {
 		MaintenanceRequest req = maintenanceRequestRepository.findById(requestId)
 				.orElseThrow(() -> new IllegalArgumentException("Request not found"));
 		if (req.getStatus() != MaintenanceRequestStatus.NEW) {
 			throw new IllegalArgumentException("Only NEW requests can be published");
+		}
+		if (req.getClub() == null) {
+			throw new IllegalArgumentException("Черновики свободных механиков нельзя отправлять администрации");
+		}
+		User requester = findUserByLogin(requestedByLogin);
+		if (isFreeMechanic(requester)) {
+			throw new IllegalArgumentException("Свободные механики могут только сохранять черновики");
 		}
 		req.setStatus(MaintenanceRequestStatus.IN_PROGRESS);
 		req.setPublishedAt(java.time.LocalDateTime.now());

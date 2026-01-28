@@ -1,4 +1,9 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../../../core/repositories/user_repository.dart';
 import '../../../../../core/services/authz/acl.dart';
@@ -60,6 +65,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
   bool _accessCheckInProgress = true;
   bool _accessDenied = false;
   bool _helpStatusLoading = false;
+  bool _isExporting = false;
   final Map<int, bool> _availabilityDecisions = {};
   Set<int> _selectedHelpPartIds = {};
   HelpResponseDecision _decision = HelpResponseDecision.approved;
@@ -197,6 +203,39 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
     await _loadFavorites();
   }
 
+  Future<void> _exportToExcel() async {
+    final request = _request;
+    if (request?.requestId == null) {
+      _toast('Не удалось определить заявку для выгрузки');
+      return;
+    }
+    if (kIsWeb) {
+      _toast('Выгрузка доступна в мобильном приложении');
+      return;
+    }
+    if (_isExporting) {
+      return;
+    }
+    setState(() => _isExporting = true);
+    try {
+      final bytes = await _maintenanceRepository.downloadOrderExcel(request!.requestId);
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/order-${request.requestId}.xlsx');
+      await file.writeAsBytes(bytes, flush: true);
+      final result = await OpenFilex.open(file.path);
+      if (result.type != ResultType.done) {
+        _toast('Файл сохранён: ${file.path}');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      showApiError(context, e);
+    } finally {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.typo;
@@ -295,6 +334,28 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          if (_scope?.isFreeMechanic == true && request != null) ...[
+            OutlinedButton.icon(
+              onPressed: _isExporting ? null : _exportToExcel,
+              icon: _isExporting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download_outlined, color: AppColors.primary),
+              label: Text(
+                _isExporting ? 'Выгрузка...' : 'Выгрузить в Excel',
+                style: const TextStyle(color: AppColors.primary),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.primary),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           Text('Детали заказа', style: t.sectionTitle),
           const SizedBox(height: 12),
           if (request == null || request.requestedParts.isEmpty)
