@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../../../core/repositories/user_repository.dart';
@@ -222,10 +221,7 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
       final dir = await getApplicationDocumentsDirectory();
       final file = File('${dir.path}/order-${request.requestId}.xlsx');
       await file.writeAsBytes(bytes, flush: true);
-      final result = await OpenFilex.open(file.path);
-      if (result.type != ResultType.done) {
-        _toast('Файл сохранён: ${file.path}');
-      }
+      _toast('Файл сохранён: ${file.path}');
     } catch (e) {
       if (!mounted) return;
       showApiError(context, e);
