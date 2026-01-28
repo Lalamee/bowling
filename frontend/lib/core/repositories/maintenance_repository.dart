@@ -1,4 +1,8 @@
 
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
+
 import '../../api/api_core.dart';
 import '../../api/api_service.dart';
 import '../../models/maintenance_request_response_dto.dart';
@@ -188,5 +192,16 @@ class MaintenanceRepository {
 
   Future<List<AdminHelpRequestDto>> getAdminHelpRequests() async {
     return _api.getAdminHelpRequests();
+  }
+
+  Future<Uint8List> downloadOrderExcel(int requestId) async {
+    final res = await _dio.get(
+      '/api/maintenance/requests/$requestId/export',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    if (res.statusCode == 200) {
+      return Uint8List.fromList(res.data as List<int>);
+    }
+    throw Exception('Не удалось выгрузить файл');
   }
 }

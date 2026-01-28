@@ -439,6 +439,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   bool _canCompleteRequest(MaintenanceRequestResponseDto request) {
     if (!_isMechanic) return false;
+    if (_isFreeMechanic) return false;
     final status = request.status;
     if (status == null) return false;
     final resolved = OrderStatusType.fromRaw(status);

@@ -381,6 +381,11 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       return;
     }
 
+    if (_isFreeMechanic && publish) {
+      showSnack(context, 'Свободные механики могут только сохранять черновики');
+      return;
+    }
+
     if (_mechanicProfileId == null) {
       showSnack(context, 'Не удалось определить профиль механика. Перезайдите в приложение.');
       return;
@@ -807,36 +812,49 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
           const SizedBox(height: 8),
           Text(
             _isFreeMechanic
-                ? 'Сохраните черновик, чтобы дополнить позже, или сразу оформить заявку.'
+                ? 'Сохраните черновик, чтобы дополнить позже.'
                 : 'Сохраните черновик, чтобы дополнить позже, или сразу отправьте менеджеру для согласования и выдачи.',
             style: const TextStyle(color: AppColors.darkGray),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _submitting ? null : () => _submit(publish: false),
-                  icon: const Icon(Icons.save_outlined, color: AppColors.primary),
-                  label: const Text('Сохранить черновик', style: TextStyle(color: AppColors.primary)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.primary),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          if (_isFreeMechanic)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _submitting ? null : () => _submit(publish: false),
+                icon: const Icon(Icons.save_outlined, color: AppColors.primary),
+                label: const Text('Сохранить черновик', style: TextStyle(color: AppColors.primary)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.primary),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _submitting ? null : () => _submit(publish: false),
+                    icon: const Icon(Icons.save_outlined, color: AppColors.primary),
+                    label: const Text('Сохранить черновик', style: TextStyle(color: AppColors.primary)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.primary),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: CustomButton(
-                  text: _submitting
-                      ? 'Отправка...'
-                      : (_isFreeMechanic ? 'Оформить' : 'Отправить менеджеру'),
-                  onPressed: _submitting ? null : () => _submit(publish: true),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: CustomButton(
+                    text: _submitting ? 'Отправка...' : 'Отправить менеджеру',
+                    onPressed: _submitting ? null : () => _submit(publish: true),
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );
