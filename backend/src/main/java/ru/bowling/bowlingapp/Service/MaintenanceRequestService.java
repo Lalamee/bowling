@@ -1,6 +1,7 @@
 package ru.bowling.bowlingapp.Service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -37,6 +38,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class MaintenanceRequestService {
 
         private final MaintenanceRequestRepository maintenanceRequestRepository;
@@ -188,7 +190,10 @@ public class MaintenanceRequestService {
                                         "Название",
                                         "Каталожный номер",
                                         "Количество",
+                                        "ID склада (позиции)",
+                                        "ID каталога",
                                         "Статус",
+                                        "Причина отказа",
                                         "Доступность",
                                         "Принято",
                                         "Комментарий приемки",
@@ -199,7 +204,8 @@ public class MaintenanceRequestService {
                                         "Дата доставки",
                                         "Дата выдачи",
                                         "Локация",
-                                        "ID склада"
+                                        "ID склада",
+                                        "Запрос помощи"
                         );
                         Row headerRow = partsSheet.createRow(0);
                         for (int i = 0; i < headers.size(); i++) {
@@ -216,7 +222,10 @@ public class MaintenanceRequestService {
                                 partRow.createCell(col++).setCellValue(safeValue(part.getPartName()));
                                 partRow.createCell(col++).setCellValue(safeValue(part.getCatalogNumber()));
                                 partRow.createCell(col++).setCellValue(safeValue(part.getQuantity()));
+                                partRow.createCell(col++).setCellValue(safeValue(part.getInventoryId()));
+                                partRow.createCell(col++).setCellValue(safeValue(part.getCatalogId()));
                                 partRow.createCell(col++).setCellValue(safeValue(part.getStatus()));
+                                partRow.createCell(col++).setCellValue(safeValue(part.getRejectionReason()));
                                 partRow.createCell(col++).setCellValue(safeValue(part.getAvailable()));
                                 partRow.createCell(col++).setCellValue(safeValue(part.getAcceptedQuantity()));
                                 partRow.createCell(col++).setCellValue(safeValue(part.getAcceptanceComment()));
@@ -228,6 +237,7 @@ public class MaintenanceRequestService {
                                 partRow.createCell(col++).setCellValue(formatDate(part.getIssueDate()));
                                 partRow.createCell(col++).setCellValue(safeValue(part.getInventoryLocation()));
                                 partRow.createCell(col++).setCellValue(safeValue(part.getWarehouseId()));
+                                partRow.createCell(col++).setCellValue(safeValue(part.getHelpRequested()));
                         }
 
                         autoSizeColumns(infoSheet, 2);
@@ -236,6 +246,7 @@ public class MaintenanceRequestService {
                         workbook.write(outputStream);
                         return outputStream.toByteArray();
                 } catch (Exception ex) {
+                        log.error("Failed to export request {} to Excel", requestId, ex);
                         throw new IllegalStateException("Не удалось сформировать Excel файл", ex);
                 }
         }
