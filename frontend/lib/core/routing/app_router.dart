@@ -167,7 +167,16 @@ class AppRouter {
         }
         return MaterialPageRoute(builder: (_) => OwnerDashboardScreen(initialClubId: clubId));
       case Routes.clubStaff:
-        return MaterialPageRoute(builder: (_) => const ClubStaffScreen());
+        int? clubId;
+        final args = settings.arguments;
+        if (args is int) {
+          clubId = args;
+        } else if (args is Map) {
+          final map = Map<String, dynamic>.from(args as Map);
+          final val = map['clubId'];
+          if (val is num) clubId = val.toInt();
+        }
+        return MaterialPageRoute(builder: (_) => ClubStaffScreen(clubId: clubId));
 
       case Routes.profileMechanic:
         return MaterialPageRoute(builder: (_) => const MechanicProfileScreen());

@@ -217,6 +217,20 @@ class _ClubScreenState extends State<ClubScreen> {
     Navigator.pushNamed(context, Routes.ownerDashboard, arguments: selected.id);
   }
 
+  void _openClubStaff() {
+    final selected = _selectedIndex != null ? _clubs[_selectedIndex!] : null;
+    if (selected == null) {
+      showSnack(context, 'Выберите клуб');
+      return;
+    }
+    final scope = _scope;
+    if (scope != null && !scope.canActOnClub(selected)) {
+      showSnack(context, 'Нет доступа к выбранному клубу');
+      return;
+    }
+    Navigator.pushNamed(context, Routes.clubStaff, arguments: selected.id);
+  }
+
   Future<void> _openClubRequestSheet() async {
     final clubOptions = _clubs.isNotEmpty ? _clubs : _availableClubs;
     if (clubOptions.isEmpty) {
@@ -811,6 +825,8 @@ class _ClubScreenState extends State<ClubScreen> {
         ],
         if (_scope?.role == 'owner' || _scope?.role == 'manager' || _scope?.role == 'admin') ...[
           CustomButton(text: 'Техинформация и ТО', onPressed: _openOwnerDashboard),
+          const SizedBox(height: 12),
+          CustomButton(text: 'Сотрудники', onPressed: _openClubStaff),
           const SizedBox(height: 12),
         ],
         CustomButton(text: 'Дорожки и ТО', onPressed: _openLanesOverview),
