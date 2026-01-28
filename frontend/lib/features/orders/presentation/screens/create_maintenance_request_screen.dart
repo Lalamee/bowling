@@ -12,9 +12,11 @@ import '../../../../core/utils/part_availability_helper.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../core/utils/user_club_resolver.dart';
 import '../../../../core/models/user_club.dart';
+import '../../../../api/api_service.dart';
 import '../../../../models/part_request_dto.dart';
 import '../../../../models/part_dto.dart';
 import '../../../../models/parts_catalog_response_dto.dart';
+import '../../../../models/parts_search_dto.dart';
 import '../../../../models/warehouse_summary_dto.dart';
 import '../../../../shared/widgets/buttons/custom_button.dart';
 import '../widgets/part_picker_sheet.dart';
@@ -34,6 +36,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
   final _repo = MaintenanceRepository();
   final _userRepository = UserRepository();
   final _inventoryRepository = InventoryRepository();
+  final _api = ApiService();
 
   final _reasonController = TextEditingController();
   final _laneController = TextEditingController();
@@ -55,9 +58,8 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
 
   List<RequestedPartDto> requestedParts = [];
   List<PartAvailabilityResult?> _availability = const [];
-  List<PartDto> _partSuggestions = const <PartDto>[];
+  List<PartsCatalogResponseDto> _partSuggestions = const <PartsCatalogResponseDto>[];
   bool _isSearchingParts = false;
-  PartDto? _selectedCatalogPart;
   PartsCatalogResponseDto? _selectedCatalogItem;
 
   @override
@@ -181,17 +183,15 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       return;
     }
 
-    final selected = _selectedCatalogPart;
     final catalogSelection = _selectedCatalogItem;
 
-    if (selected == null && catalogSelection == null) {
+    if (catalogSelection == null) {
       showSnack(context, 'Выберите запчасть из каталога по категории оборудования');
       return;
     }
     final catalogNumberInput = _catalogNumberController.text.trim();
-    final resolvedCatalogNumber = catalogNumberInput.isNotEmpty
-        ? catalogNumberInput
-        : (selected != null ? _resolveCatalogNumber(selected) : catalogSelection?.catalogNumber);
+    final resolvedCatalogNumber =
+        catalogNumberInput.isNotEmpty ? catalogNumberInput : catalogSelection?.catalogNumber;
 
     if (resolvedCatalogNumber == null || resolvedCatalogNumber.isEmpty) {
       showSnack(context, 'Укажите каталожный номер запчасти');
@@ -200,17 +200,14 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
 
     setState(() {
       final newItem = RequestedPartDto(
-        inventoryId: selected?.inventoryId,
-        catalogId: selected?.catalogId ?? catalogSelection?.catalogId,
+        catalogId: catalogSelection?.catalogId,
         catalogNumber: resolvedCatalogNumber,
         partName: name,
         quantity: quantity,
-        warehouseId: selected?.warehouseId ?? _selectedClubId,
-        location: selected?.location,
+        warehouseId: _selectedClubId,
         helpRequested: helpRequested,
-        isAvailable: selected?.isAvailable ??
-            ((catalogSelection?.availabilityStatus?.toUpperCase() == 'AVAILABLE' ||
-                    (catalogSelection?.availableQuantity ?? 0) > 0)),
+        isAvailable: catalogSelection?.availabilityStatus?.toUpperCase() == 'AVAILABLE' ||
+            (catalogSelection?.availableQuantity ?? 0) > 0,
       );
 
       if (newItem.inventoryId != null) {
@@ -237,9 +234,8 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       _catalogNumberController.clear();
       _partNameController.clear();
       _quantityController.clear();
-      _selectedCatalogPart = null;
       _selectedCatalogItem = null;
-      _partSuggestions = const <PartDto>[];
+      _partSuggestions = const <PartsCatalogResponseDto>[];
       _availability = List.filled(requestedParts.length, null, growable: false);
     });
     await _refreshAvailability();
@@ -255,22 +251,9 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     _refreshAvailability();
   }
 
-  String _resolvePartDisplayName(PartDto part) {
-    final names = [part.commonName, part.officialNameRu, part.officialNameEn];
-    for (final name in names) {
-      if (name != null && name.trim().isNotEmpty) {
-        final resolved = name.trim();
-        if (part.equipmentNodeName != null && part.equipmentNodeName!.trim().isNotEmpty) {
-          return '$resolved (${part.equipmentNodeName!.trim()})';
-        }
-        return resolved;
-      }
-    }
-    final fallback = part.catalogNumber;
-    if (part.equipmentNodeName != null && part.equipmentNodeName!.trim().isNotEmpty) {
-      return '$fallback (${part.equipmentNodeName!.trim()})';
-    }
-    return fallback;
+  String _resolveCatalogDisplayName(PartsCatalogResponseDto part) {
+    final name = _resolveCatalogNameFromDto(part);
+    return name.isNotEmpty ? name : part.catalogNumber;
   }
 
   String _resolveCatalogNameFromDto(PartsCatalogResponseDto dto) {
@@ -283,40 +266,30 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     return dto.catalogNumber;
   }
 
-  String _resolveCatalogNumber(PartDto part) {
-    final candidate = part.catalogNumber.trim();
-    if (candidate.isNotEmpty) {
-      return candidate;
-    }
-    return part.catalogId.toString();
-  }
-
   void _clearPartSelection() {
     _partsSearchDebounce?.cancel();
     setState(() {
-      _selectedCatalogPart = null;
       _selectedCatalogItem = null;
       _partNameController.clear();
       _catalogNumberController.clear();
-      _partSuggestions = const <PartDto>[];
+      _partSuggestions = const <PartsCatalogResponseDto>[];
       _isSearchingParts = false;
     });
   }
 
-  bool get _isCatalogNumberLocked => _selectedCatalogPart != null || _selectedCatalogItem != null;
+  bool get _isCatalogNumberLocked => _selectedCatalogItem != null;
 
   void _onPartNameChanged(String value) {
     _partsSearchDebounce?.cancel();
     setState(() {
-      _selectedCatalogPart = null;
       _selectedCatalogItem = null;
       _catalogNumberController.clear();
-      _partSuggestions = const <PartDto>[];
+      _partSuggestions = const <PartsCatalogResponseDto>[];
     });
     final trimmed = value.trim();
     if (trimmed.length < 2) {
       setState(() {
-        _partSuggestions = const <PartDto>[];
+        _partSuggestions = const <PartsCatalogResponseDto>[];
         _isSearchingParts = false;
       });
       return;
@@ -331,7 +304,10 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
       _isSearchingParts = true;
     });
     try {
-      final results = await _inventoryRepository.search(query: query, clubId: _selectedClubId);
+      final results = await _api.searchParts(PartsSearchDto(
+        searchQuery: query,
+        size: 10,
+      ));
       if (!mounted) return;
       setState(() {
         _partSuggestions = results.take(10).toList();
@@ -340,7 +316,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _partSuggestions = const <PartDto>[];
+        _partSuggestions = const <PartsCatalogResponseDto>[];
         _isSearchingParts = false;
       });
     }
@@ -354,7 +330,6 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     );
     if (result != null) {
       setState(() {
-        _selectedCatalogPart = null;
         _selectedCatalogItem = result;
         _partNameController.text = _resolveCatalogNameFromDto(result);
         _catalogNumberController.text = result.catalogNumber;
@@ -362,14 +337,13 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
     }
   }
 
-  void _selectSuggestedPart(PartDto part) {
+  void _selectSuggestedPart(PartsCatalogResponseDto part) {
     _partsSearchDebounce?.cancel();
     setState(() {
-      _selectedCatalogPart = part;
-      _selectedCatalogItem = null;
-      _partNameController.text = _resolvePartDisplayName(part);
-      _catalogNumberController.text = _resolveCatalogNumber(part);
-      _partSuggestions = const <PartDto>[];
+      _selectedCatalogItem = part;
+      _partNameController.text = _resolveCatalogNameFromDto(part);
+      _catalogNumberController.text = part.catalogNumber;
+      _partSuggestions = const <PartsCatalogResponseDto>[];
     });
   }
 
@@ -658,7 +632,7 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
                 return null;
               }
               final value = _catalogNumberController.text.trim();
-              if (value.isEmpty && _selectedCatalogPart == null) {
+              if (value.isEmpty && _selectedCatalogItem == null) {
                 return 'Каталожный номер обязателен';
               }
               return null;
@@ -968,19 +942,15 @@ class _CreateMaintenanceRequestScreenState extends State<CreateMaintenanceReques
               physics: const NeverScrollableScrollPhysics(),
               itemBuilder: (context, index) {
                 final part = _partSuggestions[index];
-                final quantity = part.quantity;
+                final quantity = part.availableQuantity;
                 final subtitleBuffer = StringBuffer(part.catalogNumber);
                 if (quantity != null) {
                   subtitleBuffer.write(' · Остаток: $quantity');
                 }
-                final location = part.location;
-                if (location != null && location.trim().isNotEmpty) {
-                  subtitleBuffer.write(' · ${location.trim()}');
-                }
                 final subtitle = subtitleBuffer.toString();
                 return ListTile(
                   leading: const Icon(Icons.settings_suggest_rounded, color: AppColors.primary),
-                  title: Text(_resolvePartDisplayName(part)),
+                  title: Text(_resolveCatalogDisplayName(part)),
                   subtitle: Text(subtitle),
                   onTap: () => _selectSuggestedPart(part),
                 );
