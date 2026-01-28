@@ -21,7 +21,9 @@ import '../../../../../models/club_summary_dto.dart';
 import '../../../../../models/mechanic_directory_models.dart';
 
 class AdminMechanicsScreen extends StatefulWidget {
-  const AdminMechanicsScreen({super.key});
+  const AdminMechanicsScreen({super.key, this.isClubOwner = false});
+
+  final bool isClubOwner;
 
   @override
   State<AdminMechanicsScreen> createState() => _AdminMechanicsScreenState();
@@ -51,6 +53,8 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
   List<_ClubOption> _clubOptions = [];
   List<FreeMechanicApplicationResponseDto> _freeMechanics = [];
   Map<int, MechanicDirectoryDetail> _freeMechanicDetails = {};
+
+  String get _freeMechanicAssignLabel => widget.isClubOwner ? 'Принять в клуб' : 'Назначить клуб';
 
   @override
   void initState() {
@@ -637,7 +641,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
                     ? () => _showMissingClubsNotice()
                     : () => _attachFreeMechanicToClub(mechanic),
                 icon: const Icon(Icons.add_business),
-                label: const Text('Назначить клуб'),
+                label: Text(_freeMechanicAssignLabel),
               ),
             ),
             const SizedBox(height: 8),
@@ -746,7 +750,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
-          title: const Text('Назначить клуб'),
+          title: Text(_freeMechanicAssignLabel),
           content: Form(
             key: formKey,
             child: DropdownButtonFormField<int?>(

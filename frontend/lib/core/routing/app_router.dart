@@ -237,7 +237,15 @@ class AppRouter {
       case Routes.adminClubs:
         return MaterialPageRoute(builder: (_) => const AdminClubsScreen());
       case Routes.adminMechanics:
-        return MaterialPageRoute(builder: (_) => const AdminMechanicsScreen());
+        final args = settings.arguments;
+        var isClubOwner = false;
+        if (args is Map) {
+          final value = args['isClubOwner'];
+          if (value is bool) {
+            isClubOwner = value;
+          }
+        }
+        return MaterialPageRoute(builder: (_) => AdminMechanicsScreen(isClubOwner: isClubOwner));
       case Routes.adminOrders:
         return MaterialPageRoute(builder: (_) => const AdminOrdersScreen());
       case Routes.adminAttestations:

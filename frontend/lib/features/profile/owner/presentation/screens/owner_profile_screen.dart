@@ -408,6 +408,12 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeBaseScreen())),
                       ),
                       const SizedBox(height: 10),
+                      ProfileTile(
+                        icon: Icons.handyman_outlined,
+                        text: 'База свободных агентов',
+                        onTap: () => Navigator.pushNamed(context, Routes.adminMechanics, arguments: {'isClubOwner': true}),
+                      ),
+                      const SizedBox(height: 10),
                       if (profile.clubs.isNotEmpty)
                         ...List.generate(profile.clubs.length, (i) {
                           final club = profile.clubs[i];
