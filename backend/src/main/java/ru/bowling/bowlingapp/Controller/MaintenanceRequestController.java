@@ -3,6 +3,7 @@ package ru.bowling.bowlingapp.Controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import ru.bowling.bowlingapp.DTO.MaintenanceRequestResponseDTO;
 import ru.bowling.bowlingapp.DTO.PartRequestDTO;
@@ -64,8 +65,9 @@ public class MaintenanceRequestController {
 
     @PatchMapping("/{requestId}/complete")
     @PreAuthorize("hasAnyRole('MECHANIC', 'CHIEF_MECHANIC', 'HEAD_MECHANIC', 'ADMIN')")
-    public ResponseEntity<MaintenanceRequestResponseDTO> completeRequest(@PathVariable Long requestId) {
-        return ResponseEntity.ok(maintenanceRequestService.completeRequest(requestId));
+    public ResponseEntity<MaintenanceRequestResponseDTO> completeRequest(@PathVariable Long requestId,
+                                                                         Authentication authentication) {
+        return ResponseEntity.ok(maintenanceRequestService.completeRequest(requestId, authentication.getName()));
     }
 
 //    @PatchMapping("/{requestId}/status")
