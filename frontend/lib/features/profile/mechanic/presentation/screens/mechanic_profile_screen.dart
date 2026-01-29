@@ -144,6 +144,12 @@ class _MechanicProfileScreenState extends State<MechanicProfileScreen> {
         });
         return;
       }
+      final remoteAccountType = me['accountType']?.toString() ?? me['accountTypeName']?.toString();
+      if (remoteAccountType != null && remoteAccountType.isNotEmpty && remoteAccountType != _accountType) {
+        _accountType = remoteAccountType;
+        _isFreeMechanic = _isFreeMechanicType(remoteAccountType);
+        await LocalAuthStorage.setRegisteredAccountType(remoteAccountType);
+      }
       final scope = await UserAccessScope.fromProfile(me);
       await _notificationsController.ensureInitialized(scope);
       String? attestationStatus;
