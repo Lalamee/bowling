@@ -285,7 +285,15 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
 
   Future<Directory?> _resolveDownloadsDirectory() async {
     if (Platform.isAndroid) {
-      return DownloadsPathProvider.downloadsDirectory;
+      final legacyDownloads = Directory('/storage/emulated/0/Download');
+      if (await legacyDownloads.exists()) {
+        return legacyDownloads;
+      }
+      final externalDir = await getExternalStorageDirectory();
+      if (externalDir == null) {
+        return null;
+      }
+      return Directory('${externalDir.path}/Download');
     }
     return getDownloadsDirectory();
   }
@@ -296,6 +304,9 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
       if (downloadsDir == null) {
         _toast('Не удалось определить папку Downloads');
         return;
+      }
+      if (!await downloadsDir.exists()) {
+        await downloadsDir.create(recursive: true);
       }
       final targetFile = File('${downloadsDir.path}/order-$requestId.xlsx');
       await tempFile.copy(targetFile.path);
