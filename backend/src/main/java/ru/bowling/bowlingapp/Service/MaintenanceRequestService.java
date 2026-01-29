@@ -430,7 +430,12 @@ public class MaintenanceRequestService {
 
         private void autoSizeColumns(Sheet sheet, int columnCount) {
                 for (int i = 0; i < columnCount; i++) {
-                        sheet.autoSizeColumn(i);
+                        try {
+                                sheet.autoSizeColumn(i);
+                        } catch (Exception ex) {
+                                log.warn("Failed to auto size column {} in sheet {}", i, sheet.getSheetName(), ex);
+                                sheet.setColumnWidth(i, 22 * 256);
+                        }
                 }
         }
 
