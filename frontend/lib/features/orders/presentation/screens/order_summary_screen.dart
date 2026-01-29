@@ -1,8 +1,11 @@
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:downloads_path_provider_28/downloads_path_provider_28.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../../core/repositories/user_repository.dart';
 import '../../../../../core/services/authz/acl.dart';
@@ -218,10 +221,12 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
     setState(() => _isExporting = true);
     try {
       final bytes = await _maintenanceRepository.downloadOrderExcel(request!.requestId);
-      final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/order-${request.requestId}.xlsx');
-      await file.writeAsBytes(bytes, flush: true);
-      _toast('Файл сохранён: ${file.path}');
+      final tempFile = await _writeExcelTemp(bytes, request.requestId);
+      if (!mounted) return;
+      final handled = await _showExportActions(tempFile, request.requestId);
+      if (!handled) {
+        await _deleteTempFile(tempFile);
+      }
     } catch (e) {
       if (!mounted) return;
       showApiError(context, e);
@@ -229,6 +234,89 @@ class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
       if (mounted) {
         setState(() => _isExporting = false);
       }
+    }
+  }
+
+  Future<File> _writeExcelTemp(Uint8List bytes, int requestId) async {
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/order-$requestId.xlsx');
+    await file.writeAsBytes(bytes, flush: true);
+    return file;
+  }
+
+  Future<void> _deleteTempFile(File file) async {
+    if (await file.exists()) {
+      await file.delete();
+    }
+  }
+
+  Future<bool> _showExportActions(File tempFile, int requestId) async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.download),
+                title: const Text('Скачать в Downloads'),
+                onTap: () async {
+                  Navigator.pop(context, true);
+                  await _saveExcelToDownloads(tempFile, requestId);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.share),
+                title: const Text('Поделиться'),
+                onTap: () async {
+                  Navigator.pop(context, true);
+                  await _shareExcel(tempFile, requestId);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    return result ?? false;
+  }
+
+  Future<Directory?> _resolveDownloadsDirectory() async {
+    if (Platform.isAndroid) {
+      return DownloadsPathProvider.downloadsDirectory;
+    }
+    return getDownloadsDirectory();
+  }
+
+  Future<void> _saveExcelToDownloads(File tempFile, int requestId) async {
+    try {
+      final downloadsDir = await _resolveDownloadsDirectory();
+      if (downloadsDir == null) {
+        _toast('Не удалось определить папку Downloads');
+        return;
+      }
+      final targetFile = File('${downloadsDir.path}/order-$requestId.xlsx');
+      await tempFile.copy(targetFile.path);
+      _toast('Файл сохранён в Downloads');
+    } catch (e) {
+      showApiError(context, e);
+    } finally {
+      await _deleteTempFile(tempFile);
+    }
+  }
+
+  Future<void> _shareExcel(File tempFile, int requestId) async {
+    try {
+      await Share.shareXFiles(
+        [XFile(tempFile.path)],
+        text: 'Заявка №$requestId',
+      );
+    } catch (e) {
+      showApiError(context, e);
+    } finally {
+      await _deleteTempFile(tempFile);
     }
   }
 
