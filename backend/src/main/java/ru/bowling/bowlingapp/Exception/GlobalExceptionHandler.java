@@ -77,9 +77,9 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(IllegalStateException.class)
 	public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException ex, HttpServletRequest request) {
-		log.warn("Illegal state at {}: {}", request.getRequestURI(), ex.getMessage());
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-				.body(buildError(request, HttpStatus.BAD_REQUEST, "BAD_REQUEST", ex.getMessage()));
+		log.error("Illegal state at {}", request.getRequestURI(), ex);
+		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+				.body(buildError(request, HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", ex.getMessage()));
 	}
 
 	@ExceptionHandler(Exception.class)

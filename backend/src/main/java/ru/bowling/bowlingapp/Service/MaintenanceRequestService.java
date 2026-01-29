@@ -425,7 +425,16 @@ public class MaintenanceRequestService {
         }
 
         private String safeValue(Object value) {
-                return value == null ? "" : String.valueOf(value);
+                if (value == null) {
+                        return "";
+                }
+                String text = String.valueOf(value);
+                int maxLength = 32767;
+                if (text.length() > maxLength) {
+                        log.warn("Truncating Excel cell value from {} to {} characters", text.length(), maxLength);
+                        return text.substring(0, maxLength);
+                }
+                return text;
         }
 
         private void autoSizeColumns(Sheet sheet, int columnCount) {

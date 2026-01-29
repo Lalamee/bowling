@@ -2,7 +2,11 @@ package ru.bowling.bowlingapp.Controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +24,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/maintenance")
 @RequiredArgsConstructor
+@Slf4j
 public class MaintenanceController {
 
 	private final MaintenanceRequestService maintenanceRequestService;
@@ -154,10 +159,18 @@ public class MaintenanceController {
                         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
                 }
                 byte[] fileBytes = maintenanceRequestService.exportRequestToExcel(id);
+                if (fileBytes == null || fileBytes.length == 0) {
+                        log.error("Excel export for request {} returned empty payload", id);
+                        throw new IllegalStateException("Пустой Excel файл");
+                }
+                ContentDisposition contentDisposition = ContentDisposition.attachment()
+                                .filename("order-" + id + ".xlsx")
+                                .build();
                 return ResponseEntity.ok()
-                                .header("Content-Disposition", "attachment; filename=order-" + id + ".xlsx")
-                                .header("Content-Type",
-                                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString())
+                                .contentType(MediaType.parseMediaType(
+                                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                                .contentLength(fileBytes.length)
                                 .body(fileBytes);
         }
 
