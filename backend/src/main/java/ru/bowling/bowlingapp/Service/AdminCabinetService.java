@@ -185,7 +185,7 @@ public class AdminCabinetService {
             throw new IllegalStateException("Mechanic profile is not bound to a user");
         }
 
-        BowlingClub club = bowlingClubRepository.findById(request.getClubId())
+        BowlingClub club = bowlingClubRepository.findById(targetClubId)
                 .orElseThrow(() -> new IllegalArgumentException("Club not found"));
         Long clubId = club.getClubId();
 
@@ -236,9 +236,23 @@ public class AdminCabinetService {
     }
 
     @Transactional
-    public AdminRegistrationApplicationDTO assignFreeMechanicToClub(Long userId, FreeMechanicClubAssignRequestDTO request) {
-        if (request == null || request.getClubId() == null) {
-            throw new IllegalArgumentException("Club id is required");
+    public AdminRegistrationApplicationDTO assignFreeMechanicToClub(Long userId, FreeMechanicClubAssignRequestDTO request, String actorPhone) {
+        User actor = actorPhone != null ? userRepository.findByPhone(actorPhone).orElse(null) : null;
+        RoleName actorRole = actor != null && actor.getRole() != null ? RoleName.from(actor.getRole().getName()) : null;
+        Long targetClubId;
+        if (actorRole == RoleName.CLUB_OWNER) {
+            OwnerProfile ownerProfile = ownerProfileRepository.findByUser_UserId(actor.getUserId())
+                    .orElseThrow(() -> new IllegalStateException("Owner profile not found"));
+            List<BowlingClub> ownerClubs = Optional.ofNullable(ownerProfile.getClubs()).orElseGet(ArrayList::new);
+            if (ownerClubs.isEmpty()) {
+                throw new IllegalArgumentException("Owner has no club configured");
+            }
+            targetClubId = ownerClubs.get(0).getClubId();
+        } else {
+            if (request == null || request.getClubId() == null) {
+                throw new IllegalArgumentException("Club id is required");
+            }
+            targetClubId = request.getClubId();
         }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -262,7 +276,7 @@ public class AdminCabinetService {
             profile = profiles.get(0);
         }
 
-        BowlingClub club = bowlingClubRepository.findById(request.getClubId())
+        BowlingClub club = bowlingClubRepository.findById(targetClubId)
                 .orElseThrow(() -> new IllegalArgumentException("Club not found"));
 
         AccountType currentAccountType = user.getAccountType();
@@ -347,10 +361,14 @@ public class AdminCabinetService {
     }
 
     @Transactional(readOnly = true)
-    public List<AdminMechanicStatusChangeDTO> listMechanicStatusChanges() {
+    public List<AdminMechanicStatusChangeDTO> listMechanicStatusChanges(String actorPhone) {
+        Set<Long> allowedClubIds = resolveAllowedClubIds(actorPhone);
         return clubStaffRepository.findAll().stream()
                 .filter(staff -> staff.getUser() != null && staff.getUser().getRole() != null
                         && RoleName.from(staff.getUser().getRole().getName()) == RoleName.MECHANIC)
+                .filter(staff -> allowedClubIds == null
+                        || (staff.getClub() != null && staff.getClub().getClubId() != null
+                        && allowedClubIds.contains(staff.getClub().getClubId())))
                 .map(this::toStatusChangeDto)
                 .filter(dto -> Boolean.FALSE.equals(dto.getIsActive()) || Boolean.TRUE.equals(dto.getInfoAccessRestricted()))
                 .collect(Collectors.toList());
@@ -421,6 +439,32 @@ public class AdminCabinetService {
         }
         userRepository.save(user);
         return mapUserToRegistration(user);
+    }
+
+
+    private Set<Long> resolveAllowedClubIds(String actorPhone) {
+        if (actorPhone == null || actorPhone.isBlank()) {
+            return null;
+        }
+        User actor = userRepository.findByPhone(actorPhone).orElse(null);
+        if (actor == null || actor.getRole() == null) {
+            return null;
+        }
+        RoleName roleName = RoleName.from(actor.getRole().getName());
+        if (roleName == RoleName.ADMIN) {
+            return null;
+        }
+        if (roleName != RoleName.CLUB_OWNER) {
+            return Set.of();
+        }
+        OwnerProfile ownerProfile = ownerProfileRepository.findByUser_UserId(actor.getUserId()).orElse(null);
+        if (ownerProfile == null || ownerProfile.getClubs() == null) {
+            return Set.of();
+        }
+        return ownerProfile.getClubs().stream()
+                .map(BowlingClub::getClubId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 
     @Transactional(readOnly = true)

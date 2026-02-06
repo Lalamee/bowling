@@ -8,9 +8,12 @@ import ru.bowling.bowlingapp.DTO.AdminMechanicListResponseDTO;
 import ru.bowling.bowlingapp.DTO.AdminMechanicSummaryDTO;
 import ru.bowling.bowlingapp.DTO.AdminPendingMechanicDTO;
 import ru.bowling.bowlingapp.Entity.MechanicProfile;
+import ru.bowling.bowlingapp.Entity.OwnerProfile;
 import ru.bowling.bowlingapp.Entity.User;
 import ru.bowling.bowlingapp.Entity.BowlingClub;
+import ru.bowling.bowlingapp.Enum.RoleName;
 import ru.bowling.bowlingapp.Repository.MechanicProfileRepository;
+import ru.bowling.bowlingapp.Repository.OwnerProfileRepository;
 import ru.bowling.bowlingapp.Repository.UserRepository;
 import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
 
@@ -21,6 +24,9 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +35,7 @@ public class AdminService {
     private final UserRepository userRepository;
     private final MechanicProfileRepository mechanicProfileRepository;
     private final ClubStaffRepository clubStaffRepository;
+    private final OwnerProfileRepository ownerProfileRepository;
 
     @Transactional
     public void verifyUser(Long userId) {
@@ -81,6 +88,12 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public AdminMechanicListResponseDTO getMechanicsOverview() {
+        return getMechanicsOverview(null);
+    }
+
+    @Transactional(readOnly = true)
+    public AdminMechanicListResponseDTO getMechanicsOverview(String actorPhone) {
+        Set<Long> allowedClubIds = resolveAllowedClubIds(actorPhone);
         List<MechanicProfile> profiles = mechanicProfileRepository.findAllWithUserAndClubs();
 
         List<AdminPendingMechanicDTO> pending = new ArrayList<>();
@@ -91,7 +104,10 @@ public class AdminService {
                 continue;
             }
             if (isPending(profile)) {
-                pending.add(mapPending(profile));
+                AdminPendingMechanicDTO pendingDto = mapPending(profile);
+                if (allowedClubIds == null || (pendingDto.getRequestedClubId() != null && allowedClubIds.contains(pendingDto.getRequestedClubId()))) {
+                    pending.add(pendingDto);
+                }
                 continue;
             }
 
@@ -102,6 +118,9 @@ public class AdminService {
             AdminMechanicSummaryDTO mechanicDto = mapSummary(profile);
             for (BowlingClub club : profile.getClubs()) {
                 if (club == null || club.getClubId() == null) {
+                    continue;
+                }
+                if (allowedClubIds != null && !allowedClubIds.contains(club.getClubId())) {
                     continue;
                 }
                 ClubMechanicsAggregate aggregate = clubAggregates.computeIfAbsent(
@@ -139,6 +158,31 @@ public class AdminService {
                 .pending(pending)
                 .clubs(clubDtos)
                 .build();
+    }
+
+    private Set<Long> resolveAllowedClubIds(String actorPhone) {
+        if (actorPhone == null || actorPhone.isBlank()) {
+            return null;
+        }
+        User actor = userRepository.findByPhone(actorPhone).orElse(null);
+        if (actor == null || actor.getRole() == null) {
+            return null;
+        }
+        RoleName roleName = RoleName.from(actor.getRole().getName());
+        if (roleName == RoleName.ADMIN) {
+            return null;
+        }
+        if (roleName != RoleName.CLUB_OWNER) {
+            return Set.of();
+        }
+        OwnerProfile ownerProfile = ownerProfileRepository.findByUser_UserId(actor.getUserId()).orElse(null);
+        if (ownerProfile == null || ownerProfile.getClubs() == null) {
+            return Set.of();
+        }
+        return ownerProfile.getClubs().stream()
+                .map(BowlingClub::getClubId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 
     private boolean isPending(MechanicProfile profile) {
