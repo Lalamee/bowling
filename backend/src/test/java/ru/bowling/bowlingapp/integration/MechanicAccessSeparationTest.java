@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
+import ru.bowling.bowlingapp.DTO.FreeMechanicClubAssignRequestDTO;
 import ru.bowling.bowlingapp.DTO.MechanicProfileDTO;
 import ru.bowling.bowlingapp.DTO.RegisterUserDTO;
 import ru.bowling.bowlingapp.Entity.*;
@@ -13,6 +14,7 @@ import ru.bowling.bowlingapp.Entity.enums.WorkType;
 import ru.bowling.bowlingapp.Enum.AccountTypeName;
 import ru.bowling.bowlingapp.Enum.RoleName;
 import ru.bowling.bowlingapp.Repository.*;
+import ru.bowling.bowlingapp.Service.AdminCabinetService;
 import ru.bowling.bowlingapp.Service.AuthService;
 import ru.bowling.bowlingapp.Service.InvitationService;
 import ru.bowling.bowlingapp.Service.WorkLogService;
@@ -32,6 +34,9 @@ class MechanicAccessSeparationTest {
 
     @Autowired
     private InvitationService invitationService;
+
+    @Autowired
+    private AdminCabinetService adminCabinetService;
 
     @Autowired
     private WorkLogService workLogService;
@@ -203,5 +208,93 @@ class MechanicAccessSeparationTest {
         assertThat(freeMechanicUser.getMechanicProfile().getClubs()).isEmpty();
         assertThat(clubStaffRepository.findByUserUserId(freeMechanicUser.getUserId())).isEmpty();
     }
-}
 
+    @Test
+    void adminAssignmentRequiresOwnerApprovalBeforeClubAccess() {
+        BowlingClub club = bowlingClubRepository.save(BowlingClub.builder()
+                .name("Club Owner Review")
+                .address("Address")
+                .lanesCount(10)
+                .isActive(true)
+                .isVerified(true)
+                .createdAt(LocalDate.now())
+                .updatedAt(LocalDate.now())
+                .build());
+
+        Role mechanicRole = roleRepository.findByNameIgnoreCase(RoleName.MECHANIC.name()).orElseThrow();
+        AccountType freeAccount = accountTypeRepository.findByNameIgnoreCase(AccountTypeName.FREE_MECHANIC_BASIC.name()).orElseThrow();
+
+        authService.registerUser(RegisterUserDTO.builder()
+                        .phone("+79990000001")
+                        .password("FreeMechanic123")
+                        .roleId(mechanicRole.getRoleId().intValue())
+                        .accountTypeId(freeAccount.getAccountTypeId().intValue())
+                        .build(),
+                MechanicProfileDTO.builder()
+                        .fullName("Свободный назначаемый")
+                        .birthDate(LocalDate.of(1990, 1, 1))
+                        .totalExperienceYears(4)
+                        .bowlingExperienceYears(2)
+                        .isEntrepreneur(true)
+                        .region("Казань")
+                        .build(),
+                null, null, null);
+
+        User mechanic = userRepository.findByPhone("+79990000001").orElseThrow();
+
+        adminCabinetService.assignFreeMechanicToClub(
+                mechanic.getUserId(),
+                FreeMechanicClubAssignRequestDTO.builder().clubId(club.getClubId()).build(),
+                null
+        );
+
+        assertThat(clubInvitationRepository.findByMechanic_UserIdAndStatus(mechanic.getUserId(), "OWNER_REVIEW")).hasSize(1);
+        assertThat(clubStaffRepository.findByUserUserIdAndIsActiveTrue(mechanic.getUserId())).isEmpty();
+    }
+
+    @Test
+    void ownerInvitationAcceptancePromotesFreeMechanicToClubMechanic() {
+        BowlingClub club = bowlingClubRepository.save(BowlingClub.builder()
+                .name("Club Invite")
+                .address("Address")
+                .lanesCount(8)
+                .isActive(true)
+                .isVerified(true)
+                .createdAt(LocalDate.now())
+                .updatedAt(LocalDate.now())
+                .build());
+
+        Role mechanicRole = roleRepository.findByNameIgnoreCase(RoleName.MECHANIC.name()).orElseThrow();
+        AccountType freeAccount = accountTypeRepository.findByNameIgnoreCase(AccountTypeName.FREE_MECHANIC_PREMIUM.name()).orElseThrow();
+
+        authService.registerUser(RegisterUserDTO.builder()
+                        .phone("+79990000002")
+                        .password("FreeMechanic123")
+                        .roleId(mechanicRole.getRoleId().intValue())
+                        .accountTypeId(freeAccount.getAccountTypeId().intValue())
+                        .build(),
+                MechanicProfileDTO.builder()
+                        .fullName("Свободный по приглашению")
+                        .birthDate(LocalDate.of(1992, 2, 2))
+                        .totalExperienceYears(6)
+                        .bowlingExperienceYears(3)
+                        .isEntrepreneur(true)
+                        .region("Пермь")
+                        .build(),
+                null, null, null);
+
+        User mechanic = userRepository.findByPhone("+79990000002").orElseThrow();
+
+        invitationService.inviteMechanic(club.getClubId(), mechanic.getUserId());
+        ClubInvitation invitation = clubInvitationRepository.findByMechanic_UserIdAndStatus(mechanic.getUserId(), "PENDING").get(0);
+        invitationService.acceptInvitation(invitation.getId());
+
+        User updated = userRepository.findById(mechanic.getUserId()).orElseThrow();
+        assertThat(updated.getAccountType().getName()).isEqualTo(AccountTypeName.INDIVIDUAL.name());
+        assertThat(updated.getMechanicProfile().getClubs())
+                .extracting(BowlingClub::getClubId)
+                .contains(club.getClubId());
+        assertThat(clubStaffRepository.findByUserUserIdAndIsActiveTrue(updated.getUserId())).isNotEmpty();
+    }
+
+}

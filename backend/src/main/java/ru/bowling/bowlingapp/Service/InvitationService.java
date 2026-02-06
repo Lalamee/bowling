@@ -5,10 +5,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.bowling.bowlingapp.Entity.*;
 import ru.bowling.bowlingapp.Enum.AccountTypeName;
-import ru.bowling.bowlingapp.Repository.BowlingClubRepository;
-import ru.bowling.bowlingapp.Repository.ClubInvitationRepository;
-import ru.bowling.bowlingapp.Repository.ClubStaffRepository;
-import ru.bowling.bowlingapp.Repository.UserRepository;
+import ru.bowling.bowlingapp.Repository.*;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +19,9 @@ public class InvitationService {
     private final BowlingClubRepository bowlingClubRepository;
     private final UserRepository userRepository;
     private final ClubStaffRepository clubStaffRepository;
+    private final OwnerProfileRepository ownerProfileRepository;
+    private final AccountTypeRepository accountTypeRepository;
+    private final MechanicProfileRepository mechanicProfileRepository;
 
     @Transactional
     public void inviteMechanic(Long clubId, Long mechanicId) {
@@ -34,38 +38,41 @@ public class InvitationService {
     }
 
     @Transactional
+    public void ownerApproveInvitation(Long invitationId, String ownerPhone) {
+        ClubInvitation invitation = invitationRepository.findById(invitationId)
+                .orElseThrow(() -> new IllegalArgumentException("Invitation not found"));
+
+        if (!"OWNER_REVIEW".equalsIgnoreCase(invitation.getStatus())) {
+            throw new IllegalStateException("Invitation is not waiting for owner review");
+        }
+
+        User ownerUser = userRepository.findByPhone(ownerPhone)
+                .orElseThrow(() -> new IllegalArgumentException("Owner not found"));
+        OwnerProfile ownerProfile = ownerProfileRepository.findByUser_UserId(ownerUser.getUserId())
+                .orElseThrow(() -> new IllegalArgumentException("Owner profile not found"));
+
+        boolean clubOwned = ownerProfile.getClubs() != null && ownerProfile.getClubs().stream()
+                .anyMatch(c -> Objects.equals(c.getClubId(), invitation.getClub().getClubId()));
+        if (!clubOwned) {
+            throw new IllegalArgumentException("Owner does not manage this club");
+        }
+
+        invitation.setStatus("ACCEPTED");
+        activateMechanicInClub(invitation.getMechanic(), invitation.getClub());
+        invitationRepository.save(invitation);
+    }
+
+    @Transactional
     public void acceptInvitation(Long invitationId) {
         ClubInvitation invitation = invitationRepository.findById(invitationId)
                 .orElseThrow(() -> new IllegalArgumentException("Invitation not found"));
 
-        invitation.setStatus("ACCEPTED");
-
-        User mechanicUser = invitation.getMechanic();
-        MechanicProfile mechanicProfile = mechanicUser.getMechanicProfile();
-        BowlingClub club = (BowlingClub) invitation.getClub();
-
-        AccountTypeName accountType = mechanicUser.getAccountType() != null
-                ? AccountTypeName.from(mechanicUser.getAccountType().getName())
-                : AccountTypeName.INDIVIDUAL;
-
-        if (accountType == AccountTypeName.INDIVIDUAL) {
-            if (mechanicProfile.getClubs() == null) {
-                mechanicProfile.setClubs(new java.util.ArrayList<>());
-            }
-            if (mechanicProfile.getClubs().stream().noneMatch(c -> c.getClubId().equals(club.getClubId()))) {
-                mechanicProfile.getClubs().add(club);
-            }
-            clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, mechanicUser)
-                    .orElseGet(() -> clubStaffRepository.save(ClubStaff.builder()
-                            .club(club)
-                            .user(mechanicUser)
-                            .role(mechanicUser.getRole())
-                            .isActive(Boolean.TRUE)
-                            .assignedAt(java.time.LocalDateTime.now())
-                            .infoAccessRestricted(Boolean.FALSE)
-                            .build()));
+        if (!"PENDING".equalsIgnoreCase(invitation.getStatus())) {
+            throw new IllegalStateException("Invitation is not pending mechanic confirmation");
         }
 
+        invitation.setStatus("ACCEPTED");
+        activateMechanicInClub(invitation.getMechanic(), invitation.getClub());
         invitationRepository.save(invitation);
     }
 
@@ -75,5 +82,44 @@ public class InvitationService {
                 .orElseThrow(() -> new IllegalArgumentException("Invitation not found"));
         invitation.setStatus("REJECTED");
         invitationRepository.save(invitation);
+    }
+
+    private void activateMechanicInClub(User mechanicUser, BowlingClub club) {
+        MechanicProfile mechanicProfile = mechanicUser.getMechanicProfile();
+        if (mechanicProfile == null) {
+            throw new IllegalStateException("Mechanic profile not found");
+        }
+
+        AccountTypeName accountType = mechanicUser.getAccountType() != null
+                ? AccountTypeName.from(mechanicUser.getAccountType().getName())
+                : AccountTypeName.INDIVIDUAL;
+
+        if (accountType == AccountTypeName.FREE_MECHANIC_BASIC || accountType == AccountTypeName.FREE_MECHANIC_PREMIUM) {
+            AccountType clubMechanicType = accountTypeRepository
+                    .findFirstByNameIgnoreCaseOrderByAccountTypeIdAsc(AccountTypeName.INDIVIDUAL.name())
+                    .orElseThrow(() -> new IllegalStateException("Account type not configured: " + AccountTypeName.INDIVIDUAL));
+            mechanicUser.setAccountType(clubMechanicType);
+        }
+
+        if (mechanicProfile.getClubs() == null) {
+            mechanicProfile.setClubs(new ArrayList<>());
+        }
+        if (mechanicProfile.getClubs().stream().noneMatch(c -> Objects.equals(c.getClubId(), club.getClubId()))) {
+            mechanicProfile.getClubs().add(club);
+        }
+
+        ClubStaff staff = clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, mechanicUser)
+                .orElseGet(() -> ClubStaff.builder()
+                        .club(club)
+                        .user(mechanicUser)
+                        .assignedAt(LocalDateTime.now())
+                        .build());
+        staff.setRole(mechanicUser.getRole());
+        staff.setIsActive(Boolean.TRUE);
+        staff.setInfoAccessRestricted(Boolean.FALSE);
+
+        mechanicProfileRepository.save(mechanicProfile);
+        userRepository.save(mechanicUser);
+        clubStaffRepository.save(staff);
     }
 }
