@@ -41,6 +41,7 @@ public class AdminCabinetService {
     private final ClubStaffRepository clubStaffRepository;
     private final BowlingClubRepository bowlingClubRepository;
     private final PersonalWarehouseRepository personalWarehouseRepository;
+    private final ClubInvitationRepository clubInvitationRepository;
     private final NotificationService notificationService;
     private final AttestationService attestationService;
 
@@ -185,7 +186,7 @@ public class AdminCabinetService {
             throw new IllegalStateException("Mechanic profile is not bound to a user");
         }
 
-        BowlingClub club = bowlingClubRepository.findById(targetClubId)
+        BowlingClub club = bowlingClubRepository.findById(request.getClubId())
                 .orElseThrow(() -> new IllegalArgumentException("Club not found"));
         Long clubId = club.getClubId();
 
@@ -282,33 +283,41 @@ public class AdminCabinetService {
         AccountType currentAccountType = user.getAccountType();
         String rawAccountType = currentAccountType != null ? currentAccountType.getName() : null;
         boolean isFreeMechanic = rawAccountType != null && rawAccountType.toUpperCase().contains("FREE_MECHANIC");
-        if (currentAccountType == null || isFreeMechanic) {
-            AccountType targetAccountType = accountTypeRepository
-                    .findFirstByNameIgnoreCaseOrderByAccountTypeIdAsc(AccountTypeName.INDIVIDUAL.name())
-                    .orElseThrow(() -> new IllegalStateException("Account type not configured: " + AccountTypeName.INDIVIDUAL));
-            user.setAccountType(targetAccountType);
-            user.setLastModified(LocalDateTime.now());
+
+        if (actorRole == RoleName.ADMIN) {
+            clubInvitationRepository.save(ClubInvitation.builder()
+                    .club(club)
+                    .mechanic(user)
+                    .status("OWNER_REVIEW")
+                    .build());
+        } else {
+            if (currentAccountType == null || isFreeMechanic) {
+                AccountType targetAccountType = accountTypeRepository
+                        .findFirstByNameIgnoreCaseOrderByAccountTypeIdAsc(AccountTypeName.INDIVIDUAL.name())
+                        .orElseThrow(() -> new IllegalStateException("Account type not configured: " + AccountTypeName.INDIVIDUAL));
+                user.setAccountType(targetAccountType);
+                user.setLastModified(LocalDateTime.now());
+            }
+            List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs())
+                    .map(ArrayList::new)
+                    .orElseGet(ArrayList::new);
+            if (clubs.stream().noneMatch(c -> Objects.equals(c.getClubId(), club.getClubId()))) {
+                clubs.add(club);
+            }
+            profile.setClubs(clubs);
+            upsertStaff(user, club);
+            clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, user).ifPresent(staff -> {
+                staff.setInfoAccessRestricted(false);
+                staff.setIsActive(true);
+                clubStaffRepository.save(staff);
+            });
+            ensurePersonalWarehouse(profile);
+            profile.setUpdatedAt(LocalDate.now());
+            mechanicProfileRepository.save(profile);
         }
 
-        List<BowlingClub> clubs = Optional.ofNullable(profile.getClubs())
-                .map(ArrayList::new)
-                .orElseGet(ArrayList::new);
-        if (clubs.stream().noneMatch(c -> Objects.equals(c.getClubId(), club.getClubId()))) {
-            clubs.add(club);
-        }
-        profile.setClubs(clubs);
-        upsertStaff(user, club);
-        clubStaffRepository.findFirstByClubAndUserOrderByStaffIdAsc(club, user).ifPresent(staff -> {
-            staff.setInfoAccessRestricted(false);
-            staff.setIsActive(true);
-            clubStaffRepository.save(staff);
-        });
-        ensurePersonalWarehouse(profile);
-        profile.setUpdatedAt(LocalDate.now());
-
-        mechanicProfileRepository.save(profile);
         userRepository.save(user);
-        log.info("Assigned free mechanic user {} to club {}", userId, club.getClubId());
+        log.info("Assigned free mechanic user {} to club {} by {}", userId, club.getClubId(), actorRole);
         return mapUserToRegistration(user);
     }
 
