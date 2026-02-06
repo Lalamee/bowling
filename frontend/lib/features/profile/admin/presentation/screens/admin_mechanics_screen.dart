@@ -553,7 +553,9 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            _clubOptions.isEmpty ? 'Список доступен только для просмотра' : 'Можно назначить клуб свободному агенту',
+            widget.isClubOwner
+                ? 'Можно пригласить агента только в ваш клуб'
+                : (_clubOptions.isEmpty ? 'Список доступен только для просмотра' : 'Можно назначить клуб свободному агенту'),
             style: const TextStyle(fontSize: 12, color: AppColors.darkGray),
           ),
           const SizedBox(height: 12),
@@ -637,9 +639,7 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _clubOptions.isEmpty
-                    ? () => _showMissingClubsNotice()
-                    : () => _attachFreeMechanicToClub(mechanic),
+                onPressed: () => _attachFreeMechanicToClub(mechanic),
                 icon: const Icon(Icons.add_business),
                 label: Text(_freeMechanicAssignLabel),
               ),
@@ -740,10 +740,54 @@ class _AdminMechanicsScreenState extends State<AdminMechanicsScreen> {
 
   Future<void> _attachFreeMechanicToClub(FreeMechanicApplicationResponseDto mechanic) async {
     if (mechanic.userId == null) return;
+
+    if (widget.isClubOwner) {
+      final confirmedOwner = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(_freeMechanicAssignLabel),
+          content: const Text('Пригласить свободного агента в ваш клуб?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
+            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Пригласить')),
+          ],
+        ),
+      );
+      if (confirmedOwner != true) return;
+      try {
+        await _cabinetRepository.assignFreeMechanicToClub(
+          mechanic.userId!,
+          const FreeMechanicClubAssignRequestDto(),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        showApiError(context, e);
+        return;
+      }
+      try {
+        if (mounted) {
+          setState(() {
+            _freeMechanics = _freeMechanics.where((m) => m.userId != mechanic.userId).toList();
+            if (mechanic.mechanicProfileId != null) {
+              _freeMechanicDetails.remove(mechanic.mechanicProfileId);
+            }
+          });
+        }
+        await _loadData();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Агент приглашён в ваш клуб')));
+      } catch (e) {
+        if (!mounted) return;
+        showApiError(context, e);
+      }
+      return;
+    }
+
     if (_clubOptions.isEmpty) {
       _showMissingClubsNotice();
       return;
     }
+
     int? selected = _clubOptions.isNotEmpty ? _clubOptions.first.id : null;
     final formKey = GlobalKey<FormState>();
     final confirmed = await showDialog<bool>(
