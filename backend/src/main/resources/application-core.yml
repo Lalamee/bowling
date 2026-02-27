@@ -8,3 +8,16 @@ spring:
 
 server:
   port: ${CORE_SERVICE_PORT:8081}
+
+
+integration:
+  onec:
+    enabled: ${ONEC_ENABLED:false}
+    base-url: ${ONEC_BASE_URL:http://localhost:8085}
+    username: ${ONEC_USERNAME:admin}
+    password: ${ONEC_PASSWORD:admin}
+    stock-endpoint: ${ONEC_STOCK_ENDPOINT:/hs/warehouse/v1/stocks}
+    products-endpoint: ${ONEC_PRODUCTS_ENDPOINT:/hs/warehouse/v1/products}
+    retry-attempts: ${ONEC_RETRY_ATTEMPTS:3}
+    retry-delay-ms: ${ONEC_RETRY_DELAY_MS:1000}
+    sync-cron: ${ONEC_SYNC_CRON:0 */30 * * * *}

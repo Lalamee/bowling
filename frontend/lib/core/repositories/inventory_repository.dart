@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../api/api_core.dart';
 import '../../models/part_dto.dart';
 import '../../models/warehouse_summary_dto.dart';
+import '../../models/onec_sync_status_dto.dart';
 
 class InventoryRepository {
   final Dio _dio = ApiCore().dio;
@@ -101,6 +102,23 @@ class InventoryRepository {
     };
 
     await _dio.post('/api/inventory', data: payload);
+  }
+
+
+  Future<OneCSyncStatusDto> syncWithOneC() async {
+    final res = await _dio.post('/api/inventory/1c/sync');
+    if (res.statusCode == 200 && res.data is Map) {
+      return OneCSyncStatusDto.fromJson(Map<String, dynamic>.from(res.data as Map));
+    }
+    throw Exception('Не удалось запустить синхронизацию 1С');
+  }
+
+  Future<OneCSyncStatusDto> getOneCSyncStatus() async {
+    final res = await _dio.get('/api/inventory/1c/sync/status');
+    if (res.statusCode == 200 && res.data is Map) {
+      return OneCSyncStatusDto.fromJson(Map<String, dynamic>.from(res.data as Map));
+    }
+    throw Exception('Не удалось получить статус синхронизации 1С');
   }
 
   Future<void> deleteInventoryItem(int inventoryId) async {
