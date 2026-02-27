@@ -3,8 +3,6 @@ package ru.bowling.bowlingapp.Controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -12,7 +10,6 @@ import org.springframework.web.bind.annotation.RestController;
 import ru.bowling.bowlingapp.DTO.GlobalSearchResponseDTO;
 import ru.bowling.bowlingapp.Security.UserPrincipal;
 import ru.bowling.bowlingapp.Service.GlobalSearchService;
-import ru.bowling.bowlingapp.Service.AuthService;
 
 @RestController
 @RequestMapping("/api/search")
@@ -20,7 +17,6 @@ import ru.bowling.bowlingapp.Service.AuthService;
 public class SearchController {
 
     private final GlobalSearchService globalSearchService;
-    private final AuthService authService;
 
     @GetMapping("/global")
     public ResponseEntity<GlobalSearchResponseDTO> search(
@@ -56,24 +52,6 @@ public class SearchController {
             return userPrincipal.getId();
         }
 
-        String login = authentication.getName();
-        if (login == null || login.isBlank()) {
-            return null;
-        }
-
-        try {
-            UserDetails details = authService.loadUserByUsername(login);
-            if (details instanceof UserPrincipal resolved && resolved.getId() != null) {
-                return resolved.getId();
-            }
-        } catch (UsernameNotFoundException ex) {
-            // fall back to direct phone lookup below
-        }
-
-        try {
-            return authService.findUserByPhone(login).getUserId();
-        } catch (UsernameNotFoundException ex) {
-            return null;
-        }
+        return null;
     }
 }
