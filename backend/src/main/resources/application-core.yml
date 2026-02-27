@@ -9,7 +9,6 @@ spring:
 server:
   port: ${CORE_SERVICE_PORT:8081}
 
-
 integration:
   onec:
     enabled: ${ONEC_ENABLED:false}
@@ -21,3 +20,19 @@ integration:
     retry-attempts: ${ONEC_RETRY_ATTEMPTS:3}
     retry-delay-ms: ${ONEC_RETRY_DELAY_MS:1000}
     sync-cron: ${ONEC_SYNC_CRON:0 */30 * * * *}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+server:
+  port: ${CORE_SERVICE_TEST_PORT:18081}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+server:
+  port: ${CORE_SERVICE_PORT:8081}

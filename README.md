@@ -51,11 +51,12 @@ API_URL=http://localhost:8080
 
 ```bash
 cd backend
-./gradlew bootRun
+JAVA_HOME=$HOME/.local/share/mise/installs/java/17.0.2 ./gradlew :auth-service:bootRun :core-service:bootRun
 ```
 
-Backend доступен на `http://localhost:8080`  
-Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+Auth service: `http://localhost:8082`  
+Core service: `http://localhost:8081`  
+Swagger UI (core): `http://localhost:8081/swagger-ui/index.html`
 
 ### 4. Запуск Frontend
 
@@ -72,7 +73,7 @@ flutter run
 
 ## 🏗️ Архитектура
 
-### Backend (Spring Boot)
+### Backend (Spring Boot microservices)
 - **Контроллеры:** 8 (Auth, Maintenance, Parts, WorkLog, ServiceHistory, Admin, Invitations, Inventory)
 - **Сервисы:** 11
 - **Репозитории:** 20
@@ -119,7 +120,7 @@ flutter run
 ## 🛠️ Технологии
 
 **Backend:**
-- Spring Boot 3.5.3
+- Spring Boot 3.5.3 (auth-service + core-service)
 - Spring Security + JWT
 - Spring Data JPA
 - PostgreSQL
@@ -187,7 +188,7 @@ flutter build web --release
 
 ```bash
 cd backend
-docker-compose up -d
+docker compose up -d auth-service core-service
 ```
 
 ## 📝 Структура проекта
