@@ -1,1 +1,5 @@
 rootProject.name = 'bowling-app'
+
+include 'platform-common'
+include 'auth-service'
+include 'core-service'
