@@ -1,3 +1,7 @@
+app:
+  service:
+    mode: ${APP_SERVICE_MODE:core}
+
 spring:
   application:
     name: bowling-app

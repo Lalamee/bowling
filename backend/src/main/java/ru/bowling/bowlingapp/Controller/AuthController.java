@@ -2,6 +2,7 @@ package ru.bowling.bowlingapp.Controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,7 @@ import ru.bowling.bowlingapp.Service.FreeMechanicApplicationService;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "app.service.mode", havingValue = "auth")
 public class AuthController {
 
     private final AuthService authService;

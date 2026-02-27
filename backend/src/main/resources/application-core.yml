@@ -1,0 +1,10 @@
+app:
+  service:
+    mode: core
+
+spring:
+  application:
+    name: core-service
+
+server:
+  port: ${CORE_SERVICE_PORT:8081}

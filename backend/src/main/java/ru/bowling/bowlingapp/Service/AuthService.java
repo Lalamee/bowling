@@ -1,6 +1,7 @@
 package ru.bowling.bowlingapp.Service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -23,6 +24,7 @@ import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "app.service.mode", havingValue = "auth")
 public class AuthService implements UserDetailsService {
 
     private final UserRepository userRepository;

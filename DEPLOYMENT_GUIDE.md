@@ -95,21 +95,25 @@ JWT_REFRESH_EXPIRATION=604800000
 CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8081,http://10.0.2.2:8080
 ```
 
-#### 2.4. Запуск Backend
+#### 2.4. Запуск Backend (микросервисы)
 
 ```bash
 cd backend
 
-# Windows
-gradlew.bat bootRun
+# Core service (бизнес-логика + API)
+./gradlew bootRun --args='--spring.profiles.active=core'
 
-# Linux/macOS
-./gradlew bootRun
+# Auth service (регистрация/логин/JWT)
+./gradlew bootRun --args='--spring.profiles.active=auth --server.port=8082'
 ```
 
-Backend будет доступен на `http://localhost:8080`
+- `core-service`: `http://localhost:8081`
+- `auth-service`: `http://localhost:8082`
+- Оба сервиса используют одну PostgreSQL БД и общий `JWT_SECRET`.
 
-**Swagger UI:** `http://localhost:8080/swagger-ui/index.html`
+**Swagger UI:**
+- `core-service`: `http://localhost:8081/swagger-ui/index.html`
+- `auth-service`: `http://localhost:8082/swagger-ui/index.html`
 
 ### 3. Настройка Frontend
 
