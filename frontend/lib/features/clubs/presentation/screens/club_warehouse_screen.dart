@@ -8,6 +8,7 @@ import '../../../../core/utils/bottom_nav.dart';
 import '../../../../core/repositories/inventory_repository.dart';
 import '../../../../core/utils/net_ui.dart';
 import '../../../../models/part_dto.dart';
+import '../../../../models/onec_sync_status_dto.dart';
 import 'club_search_screen.dart';
 import '../../../../shared/widgets/inputs/adaptive_text.dart';
 
@@ -46,11 +47,14 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
   bool _hasError = false;
   bool _initialSelectionPending = true;
   String? _availabilityFilter;
+  OneCSyncStatusDto? _syncStatus;
+  bool _syncInProgress = false;
 
   @override
   void initState() {
     super.initState();
     final query = widget.initialQuery?.trim();
+    _loadSyncStatus();
     if (query != null && query.isNotEmpty) {
       _searchCtrl.text = query;
       _searchInventory(query);
@@ -260,6 +264,69 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
     });
   }
 
+
+
+  Future<void> _loadSyncStatus() async {
+    try {
+      final status = await _repo.getOneCSyncStatus();
+      if (!mounted) return;
+      setState(() => _syncStatus = status);
+    } catch (_) {
+      // ignore sync status load errors for screen init
+    }
+  }
+
+  Future<void> _syncWithOneC() async {
+    setState(() => _syncInProgress = true);
+    try {
+      final status = await _repo.syncWithOneC();
+      if (!mounted) return;
+      setState(() => _syncStatus = status);
+      await _fetchInventory(query: _searchCtrl.text);
+    } catch (e) {
+      if (!mounted) return;
+      showApiError(context, e);
+    } finally {
+      if (mounted) {
+        setState(() => _syncInProgress = false);
+      }
+    }
+  }
+
+  Widget _buildSyncStatusCard() {
+    final status = _syncStatus;
+    final text = status?.message ?? 'Синхронизация еще не выполнялась';
+    final detail = status == null
+        ? 'Импорт: 0 • Обновлено: 0 • Пропущено: 0'
+        : 'Импорт: ${status.imported} • Обновлено: ${status.updated} • Пропущено: ${status.skipped}';
+    final color = status?.success == true ? Colors.green : AppColors.darkGray;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFEDEDED)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.cloud_sync, color: color),
+              const SizedBox(width: 8),
+              const Text('Статус синхронизации 1С', style: TextStyle(fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(text, style: const TextStyle(color: AppColors.textDark)),
+          const SizedBox(height: 4),
+          Text(detail, style: const TextStyle(color: AppColors.darkGray, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFilters() {
     final chips = <Widget>[
       ChoiceChip(
@@ -306,8 +373,27 @@ class _ClubWarehouseScreenState extends State<ClubWarehouseScreen> {
                   ),
                 ),
                 IconButton(onPressed: _loadInventory, icon: const Icon(Icons.sync, color: AppColors.primary)),
+                const SizedBox(width: 4),
+                ElevatedButton.icon(
+                  onPressed: _syncInProgress ? null : _syncWithOneC,
+                  icon: _syncInProgress
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.cloud_sync),
+                  label: const Text('1С'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
               ],
             ),
+            const SizedBox(height: 8),
+            _buildSyncStatusCard(),
             const SizedBox(height: 8),
             Container(
               height: 48,
