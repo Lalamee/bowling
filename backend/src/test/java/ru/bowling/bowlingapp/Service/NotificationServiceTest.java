@@ -20,7 +20,15 @@ class NotificationServiceTest {
 
     @BeforeEach
     void setUp() {
-        notificationService = new NotificationService();
+        notificationService = new NotificationService(new NotificationWebSocketPublisher() {
+            @Override
+            public void publishNotification(NotificationEvent event) {
+            }
+
+            @Override
+            public void publishTestBroadcast(String message) {
+            }
+        });
         notificationService.clearNotifications();
     }
 

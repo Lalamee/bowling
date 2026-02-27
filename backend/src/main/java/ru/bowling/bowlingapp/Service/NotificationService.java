@@ -1,5 +1,6 @@
 package ru.bowling.bowlingapp.Service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.bowling.bowlingapp.DTO.NotificationEvent;
@@ -21,8 +22,10 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class NotificationService {
     private final CopyOnWriteArrayList<NotificationEvent> notifications = new CopyOnWriteArrayList<>();
+    private final NotificationWebSocketPublisher notificationWebSocketPublisher;
 
     public List<NotificationEvent> getNotificationsForRole(RoleName role) {
         if (role == null) {
@@ -66,7 +69,7 @@ public class NotificationService {
                 .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
                 .audiences(Set.of(RoleName.ADMIN))
                 .build();
-        notifications.add(event);
+        storeAndPublish(event);
 
         log.info("NOTIFICATION: Свободный механик {} ожидает подтверждения администрацией (user {})",
                 mechanicProfile.getProfileId(), mechanicProfile.getUser().getUserId());
@@ -87,7 +90,7 @@ public class NotificationService {
                 .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
                 .audiences(Set.of(RoleName.MECHANIC))
                 .build();
-        notifications.add(event);
+        storeAndPublish(event);
 
         log.info("NOTIFICATION: Свободный механик {} подтвержден (user {})",
                 mechanicProfile.getProfileId(), mechanicProfile.getUser().getUserId());
@@ -114,7 +117,7 @@ public class NotificationService {
                 .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
                 .audiences(Set.of(RoleName.ADMIN))
                 .build();
-        notifications.add(event);
+        storeAndPublish(event);
         return event;
     }
 
@@ -139,7 +142,7 @@ public class NotificationService {
                 .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
                 .audiences(Set.of(RoleName.ADMIN))
                 .build();
-        notifications.add(event);
+        storeAndPublish(event);
         return event;
     }
 
@@ -160,7 +163,7 @@ public class NotificationService {
                 .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
                 .audiences(Set.of(RoleName.CLUB_OWNER, RoleName.HEAD_MECHANIC))
                 .build();
-        notifications.add(event);
+        storeAndPublish(event);
         return event;
     }
 
@@ -181,7 +184,7 @@ public class NotificationService {
                 .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
                 .audiences(Set.of(RoleName.MECHANIC))
                 .build();
-        notifications.add(event);
+        storeAndPublish(event);
         return event;
     }
 
@@ -208,7 +211,7 @@ public class NotificationService {
                 reason,
                 Set.of(RoleName.ADMIN, RoleName.HEAD_MECHANIC, RoleName.CLUB_OWNER, RoleName.MECHANIC)
         );
-        notifications.add(event);
+        storeAndPublish(event);
         log.info("NOTIFICATION: {}. Request #{}, parts={}, reason={}", message, request != null ? request.getRequestId() : null, partIds(parts), reason);
         return event;
     }
@@ -222,7 +225,7 @@ public class NotificationService {
                 comment,
                 Set.of(RoleName.MECHANIC, RoleName.ADMIN, RoleName.HEAD_MECHANIC, RoleName.CLUB_OWNER)
         );
-        notifications.add(event);
+        storeAndPublish(event);
         log.info("NOTIFICATION: Запрос помощи подтвержден по заявке #{}: {}", request != null ? request.getRequestId() : null, comment);
         return event;
     }
@@ -236,7 +239,7 @@ public class NotificationService {
                 comment,
                 Set.of(RoleName.MECHANIC, RoleName.ADMIN, RoleName.HEAD_MECHANIC, RoleName.CLUB_OWNER)
         );
-        notifications.add(event);
+        storeAndPublish(event);
         log.info("NOTIFICATION: Запрос помощи отклонен по заявке #{}: {}", request != null ? request.getRequestId() : null, comment);
         return event;
     }
@@ -252,9 +255,15 @@ public class NotificationService {
         ).toBuilder()
                 .mechanicId(newMechanicId)
                 .build();
-        notifications.add(event);
+        storeAndPublish(event);
         log.info("NOTIFICATION: Заявка #{} переназначена другому механику {}: {}", request != null ? request.getRequestId() : null, newMechanicId, comment);
         return event;
+    }
+
+
+    private void storeAndPublish(NotificationEvent event) {
+        notifications.add(event);
+        notificationWebSocketPublisher.publishNotification(event);
     }
 
     private NotificationEvent buildBaseEvent(NotificationEventType type,
