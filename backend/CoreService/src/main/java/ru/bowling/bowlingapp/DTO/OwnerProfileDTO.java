@@ -1,0 +1,18 @@
+package ru.bowling.bowlingapp.DTO;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class OwnerProfileDTO {
+    @NotBlank
+    private String inn;
+
+    @NotBlank
+    private String address;
+
+    private String legalName;
+    private String contactPerson;
+    private String contactPhone;
+    private String contactEmail;
+}

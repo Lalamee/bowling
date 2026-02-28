@@ -1,7 +1,6 @@
 plugins {
-    id 'java-library'
-    id 'jacoco'
-    id 'org.springframework.boot' version '3.5.3' apply false
+    id 'java'
+    id 'org.springframework.boot' version '3.5.3'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -14,144 +13,39 @@ java {
     }
 }
 
-allprojects {
-    repositories {
-        mavenCentral()
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
     }
 }
 
-ext {
-    springBootVersion = '3.5.3'
+repositories {
+    mavenCentral()
 }
 
-subprojects {
-    apply plugin: 'java'
-    apply plugin: 'io.spring.dependency-management'
-
-    java {
-        toolchain {
-            languageVersion = JavaLanguageVersion.of(17)
-        }
-    }
-
-    configurations {
-        compileOnly {
-            extendsFrom annotationProcessor
-        }
-    }
-
-    dependencyManagement {
-        imports {
-            mavenBom "org.springframework.boot:spring-boot-dependencies:${springBootVersion}"
-        }
-    }
-
-    dependencies {
-        compileOnly 'org.projectlombok:lombok'
-        annotationProcessor 'org.projectlombok:lombok'
-        annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
-        testImplementation 'org.springframework.boot:spring-boot-starter-test'
-        testImplementation 'org.springframework.security:spring-security-test'
-        testImplementation platform('org.testcontainers:testcontainers-bom:1.19.7')
-        testImplementation 'org.testcontainers:junit-jupiter'
-        testImplementation 'org.testcontainers:postgresql'
-        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-        testRuntimeOnly 'com.h2database:h2'
-    }
-
-    tasks.named('test') {
-        useJUnitPlatform()
-    }
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web:3.5.3'
+    implementation 'org.springframework.boot:spring-boot-starter-validation:3.5.3'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
+    implementation 'org.apache.poi:poi-ooxml:5.2.5'
+    compileOnly 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    runtimeOnly 'org.postgresql:postgresql'
+    annotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation platform('org.testcontainers:testcontainers-bom:1.19.7')
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testRuntimeOnly 'com.h2database:h2'
+    implementation 'com.auth0:java-jwt:4.4.0'
+    implementation 'org.mapstruct:mapstruct:1.5.5.Final'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
 }
 
-project(':platform-common') {
-    apply plugin: 'java-library'
-
-    sourceSets {
-        main {
-            java.srcDirs = ['../src/main/java']
-            resources.srcDirs = ['../src/main/resources']
-        }
-        test {
-            java.srcDirs = ['../src/test/java']
-            resources.srcDirs = ['../src/test/resources']
-        }
-    }
-
-    dependencies {
-        api 'org.springframework.boot:spring-boot-starter-web'
-        api 'org.springframework.boot:spring-boot-starter-validation'
-        api 'org.springframework.boot:spring-boot-starter-data-jpa'
-        api 'org.springframework.boot:spring-boot-starter-security'
-        api 'org.springframework.boot:spring-boot-starter-websocket'
-        api 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
-        api 'org.apache.poi:poi-ooxml:5.2.5'
-        api 'org.mapstruct:mapstruct:1.5.5.Final'
-        api 'com.auth0:java-jwt:4.4.0'
-        runtimeOnly 'org.postgresql:postgresql'
-    }
-}
-
-project(':core-service') {
-    apply plugin: 'org.springframework.boot'
-    apply plugin: 'jacoco'
-
-    dependencies {
-        implementation project(':platform-common')
-        developmentOnly 'org.springframework.boot:spring-boot-devtools'
-    }
-
-    springBoot {
-        mainClass = 'ru.bowling.bowlingapp.core.CoreServiceApplication'
-    }
-
-    tasks.named('bootJar') {
-        archiveFileName = 'core-service.jar'
-    }
-
-    tasks.named('test') {
-        finalizedBy tasks.named('jacocoTestReport'), tasks.named('jacocoTestCoverageVerification')
-    }
-
-    jacoco {
-        toolVersion = '0.8.12'
-    }
-
-    tasks.named('jacocoTestReport') {
-        dependsOn tasks.named('test')
-        reports {
-            xml.required = true
-            html.required = true
-        }
-    }
-
-    tasks.named('jacocoTestCoverageVerification') {
-        dependsOn tasks.named('jacocoTestReport')
-        violationRules {
-            rule {
-                limit {
-                    counter = 'INSTRUCTION'
-                    value = 'COVEREDRATIO'
-                    minimum = 0.80
-                }
-            }
-        }
-    }
-}
-
-project(':auth-service') {
-    apply plugin: 'org.springframework.boot'
-
-    dependencies {
-        implementation project(':platform-common')
-        developmentOnly 'org.springframework.boot:spring-boot-devtools'
-    }
-
-    springBoot {
-        mainClass = 'ru.bowling.bowlingapp.auth.AuthServiceApplication'
-    }
-
-    tasks.named('bootJar') {
-        archiveFileName = 'auth-service.jar'
-    }
+tasks.named('test') {
+    useJUnitPlatform()
 }

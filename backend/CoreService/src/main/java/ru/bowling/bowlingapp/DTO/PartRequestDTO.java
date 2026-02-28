@@ -1,0 +1,62 @@
+package ru.bowling.bowlingapp.DTO;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.List;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class PartRequestDTO {
+
+    private Long clubId;
+
+    private Integer laneNumber;
+
+    @NotNull(message = "Mechanic ID is required")
+    private Long mechanicId;
+
+    private String managerNotes;
+
+    // Обязательное поле: причина закупки или выдачи детали
+    @NotBlank(message = "Причина запроса обязательна")
+    private String reason;
+
+    @NotNull(message = "At least one part is required")
+    private List<RequestedPartDTO> requestedParts;
+
+    @Data
+    @Builder
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class RequestedPartDTO {
+
+        private Long inventoryId;
+
+        private Long catalogId;
+
+        @NotBlank(message = "Каталожный номер обязателен")
+        private String catalogNumber;
+
+        @NotBlank(message = "Part name is required")
+        private String partName;
+
+        @NotNull(message = "Quantity is required")
+        @Positive(message = "Quantity must be positive")
+        private Integer quantity;
+
+        private Integer warehouseId;
+
+        private String location;
+
+        // TODO: уточнить список ролей, которые могут ставить признак помощи
+        private Boolean helpRequested;
+    }
+}
